@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-20</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-22 ~ 2026-11-20</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 8 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>4 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>14</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-20 07:30:59 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-20 07:44:11 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-11-20 日报速读 8 篇，精读 0 篇，重点集中在知识工程与因果推理方向。</p>
-<p>其中《KnowledgeClaw》以 7.0 分领先，关注全模态超图驱动的智能知识工程；另有自动本体归纳与因果推理开放知识图谱两篇 6.0 分可选读。</p>
-<p>建议普通读者先看《KnowledgeClaw》了解全模态知识工程思路，再按兴趣浏览本体归纳和因果推理两篇。</p>
+<p>本期速读 14 篇论文，聚焦 GraphRAG 与图检索增强生成的新进展。最值得关注的是 Typed-Centrality Grounding 与 LSP-RAG（均 9.0/10），它们分别从符号化中心性约束和潜在评分视角提升智能体推理与知识图谱检索。普通读者可先读这两篇的高分论文摘要，再按兴趣追踪联邦式 GraphRAG。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">8 篇</strong>
+    <strong class="dpr-home-dashboard-count">14 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="KnowledgeClaw: Towards Agentic Knowledge Engineering via Omnimodal Hypergraphs">KnowledgeClaw: Towards Agentic Knowledge Engineering via Omnimodal Hypergraphs</span></li><li><span class="dpr-home-dashboard-paper-title" title="AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction">AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Causals: An Open Knowledge Graph for Research on Causal Reasoning">Causals: An Open Knowledge Graph for Research on Causal Reasoning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning">Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning</span></li><li><span class="dpr-home-dashboard-paper-title" title="LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation">LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Federated Graph Retrieval-Augmented Generation">Federated Graph Retrieval-Augmented Generation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>8</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>14</strong></span></div>
 </section>
 </div>
 
