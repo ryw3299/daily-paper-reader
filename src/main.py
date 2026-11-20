@@ -32,6 +32,20 @@ def run_step(label: str, args: list[str], env: dict[str, str] | None = None) -> 
     subprocess.run(args, check=True, env=env)
 
 
+def run_data_step(label: str, args: list[str], output_path: str, env: dict[str, str] | None = None) -> dict:
+    """要求每个数据步骤产出本次结果，避免重跑时误用磁盘上的旧文件。"""
+    if os.path.isfile(output_path):
+        os.remove(output_path)
+    run_step(label, args, env=env)
+    with open(output_path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict) or not all(
+        isinstance(payload.get(key), list) for key in ("papers", "queries")
+    ):
+        raise ValueError(f"{label} 结果格式无效：{output_path}")
+    return payload
+
+
 def _load_full_config() -> dict:
     if not os.path.exists(CONFIG_FILE):
         return {}
@@ -671,13 +685,14 @@ def main() -> None:
         )
     if trace_ids:
         print_trace_retrieval("RAW", raw_path, trace_ids)
-    run_step(
+    run_data_step(
         "Step 2.1 - BM25",
         [python, os.path.join(SRC_DIR, "2.1.retrieval_papers_bm25.py")],
+        bm25_path,
     )
     if trace_ids:
         print_trace_retrieval("BM25", bm25_path, trace_ids)
-    run_step(
+    run_data_step(
         "Step 2.2 - Embedding",
         [
             python,
@@ -687,25 +702,35 @@ def main() -> None:
             "--batch-size",
             str(args.embedding_batch_size),
         ],
+        embedding_path,
     )
     if trace_ids:
         print_trace_retrieval("EMBEDDING", embedding_path, trace_ids)
-    run_step(
+    rrf_data = run_data_step(
         "Step 2.3 - RRF",
         [python, os.path.join(SRC_DIR, "2.3.retrieval_papers_rrf.py")],
+        rrf_path,
     )
     if trace_ids:
         print_trace_retrieval("RRF", rrf_path, trace_ids)
-    run_step(
-        "Step 3 - Rerank",
-        [python, os.path.join(SRC_DIR, "3.rank_papers.py")],
-    )
-    if trace_ids:
-        print_trace_retrieval("RERANK", rerank_path, trace_ids)
-    run_step(
-        "Step 4 - LLM refine",
-        [python, os.path.join(SRC_DIR, "4.llm_refine_papers.py")],
-    )
+    if rrf_data["papers"]:
+        run_data_step(
+            "Step 3 - Rerank",
+            [python, os.path.join(SRC_DIR, "3.rank_papers.py")],
+            rerank_path,
+        )
+        if trace_ids:
+            print_trace_retrieval("RERANK", rerank_path, trace_ids)
+        run_data_step(
+            "Step 4 - LLM refine",
+            [python, os.path.join(SRC_DIR, "4.llm_refine_papers.py")],
+            llm_path,
+        )
+    else:
+        # 完成检索后的合法零命中不需要模型调用，也不能沿用上次的评分文件。
+        print("[INFO] 检索已完成，零命中；跳过 Rerank / LLM refine。", flush=True)
+        save_json(rerank_path, rrf_data)
+        save_json(llm_path, {**rrf_data, "llm_ranked": []})
     if trace_ids:
         print_trace_llm("LLM", llm_path, trace_ids)
     run_step(

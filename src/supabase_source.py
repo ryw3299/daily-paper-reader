@@ -348,7 +348,7 @@ def fetch_papers_by_date_range(
             )
             if resp.status_code >= 300:
                 return ([], f"papers 查询失败：HTTP {resp.status_code} {resp.text[:200]}")
-            rows = resp.json() or []
+            rows = resp.json()
             if not isinstance(rows, list):
                 return ([], "papers 查询结果格式异常")
             if not rows:
@@ -364,10 +364,10 @@ def fetch_papers_by_date_range(
         out: List[Dict[str, Any]] = []
         for r in all_rows:
             if not isinstance(r, dict):
-                continue
+                return ([], "papers 查询结果格式异常：记录必须是对象")
             pid = _norm(r.get("id"))
             if not pid:
-                continue
+                return ([], "papers 查询结果格式异常：记录缺少 id")
             emb_dim = 0
             try:
                 emb_dim = int(r.get("embedding_dim") or 0)
@@ -542,9 +542,11 @@ def match_papers_by_embedding(
         )
         if resp.status_code >= 300:
             return ([], f"rpc 查询失败：HTTP {resp.status_code} {resp.text[:200]}")
-        rows = resp.json() or []
+        rows = resp.json()
         if not isinstance(rows, list):
             return ([], "rpc 查询结果格式异常")
+        if any(not isinstance(row, dict) or not _norm(row.get("id")) for row in rows):
+            return ([], "rpc 查询结果格式异常：记录必须是带 id 的对象")
         rows = _filter_rows_by_window(
             rows,
             start_dt=start_dt,
@@ -554,10 +556,10 @@ def match_papers_by_embedding(
         out: List[Dict[str, Any]] = []
         for r in rows:
             if not isinstance(r, dict):
-                continue
+                return ([], "rpc 查询结果格式异常：记录必须是对象")
             pid = _norm(r.get("id"))
             if not pid:
-                continue
+                return ([], "rpc 查询结果格式异常：记录缺少 id")
             sim = r.get("similarity")
             try:
                 sim_f = float(sim)
@@ -639,9 +641,11 @@ def match_papers_by_bm25(
         )
         if resp.status_code >= 300:
             return ([], f"rpc 查询失败：HTTP {resp.status_code} {resp.text[:200]}")
-        rows = resp.json() or []
+        rows = resp.json()
         if not isinstance(rows, list):
             return ([], "rpc 查询结果格式异常")
+        if any(not isinstance(row, dict) or not _norm(row.get("id")) for row in rows):
+            return ([], "rpc 查询结果格式异常：记录必须是带 id 的对象")
         rows = _filter_rows_by_window(
             rows,
             start_dt=start_dt,
@@ -651,10 +655,10 @@ def match_papers_by_bm25(
         out: List[Dict[str, Any]] = []
         for r in rows:
             if not isinstance(r, dict):
-                continue
+                return ([], "rpc 查询结果格式异常：记录必须是对象")
             pid = _norm(r.get("id"))
             if not pid:
-                continue
+                return ([], "rpc 查询结果格式异常：记录缺少 id")
             out.append(
                 {
                     "id": pid,

@@ -5,11 +5,13 @@ arxiv_paper_setting:
   mode: standard
   days_window: 9
   docs_dir: docs
-  prefer_supabase_read: false
+  prefer_supabase_read: true
+  # 自建库入库范围；推荐与专题研究仍使用原有数据库检索流程。
+  ingest_query: 'all:"knowledge graph" OR all:"GraphRAG" OR all:"retrieval augmented generation" OR all:"causal reasoning" OR all:"counterfactual reasoning" OR all:"knowledge poisoning" OR all:"retrieval poisoning" OR all:"indirect prompt injection" OR all:"autonomous driving" OR all:"in-vehicle agent" OR all:"automotive agent" OR all:"graph reasoning"'
 supabase:
-  enabled: false
-  url: https://lyucdwgefyfbmaiopjbk.supabase.co
-  anon_key: sb_publishable_lX-oi64Uxyd7SIVv3_w2Uw_MTOojeKq
+  enabled: true
+  url: https://ituywbgitmuyjbhdpdtv.supabase.co
+  anon_key: sb_publishable_VFtddVQRofEMb5yTU1JYCA_ztnLB3cf
   papers_table: arxiv_papers
   use_vector_rpc: true
   vector_rpc: match_arxiv_papers
@@ -115,9 +117,9 @@ source_backends:
     sync_success_value: success
     schema: public
     kind: supabase
-    enabled: false
-    url: https://lyucdwgefyfbmaiopjbk.supabase.co
-    anon_key: sb_publishable_lX-oi64Uxyd7SIVv3_w2Uw_MTOojeKq
+    enabled: true
+    url: https://ituywbgitmuyjbhdpdtv.supabase.co
+    anon_key: sb_publishable_VFtddVQRofEMb5yTU1JYCA_ztnLB3cf
   biorxiv:
     papers_table: biorxiv_papers
     use_vector_rpc: true
@@ -128,5 +130,5 @@ source_backends:
     schema: public
     kind: supabase
     enabled: false
-    url: https://lyucdwgefyfbmaiopjbk.supabase.co
-    anon_key: sb_publishable_lX-oi64Uxyd7SIVv3_w2Uw_MTOojeKq
+    url: https://ituywbgitmuyjbhdpdtv.supabase.co
+    anon_key: sb_publishable_VFtddVQRofEMb5yTU1JYCA_ztnLB3cf

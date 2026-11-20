@@ -187,22 +187,17 @@ def main() -> None:
   if not os.path.isabs(out_path):
     out_path = os.path.abspath(os.path.join(ROOT_DIR, out_path))
 
-  # 检查输入文件是否存在，如果不存在说明今天没有新论文，优雅退出
-  if not os.path.exists(bm25_path) and not os.path.exists(emb_path):
-    log("[INFO] BM25 和 Embedding 结果文件都不存在（今天没有新论文，将跳过 RRF 融合）")
-    return
-
-  if not os.path.exists(bm25_path):
-    log(f"[INFO] BM25 结果文件不存在：{bm25_path}（将跳过 RRF 融合）")
-    return
-
-  if not os.path.exists(emb_path):
-    log(f"[INFO] Embedding 结果文件不存在：{emb_path}（将跳过 RRF 融合）")
-    return
+  # 零命中也必须有结果文件；缺少文件说明检索阶段未完成。
+  for path in (bm25_path, emb_path):
+    if not os.path.isfile(path):
+      raise FileNotFoundError(f"RRF 必需的检索结果不存在：{path}")
 
   group_start("Step 2.3 - load inputs")
   bm25_data = load_json(bm25_path)
   emb_data = load_json(emb_path)
+  for path, data in ((bm25_path, bm25_data), (emb_path, emb_data)):
+    if not isinstance(data, dict) or not all(isinstance(data.get(key), list) for key in ("papers", "queries")):
+      raise ValueError(f"RRF 检索结果格式无效：{path}")
   group_end()
 
   bm25_queries = bm25_data.get("queries") or []

@@ -293,11 +293,12 @@ def fetch_category_in_windows(
     seen_ids: set[str],
     unique_papers: dict,
     split_on_error_depth: int = 1,
+    query_filter: str = "",
 ) -> datetime | None:
     """
     按时间窗口抓取单个大类。
-    - 失败粒度降为“单窗口失败”，不会丢掉整个分类；
-    - 若窗口仍然过大导致 500，可继续在上层按更小窗口重试（可选）。
+    - 可使用自建库的入库查询，分页、元数据格式和时间分片保持一致；
+    - 若窗口过大导致失败，先二分重试；最终失败必须向上传播，不能发布不完整结果。
     """
     max_published_new: datetime | None = None
 
@@ -307,7 +308,8 @@ def fetch_category_in_windows(
         group_start(f"Fetch category: {category} (window {idx}/{len(windows)} {start_str}..{end_str})")
         log(f"🚀 Fetching category: {category} | window {idx}/{len(windows)} ...")
 
-        query = f"cat:{category}* AND submittedDate:[{start_str} TO {end_str}]"
+        scope = f"({query_filter})" if query_filter else f"cat:{category}*"
+        query = f"{scope} AND submittedDate:[{start_str} TO {end_str}]"
         search = arxiv.Search(
             query=query,
             max_results=None,
@@ -353,7 +355,6 @@ def fetch_category_in_windows(
 
             log(f"   ✅ Finished {category} (win {idx}/{len(windows)}): Got {count} new papers.")
         except Exception as e:
-            # 单个窗口失败不影响其他窗口/分类
             log(f"   ❌ Error fetching category {category} (win {idx}/{len(windows)}): {e}")
             # 回退：如果窗口仍然很大，尝试把该窗口再二分（仅一层，避免过度递归）
             if split_on_error_depth > 0 and (win_end - win_start) >= timedelta(days=2):
@@ -374,6 +375,7 @@ def fetch_category_in_windows(
                     seen_ids=seen_ids,
                     unique_papers=unique_papers,
                     split_on_error_depth=split_on_error_depth - 1,
+                    query_filter=query_filter,
                 )
                 cat_max_right = fetch_category_in_windows(
                     client=client,
@@ -382,11 +384,15 @@ def fetch_category_in_windows(
                     seen_ids=seen_ids,
                     unique_papers=unique_papers,
                     split_on_error_depth=split_on_error_depth - 1,
+                    query_filter=query_filter,
                 )
                 for candidate in (cat_max_left, cat_max_right):
                     if candidate and (max_published_new is None or candidate > max_published_new):
                         max_published_new = candidate
-            time.sleep(5)
+            else:
+                raise RuntimeError(
+                    f"arXiv 抓取窗口失败：{category} {start_str}..{end_str}，未发布不完整论文池。"
+                ) from e
         finally:
             group_end()
 
@@ -409,9 +415,7 @@ def fetch_all_domains_metadata_robust(
         days = resolve_days_window(1)
 
     # 0) 优先走 Supabase 公共库（无状态模式）
-    # 规则：
-    # - Supabase 访问失败或返回 0 条：回退本地爬取；
-    # - Supabase 返回 >0 条：直接使用数据库结果。
+    # 已选择数据库时，失败必须报错；成功零命中也写出合法空结果。
     sb = get_supabase_read_config(config)
     if disable_supabase_read:
         sb["enabled"] = False
@@ -421,8 +425,7 @@ def fetch_all_domains_metadata_robust(
         sb_url = str(sb.get("url") or "")
         sb_key = str(sb.get("anon_key") or "")
         if not sb_url or not sb_key:
-            log("⚠️ Supabase 已启用但缺少 url/anon_key，回退本地爬取。")
-            group_end()
+            raise RuntimeError("Supabase 已启用但缺少 url/anon_key。")
         else:
             sb_start_dt, sb_end_dt, sb_window_label = resolve_supabase_time_window(
                 end_date=end_date,
@@ -449,26 +452,25 @@ def fetch_all_domains_metadata_robust(
                     include_embedding=include_embedding_fields,
                 )
             log(f"[Supabase] {msg}")
-            if papers:
-                if not output_file:
-                    run_token = get_run_date_token(end_date)
-                    archive_dir = os.path.join(ROOT_DIR, "archive", run_token)
-                    raw_dir = os.path.join(archive_dir, "raw")
-                    output_file = os.path.join(raw_dir, f"arxiv_papers_{run_token}.json")
+            if not msg.startswith("papers 查询成功"):
+                raise RuntimeError(f"Supabase 原始论文读取失败：{msg}")
+            if not output_file:
+                run_token = get_run_date_token(end_date)
+                archive_dir = os.path.join(ROOT_DIR, "archive", run_token)
+                raw_dir = os.path.join(archive_dir, "raw")
+                output_file = os.path.join(raw_dir, f"arxiv_papers_{run_token}.json")
 
-                os.makedirs(os.path.dirname(output_file) if os.path.dirname(output_file) else ".", exist_ok=True)
-                with open(output_file, "w", encoding="utf-8") as f:
-                    json.dump(papers, f, ensure_ascii=False, indent=2)
-                log(f"💾 Supabase 结果已写入：{output_file}")
-                log(f"[Supabase] 该批次时间区间：{_format_supabase_batch_window(papers)}")
+            os.makedirs(os.path.dirname(output_file) if os.path.dirname(output_file) else ".", exist_ok=True)
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(papers, f, ensure_ascii=False, indent=2)
+            log(f"💾 Supabase 结果已写入：{output_file}")
+            log(f"[Supabase] 该批次时间区间：{_format_supabase_batch_window(papers)}")
 
-                # 记录抓取时间，维持后续流程一致性
-                save_last_crawl_at(end_date)
-                group_end()
-                return
-
-            log("ℹ️ Supabase 返回 0 条或不可用，回退本地 arXiv 抓取。")
+            # 记录抓取时间，维持后续流程一致性
+            save_last_crawl_at(end_date)
             group_end()
+            return
+
 
     # ignore_seen 语义：完全按 days_window 回溯，不使用 last_crawl_at / latest_published_at 作为起点
     if ignore_seen:
@@ -520,14 +522,21 @@ def fetch_all_domains_metadata_robust(
         num_retries=5
     )
 
-    # 2. 遍历分类进行抓取
-    for category in CATEGORIES_TO_FETCH:
+    # 自建库可只存储研究方向相关的论文，仍使用同一个抓取器完整分页，
+    # 不走仅取最新200篇的直接推荐抓取路径。未配置时维持原有全领域入库。
+    ingest_query = str((config.get("arxiv_paper_setting") or {}).get("ingest_query") or "").strip()
+    categories = ["research-scope"] if ingest_query else CATEGORIES_TO_FETCH
+    if ingest_query:
+        log(f"[Research Ingest] 入库范围：{ingest_query}")
+    # 2. 遍历分类或自建库研究范围进行抓取
+    for category in categories:
         cat_max = fetch_category_in_windows(
             client=client,
             category=category,
             windows=windows,
             seen_ids=seen_ids,
             unique_papers=unique_papers,
+            query_filter=ingest_query,
         )
         if cat_max and (max_published_new is None or cat_max > max_published_new):
             max_published_new = cat_max

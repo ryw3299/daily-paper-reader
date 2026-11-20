@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   maintain_supabase:
-    if: github.repository == 'ziwenhahaha/daily-paper-reader' || github.repository == '5-xj/daily-paper-reader'
+    if: github.repository == 'ziwenhahaha/daily-paper-reader' || github.repository == '5-xj/daily-paper-reader' || vars.DPR_MAINTAIN_OWN_SUPABASE == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -42,7 +42,7 @@ jobs:
       DPR_EMBED_API_URL: ${{ secrets.DPR_EMBED_API_URL || 'https://zwwen.online/embed' }}
       DPR_EMBED_API_KEY: ${{ secrets.DPR_EMBED_API_KEY }}
       DPR_EMBED_API_TIMEOUT: "60"
-      SUPABASE_URL: https://lyucdwgefyfbmaiopjbk.supabase.co
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || ((github.repository == 'ziwenhahaha/daily-paper-reader' || github.repository == '5-xj/daily-paper-reader') && 'https://lyucdwgefyfbmaiopjbk.supabase.co') || '' }}
       SUPABASE_SCHEMA: public
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       SUPABASE_BACKEND_KEY: arxiv
@@ -152,8 +152,12 @@ jobs:
           set -x
 
           if [ -z "${SUPABASE_SERVICE_KEY}" ]; then
-            echo "[WARN] 未配置 SUPABASE_SERVICE_KEY，已跳过维护同步。"
-            exit 0
+            echo "::error::未配置 SUPABASE_SERVICE_KEY，不能维护论文库。"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_URL}" ]; then
+            echo "::error::自建论文库必须配置 SUPABASE_URL。"
+            exit 1
           fi
 
           MAINTAIN_TARGET="${{ github.event.inputs.maintain_target }}"
