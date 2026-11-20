@@ -266,9 +266,10 @@ jobs:
           fi
           git push origin HEAD:"$branch"
 
-  verify-topic-pages:
+  verify-pages:
+    name: Publish and verify Pages
     needs: run
-    if: github.repository != 'ziwenhahaha/daily-paper-reader' && (needs.run.outputs.research_days == '90' || needs.run.outputs.research_days == '365')
+    if: github.repository != 'ziwenhahaha/daily-paper-reader'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
