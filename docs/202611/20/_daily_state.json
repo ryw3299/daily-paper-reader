@@ -1,10 +1,58 @@
 {
   "date": "20261120",
   "date_label": "",
-  "generated_at": "2026-11-20 07:30:59 UTC",
+  "generated_at": "2026-11-20 12:36:36 UTC",
   "recommend_exists": true,
-  "run_count": 2,
+  "run_count": 3,
   "papers": [
+    {
+      "paper_id": "2611.15467v1",
+      "route": "202611/20/2611.15467v1-autoontic-automatic-ontology-induction-from-text-for-knowledge-graph-construction",
+      "title": "AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "通过本体归纳提升GraphRAG的知识图谱质量",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
+    {
+      "paper_id": "2611.19441v1",
+      "route": "202611/20/2611.19441v1-grasp-query-adaptive-graph-retrieval-framework-with-cross-attention-scoring-and-path-sufficiency-verification-for-question-answering",
+      "title": "GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向知识图谱检索增强生成的查询自适应图检索与证据充分性验证",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
+    {
+      "paper_id": "2611.20045v1",
+      "route": "202611/20/2611.20045v1-security-of-deep-research-agents-attack-surface-defenses-benchmarks-and-agenda-seeding-against-research-planning",
+      "title": "Security of Deep Research Agents: Attack Surface, Defenses, Benchmarks, and Agenda Seeding against Research Planning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "深度研究智能体安全中的RAG投毒、提示注入与评测缺口",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
     {
       "paper_id": "2611.24294v1",
       "route": "202611/20/2611.24294v1-knowledgeclaw-towards-agentic-knowledge-engineering-via-omnimodal-hypergraphs",
@@ -19,12 +67,12 @@
       "score": 7.0,
       "evidence": "构建全模态类型化超图知识库并结合图检索增强生成的智能体化知识工程",
       "first_seen_at": "2026-11-20 06:48:25 UTC",
-      "updated_at": "2026-11-20 06:48:25 UTC"
+      "updated_at": "2026-11-20 12:36:36 UTC"
     },
     {
-      "paper_id": "2611.15467v1",
-      "route": "202611/20/2611.15467v1-autoontic-automatic-ontology-induction-from-text-for-knowledge-graph-construction",
-      "title": "AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction",
+      "paper_id": "2611.24362v1",
+      "route": "202611/20/2611.24362v1-pipette-prompt-injection-purple-teaming-for-robust-llm-agents",
+      "title": "PIPETTE: Prompt Injection Purple-Teaming for Robust LLM Agents",
       "section": "quick",
       "tags": [
         {
@@ -32,15 +80,15 @@
           "label": "kg-rag-agent"
         }
       ],
-      "score": 6.0,
-      "evidence": "通过本体归纳提升GraphRAG的知识图谱质量",
-      "first_seen_at": "2026-11-20 06:48:25 UTC",
-      "updated_at": "2026-11-20 06:48:25 UTC"
+      "score": 7.0,
+      "evidence": "间接提示注入攻击与LLM智能体鲁棒性",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
     },
     {
-      "paper_id": "2611.16267v1",
-      "route": "202611/20/2611.16267v1-causals-an-open-knowledge-graph-for-research-on-causal-reasoning",
-      "title": "Causals: An Open Knowledge Graph for Research on Causal Reasoning",
+      "paper_id": "2611.25229v1",
+      "route": "202611/20/2611.25229v1-lsp-rag-latent-scoring-perspectives-for-knowledge-graph-retrieval-augmented-generation",
+      "title": "LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation",
       "section": "quick",
       "tags": [
         {
@@ -48,10 +96,10 @@
           "label": "kg-rag-agent"
         }
       ],
-      "score": 6.0,
-      "evidence": "支持因果与多跳推理的开放知识图谱表示",
-      "first_seen_at": "2026-11-20 06:48:25 UTC",
-      "updated_at": "2026-11-20 06:48:25 UTC"
+      "score": 7.0,
+      "evidence": "基于潜在评分的知识图谱检索增强生成",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
     },
     {
       "paper_id": "2611.19871v1",
@@ -67,7 +115,39 @@
       "score": 6.0,
       "evidence": "面向大模型智能体推理的结构化与检索环境及子图检索",
       "first_seen_at": "2026-11-20 06:48:25 UTC",
-      "updated_at": "2026-11-20 06:48:25 UTC"
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
+    {
+      "paper_id": "2611.24080v1",
+      "route": "202611/20/2611.24080v1-causaldrive-causal-decomposition-for-data-efficient-end-to-end-autonomous-driving",
+      "title": "CausalDrive: Causal Decomposition for Data-Efficient End-to-End Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "端到端驾驶策略的因果分解，契合车载智能体的因果推理主题",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
+    {
+      "paper_id": "2611.24376v1",
+      "route": "202611/20/2611.24376v1-teaching-vlms-what-to-say-not-how-to-reason-rethinking-counterfactual-reasoning-in-autonomous-driving",
+      "title": "Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向视觉语言模型驾驶决策的反事实推理与因果鲁棒性评测，契合反事实鲁棒性主题",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
     },
     {
       "paper_id": "2611.24552v1",
@@ -82,6 +162,38 @@
       ],
       "score": 6.0,
       "evidence": "对噪声检索鲁棒的多模态知识图谱推理",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
+    {
+      "paper_id": "2611.24719v1",
+      "route": "202611/20/2611.24719v1-drift-detachable-reasoning-for-runtime-flexible-and-efficient-end-to-end-driving",
+      "title": "DRIFT: Detachable Reasoning for Runtime-Flexible and Efficient End-to-End Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向端到端驾驶的轻量语言推理与场景描述",
+      "first_seen_at": "2026-11-20 12:36:36 UTC",
+      "updated_at": "2026-11-20 12:36:36 UTC"
+    },
+    {
+      "paper_id": "2611.16267v1",
+      "route": "202611/20/2611.16267v1-causals-an-open-knowledge-graph-for-research-on-causal-reasoning",
+      "title": "Causals: An Open Knowledge Graph for Research on Causal Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "支持因果与多跳推理的开放知识图谱表示",
       "first_seen_at": "2026-11-20 06:48:25 UTC",
       "updated_at": "2026-11-20 06:48:25 UTC"
     },

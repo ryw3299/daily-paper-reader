@@ -1,0 +1,301 @@
+Title: DRIFT: Detachable Reasoning for Runtime-Flexible and Efficient End-to-End Driving
+
+URL Source: https://arxiv.org/pdf/2611.24719v1
+
+Published Time: Thu, 19 Nov 2026 03:31:20 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# DRIFT: Detachable Reasoning for Runtime-Flexible and Efficient End-to-End Driving 
+
+Emad Aghajanzadeh 1,2,∗, Bethany Anne Wong 1,2,∗† , Leonhard Kunze 1,2,†, Moritz Thoma 2
+
+Maximilian Forstenh¨ ausler 2,3, Nael Fasfous 2,†, Manoj Rohit Vemparala 2, Pierpaolo Mori 2
+
+Christos Anagnostopoulos 3, Daniel Mueller-Gritschneder 4, Ulf Schlichtmann 1
+
+> 1
+
+Technical University of Munich, Germany 2BMW Group, Germany 3University of Glasgow, UK 4TU Wien, Austria    
+
+> {firstname.lastname }@{1tum.de, 2bmw.de, 3glasgow.ac.uk, 4tuwien.ac.at }
+
+Abstract 
+
+The integration of vision-language models (VLMs) into end-to-end (E2E) autonomous driving has demonstrated strong potential by providing scene description and reasoning ca-pabilities. However, VLMs are computationally expen-sive, and switching language reasoning on and off at run-time without hurting closed-loop performance has not been demonstrated, which hinders practical adoption. To ad-dress these issues, we propose DRIFT, an E2E autonomous driving framework that integrates a lightweight language model (LM) for visual question answering and action com-mentary. By efficiently projecting intermediate driving rep-resentations into the language embedding space, we demon-strate that a compact LM ( <150M parameters) can achieve strong scene description and action commentary. Further-more, we introduce a runtime-flexible planning module that is trained on surrogate reasoning features distilled from the LM and can be conditioned on either the LM or the surro-gate reasoning features at inference. This design enables bypassing the LM entirely when required by deployment constraints, without sacrificing driving performance. With only 255M parameters, DRIFT reaches up to a Driving Score (DS) of 97.03 and a Success Rate of 89.39% (mean over three runs) on Bench2Drive by interleaving its LM and surrogate reasoning at a chosen reasoning rate. This is on par with the strongest non-language models while being far more compact than existing VLM-based mod-els. DRIFT further achieves competitive results on the real-world NAVSIM and AlpaSim benchmarks at signifi-cantly lower computational cost than existing VLM-based approaches. Project page: drift-e2e.github.io 
+
+> *Equal contribution. Co-first authors are ordered in alphabetical order.
+> †Employed at BMW at time of submission.
+
+1. Introduction 
+
+End-to-end (E2E) driving models [13, 16] achieve promis-ing driving performance, but they lack interpretability and high-level semantic reasoning. To address these limita-tions, recent works have integrated vision-language models (VLMs) into the driving pipeline, enabling visual question answering (VQA) [32, 34] and language-guided reasoning [8, 32]. Despite their success, existing VLM-based E2E methods typically improve language performance by scal-ing up the language models (LMs), incurring substantial computational overhead. Approaches such as DriveVLM [34], ORION [8], and AdaThinkDrive [25] employ mod-els exceeding 7B parameters, making real-time deployment on edge hardware increasingly challenging. This motivates us to study how strong language reasoning can be achieved with a significantly smaller LM. A second limitation is that these frameworks couple lan-guage reasoning tightly to the driving pipeline, requiring LM inference throughout deployment. To reduce this cost, some models run separate fast (standard E2E) and slow (VLM-based) branches and switch between them at run-time [10, 30, 41], while others switch a single VLA between thinking and non-thinking modes [25, 45], but most of them still rely on a large model in complex scenes. Others distill the LM into the driving model, such as DiMA [11], VLM-AD [38], and VERDI [7], but language only shapes the planner during training, and the planner cannot take reason-ing as input at inference. DiMA’s Dual variant is the only one of them that is able to run the LM at inference, but it is evaluated only in open-loop settings, leaving the switching of the LM on and off in difficult closed-loop driving unex-plored. We argue that efficiently integrating a language model into E2E driving requires two properties: compactness , so that the LM adds little computational cost, and detachabil-ity , so that the LM can be removed at runtime without de-1arXiv:2611.24719v1 [cs.CV] 18 Nov 2026 grading driving score. We propose DRIFT, an E2E driving framework that realizes this paradigm. Our main contributions are summarized as follows: • Efficient driving VQA and action commentary with a compact LM: by aligning dense driving representations with the language embedding space, a 135M-parameter LM achieves competitive VQA and action commentary at an edge-compatible latency on a Jetson AGX Orin. Addi-tionally, as an interesting finding, we show that language training also enriches the shared backbone features. • Detachable LM reasoning: we distill the LM’s reasoning into a lightweight surrogate module, so that a single plan-ner can run on either reasoning source and the LM can be enabled or detached without degrading driving score. • Extensive closed-loop experiments on Bench2Drive show, first, that language training improves driving over the language-free base model (+0.5 DS), and second, that combining the LM and surrogate reasoning at a chosen reasoning rate reaches 97.03 DS (+1.8 over TFv6/LEAD [27]). On the real-world NAVSIM bench-mark, DRIFT is competitive with much larger VLM-based planners, and on AlpaSim it is comparable to the LTFv6 and TransFuser-K1 baselines. Moreover, similar to Bench2Drive, enabling the LM on these benchmarks does not degrade planning performance, which shows that the detachable design carries over from simulation to real-world data. 
+
+2. Related work 
+
+2.1. VLMs in end-to-end autonomous driving 
+
+Pioneering E2E autonomous driving models [14, 16, 46] show promising results in directly mapping raw sensors to actions. Recently, LEAD [27] showed that reducing the asymmetry between student and expert boosts perfor-mance, yielding the strong TFv6 and the diffusion-based BridgeDrive [23] models. However, despite their success, these models offer limited interpretability and lack explicit language reasoning. Hint-AD [5] improves interpretabil-ity by decoding language from the intermediate features of a frozen E2E model, but its language only explains the model’s decisions post hoc and does not influence driving. This motivates the integration of VLMs into E2E driving. VLM-based autonomous driving frameworks [18, 24, 26, 36, 37, 40, 43, 44] show the potential of integrating LMs into E2E driving through VQA and language-guided driving. However, they were primarily evaluated in open-loop settings, which may not reflect real-world driving [15, 21]. This has motivated closed-loop VLM-based driv-ing [8, 9, 17, 39, 42], where SimLingo [31] shows that a 1B model suffices when reasoning and driving actions are generated jointly, while LinkVLA [35] and FIVE-VLA [29] further improve efficiency. Yet these frameworks are computationally demanding because of their large LMs, the tight coupling between language reasoning and planning, or both, which limits deployment. 
+
+2.2. Efficient reasoning for autonomous driving 
+
+Fast-slow methods. To reduce the inference cost of VLMs, fast-slow methods invoke them only when needed. Dual-branch designs [10, 20, 30, 34, 41] pair a fast VLM-free path with a slow VLM path, while adaptive-thinking VLAs [22, 25, 45] switch a single model between thinking and direct action. However, most of them still rely on a large VLM or VLA, whose use remains mandatory in complex scenes, which limits deployment under resource constraints. DRIFT also invokes its LM at a chosen reasoning rate, but with a compact LM, a single planner, and the option to by-pass the LM without a drop in driving performance. 
+
+VLM knowledge distillation. A complementary direc-tion transfers VLM knowledge into the driving model dur-ing training so that the VLM can be dropped at deployment. VLM-AD [38] and VERDI [7] use an offline VLM to do reasoning on training samples and train the planner’s fea-tures to match text embeddings of it, whereas DiMA [11] jointly trains a large multi-modal LM (Vicuna 7B) with the planner and aligns their hidden features. In all three, lan-guage only shapes the planner during training and the plan-ner cannot take reasoning as input at inference. DiMA’s Dual variant can also run the LM at inference by fusing LM and planner features, but these methods are evaluated mostly open-loop or in simplified closed-loop settings, so, to our knowledge, switching the LM on and off while driv-ing was not evaluated. In DRIFT, a single planner works interchangeably and flexibly with both surrogate and LM reasoning sources in challenging closed-loop driving. 
+
+3. Proposed method: DRIFT 
+
+In this section, we present DRIFT, an E2E autonomous driv-ing framework equipped with a lightweight, plug-and-play language reasoning module. An overview of the proposed architecture is shown in Fig. 1. Given raw sensor observa-tions, a TransFuser-based backbone extracts a dense scene representation, which serves as the input to the LM for VQA (Sec. 3.1). In addition, the planner is conditioned on surro-gate reasoning tokens that are aligned to the reasoning to-kens of the LM, which can optionally replace them at infer-ence (Sec. 3.2), to facilitate aligned reasoning and driving decisions. Finally, Sec. 3.3 describes the training procedure that enables seamless integration of the detachable language module without degrading driving performance. 
+
+3.1. Efficient visual question answering 
+
+A core component of DRIFT is an efficient VQA module that enables a compact LM to interpret driving scenes with-2Backbone 
+
+𝒫 !→# 
+
+Language Model (LM) Planner 
+
+𝒫 #→$ 
+
+𝒫 !→$ !  
+
+> or
+> 𝐹 !"# $
+> 𝐹 %&' $
+> 𝐹 !"# $
+> 𝐹 !"# $𝐹 %&' $
+> Z(Z)
+> 𝐹 #𝐹 *+
+> h,)(-$
+> h)-$
+> Z./012,
+> 𝑍 %3"4567
+> Tokenizer Non-Commentary Visual Questions (ncvq) Commentary Question (cq) Non-Commentary Visual Answers Reasoning
+> or Z8
+> Attachable / Detachable at Runtime
+> LM Switch Q1: Is the ego vehicle at a junction?
+> No, the ego vehicle is not at a junction; the ego is ahead in a straight lane with no vehicles or pedestrians directly in front, and the path ahead is clear.
+> Q2: How many lanes are there in the same direction as the ego car?
+> There are two lanes in the same direction as the ego car.
+> Q3: What lane marking is on the right side of the ego car?
+> The lane marking on the right side of the ego car is a solid white line.
+> Q4: What should the ego do next?
+> Continue straight ahead, following the lane centerline, while maintaining a steady speed and keeping a safe distance from the vehicle ahead in the same lane.
+> Q1: What are the important objects in the scene?
+> The important objects in the scene are the black car to the front left of the ego vehicle and the black police car and the silver car to the front of the ego vehicle.
+> Q2: What lane marking is on the left side of the ego car?
+> The lane marking on the left side of the ego car is a yellow double solid lane.
+> Q3: Does the ego vehicle need to brake? Why?
+> The ego vehicle should stop because it must invade the opposite lane, which is occupied, in order to bypass the accident.
+> Q4: What should the ego do next?
+> A: Avoid the accident on your lane. Accelerate to change to the oncoming lane, as the gap is big enough.
+
+Figure 1. Overview of our proposed method architecture (left) and qualitative driving results (right). 
+
+out introducing substantial computational overhead. To de-sign an effective interface between the perception backbone and the language module, we investigate two fundamental questions: (1) which scene representations are most bene-ficial for language understanding, and (2) how these repre-sentations should be projected into the language embedding space. Given raw inputs X, the perception backbone first extracts dense scene representations: 
+
+ F 1: Limg , F 1: Lbev 
+
+ = Φ θ (X), (1) where Φθ (·) denotes the TransFuser-based perception backbone and L is the number of backbone layers. Simi-lar to TOKEN [33], we decode language from the driving backbone’s representations rather than from a separate vi-sion encoder. However, instead of object-level tokens, we use the dense BEV and image features extracted from the vision backbone’s final layer (denoted as F Limg and F Lbev 
+
+respectively), which our studies show to provide the most effective visual representation for language tasks (shown in Tab. 6). To transform these features into a language-compatible space, we investigate different projectors, in-cluding attention-based feature aggregation. Our experi-ments show that a lightweight per-token MLP is sufficient and achieves better performance than these more complex alternatives (shown in Tab. 6). Therefore, we employ a lightweight per-token projector Pv→l (a two-layer MLP) that maps the visual features into the embedding space of the LM. Both feature maps have the same channel width of 1512, with F Limg ∈ R432 ×1512 (a 12 ×36 grid) and 
+
+F Lbev ∈ R120 ×1512 (a 10 ×12 grid), so they are concatenated along the token axis into 552 tokens without a channel-matching projection, producing visual tokens Zv ∈ R552 ×d
+
+with the LM embedding size d:
+
+Zv = Pv→l
+
+  F Limg ; F Lbev 
+
+ . (2) In addition, we incorporate driving context to provide the LM with essential motion and navigation cues. The scalar ego-speed ve is projected through an MLP to obtain speed features Fv . Similarly, the target point is processed by an MLP to produce target-point features Ftp . These are con-catenated to form the context tokens Zc:
+
+Zc = [ Fv ; Ftp ] . (3) For a given question Q ∈ Qncvq ∪ Q cq (comprising non-commentary visual questions Qncvq and commen-tary questions Qcq ), we tokenize and embed the input query into continuous question token embeddings Zq =
+
+Embed (Tokenizer (Q)) . Finally, the visual, context, and question tokens are concatenated and provided to the com-pact LM for VQA: 
+
+Zinput = [ Zv ; Zc; Zq ]. (4) 
+
+3.2. Detachable reasoning 
+
+Effective reasoning for autonomous driving requires align-ment between language reasoning and driving decisions, as also highlighted in [31]. At the same time, we want the lan-guage module to be optional at runtime. We address both with a set of surrogate reasoning tokens that condition the planner together with dense scene features. They are pre-dicted from BEV features alone, which makes the planner independent of the LM. The LM serves as the teacher dur-ing training, and as an optional replacement for the surro-gate module at inference, allowing the planner to condition on language reasoning. Concretely, we use the generated commentary response as the reasoning signal, since it describes the current action together with its justification. During the final training stage and inference, the reasoning tokens are computed from the LM’s own greedy commentary, not from ground-truth text. We extract the last-layer hidden states at the generated an-swer positions, denoted as hLcq , and pool them into K fixed-size reasoning tokens Zreason through an attention pool-ing Pl→r, in which K=16 queries attend over the variable-length hidden states with padded positions masked. Pl→r
+
+is randomly initialized and kept fixed, i.e., it receives no gradient, so Zreason is a fixed random-feature view of the LM hidden states, which are themselves trained by Llm .In parallel, a lightweight surrogate projector Pv→˜r (a 1×1
+
+3convolution followed by an attention pooling of the same form over the BEV grid) predicts K surrogate reasoning to-kens of the same shape from the BEV features F Lbev alone, 
+
+˜Zreason = Pv→˜r (F Lbev ). During training, the planner is conditioned on the last-layer BEV features together with the surrogate tokens, and the planning loss is applied only to this path. The LM tokens Zreason do not supervise the plan-ner. Instead, they serve as detached targets (the alignment losses do not backpropagate into the LM or into Pl→r) that the surrogate tokens learn to mimic through a reasoning dis-tillation (Sec. 3.3), so that both token types live in the same representation space. We also tried feeding the LM tokens to the planner during training, i.e., additionally optimizing the planning loss on the LM path, but this degraded driv-ing performance (see the supplementary), so the planner is trained on the surrogate tokens only. At inference, the same planner can be conditioned on ei-ther token type (Eq. (5)). Because the surrogate reasoning tokens are trained to be aligned to the LM reasoning tokens, the planner can also be conditioned on the LM tokens with-out retraining (Tab. 7). Consequently, the language mod-ule can be detached completely based on user preference, or invoked at a chosen reasoning rate (Sec. 4.3) with the surrogate tokens used in between, without impacting driv-ing performance. In the planning head, we construct a uni-fied context Zplan by concatenating the flattened BEV to-kens (equipped with 2D cosine positional embeddings), ego status tokens Zstatus , and the reasoning tokens Zr:         
+
+> Zplan =
+> h
+> FL
+> bev ;Zstatus ;Zr
+> i
+> , Z r=
+> (˜Zreason LM detached ,Zreason LM invoked .(5)
+
+Hence, Zplan is the only planner context. Architecture de-tails are in the supplementary. During training, the plan-ner always receives the surrogate tokens, i.e., Zr = ˜Zreason .The LM is trained by its own language loss, and its tokens only serve as alignment targets. At inference, Zr is deter-mined by whether the LM is detached or invoked. The sta-tus tokens Zstatus encapsulate ego-vehicle states (e.g., ve-locity, navigation commands, and target points) projected via linear encoders and differentiated through per-slot sta-tus positional embeddings Estatus . Finally, a Transformer decoder queries Zplan using learned query vectors Qplan ,
+
+hdec = Decoder (Qplan , Z plan ). Linear heads consume hdec 
+
+to predict spatial path, temporal waypoints, and target speed distributions. In closed-loop inference, we use the predicted path for steering and the speed distribution for throttle and brake selection. 
+
+3.3. Training 
+
+3.3.1. Training objective 
+
+Our overall training objective is defined in Eq. (6). To learn rich scene representations, we first optimize a set of perception tasks, including depth estimation, seman-tic segmentation in both RGB and BEV views, and ob-ject detection. Their corresponding losses are jointly de-noted as Lperc . The language model is trained to autore-gressively predict VQA answer tokens using the standard cross-entropy loss, denoted by Llm . For planning, we super-vise the predicted route using an L1 loss over route points (Lcp ), an L1 loss over future ego waypoints ( Lwp ), and a cross-entropy loss over target speed bins ( Lts ), which to-gether define the planning loss Lplan = Lcp + Lwp + Lts .It is applied to the surrogate planning branch only, yield-ing Lsurr plan . Additionally, two alignment terms pull the sur-rogate tokens toward the detached LM tokens: a point-wise MSE Lsim = MSE   ˜Zreason , sg( Zreason ), with stop-gradient sg( ·), and a relational KL loss Lcon that matches the cosine-similarity distribution of the mean-pooled tokens across samples (temperature τ = 0 .1; formula in the sup-plementary). The alignment terms are gradually introduced using α(t) = min(1 , t/ 0.3T ), where t and T are the cur-rent and total numbers of training steps of the final stage (Stage 3b, Sec. 3.3.2), which linearly increases from 0 to 
+
+1 during the first 30% of that stage. This warm-up lets the surrogate projector, which already imitates the ground-truth reasoning tokens from Stage 2, adapt gradually to the LM’s own (on-policy) tokens. The overall objective is            
+
+> L=Lperc +Llm +Lsurr plan +α(t) ( λsim Lsim +λcon Lcon ),(6)
+
+where Lperc is a weighted sum of its terms; all loss weights are in the supplementary. 
+
+3.3.2. Training schedule 
+
+Motivated by the number of modules and their dependen-cies, we split training into three stages. Stage 1 trains the backbone and perception heads to produce the visual fea-tures all downstream modules rely on. Stage 2 trains the language modules (the LM with LoRA, the projector, and the surrogate projector) to answer VQAs and reason in lan-guage, as well as the auxiliary perception tasks of Stage 1, with the alignment losses active on the ground-truth com-mentary (teacher-forced), while the backbone receives the LM gradient scaled down by 0.1. Stage 3 is the final end-to-end training. Stage 3a trains the backbone, planner, and surrogate path on all frames without the LM. Stage 3b ad-ditionally trains the LM jointly: the alignment losses are re-introduced with reduced weights and a warm-up, and are computed on the LM’s own greedy commentary, which matches inference and avoids targets that depend on the ex-pert’s future, at the cost of one extra LM pass per step (the language loss uses the teacher-forced pass). Ground-truth text is used earlier because it is cheap and informative while the LM is still weak. 
+
+4. Experiments 
+
+4.1. Experimental setup 
+
+We evaluate DRIFT in closed loop on the challenging Bench2Drive benchmark [15] in the CARLA simulator [6], 4reporting Driving Score (DS) and Success Rate (SR). We focus on closed-loop evaluation, since the planner’s ac-tions affect subsequent states, which reflects driving be-havior better than open-loop evaluation [31, 46]. Train-ing uses the LEAD dataset [27], for which we generate VQA annotations following DriveLM [32] and commen-tary annotations following SimLingo [31]; language qual-ity is measured with SPICE, CIDEr, BLEU-4, ROUGE-L and METEOR. To evaluate DRIFT on real-world data, we train it on the navtrain split of NAVSIM [2, 3] and report the PDM Score (PDMS) on navtest and the extended PDM Score (EPDMS) on navhard. We additionally evaluate it in closed loop on the nuPlan track of AlpaSim [28], fol-lowing the 123D protocol [4]. Language annotations for NAVSIM are generated with Qwen3-VL [1]. Training con-sists of three stages, namely perception pre-training follow-ing TFv6 [27], LoRA [12] finetuning of the LM with the alignment losses, and end-to-end training, and runs on 8 NVIDIA H100 GPUs. Further details on the data, metrics and training are in the supplementary. 
+
+4.2. Main results 
+
+We compare DRIFT with prior language-based models in Tab. 1. Benefiting from the finding of LEAD [27] that reducing the learner–expert asymmetry improves imitation learning, DRIFT is trained on the data collected by LEAD. Some works use additionally collected data, which results in inconsistent training data across methods, from the 234K frames of the Bench2Drive training set to 3.1M frames for SimLingo, and some do not report it (see the column in the table). Hence, the numbers are not strictly compara-ble, and we read them as a comparison of complete driving recipes, i.e., data, backbone, and architecture together. In this comparison, DRIFT w/ LM improves over the strongest language-based model, LinkVLA [35], by 6.0 DS and 14.8 SR with about 4× fewer parameters (255M vs. 1B). More-over, SimLingo [31] reports that its language-free version, SimLingo-BASE, drives as well as the full model, i.e., lan-guage preserves but does not improve its driving perfor-mance, whereas in DRIFT the LM can improve it within a single model. Next, we compare DRIFT with and without language invocation to the non-language models TFv6 [27] and BridgeDrive [23], which are trained on the same LEAD data. Without the LM, DRIFT is on par with TFv6 (DS 95.97 vs. 95.2). Invoking the LM then adds 1.1 DS, giv-ing the best result on Bench2Drive: DRIFT w/ LM reaches 97.03 DS and 89.39 SR, ahead of TFv6 by 1.8 DS and 2.6 SR. BridgeDrive is a diffusion-based model with a more complex planning head. Against it, the margin is smaller (+0.7 DS) and mostly within one standard deviation of the evaluation runs, making DRIFT slightly ahead in DS. Besides competitive driving performance, DRIFT also 
+
+Table 1. Closed-loop results on Bench2Drive. We compare DRIFT with language-based and non-language models in Driving Score (DS) and Success Rate (SR). Frames: size of the training set (“-”: not reported). DRIFT results are mean ±std over 3 closed-loop runs (sample standard deviation); DRIFT w/ LM uses a reasoning rate of 2.                                                                   
+
+> Method Params Frames DS ↑SR (%) ↑
+> Language-based models
+> DriveMoE [39] 3B 234K 74.22 48.64 ETA [10] 7B 234K 74 .33 ±0.96 48 .33 ±3.56
+> VLR-Driver [17] 8.1B 234K 75.01 50.00 ORION [8] 7B 234K 77.74 54.62 SpaceDrive+ [19] 7.4B -78.02 55.11 AutoVLA [45] 3B 600K 78.84 57.73 MindDrive-L [9] 3B 234K 80.59 58.26 SimLingo [31] 1B 3.1M 85 .07 ±0.95 67 .27 ±2.11
+> VLADriver-RAG [42] -234K 89.12 70.42 LinkVLA [35] 1B -91.01 74.55
+> Non-language models
+> SimLingo-BASE [31] 355M 3.1M 85.94 66.82 TFv6 [27] 126M 1M 95 .2±0.386 .8±0.7
+> BridgeDrive [23] -1M 96.34 ±0.55 89.25 ±0.50
+> DRIFT w/o LM 120M 1M 95 .97 ±0.65 86 .52 ±1.60
+> DRIFT w/ LM 255M 1M 97.03 ±0.09 89.39 ±0.95
+
+Table 2. Language evaluation results. B-4 = BLEU-4, S = SPICE, C = CIDEr, R-L = ROUGE-L, M = METEOR.                            
+
+> Dataset Model B-4 ↑S↑C↑R-L ↑M↑
+> DriveLM-CARLA DriveLM-CARLA (LLaMA-7B) -72.71 1.15 71.20 -SimLingo (Qwen2-0.5B) 72.07 87.24 7.08 84.77 50.57 Ours (SmolLM2-135M) 72.63 85.56 6.96 84.59 50.08 Commentary Ours (SmolLM2-135M) 83.90 82.20 6.93 89.10 57.01
+
+produces high-quality language (Tab. 2). On DriveLM-CARLA, DRIFT with a 135M-parameter LM achieves per-formance comparable to SimLingo (0.5B). Both are evalu-ated zero-shot there after being trained on separate datasets. We attribute this efficiency to our feature-selection and pro-jector designs. DRIFT decodes language directly from the driving backbone’s intermediate representations. Because these features already encode rich, planning-oriented in-formation on the driving scenario, a small model is suffi-cient for language decoding in the form of structured driv-ing VQA and commentary. Crucially, the language head and the planner consume the same backbone features, so the LM’s outputs are grounded in the representation used for driving, which makes the generated language suitable as a reasoning sig-nal for the planner. The commentary response, which states the intended action together with its justification, is reliable enough to serve both as the target that the surrogate reason-ing tokens distill from during training, and as the planner’s conditioning when the LM is invoked at inference. The commentary answers are more demanding than DriveLM 5answers, since they must state the intended action together with its justification instead of only describing the scene. As shown in Tab. 2, they still reach high quality (SPICE 82.20), confirming their suitability as the reasoning signal. 
+
+4.3. Insights 
+
+How often should the LM reason? Because the LM in DRIFT is detachable, we can study how often reasoning needs to be invoked. We vary the reasoning rate (RR), i.e., the LM is invoked every RR frames and the surrogate rea-soning is used in between (Fig. 3), and make two observa-tions. First, invoking the LM periodically slightly improves driving over the model without LM (95.97 DS), with the best setting, RR=2, reaching 97.03 DS (+1.06 over no LM, 95% route-level bootstrap CI [0.2, 2.0]). Since we selected RR on this benchmark, we regard the gain as indicative. The gains of the other rates are within run-to-run variation. Second, invoking the LM at every frame (RR=1) is on par with no reasoning (96.06 vs. 95.97 DS) and below the in-termediate rates. We use a fixed reasoning rate, which gives predictable latency at runtime. Because surrogate and LM tokens are interchangeable, the switch between them could also be controlled by an adaptive trigger; since a trigger brings its own design choices and failure modes that could confound the impact of DRIFT, we leave studying adaptive strategies to future work. To understand why the LM and surrogate paths differ, we visualize the Grad-CAM heatmaps of the reasoning tokens produced by the LM and surrogate paths for an unprotected junction left turn scenario (Fig. 2). The surrogate branch mainly focuses on the ego lane and a few localized cues, such as the traffic light. In contrast, the language reasoning branch shows broader contextual awareness, attending not only to the ego lane but also to semantically relevant cues such as the oncoming vehicle and the pedestrian crossings. These observations suggest that the two reasoning paths provide complementary information. The LM contributes richer scene-level reasoning for complex decisions, while the surrogate emphasizes localized cues that suffice for most planning updates. Consistently, the gain of RR=2 concen-trates in negotiation scenarios, e.g., unprotected left turns (DS 84.5 without LM vs. 96.9 at RR=2 on 15 routes). Re-freshing language reasoning at a moderate rate thus lets DRIFT benefit from semantic reasoning without overriding the stable surrogate reasoning at every step. More analysis is in the supplementary. 
+
+Is DRIFT’s reasoning aligned with its actions? We measure how well the LM’s textual reasoning agrees with the action taken by the planner in DRIFT, with the LM in-voked at every frame (RR=1). As a baseline we use a de-coupled variant of DRIFT, in which the LM is trained on the same commentary data but the planner is never conditioned              
+
+> Input LM path Surrogate path
+> Figure 2. Grad-CAM maps for the LM and surrogate paths in a junction left turn scenario. While the LM maintains broader at-tention across all critical scene objects, the surrogate path focuses more narrowly on driving-relevant segments. w/o LM RR=5 RR=3 RR=2 RR=1 95 96 97 98
+> DS
+> 95.97 96.35 96.56 97.03 96.06
+> w/o LM RR=5 RR=3 RR=2 RR=1 84 86 88 90
+> SR (%)
+> 86.5 87.6 87.9 89.4 87.1
+> Figure 3. Effect of the LM reasoning rate (RR) on Bench2Drive. Bars show the mean and error bars the sample standard deviation over 3 closed-loop runs; dots are individual runs. The best setting (RR=2, selected on this benchmark) is high-lighted.
+
+on its reasoning. Since DRIFT predicts path and speed sep-arately, we evaluate the lateral and longitudinal axes sep-arately, both in closed loop on Bench2Drive and in open loop on NAVSIM (Tab. 3). The evaluation protocol and the decoupled models are described in the supplementary. Both variants are far above the constant-answer refer-ence. The decoupled variant is already well aligned, which is expected since the commentary and the planner’s ground truth come from the same expert. Furthermore, linking the planner to the LM’s reasoning increases longitudinal agree-ment by 6.0 points on Bench2Drive (93.2 vs. 87.2) and 3.4 points on NAVSIM (79.4 vs. 76.0), where planning is highly multi-modal [46]. Laterally, both variants agree equally (85.2 vs. 85.0 and 89.4 vs. 88.9), as lateral decisions are largely determined by the road geometry [46]. While both benchmarks show similar trends, the numbers should not be compared directly, as their evaluation protocols differ. Lat-eral agreement is a coarse measure, since several descrip-tions can be correct for the same situation, so 85% reflects a limit of the evaluation rather than low alignment. 
+
+4.4. Embedded inference efficiency 
+
+We evaluate embedded inference on an NVIDIA Jetson AGX Orin in MAXN power mode at batch size one (Tab. 4). The backbone and planner use static-shape TensorRT en-gines, and the language model runs in TensorRT Edge-LLM. LoRA weights are merged in FP32 before FP16 ex-6Table 3. Reasoning–action alignment. Agreement (%) between DRIFT’s generated reasoning and its plan on Bench2Drive (closed loop) and NAVSIM (open loop). Decoupled: same language model trained on the same commentary, but the planner never reads its reasoning. Constant answer: best score from always giv-ing the same answer. Protocol details in the supplementary.               
+
+> DRIFT Decoupled Constant answer
+> Bench2Drive (closed loop)
+> Longitudinal 93.2 87.2 65.6 Lateral 85.2 85.0 73.9
+> NAVSIM (open loop)
+> Longitudinal 79.4 76.0 33.3 Lateral 89.4 88.9 33.3
+
+Table 4. Embedded inference efficiency on Jetson AGX Orin 
+
+(batch size one, MAXN, mixed precision). Latency averages closed-loop inference calls, excluding simulation and communi-cation; memory and FLOPs use fixed-input profiling. DS is from one complete 220-route Bench2Drive evaluation. †LM unloaded. Runtime switching uses 1.69 GiB.                     
+
+> Method Params (M) DS ↑
+> Latency (ms) ↓FPS ↑
+> GPU mem. (GiB) ↓
+> FLOPs (G) ↓
+> DRIFT w/o LM 120 96.07 35.07 28.52 0.48 †150.6 DRIFT w/ LM (RR=1) 255 96.03 172.03 5.81 1.69 308.5 SimLingo [31] 1000 86.81 417.81 2.39 2.89 2338.6
+
+port. Numerically sensitive backbone attention, normaliza-tion, and reductions remain in FP32. We adapt Edge-LLM to accept projected multimodal embeddings and return final-layer hidden states for gener-ated answer tokens. Attention pooling reduces these states to fixed-size reasoning tokens for the planner, keeping in-termediate features on the GPU. KV caching avoids re-peated prompt computation, while reusing answer states avoids full-sequence replay when token alignment permits. Language reasoning runs at every planning step when en-abled. SimLingo uses the same TensorRT and Edge-LLM approach, with BF16 driving heads. Latency is averaged over closed-loop inference calls with varying scenes and generated answer lengths. Peak NvMap GPU allocation and logical FLOPs (FMA = 2 ) use separate fixed-input profiles. Sampled peak GPU allocation is 0.48 GiB with the LM un-loaded and 1.69 GiB with it resident for runtime switching. 
+
+4.5. Real-world applicability 
+
+To show that DRIFT is directly applicable to real-world scenarios, we evaluate it on NAVSIM and AlpaSim. On NAVSIM (Tab. 5), we first compare against recent VLM-based planners that do not directly optimize the task score, following [27]. DRIFT without the LM reaches 87.4 PDMS with only 125M parameters. Among the reported VLM-based planners, which are 16–64 × larger (2B–8B), it out-performs three and ties with SGDrive (87.4 PDMS). Com-
+
+Table 5. Real-world benchmarks. PDMS (NAVSIM navtest), EPDMS (NAVSIM navhard) and AlpaSim score (nuPlan track). ‡:with a test-time heading post-processing (heading set to the tan-gent of the predicted waypoints). Best in bold, second best under-lined, and only methods without direct optimization on NAVSIM score are listed.                                            
+
+> Method Params PDMS ↑EPDMS ↑AlpaSim Score ↑
+> FSDrive [40] 2B 85.1 --AdaThinkDrive [25] 8B 86.2 --FLARE [37] 4B 86.9 --SGDrive [18] 2B 87.4 27.1 -Qwen-Drive-1.0, SFT [44] 4B 87.9 30.5 91.7
+> LTFv6 (reported) [27] 69M 85.4 28.3 -LTFv6 RegNetY-032 ‡117M 87.0 30.2 88.6
+> DRIFT w/o LM ‡125M 87.4 32.5 89.5
+> DRIFT w/ LM ‡260M 87.3 32.8 89.5
+
+pared with the recently proposed Qwen-Drive-1.0 [44], a 4B VLM planner trained on 24 public VQA datasets, which we re-evaluated ourselves, DRIFT comes within 0.5 PDMS on navtest (87.4 vs. 87.9) at 1/32 of its size, and is ahead on the harder navhard split (32.5 vs. 30.5 EPDMS). Next, we com-pare against the direct baseline LTFv6 [27] with the same RegNetY-032 backbone, where DRIFT is on par in PDMS (+0 .4) and ahead in EPDMS ( +2 .3). Enabling the language model does not degrade performance (87.3 PDMS and 32.8 EPDMS, within noise of the planner alone) while adding explainability. Evaluation details and full results are pro-vided in the supplementary. On the closed-loop AlpaSim, DRIFT scores 89.5 with and without the LM, so detacha-bility carries over to real-world scenes. It is comparable to the LTFv6 baseline (88.6, within the ±1.4 scene-level interval) and below Qwen-Drive (91.7, SFT), which sees more cameras and frames, whereas DRIFT only receives a coarse command. It is also comparable to the very re-cent TransFuser-K1 [4] (89.6 without navigation), which is trained on significantly more data. 
+
+4.6. Ablation study 
+
+4.6.1. Feature selection and projectors 
+
+We first study which backbone features the LM should read (Tab. 6, top). On the LEAD validation split, all variants exhibit strong performances, showing that the intermedi-ate driving features already enable strong language de-coding : even LiDAR-only features reach 94.88 SPICE. The largest gain comes from replacing LiDAR with RGB features (METEOR 63.47 → 64.38), as RGB carries fine-grained cues (colors, lane types, traffic lights and signs) that are not possible or hard to decode from LiDAR. Combining LiDAR with RGB gives only a negligible improvement, yet we retain LiDAR features since the planner requires it, and sharing the features between the LM and the planner keeps the language grounded in what the planner observes. The ego-speed and target-point projectors give a small gain, con-7Table 6. Ablation on feature selection (top) and projector design (bottom). Evaluated after Stage 2 on the in-distribution LEAD validation split, hence not comparable to Tab. 2. LiDAR refers to F Lbev and RGB to F Limg . † marks the adopted default. B-4 = BLEU-4, S = SPICE, M = METEOR. 
+
+Variant B-4 ↑ S↑ M↑
+
+> Features
+
+LiDAR only 89.47 94.88 63.47 RGB only 90.51 95.37 64.38 RGB + LiDAR 90.62 95.41 64.48 + speed 90.80 95.54 64.65 + speed, tp † 90.87 95.57 64.66 
+
+> Projector
+
+Cross-attention 88.38 94.31 62.45 Deformable attention 77.58 88.78 53.45 Spatial attention 88.19 94.17 62.18 MLP † 90.87 95.57 64.66 
+
+centrated in the speed projector. We keep the target point since it conveys the route intent on which action commen-tary depends (e.g., which way to turn), although this is not visible in the metrics averaged over all question types. We next study how the driving features should be pro-jected into the language input space (Tab. 6, bottom) and compare a two-layer MLP, which keeps all visual tokens, with three attention-based projectors that compress them into learned queries: cross-attention (128 queries), de-formable attention (64 queries), and a spatial variant with a 2D locality bias (128 queries). The simple MLP outper-forms all attention-based projectors on all metrics , with the deformable variant much worse (METEOR 53.45) and the spatial variant on par with plain cross-attention (62.18 vs. 62.45). Hence, the selected features need no additional attention stage or compression before entering the LM, and the gap between the backbone’s feature space and the LM’s embedding space is small enough for a lightweight per-token mapping to bridge. 
+
+4.6.2. Training stages 
+
+We analyze the impact of each training stage in Tab. 7. All variants start from the same perception backbone, pre-trained for 30 epochs in Stage 1. DRIFT-Base is the driving-only model without any language, trained for 31 epochs E2E. Adding 2 epochs of VQA pre-training before the same E2E training improves DS from 95.45 to 95.94 (+0.49). This gain is modest given the run-to-run variance, but it appears where expected: in scenarios with vulnerable road users, DS rises from 94.13 to 97.75 and pedestrian col-lisions drop from 7 to 2. Although the BEV semantic decoders of DRIFT-Base mostly work reliably, Figure 4 shows an example of such failures, with more in the supple-mentary: DRIFT-Base barely detects a crossing pedestrian, whereas after VQA pre-training the pedestrian is clearly grounded. The LM of this variant, however, has been fine-tuned on driving VQA for only 2 epochs and still answers 
+
+Table 7. Effect of training stages. Epochs of Stage 2 (VQA), 3a (E2E driving) and 3b (driving with commentary training). S: SPICE of the commentary on the LEAD evaluation samples. DS on Bench2Drive; w/ LM uses RR=2.                                 
+
+> Epochs DS Variant S2 S3a S3b Sw/o LM w/ LM DRIFT-Base 031 0−95 .45 ±0.26 −
+> + VQA pre-training 231 076.90 95 .94 ±0.29 −
+> + Commentary training ( ours )215 16 82.20 95 .97 ±0.65 97 .03 ±0.09
+> Front camera GT BEV
+> DRIFT-Base + VQA pre-training + Commentary (ours)
+> (no language) Follow the route. Accelerate to drive with the target speed. Follow the route. Remain stopped
+> due to the pedestrian.
+
+Figure 4. Perception and reasoning in front of a crossing pedes-trian. Top: front camera and GT BEV. Bottom: predicted BEV semantics of each training variant, with the LM’s answer to “What should the ego do next?” below. 
+
+“accelerate”. Since this LM is not trained during E2E driv-ing, we do not evaluate its LM path. Our final model there-fore adds 16 epochs of joint commentary training, in which the surrogate reasoning is trained to match the LM’s. This sharpens the reasoning (“remain stopped due to the pedes-trian”) and raises the commentary SPICE from 76.90 to 82.20, at no cost for the surrogate path (95.97 vs. 95.94). The resulting LM path drives equally well when invoked at every frame (96.06 DS) and reaches 97.03 DS at RR=2. 
+
+5. Conclusion 
+
+In this paper, we argue that VLM-based E2E driving mod-els become more practical by following two design choices: compactness and detachability. To this end, we introduce DRIFT, which shows that rich intermediate driving features enable effective visual question answering and action com-mentary with a compact LM of under 150M parameters, connected through a simple per-token projector. A surro-gate reasoning module trained via knowledge distillation allows the LM to be detached at inference without sacri-ficing driving performance. On Bench2Drive, DRIFT with LM reasoning reaches up to 97.03 DS and 89.39% SR with 8about 4× fewer parameters than the strongest language-based model. Our analysis shows that VQA training can help encode additional features in the driving backbone. It further shows that linking the planner to the LM’s reasoning at inference improves the alignment between the generated language and the planned speed, compared to a decoupled variant. Moreover, benchmarking DRIFT on NAVSIM and AlpaSim shows competitive driving quality with a drasti-cally smaller footprint. 
+
+References 
+
+[1] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, et al. Qwen3-vl technical report. arXiv preprint arXiv:2511.21631 , 2025. 5 [2] Wei Cao, Marcel Hallgarten, Tianyu Li, Daniel Dauner, Xunjiang Gu, Caojun Wang, Yakov Miron, Marco Aiello, Hongyang Li, Igor Gilitschenski, et al. Pseudo-simulation for autonomous driving. arXiv preprint arXiv:2506.04218 ,2025. 5 [3] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, et al. Navsim: Data-driven non-reactive autonomous vehicle simulation and benchmarking. Advances in Neural Information Processing Systems , 37:28706–28719, 2024. 5 [4] Daniel Dauner, Valentin Charraut, Bastian Berle, Tianyu Li, Long Nguyen, Jiabao Wang, Changhui Jing, Maxim-ilian Igl, Holger Caesar, Boris Ivanovic, Yiyi Liao, An-dreas Geiger, and Kashyap Chitta. 123d: Unifying multi-modal autonomous driving data at scale. arXiv preprint arXiv:2605.08084 , 2026. 5, 7 [5] Kairui Ding, Boyuan Chen, Yuchen Su, Huan-ang Gao, Bu Jin, Chonghao Sima, Wuqiang Zhang, Xiaohui Li, Paul Barsch, Hongyang Li, et al. Hint-ad: Holistically aligned interpretability in end-to-end autonomous driving. arXiv preprint arXiv:2409.06702 , 2024. 2 [6] Alexey Dosovitskiy, German Ros, Felipe Codevilla, Anto-nio Lopez, and Vladlen Koltun. Carla: An open urban driv-ing simulator. In Conference on robot learning , pages 1–16. PMLR, 2017. 4 [7] Bowen Feng, Zhiting Mei, Julian Ost, Filippo Ghilotti, Ba-iang Li, Roger Girgis, Anirudha Majumdar, and Felix Heide. Verdi: Vlm-embedded reasoning for autonomous driving. 
+
+arXiv preprint arXiv:2505.15925 , 2025. 1, 2 [8] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui, Dingkang Liang, Chong Zhang, Dingyuan Zhang, Hongwei Xie, Bing Wang, and Xiang Bai. Orion: A holistic end-to-end autonomous driving framework by vision-language in-structed action generation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 24823– 24834, 2025. 1, 2, 5 [9] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui, Hongwei Xie, Bing Wang, Guang Chen, Hangjun Ye, Dingkang Liang, and Xiang Bai. Minddrive: A vision-language-action model for autonomous driving via online reinforcement learning. arXiv preprint arXiv:2512.13636 ,2025. 2, 5 [10] Shadi Hamdan, Chonghao Sima, Zetong Yang, Hongyang Li, and Fatma Guney. Eta: Efficiency through thinking ahead, a dual approach to self-driving with large models. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 26529–26538, 2025. 1, 2, 5 [11] Deepti Hegde, Rajeev Yasarla, Hong Cai, Shizhong Han, Apratim Bhattacharyya, Shweta Mahajan, Litian Liu, Risheek Garrepalli, Vishal M Patel, and Fatih Porikli. Dis-tilling multi-modal large language models for autonomous driving. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 27575–27585, 2025. 1, 2 [12] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Liang Wang, Weizhu Chen, et al. Lora: Low-rank adaptation of large language mod-els. In International Conference on Learning Representa-tions , 2022. 5 [13] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, et al. Planning-oriented autonomous driving. In Pro-ceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 17853–17862, 2023. 1 [14] Bernhard Jaeger, Kashyap Chitta, and Andreas Geiger. Hid-den biases of end-to-end driving models. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 8240–8249, 2023. 2 [15] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and Junchi Yan. Bench2drive: Towards multi-ability bench-marking of closed-loop end-to-end autonomous driving. Ad-vances in Neural Information Processing Systems , 37:819– 844, 2024. 2, 4 [16] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. Vad: Vectorized scene representa-tion for efficient autonomous driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 8340–8350, 2023. 1, 2 [17] Fanjie Kong, Yitong Li, Weihuang Chen, Chen Min, Yizhe Li, Zhiqiang Gao, Haoyang Li, Zhongyu Guo, and Hongbin Sun. Vlr-driver: Large vision-language-reasoning models for embodied autonomous driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 26966–26976, 2025. 2, 5 [18] Jingyu Li, Junjie Wu, Dongnan Hu, Xiangkai Huang, Bin Sun, Zhihui Hao, Xianpeng Lang, Xiatian Zhu, and Li Zhang. Sgdrive: Scene-to-goal hierarchical world cognition for autonomous driving. arXiv preprint arXiv:2601.05640 ,2026. 2, 7 [19] Peizheng Li, Zhenghao Zhang, David Holtz, Hang Yu, Yu-tong Yang, Yuzhi Lai, Rui Song, Andreas Geiger, and An-dreas Zell. Spacedrive: Infusing spatial awareness into vlm-based autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 40096–40107, 2026. 5 [20] Yun Li, Jiachen Gong, Simon Thompson, Ehsan Javanmardi, Qunli Zhang, Zifan Zeng, Shiming Liu, Peng Wang, Zixuan 
+
+9Guo, and Manabu Tsukada. Think at 5 hz, act at 20 hz: Asynchronous fast-slow vision-language-action inference for closed-loop driving. arXiv preprint arXiv:2607.15621 ,2026. 2 [21] Zhiqi Li, Zhiding Yu, Shiyi Lan, Jiahan Li, Jan Kautz, Tong Lu, and Jose M Alvarez. Is ego status all you need for open-loop end-to-end autonomous driving? In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14864–14873, 2024. 2 [22] George Ling, Lijin Yang, Hao Yang, and Zhongzhan Huang. Blue: Toward better language use in efficient vision-language-action models for autonomous driving. arXiv preprint arXiv:2606.08684 , 2026. 2 [23] Shu Liu, Wenlin Chen, Weihao Li, Zheng Wang, Lijin Yang, Jianing Huang, Yipin Zhang, Zhongzhan Huang, Ze Cheng, and Hao Yang. Bridgedrive: Diffusion bridge pol-icy for closed-loop trajectory planning in autonomous driv-ing. In International Conference on Learning Representa-tions , pages 130989–131009, 2026. 2, 5 [24] Yuhang Lu, Jiadong Tu, Yuexin Ma, and Xinge Zhu. Real-ad: Towards human-like reasoning in end-to-end au-tonomous driving. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision , pages 27783–27793, 2025. 2 [25] Yuechen Luo, Fang Li, Shaoqing Xu, Zhiyi Lai, Lei Yang, Qimao Chen, Ziang Luo, Zixun Xie, Shengyin Jiang, Ji-axin Liu, et al. Adathinkdrive: Adaptive thinking via rein-forcement learning for autonomous driving. arXiv preprint arXiv:2509.13769 , 2025. 1, 2, 7 [26] Ana-Maria Marcu, Long Chen, Jan H¨ unermann, Alice Karn-sund, Benoit Hanotte, Prajwal Chidananda, Saurabh Nair, Vijay Badrinarayanan, Alex Kendall, Jamie Shotton, et al. Lingoqa: Visual question answering for autonomous driv-ing. In European Conference on Computer Vision , pages 252–269. Springer, 2024. 2 [27] Long Nguyen, Micha Fauth, Bernhard Jaeger, Daniel Dauner, Maximilian Igl, Andreas Geiger, and Kashyap Chitta. Lead: Minimizing learner-expert asymmetry in end-to-end driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 39775– 39785, 2026. 2, 5, 7 [28] NVIDIA, Yulong Cao, Riccardo de Lutio, Sanja Fidler, Guillermo Garcia Cobo, Zan Gojcic, Maximilian Igl, Boris Ivanovic, Peter Karkus, Janick Martinez Esturo, Marco Pavone, Aaron Smith, Ellie Tanimura, Michal Tyszkiewicz, Michael Watson, Qi Wu, and Le Zhang. Alpasim: A mod-ular, lightweight, and data-driven research simulator for au-tonomous driving, 2025. 5 [29] Kemal Oksuz, Alexandru Buburuzan, Yuhan Yao, and Puneet K Dokania. Five-vla: Fast and effective autonomous driving with recurrent action memory. arXiv preprint arXiv:2609.18623 , 2026. 2 [30] Kangan Qian, Ziang Luo, Sicong Jiang, Zilin Huang, Jinyu Miao, Zhikun Ma, Tianze Zhu, Jiayin Li, Yangfan He, Zheng Fu, et al. Fasionad++: Integrating high-level instruction and information bottleneck in fat-slow fusion systems for en-hanced safety in autonomous driving with adaptive feedback. 
+
+arXiv preprint arXiv:2503.08162 , 2025. 1, 2 [31] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski. Simlingo: Vision-only closed-loop autonomous driving with language-action alignment. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 11993– 12003, 2025. 2, 3, 5, 7 [32] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen, Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo, Andreas Geiger, and Hongyang Li. Drivelm: Driving with graph visual question answering. In European conference on computer vision , pages 256–274. Springer, 2024. 1, 5 [33] Ran Tian, Boyi Li, Xinshuo Weng, Yuxiao Chen, Edward Schmerling, Yue Wang, Boris Ivanovic, and Marco Pavone. Tokenize the world into object-level knowledge to address long-tail events in autonomous driving. arXiv preprint arXiv:2407.00959 , 2024. 3 [34] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, Xianpeng Lang, and Hang Zhao. Drivevlm: The convergence of autonomous driving and large vision-language models. arXiv preprint arXiv:2402.12289 , 2024. 1, 2 [35] Xinyang Wang, Qian Liu, Wenjie Ding, Zhao Yang, Wei Li, Chang Liu, Bailin Li, Kun Zhan, Xianpeng Lang, and Wei Chen. Unifying language-action understanding and generation for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 25193–25203, 2026. 2, 5 [36] Yuqi Wang, Xinghang Li, Wenxuan Wang, Junbo Zhang, Yingyan Li, Yuntao Chen, Xinlong Wang, and Zhaoxi-ang Zhang. Unified vision-language-action model. arXiv preprint arXiv:2506.19850 , 2025. 2 [37] Chengen Xie, Chonghao Sima, Tianyu Li, Bin Sun, Junjie Wu, Zhihui Hao, and Hongyang Li. FLARE: Learning future-aware latent representations from vision-language models for autonomous driving. arXiv preprint arXiv:2601.05611 , 2026. 2, 7 [38] Yi Xu, Yuxin Hu, Zaiwei Zhang, Gregory P. Meyer, Siva Karthik Mustikovela, Siddhartha Srinivasa, Eric M. Wolff, and Xin Huang. Vlm-ad: End-to-end autonomous driving through vision-language model supervision. arXiv preprint arXiv:2412.14446 , 2024. 1, 2 [39] Zhenjie Yang, Yilin Chai, Xiaosong Jia, Qifeng Li, Yuqian Shao, Xuekai Zhu, Haisheng Su, and Junchi Yan. Drivemoe: Mixture-of-experts for vision-language-action model in end-to-end autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 10678–10688, 2026. 2, 5 [40] Shuang Zeng, Xinyuan Chang, Mengwei Xie, Xinran Liu, Yifan Bai, Zheng Pan, Mu Xu, Xing Wei, and Ning Guo. Futuresightdrive: Thinking visually with spatio-temporal cot for autonomous driving. Advances in Neural Information Processing Systems , 38:67299–67318, 2025. 2, 7 [41] Ruifei Zhang, Junlin Xie, Wei Zhang, Weikai Chen, Xiao Tan, Xiang Wan, and Guanbin Li. Adadrive: Self-adaptive slow-fast system for language-grounded autonomous driv-ing. In Proceedings of the IEEE/CVF International Confer-ence on Computer Vision , pages 5112–5121, 2025. 1, 2 [42] Rui Zhao, Haofeng Hu, Zhenhai Gao, Jiaqiao Liu, and Gao Fei. Vladriver-rag: Retrieval-augmented vision-language-
+
+10 action models for autonomous driving. arXiv preprint arXiv:2605.08133 , 2026. 2, 5 [43] Xingcheng Zhou, Xuyuan Han, Feng Yang, Yunpu Ma, Volker Tresp, and Alois Knoll. Opendrivevla: Towards end-to-end autonomous driving with large vision language action model. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 13782–13790, 2026. 2 [44] Xin Zhou, Zongchuang Zhao, Zhibo Yang, Mingsheng Li, Humen Zhong, Shuai Bai, Du Chu, Ruizhe Chen, Zhaohai Li, Jun Tang, et al. Qwen-drive-1.0: An initial step towards a vision-language foundation model for autonomous driving. 
+
+arXiv preprint arXiv:2609.00111 , 2026. 2, 7 [45] Zewei Zhou, Tianhui Cai, Seth Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. Autovla: A vision-language-action model for end-to-end autonomous driv-ing with adaptive reasoning and reinforcement fine-tuning. 
+
+Advances in Neural Information Processing Systems , 38: 27920–27956, 2025. 1, 2, 5 [46] Julian Zimmerlin, Jens Beißwenger, Bernhard Jaeger, An-dreas Geiger, and Kashyap Chitta. Hidden biases of end-to-end driving datasets. arXiv preprint arXiv:2412.09602 ,2024. 2, 5, 6 
+
+11

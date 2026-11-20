@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-22 ~ 2026-11-20</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-20</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 15 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>4 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>3 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>14</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>15</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-20 07:44:11 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-20 12:36:36 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>本期速读 14 篇论文，聚焦 GraphRAG 与图检索增强生成的新进展。最值得关注的是 Typed-Centrality Grounding 与 LSP-RAG（均 9.0/10），它们分别从符号化中心性约束和潜在评分视角提升智能体推理与知识图谱检索。普通读者可先读这两篇的高分论文摘要，再按兴趣追踪联邦式 GraphRAG。</p>
+<p>2026-11-20 日报共收录15篇论文并全部完成速读（精读0篇），内容覆盖本体自动归纳、图检索问答与深度研究智能体安全三个方向。最值得关注的是AutoOntic用文本自动归纳本体来辅助知识图谱构建（7.0/10），以及GRASP用交叉注意力评分和路径充分性验证实现查询自适应图检索（7.0/10）；这两项对构建可溯源的知识问答系统有直接参考价值。建议普通读者先浏览这两篇的摘要和方法图，再根据自身场景决定是否深入阅读，并留意《Security of Deep Research Agents》中关于研究规划攻击面的风险提示。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">14 篇</strong>
+    <strong class="dpr-home-dashboard-count">15 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning">Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning</span></li><li><span class="dpr-home-dashboard-paper-title" title="LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation">LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Federated Graph Retrieval-Augmented Generation">Federated Graph Retrieval-Augmented Generation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction">AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction</span></li><li><span class="dpr-home-dashboard-paper-title" title="GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering">GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering</span></li><li><span class="dpr-home-dashboard-paper-title" title="Security of Deep Research Agents: Attack Surface, Defenses, Benchmarks, and Agenda Seeding against Research Planning">Security of Deep Research Agents: Attack Surface, Defenses, Benchmarks, and Agenda Seeding against Research Planning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>14</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>15</strong></span></div>
 </section>
 </div>
 

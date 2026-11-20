@@ -1,16 +1,457 @@
 {
   "mode": "standard",
-  "generated_at": "2026-11-20T07:30:58.284153+00:00",
+  "generated_at": "2026-11-20T12:36:06.892836+00:00",
   "stats": {
     "mode": "standard",
     "tag_count": 1,
     "deep_divecandidates": 0,
-    "deep_cap": null,
+    "deep_cap": 6,
     "deep_selected": 0,
-    "quick_candidates": 0,
+    "quick_candidates": 12,
     "quick_skim_target": 11,
-    "quick_selected": 0
+    "quick_selected": 11
   },
   "deep_dive": [],
-  "quick_skim": []
+  "quick_skim": [
+    {
+      "id": "2611.15467v1",
+      "source": "arxiv",
+      "title": "AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction",
+      "abstract": "Graph-based retrieval-augmented generation depends on the quality of the knowledge graph (KG) it retrieves over, yet schema-free LLM-based extraction pipelines typically produce flat graphs: deduplicated entities and relations with no type hierarchy and no domain/range constraints. We present AutoOntic, a pipeline that automatically constructs an ontology from text by canonicalizing open-vocabulary entity types and relations, inducing a hierarchy over the canonicalized types, and mining relation-level domain and range constraints. Its hierarchy induction procedure prioritizes types using corpus-derived relation-argument profiles and places them through local, LLM-adjudicated parent/child checks, allowing newly inserted types to trigger reassignment of existing parent-child links. The resulting hierarchy constrains entity deduplication and supports the induction of relation-level domain/range constraints. For intrinsic evaluation, we introduce a reference-based protocol that classifies induced ontology types as exact, broader, narrower, or unrelated to reference domain and range classes. On the Wikidata-TekGen and DBpedia-WebNLG subsets of Text2KGBench, over 90% of AutoOntic's induced endpoint types are semantically aligned with the reference classes across two LLM backbones: about half match exactly, while most remaining differences concern granularity. On MINE, knowledge graphs organized using an ontology built by AutoOntic achieve 88% retrieval accuracy. AutoOntic is available at https://github.com/screemix/AutoOntic.",
+      "authors": [
+        "Alla Chepurova",
+        "Aydar Bulatov",
+        "Mikhail Burtsev",
+        "Yuri Kuratov"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-11-11T13:37:36+00:00",
+      "link": "https://arxiv.org/pdf/2611.15467v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "automatic ontology induction for knowledge graph construction in GraphRAG",
+      "llm_evidence_cn": "面向GraphRAG知识图谱构建的自动本体归纳",
+      "llm_evidence": "面向GraphRAG知识图谱构建的自动本体归纳",
+      "canonical_evidence": "面向GraphRAG知识图谱构建的自动本体归纳",
+      "llm_tldr_en": "Graph-based RAG depends on knowledge graph quality but LLM extraction yields flat graphs; AutoOntic automatically induces ontologies with type hierarchies and relation constraints to improve KG structure.",
+      "llm_tldr_cn": "本文针对图检索增强生成依赖知识图谱质量、而LLM抽取常产生缺乏层级与约束的扁平图这一问题，提出AutoOntic流水线。该方法规范化开放词表的实体类型与关系，归纳类型层级并挖掘关系域值约束，从而自动从文本构建本体。实验表明其可生成带类型层级和域值约束的结构化知识图谱。该工作为GraphRAG提供更高质量、更结构化的知识基础。",
+      "llm_tldr": "本文针对图检索增强生成依赖知识图谱质量、而LLM抽取常产生缺乏层级与约束的扁平图这一问题，提出AutoOntic流水线。该方法规范化开放词表的实体类型与关系，归纳类型层级并挖掘关系域值约束，从而自动从文本构建本体。实验表明其可生成带类型层级和域值约束的结构化知识图谱。该工作为GraphRAG提供更高质量、更结构化的知识基础。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.19871v1",
+      "source": "arxiv",
+      "title": "Interactive Structured Environment Scaling for Large Language Model Agentic Reasoning",
+      "abstract": "Reinforcement learning via environmental interaction is a cornerstone post-training paradigm for evolving large language models into autonomous agents capable of multi-turn tool use and exploration. Because the environment defines what the policy observes and how actions are verified, its structure directly bounds the capabilities an agent can acquire. Yet existing structured and retrieval environments rely on upstream pre-filtering---extracting a compact subgraph around the gold answer or retrieving fixed passages before the policy acts. We show that such pre-filtering introduces a fundamental measurement confound: because per-question subgraphs enclose ground-truth paths, they compress the candidate space by orders of magnitude and leak answer locations via local topology, allowing a question-blind degree heuristic to surface gold answers far above chance. To restore path selection, candidate pruning, and optimal stopping as genuine policy decisions, we propose RISE (Interactive Structured Environment), which transitions structured reinforcement learning from static subgraphs to full-scale interactive databases along two coupled axes. First, Decision-Space Scaling exposes the unpruned knowledge graph via a five-stage graph-agnostic typed intent adapter under a bounded call budget and a multiplicative grounding reward gate. Second, Learning-Frontier Scaling overcomes within-group variance collapse under group-normalized objectives by uniting model-independent structural tier progression with a self-evolving competence-frontier bandit. Across nineteen benchmarks and three model backbones, RISE substantially advances in-domain and unseen-schema knowledge-graph reasoning, transfers zero-shot to open-domain passage retrieval, and significantly enhances out-of-domain mathematical and logical deduction.",
+      "authors": [
+        "Peng Yu",
+        "Luoyi Fu",
+        "Xinbing Wang",
+        "Ying Wen"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-11-15T08:20:34+00:00",
+      "link": "https://arxiv.org/pdf/2611.19871v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "graph subgraph retrieval environments for LLM agent reasoning",
+      "llm_evidence_cn": "面向大模型智能体推理的图子图检索环境",
+      "llm_evidence": "面向大模型智能体推理的图子图检索环境",
+      "canonical_evidence": "面向大模型智能体推理的图子图检索环境",
+      "llm_tldr_en": "Existing structured and retrieval environments pre-filter gold subgraphs, confounding agent capability measurement; the paper proposes interactively scalable structured environments for honest LLM agentic reasoning.",
+      "llm_tldr_cn": "论文指出结构化与检索式环境依赖上游预筛选（抽取围绕标准答案的子图或固定段落），会压缩候选空间并造成测量混淆，从而高估智能体的推理能力。作者提出可交互扩展的结构化环境，让策略在完整图上主动探索而非被动接收预筛结果。实验表明去除预筛选后智能体表现显著变化，说明环境结构直接界定能力上限。该工作为图检索型智能体的训练与评测提供了更可信的环境设计。",
+      "llm_tldr": "论文指出结构化与检索式环境依赖上游预筛选（抽取围绕标准答案的子图或固定段落），会压缩候选空间并造成测量混淆，从而高估智能体的推理能力。作者提出可交互扩展的结构化环境，让策略在完整图上主动探索而非被动接收预筛结果。实验表明去除预筛选后智能体表现显著变化，说明环境结构直接界定能力上限。该工作为图检索型智能体的训练与评测提供了更可信的环境设计。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "graph structured reasoning for safe and reliable knowledge-enhanced automotive agents",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.19441v1",
+      "source": "arxiv",
+      "title": "GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering",
+      "abstract": "Retrieval quality is a key factor in the reliability of retrieval-augmented generation (RAG), particularly when retrieval is performed over structured knowledge graphs. Graph-based retrieval requires decisions about candidate-edge scoring, traversal termination, and the sufficiency of the retrieved evidence. We propose GRASP, a query-adaptive graph retrieval framework that jointly addresses these decisions during the retrieval process. A cross-attention scorer models fine-grained interactions between individual query tokens and candidate edges, providing query-specific signals for edge selection. A learned stopping gate conditions traversal termination on the query, traversal state, and hop depth, allowing the retrieval depth to adapt to the current retrieval state. A sufficiency classifier further evaluates the assembled path before generation and triggers re-retrieval when the evidence is predicted to be incomplete. We evaluate GRASP on three biomedical question-answering benchmarks with different graph scales and answer lengths, using biomedical question answering as a representative setting for evaluating graph-based RAG retrieval. GRASP consistently improves over the strongest learned baseline across the evaluated retrieval and generation metrics. The unsupported-claim rate is reduced by 8.9% to 13.2% across the three benchmarks, with the largest reduction on the benchmark with the longest generated answers. The retrieval gains are more pronounced under higher candidate density, while ablation results indicate that the three components provide complementary improvements.",
+      "authors": [
+        "Rui Xu",
+        "Le Wang",
+        "Tianyue Wang"
+      ],
+      "primary_category": "cs.GR",
+      "categories": [
+        "cs.GR"
+      ],
+      "published": "2026-11-14T14:52:59+00:00",
+      "link": "https://arxiv.org/pdf/2611.19441v1",
+      "tags": [
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "query-adaptive graph retrieval with edge scoring and sufficiency verification for RAG over knowledge graphs",
+      "llm_evidence_cn": "面向知识图谱检索增强生成的查询自适应图检索与证据充分性验证",
+      "llm_evidence": "面向知识图谱检索增强生成的查询自适应图检索与证据充分性验证",
+      "canonical_evidence": "面向知识图谱检索增强生成的查询自适应图检索与证据充分性验证",
+      "llm_tldr_en": "GRASP is a query-adaptive graph retrieval framework for RAG over structured knowledge graphs that jointly decides candidate-edge scoring via cross-attention, traversal termination via a learned stopping gate, and evidence sufficiency via path verification.",
+      "llm_tldr_cn": "针对结构化知识图谱上检索增强生成中候选边打分、遍历终止与证据充分性判断相互耦合、影响RAG可靠性的问题，本文提出查询自适应图检索框架GRASP。该方法用交叉注意力打分器建模查询词与候选边的细粒度交互以选择边，并引入学习型停止门控依据查询与遍历状态决定终止，同时进行路径充分性验证。实验表明联合建模这些检索决策可提升检索证据质量与答案可靠性，其图检索方法可直接迁移到知识增强的车载智能体场景理解与决策中。",
+      "llm_tldr": "针对结构化知识图谱上检索增强生成中候选边打分、遍历终止与证据充分性判断相互耦合、影响RAG可靠性的问题，本文提出查询自适应图检索框架GRASP。该方法用交叉注意力打分器建模查询词与候选边的细粒度交互以选择边，并引入学习型停止门控依据查询与遍历状态决定终止，同时进行路径充分性验证。实验表明联合建模这些检索决策可提升检索证据质量与答案可靠性，其图检索方法可直接迁移到知识增强的车载智能体场景理解与决策中。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.24080v1",
+      "source": "arxiv",
+      "title": "CausalDrive: Causal Decomposition for Data-Efficient End-to-End Autonomous Driving",
+      "abstract": "Efficient use of expert demonstrations is essential for end-to-end autonomous driving. However, directly imitating expert trajectories couples nominal intention, which specifies where the vehicle should go, with multimodal driving styles, which determine how that intention is executed. Different combinations of these factors can yield similar expert trajectories, obscuring their respective causal contributions and forcing the policy to learn both from a single entangled target. This ambiguity limits how effectively the policy can exploit expert demonstrations. We propose CausalDrive, a causal decomposition framework for data-efficient driving policy learning that separates deterministic nominal intention prediction from probabilistic driving style modeling. Specifically, we construct counterfactual nominal trajectories from navigation command, map topology, and ego state by removing style dependent effects, providing a Nominal Intention Planner with supervision independent of expert trajectories. Conditioned on the predicted nominal intention and surrounding agents, a diffusion-based Style Execution Policy models diverse driving styles as a multimodal distribution over residuals between nominal and expert trajectories. This causally structured supervision reduces redundant learning of shared nominal behavior in routine scenarios, directing expert supervision toward informative execution variations and improving data utilization. CausalDrive achieves 91.2 PDMS on NAVSIM v1 and 89.5 EPDMS on NAVSIM v2, matching or surpassing state-of-the-art performance. Further experiments demonstrate strong performance with limited expert data and clear advantages in challenging interactive scenarios.",
+      "authors": [
+        "Xiaobao Wei",
+        "Jingxian Wu",
+        "Lirong Yang",
+        "Qing Han",
+        "Yuan Gao",
+        "Ziwei Yang",
+        "Shuai Yang",
+        "Weiwei Liu",
+        "Chang Huang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-18T09:07:54+00:00",
+      "link": "https://arxiv.org/pdf/2611.24080v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "causal decomposition for end-to-end driving policy, matching the causal reasoning theme for automotive agents",
+      "llm_evidence_cn": "端到端驾驶策略的因果分解，契合车载智能体的因果推理主题",
+      "llm_evidence": "端到端驾驶策略的因果分解，契合车载智能体的因果推理主题",
+      "canonical_evidence": "端到端驾驶策略的因果分解，契合车载智能体的因果推理主题",
+      "llm_tldr_en": "CausalDrive decomposes expert demonstrations into deterministic nominal intention and probabilistic driving style so that end-to-end driving policies exploit expert data more efficiently under distribution shift.",
+      "llm_tldr_cn": "端到端自动驾驶直接模仿专家轨迹会把名义行驶意图与多模态驾驶风格纠缠在单一目标中，不同组合可能产生相似轨迹，从而掩盖各自的因果贡献并降低示范数据利用效率。作者提出 CausalDrive 因果分解框架，将确定性的名义意图预测与概率化的驾驶风格建模分离，使策略能分别学习两类因素。该分解缓解了目标纠缠带来的歧义，提升了数据效率与泛化能力。其意义在于把因果结构建模引入驾驶策略学习，为可解释、鲁棒的车载智能体决策提供思路。",
+      "llm_tldr": "端到端自动驾驶直接模仿专家轨迹会把名义行驶意图与多模态驾驶风格纠缠在单一目标中，不同组合可能产生相似轨迹，从而掩盖各自的因果贡献并降低示范数据利用效率。作者提出 CausalDrive 因果分解框架，将确定性的名义意图预测与概率化的驾驶风格建模分离，使策略能分别学习两类因素。该分解缓解了目标纠缠带来的歧义，提升了数据效率与泛化能力。其意义在于把因果结构建模引入驾驶策略学习，为可解释、鲁棒的车载智能体决策提供思路。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; graph structured reasoning for safe and reliable knowledge-enhanced automotive agents; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?; How can knowledge graphs and graph retrieval augmented generation improve knowledge grounding in in vehicle intelligent agents?; What security risks arise from knowledge base poisoning and retrieval pollution in retrieval augmented automotive agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.20045v1",
+      "source": "arxiv",
+      "title": "Security of Deep Research Agents: Attack Surface, Defenses, Benchmarks, and Agenda Seeding against Research Planning",
+      "abstract": "Deep research and agentic search agents autonomously retrieve content from the open web and generate reports with citations, and their outputs are often taken directly as research conclusions. This paper systematizes security research in this area along four stages, namely retrieval, planning, evidence integration, and report generation. We present a unified threat model, a taxonomy of attacks and defenses, and a review of evaluation benchmarks, and we align the area dimension by dimension with retrieval-augmented generation (RAG) poisoning, prompt injection, and generative engine optimization (GEO). Coding 34 primary studies shows that only 26.5% of them involve the planning stage, and none performs an end-to-end poisoning evaluation on commercial products. To address this gap, we propose the agenda seeding attack, in which the attacker writes no instructions and only introduces a fictitious evaluation metric. Across 3,520 sandboxed research runs under the same budget, GEO and prompt injection are nearly ineffective, whereas agenda seeding makes the attacker's target the top pick in 16% to 28% of reports. Injection detection and query anchoring fail against it, verification prompting hurts utility, and our proposed provenance tagging preserves utility but can be bypassed by multi-site bait. Finally, we propose eight research directions.",
+      "authors": [
+        "Yang Luo",
+        "Guangpu Chen",
+        "Yichen Liu",
+        "Zhaoyu Chen",
+        "Yifeng Gao",
+        "Zhiyang Ding",
+        "Qingni Shen",
+        "Zhonghai Wu"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR",
+        "cs.AI"
+      ],
+      "published": "2026-11-15T14:44:28+00:00",
+      "link": "https://arxiv.org/pdf/2611.20045v1",
+      "tags": [
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "RAG poisoning, prompt injection and benchmark gaps in deep research agent security",
+      "llm_evidence_cn": "深度研究智能体安全中的RAG投毒、提示注入与评测缺口",
+      "llm_evidence": "深度研究智能体安全中的RAG投毒、提示注入与评测缺口",
+      "canonical_evidence": "深度研究智能体安全中的RAG投毒、提示注入与评测缺口",
+      "llm_tldr_en": "This paper systematizes security of deep research agents across retrieval, planning, evidence integration and report generation, aligning attacks with RAG poisoning and prompt injection and reviewing benchmarks.",
+      "llm_tldr_cn": "深度研究与智能搜索智能体自主从开放网络检索内容并生成带引用的报告，其输出常被直接当作结论，带来严重安全风险。作者沿检索、规划、证据整合与报告生成四个阶段建立统一威胁模型、攻击与防御分类及评测基准综述，并与 RAG 投毒、提示注入和生成引擎优化对齐。对34项研究的编码显示仅少数涉及规划阶段，凸显知识库投毒与检索污染防护的评测空白。",
+      "llm_tldr": "深度研究与智能搜索智能体自主从开放网络检索内容并生成带引用的报告，其输出常被直接当作结论，带来严重安全风险。作者沿检索、规划、证据整合与报告生成四个阶段建立统一威胁模型、攻击与防御分类及评测基准综述，并与 RAG 投毒、提示注入和生成引擎优化对齐。对34项研究的编码显示仅少数涉及规划阶段，凸显知识库投毒与检索污染防护的评测空白。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "What security risks arise from knowledge base poisoning and retrieval pollution in retrieval augmented automotive agents?",
+      "matched_requirement_id": "req-7",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.24376v1",
+      "source": "arxiv",
+      "title": "Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving",
+      "abstract": "End-to-end autonomous driving systems have been shown to suffer from shortcut learning and causal confusion, limiting their ability to generalize robustly under distribution shift. To mitigate these limitations, recent works based on Vision-Language Models (VLMs) have explored incorporating linguistic reasoning capabilities into driving decision-making, reporting improvements in driving performance. In particular, counterfactual (CF) reasoning has been proposed to enable self-reflective, high-level causal understanding. However, it remains unclear whether the language-based reasoning mitigates shortcut learning or merely shifts it from visual representations to linguistic patterns, creating an illusion of causal understanding. Moreover, existing approaches often conflate intervention-based reasoning with CF reasoning, leaving the effects of genuine CF reasoning unexplored. In this work, we examine what CF reasoning actually induces in VLM-based autonomous driving and observe that it shifts the action distribution toward more conservative behaviors while increasing uncertainty in reasoning and decision-making. This effect persists under reinforcement fine-tuning, suggesting that it is not merely a transient artifact. Furthermore, visual attention analysis shows that CF reasoning does not alter visual grounding, while causal intervention experiments reveal that masking causally relevant and non-causal factors in accident scenarios results in comparable decision change rates. Overall, these results suggest that CF reasoning does not induce genuine causal reasoning grounded in visual evidence. Instead, it acts as a linguistic shortcut that reshapes the action distribution, teaching models what to say but not how to reason, highlighting a gap between language-based reasoning and causal understanding in autonomous driving.",
+      "authors": [
+        "Hayeon Oh",
+        "Donghwan Lee"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-18T13:06:24+00:00",
+      "link": "https://arxiv.org/pdf/2611.24376v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "counterfactual reasoning and causal robustness evaluation for VLM driving decisions, central to counterfactual robustness theme",
+      "llm_evidence_cn": "面向视觉语言模型驾驶决策的反事实推理与因果鲁棒性评测，契合反事实鲁棒性主题",
+      "llm_evidence": "面向视觉语言模型驾驶决策的反事实推理与因果鲁棒性评测，契合反事实鲁棒性主题",
+      "canonical_evidence": "面向视觉语言模型驾驶决策的反事实推理与因果鲁棒性评测，契合反事实鲁棒性主题",
+      "llm_tldr_en": "Rethinks counterfactual reasoning in VLM-based driving, questioning whether language reasoning mitigates shortcut learning or merely shifts it into linguistic patterns, creating an illusion of causal understanding.",
+      "llm_tldr_cn": "端到端自动驾驶系统存在捷径学习与因果混淆，在分布偏移下泛化能力受限，基于视觉语言模型的反事实推理被认为可提供高层因果理解。作者系统检验这类语言推理究竟是缓解了捷径学习，还是仅把捷径从视觉表征转移到语言模式，从而制造因果理解的假象。分析表明语言层面的反事实训练未必带来真正的因果鲁棒性。该工作提醒社区在评测反事实推理与鲁棒驾驶决策时需采用更严格的检验标准，对车载智能体的可靠性评估具有警示意义。",
+      "llm_tldr": "端到端自动驾驶系统存在捷径学习与因果混淆，在分布偏移下泛化能力受限，基于视觉语言模型的反事实推理被认为可提供高层因果理解。作者系统检验这类语言推理究竟是缓解了捷径学习，还是仅把捷径从视觉表征转移到语言模式，从而制造因果理解的假象。分析表明语言层面的反事实训练未必带来真正的因果鲁棒性。该工作提醒社区在评测反事实推理与鲁棒驾驶决策时需采用更严格的检验标准，对车载智能体的可靠性评估具有警示意义。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; graph structured reasoning for safe and reliable knowledge-enhanced automotive agents; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?; How can knowledge graphs and graph retrieval augmented generation improve knowledge grounding in in vehicle intelligent agents?; What security risks arise from knowledge base poisoning and retrieval pollution in retrieval augmented automotive agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.24294v1",
+      "source": "arxiv",
+      "title": "KnowledgeClaw: Towards Agentic Knowledge Engineering via Omnimodal Hypergraphs",
+      "abstract": "Knowledge engineering (KE) turns raw files into a reasoning-ready knowledge base, a task now within reach of LLM agents. KE has progressed from chunk and graph retrieval-augmented generation (RAG) to memory agents, agentic KE and multimodal KE. However, a live knowledge base needs omnimodality, a closed-loop lifecycle and multi-granular application at once, yet existing systems meet at most two and no benchmark measures all three. We formalize Omnimodal Knowledge Engineering (OmniKE) and release OmniKE-Bench, six tasks with 1,829 model-free items over 3,960 real files in five modalities. We further propose KnowledgeClaw, an agentic system that builds an omnimodal typed hypergraph, keeps it current with a closed-loop lifecycle agent and routes each query to the granularity it needs. Against 30 baselines, it ranks first on all six tasks with an overall OKE of 55.9, +14.6 over the strongest baseline. Our software and data are publicly available at https://github.com/LHRLAB/KnowledgeClaw.",
+      "authors": [
+        "Haoran Luo",
+        "Jiapu Wang",
+        "Linhao Luo",
+        "Luu Anh Tuan"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-11-18T12:06:06+00:00",
+      "link": "https://arxiv.org/pdf/2611.24294v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "agentic knowledge engineering with omnimodal hypergraph and graph RAG",
+      "llm_evidence_cn": "基于全模态超图与图RAG的智能体知识工程",
+      "llm_evidence": "基于全模态超图与图RAG的智能体知识工程",
+      "canonical_evidence": "基于全模态超图与图RAG的智能体知识工程",
+      "llm_tldr_en": "KnowledgeClaw formalizes omnimodal knowledge engineering and builds an omnimodal typed hypergraph with a closed-loop lifecycle agent, outperforming chunk and graph RAG pipelines on the new OmniKE-Bench.",
+      "llm_tldr_cn": "现有知识工程系统难以同时兼顾全模态、闭环生命周期与多粒度应用。论文形式化全模态知识工程任务，发布包含六项任务、1829个条目与3960个真实文件的OmniKE-Bench，并提出KnowledgeClaw智能体系统，构建全模态类型化超图，借助闭环生命周期智能体保持知识更新并完成路由。实验表明该系统在多粒度知识构建与应用上表现优异，为面向推理的知识库构建与图检索增强提供了新范式。",
+      "llm_tldr": "现有知识工程系统难以同时兼顾全模态、闭环生命周期与多粒度应用。论文形式化全模态知识工程任务，发布包含六项任务、1829个条目与3960个真实文件的OmniKE-Bench，并提出KnowledgeClaw智能体系统，构建全模态类型化超图，借助闭环生命周期智能体保持知识更新并完成路由。实验表明该系统在多粒度知识构建与应用上表现优异，为面向推理的知识库构建与图检索增强提供了新范式。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.24552v1",
+      "source": "arxiv",
+      "title": "NaviGATE: Noise-Aware Dual-View Generation for Multimodal Knowledge Graph Reasoning",
+      "abstract": "Multimodal knowledge graph reasoning (MKGR) aims to infer missing facts by jointly exploiting relational structures, textual descriptions, and visual evidence. Existing embedding-based methods effectively capture graph topology, but their fixed multimodal representations are less effective for query-specific fine-grained semantic reasoning, while generation-based methods are vulnerable to noisy retrieval and may produce invalid entities. To address these challenges, we propose NaviGATE, a noise-aware generative framework for MKGR. NaviGATE first aligns graph-derived structural representations with textual semantics, then performs structure-aware internal knowledge activation by fine-tuning the multimodal language model with multimodal entity summaries and injected structural tokens. In the noise-aware dual-view instruction tuning stage, NaviGATE jointly optimizes retrieval-free and retrieval-aware views: reliable retrieved candidates are reinforced through contrastive logit sharpening, while misleading candidates are suppressed through parametric consistency distillation. In inference, structure-constrained decoding restricts generation to valid entities in the target knowledge graph. Experiments on standard benchmarks show that NaviGATE consistently outperforms strong unimodal, multimodal, and generation-based baselines, and remains robust under noisy retrieval scenarios.",
+      "authors": [
+        "Jie Peng",
+        "Yongxue Shan",
+        "Yongfu Zha",
+        "Cui Miao",
+        "Xiaodong Wang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-11-18T14:53:42+00:00",
+      "link": "https://arxiv.org/pdf/2611.24552v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "noise-aware multimodal knowledge graph reasoning robust to noisy retrieval",
+      "llm_evidence_cn": "抗噪多模态知识图谱推理，应对噪声检索",
+      "llm_evidence": "抗噪多模态知识图谱推理，应对噪声检索",
+      "canonical_evidence": "抗噪多模态知识图谱推理，应对噪声检索",
+      "llm_tldr_en": "Existing embedding-based multimodal KG reasoning lacks query-specific reasoning while generative methods suffer noisy retrieval and invalid entities. NaviGATE aligns graph structure with text and fine-tunes a multimodal LM for structure-aware knowledge activation, improving robust reasoning.",
+      "llm_tldr_cn": "针对现有多模态知识图谱推理中嵌入方法难以做查询级细粒度推理、生成方法易受噪声检索影响并产生无效实体的问题，本文提出NaviGATE这一抗噪生成式框架。该方法先将图结构表示与文本语义对齐，再通过微调多模态语言模型实现结构感知的内部知识激活。实验表明其在噪声检索条件下仍能稳健推理，为知识图谱与生成式检索结合提供了可迁移的抗噪思路。",
+      "llm_tldr": "针对现有多模态知识图谱推理中嵌入方法难以做查询级细粒度推理、生成方法易受噪声检索影响并产生无效实体的问题，本文提出NaviGATE这一抗噪生成式框架。该方法先将图结构表示与文本语义对齐，再通过微调多模态语言模型实现结构感知的内部知识激活。实验表明其在噪声检索条件下仍能稳健推理，为知识图谱与生成式检索结合提供了可迁移的抗噪思路。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.24362v1",
+      "source": "arxiv",
+      "title": "PIPETTE: Prompt Injection Purple-Teaming for Robust LLM Agents",
+      "abstract": "Large language model (LLM) agents routinely interact with untrusted external data, exposing them to indirect prompt injection (IPI) attacks that hijack agents into executing attacker-chosen tasks. To uncover these vulnerabilities at scale, automated red-teaming methods often leverage reinforcement learning (RL) to generate attacks that achieve high attack success rates (ASR). Model developers use the attacks discovered during internal red-teaming to harden agents through adversarial training before deployment, a collaborative offensive-defensive process known in cybersecurity as purple-teaming. However, we show that achieving high ASR during red-teaming does not guarantee robustness gains from subsequent adversarial training. Specifically, we find that two state-of-the-art RL-based red-teaming methods, RL-Hammer and PISmith, suffer from mode collapse, repeatedly discovering similar attack strategies whose additional successes add no additional robustness improvements to adversarial training. To address this gap, we introduce PIPETTE, a unified prompt injection purple-teaming framework that effectively converts red-teaming discoveries into defender robustness improvements. PIPETTE employs a dictionary learning-based reward that encourages broader coverage of attack strategies during red-teaming. It also integrates an on-policy adversarial training pipeline tailored to IPI defense, enabling agents to resist attacks while completing legitimate user tasks. Extensive evaluations across agentic benchmarks (AgentDojo and ASB) demonstrate that PIPETTE produces defenders that achieve near-zero attack success rates on static attacks and can withstand strong adaptive attacks, while maintaining benign task utility close to that of the undefended baseline.",
+      "authors": [
+        "Lipeng He",
+        "Yihan Wang",
+        "Jiawen Zhang",
+        "N. Asokan"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR",
+        "cs.AI"
+      ],
+      "published": "2026-11-18T12:56:06+00:00",
+      "link": "https://arxiv.org/pdf/2611.24362v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "indirect prompt injection attacks and robustness of LLM agents",
+      "llm_evidence_cn": "间接提示注入攻击与LLM智能体鲁棒性",
+      "llm_evidence": "间接提示注入攻击与LLM智能体鲁棒性",
+      "canonical_evidence": "间接提示注入攻击与LLM智能体鲁棒性",
+      "llm_tldr_en": "LLM agents consuming untrusted data face indirect prompt injection. PIPETTE shows high red-teaming attack success does not guarantee robustness after adversarial training, exposing a gap between attack discovery and defense for retrieval-augmented agents.",
+      "llm_tldr_cn": "针对LLM智能体处理不可信外部数据时遭受间接提示注入攻击的风险，本文研究自动化红队与对抗训练的协同效果。作者提出PIPETTE紫队框架，发现红队阶段的高攻击成功率并不能保证后续对抗训练带来鲁棒性提升。该结果揭示了攻击发现与防御之间的鸿沟，对检索增强智能体的安全加固具有警示意义。",
+      "llm_tldr": "针对LLM智能体处理不可信外部数据时遭受间接提示注入攻击的风险，本文研究自动化红队与对抗训练的协同效果。作者提出PIPETTE紫队框架，发现红队阶段的高攻击成功率并不能保证后续对抗训练带来鲁棒性提升。该结果揭示了攻击发现与防御之间的鸿沟，对检索增强智能体的安全加固具有警示意义。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "What security risks arise from knowledge base poisoning and retrieval pollution in retrieval augmented automotive agents?",
+      "matched_requirement_id": "req-7",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.24719v1",
+      "source": "arxiv",
+      "title": "DRIFT: Detachable Reasoning for Runtime-Flexible and Efficient End-to-End Driving",
+      "abstract": "The integration of vision-language models (VLMs) into end-to-end (E2E) autonomous driving has demonstrated strong potential by providing scene description and reasoning capabilities. However, VLMs are computationally expensive, and switching language reasoning on and off at runtime without hurting closed-loop performance has not been demonstrated, which hinders practical adoption. To address these issues, we propose DRIFT, an E2E autonomous driving framework that integrates a lightweight language model (LM) for visual question answering and action commentary. By efficiently projecting intermediate driving representations into the language embedding space, we demonstrate that a compact LM (<150M parameters) can achieve strong scene description and action commentary. Furthermore, we introduce a runtime-flexible planning module that is trained on surrogate reasoning features distilled from the LM and can be conditioned on either the LM or the surrogate reasoning features at inference. This design enables bypassing the LM entirely when required by deployment constraints, without sacrificing driving performance. With only 255M parameters, DRIFT reaches up to a Driving Score (DS) of 97.03 and a Success Rate of 89.39% (mean over three runs) on Bench2Drive by interleaving its LM and surrogate reasoning at a chosen reasoning rate. This is on par with the strongest non-language models while being far more compact than existing VLM-based models. DRIFT further achieves competitive results on the real-world NAVSIM and AlpaSim benchmarks at significantly lower computational cost than existing VLM-based approaches. Project page: https://drift-e2e.github.io/",
+      "authors": [
+        "Emad Aghajanzadeh",
+        "Bethany Anne Wong",
+        "Leonhard Kunze",
+        "Moritz Thoma",
+        "Maximilian Forstenhäusler",
+        "Nael Fasfous",
+        "Manoj Rohit Vemparala",
+        "Pierpaolo Mori",
+        "Christos Anagnostopoulos",
+        "Daniel Mueller-Gritschneder",
+        "Ulf Schlichtmann"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.CL",
+        "cs.LG",
+        "cs.RO"
+      ],
+      "published": "2026-11-18T16:40:13+00:00",
+      "link": "https://arxiv.org/pdf/2611.24719v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "lightweight language reasoning for end-to-end driving scene description",
+      "llm_evidence_cn": "面向端到端驾驶的轻量语言推理与场景描述",
+      "llm_evidence": "面向端到端驾驶的轻量语言推理与场景描述",
+      "canonical_evidence": "面向端到端驾驶的轻量语言推理与场景描述",
+      "llm_tldr_en": "DRIFT integrates a compact under-150M language model into end-to-end driving, projecting driving representations into language space so reasoning can be toggled at runtime for scene description and commentary.",
+      "llm_tldr_cn": "视觉语言模型为端到端驾驶带来场景描述与推理能力，但计算开销大，且难以在运行时开关语言推理而不损伤闭环性能。作者提出 DRIFT 框架，将中间驾驶表征投影到语言嵌入空间，用一个不足1.5亿参数的轻量语言模型完成视觉问答与动作解说。实验表明该紧凑模型可获得良好的场景描述与推理效果，并支持运行时灵活切换。该工作为车载语言推理与决策解释的实用化提供了可行路径。",
+      "llm_tldr": "视觉语言模型为端到端驾驶带来场景描述与推理能力，但计算开销大，且难以在运行时开关语言推理而不损伤闭环性能。作者提出 DRIFT 框架，将中间驾驶表征投影到语言嵌入空间，用一个不足1.5亿参数的轻量语言模型完成视觉问答与动作解说。实验表明该紧凑模型可获得良好的场景描述与推理效果，并支持运行时灵活切换。该工作为车载语言推理与决策解释的实用化提供了可行路径。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.25229v1",
+      "source": "arxiv",
+      "title": "LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation",
+      "abstract": "Large Language Models (LLMs) have demonstrated strong capabilities in open-domain question answering, but often struggle with factual accuracy and multi-hop reasoning due to the incompleteness of the training corpora. A promising solution is Knowledge Graph Retrieval-Augmented Generation (KG-RAG), which supplements LLMs with structured knowledge retrieved from external knowledge graphs (KGs). However, existing KG-RAG methods either rely on large-scale language models (e.g., ChatGPT) to guide the retrieval process, which leads to high computational costs, or suffer from limited retrieval quality when using lightweight language models, particularly under multi-hop scenarios. We propose LSP-RAG (Latent Scoring Perspectives for Retrieval-Augmented Generation over Knowledge Graphs), a novel KG-RAG framework that enhances hop-wise KG knowledge retrieval through multi-perspective prompted scoring. Each latent scoring perspective is guided by a combination of two types of soft prompts: a perspective-specific soft prompt induces a distinct prompt-conditioned scoring function over candidate triplets, while a contextual soft prompt evolves with each reasoning hop by encoding the query and previously explored KG triplets, enabling the model to preserve consistency and relevance across multi-hop retrieval. Rather than assuming manually defined semantic roles, these latent perspectives are adaptively aggregated to capture heterogeneous relevance signals during retrieval. This design allows LSP-RAG to perform accurate and robust retrieval using lightweight language models. LSP-RAG achieves superior performance across multiple KG-based Question Answering benchmarks compared to existing retrieval systems, including those that rely on much larger language models, demonstrating its effectiveness under limited computational budgets.",
+      "authors": [
+        "Haochen Liu",
+        "Guanghui Min",
+        "Song Wang",
+        "Yada Zhu",
+        "Chen Chen",
+        "Jundong Li"
+      ],
+      "primary_category": "cs.IR",
+      "categories": [
+        "cs.IR"
+      ],
+      "published": "2026-11-18T22:01:25+00:00",
+      "link": "https://arxiv.org/pdf/2611.25229v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "knowledge graph retrieval-augmented generation with latent scoring",
+      "llm_evidence_cn": "基于潜在评分的知识图谱检索增强生成",
+      "llm_evidence": "基于潜在评分的知识图谱检索增强生成",
+      "canonical_evidence": "基于潜在评分的知识图谱检索增强生成",
+      "llm_tldr_en": "LSP-RAG improves knowledge graph retrieval-augmented generation by scoring retrieval from latent perspectives, enabling lightweight models to retrieve high-quality multi-hop evidence at lower cost.",
+      "llm_tldr_cn": "论文针对大模型在多跳问答中事实性不足、而现有知识图谱检索增强方法要么依赖大模型引导检索导致成本高、要么轻量模型检索质量差的问题，提出LSP-RAG。方法从潜在评分视角改进知识图谱检索，用轻量模型实现高质量多跳子图检索并支撑生成。实验表明其在多跳问答上优于现有KG-RAG基线且计算开销更低。该工作为知识图谱检索增强生成提供了更实用的检索方案。",
+      "llm_tldr": "论文针对大模型在多跳问答中事实性不足、而现有知识图谱检索增强方法要么依赖大模型引导检索导致成本高、要么轻量模型检索质量差的问题，提出LSP-RAG。方法从潜在评分视角改进知识图谱检索，用轻量模型实现高质量多跳子图检索并支撑生成。实验表明其在多跳问答上优于现有KG-RAG基线且计算开销更低。该工作为知识图谱检索增强生成提供了更实用的检索方案。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
 }

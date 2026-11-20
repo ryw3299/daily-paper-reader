@@ -1,0 +1,357 @@
+Title: CausalDrive: Causal Decomposition for Data-Efficient End-to-End Autonomous Driving
+
+URL Source: https://arxiv.org/pdf/2611.24080v1
+
+Published Time: Thu, 19 Nov 2026 02:25:33 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# CausalDrive: Causal Decomposition for Data-Efficient End-to-End Autonomous Driving 
+
+# Xiaobao Wei, Jingxian Wu, Lirong Yang, Qing Han, Yuan Gao Ziwei Yang, Shuai Yang, Weiwei Liu, Chang Huang Carizon Existing methods CausalDrive 
+
+> “TURN LEFT”
+> Planner  Similar Trajectory
+> “GO STRAIGHT”
+> “TURN LEFT”
+> Intention Prediction
+> Multimodal Response
+> P=0.7 P=0.3
+> “GO STRAIGHT”
+> P=1.0
+
+Figure 1. Comparison of existing methods and CausalDrive . A left turn intention and an intention to proceed straight aggressively exhibit the same lane-changing trajectory, making it difficult to identify the factors that truly influence the driving decision. CausalDrive assigns the two sources of driving behavior to separate learning objectives instead of requiring a single expert trajectory to supervise both implicitly. 
+
+# Abstract 
+
+Efficient use of expert demonstrations is essential for end-to-end autonomous driving. However, directly imitating ex-pert trajectories couples nominal intention, which speci-fies where the vehicle should go, with multimodal driving styles, which determine how that intention is executed. Dif-ferent combinations of these factors can yield similar expert trajectories, obscuring their respective causal contributions and forcing the policy to learn both from a single entangled target. This ambiguity limits how effectively the policy can exploit expert demonstrations. We propose CausalDrive , a causal decomposition framework for data-efficient driving policy learning that separates deterministic nominal in-tention prediction from probabilistic driving style model-ing . Specifically, we construct counterfactual nominal tra-jectories from navigation command, map topology, and ego state by removing style dependent effects, providing a Nom-inal Intention Planner with supervision independent of ex-pert trajectories. Conditioned on the predicted nominal intention and surrounding agents, a diffusion-based Style Execution Policy models diverse driving styles as a multi-modal distribution over residuals between nominal and ex-pert trajectories. This causally structured supervision re-duces redundant learning of shared nominal behavior in routine scenarios, directing expert supervision toward in-formative execution variations and improving data utiliza-tion. CausalDrive achieves 91.2 PDMS on NAVSIM v1 and 
+
+89.5 EPDMS on NAVSIM v2, matching or surpassing state-of-the-art performance. Further experiments demonstrate strong performance with limited expert data and clear ad-vantages in challenging interactive scenarios. 
+
+# 1. Introduction 
+
+End-to-end autonomous driving maps scene observations and driving context to future ego trajectories. Early stud-ies established imitation learning for driving policy learn-ing [1, 4, 6, 31, 41], while recent approaches introduced structured scene representations and planning-oriented ar-chitectures [12, 13, 16, 17, 22, 34, 36, 43, 46]. Despite these advances, most methods treat expert trajectories as monolithic supervision targets, entangling factors with dis-tinct causal roles. Learning these factors jointly obscures 1arXiv:2611.24080v1 [cs.CV] 18 Nov 2026 their respective contributions and limits the effective use of expert demonstrations. We distinguish two factors underlying driving behav-ior: a nominal intention that specifies where the vehicle should go, and multimodal driving styles that determine how that intention is executed. Given the navigation com-mand, map topology, and ego state, the nominal intention is represented by an intention-consistent trajectory [29, 32]. Driving styles, in contrast, describe how the ego vehicle re-sponds to surrounding agents, such as by following, yield-ing, or overtaking, while pursuing that intention. Different combinations of these factors can yield similar expert tra-jectories over a short planning horizon. As illustrated in Figure 1, a vehicle intending to turn left and one intend-ing to proceed straight with an aggressive execution style can exhibit similar lane-changing trajectories. The observed trajectory alone therefore provides no explicit signal for at-tributing the behavior to nominal intention or driving style. Directly imitating this trajectory requires the policy to infer both factors from a single entangled target, making their re-spective contributions ambiguous and reducing the sample efficiency of learning either factor. Existing approaches do not explicitly resolve this ambi-guity. Conventional planners based on regression directly predict the complete expert trajectory, coupling nominal intention and driving style within a single target. Gen-erative approaches [21, 25, 40, 44, 47, 48, 50] instead model a multimodal distribution over complete trajecto-ries, but typically leave the underlying sources of multi-modality entangled. Meanwhile, methods based on causal-ity [14, 26, 27, 30, 37, 49] mitigate spurious correlations at the representation or training level. Our approach instead explicitly decomposes the supervision target, assigning de-terministic nominal intention and probabilistic driving style to dedicated learning objectives. To this end, we introduce CausalDrive , a causal decom-position framework for data-efficient driving policy learn-ing . First, we construct counterfactual nominal trajectories from navigation commands, map topology, and ego state by removing style dependent effects. Each trajectory repre-sents how the ego vehicle would proceed under the speci-fied intention in the absence of surrounding agents. These targets supervise a Nominal Intention Planner (NIP) in-dependently of expert trajectories, and the NIP predicts a deterministic nominal trajectory. Second, conditioned on the predicted nominal trajectory and surrounding agents, a diffusion-based Style Execution Policy (SEP) models di-verse driving styles as a multimodal distribution over resid-uals between nominal and expert trajectories. This decomposition provides causally structured super-vision by aligning separate learning objectives with the dis-tinct roles of nominal intention and driving style. In rou-tine scenes, nominal trajectories already approximate ex-pert execution. Residual modeling therefore reduces redun-dant learning of nominal behavior and focuses expert su-pervision on informative style variations. Moreover, large residuals identify demonstrations that contribute substan-tial execution adjustments beyond the nominal reference, which improves both data utilization and challenging sce-nario mining. Extensive experiments validate the effectiveness of CausalDrive. It achieves 91.2 PDMS on NAVSIM v1 and 
+
+89.5 EPDMS on the more challenging NAVSIM v2, match-ing or surpassing state-of-the-art performance. Residual guided data selection yields strong performance with only 20% of the expert demonstrations, while further analyses show clear advantages in large residual interactive scenarios and more structured driving style distributions. Our contri-butions are summarized as follows: • We identify a causal ambiguity in direct imitation of ex-pert trajectories: different combinations of nominal inten-tion and driving style can yield similar trajectories, ob-scuring their respective contributions and limiting the ef-fective use of expert demonstrations. • We propose CausalDrive , a causally structured supervi-sion framework that separates deterministic nominal in-tention prediction from probabilistic driving style mod-eling. A Nominal Intention Planner learns from inde-pendent counterfactual targets, while a diffusion-based 
+
+Style Execution Policy models execution residuals, re-ducing redundant learning of nominal behavior and en-abling residual guided mining of informative scenarios. • CausalDrive achieves 91.2 PDMS on NAVSIM v1 and 89.5 EPDMS on NAVSIM v2. Extensive experiments demonstrate strong data efficiency with residual guided data mining and clear advantages in large residual inter-active scenarios. 
+
+# 2. Related Work 
+
+2.1. End-to-End Autonomous Driving 
+
+End-to-end autonomous driving maps sensor observations and driving context to future ego trajectories, enabling per-ception, prediction, and planning to be optimized toward a unified objective. Early approaches established imita-tion learning as an effective paradigm for driving policy learning and improved robustness through synthesized per-turbations or privileged supervision [1, 4, 15, 18, 28, 38, 39]. Subsequent work introduced structured scene repre-sentations and planning-oriented architectures. ST-P3 [12] learns spatial-temporal features for vision-based planning, UniAD [13] organizes perception and prediction around a planning objective, VAD [17] represents map elements and agent motion as vectors, and SparseDrive [36] develops a sparse, object-centric driving framework. Complementary causality-aware approaches [24, 26, 37] address spurious 2correlations through causal intervention or structured scene modeling. These advances improve scene modeling and policy learning, but generally retain the complete expert tra-jectory as the supervision target without separately super-vising nominal intention and driving style. CausalDrive in-stead decomposes this target into independently supervised nominal intention and expert-derived style residuals, mak-ing their causal roles explicit and reducing the ambiguity that limits effective use of expert demonstrations. 
+
+2.2. Generative and Diffusion-Based Planning 
+
+Generative planners model uncertainty in driving by pro-ducing diverse trajectory hypotheses rather than a single de-terministic prediction. GenAD [48] jointly generates agent motion and ego plans through latent generative modeling, while DiffusionDrive [25] employs truncated diffusion for efficient multimodal planning. DiffusionDriveV2 [50] fur-ther incorporates reinforcement learning to improve trajec-tory quality while preserving behavioral diversity. These methods model multimodality over complete trajectories without explicitly separating variation in nominal intention from variation in its execution. ResAD [49] instead mod-els normalized residuals relative to an inertial reference, simplifying trajectory generation. However, residual pa-rameterization alone does not provide an independently su-pervised, intention-consistent reference or explicitly isolate driving style. In contrast, CausalDrive learns a determinis-tic nominal trajectory from style-free counterfactual targets and conditions diffusion on this trajectory to model mul-timodal style residuals. The distinction lies not merely in generating residuals, but in assigning nominal intention and driving style to separate supervision targets, reducing the burden of learning their entangled distribution from expert demonstrations. 
+
+# 3. Method 
+
+3.1. Preliminary 
+
+Problem formulation. Each planning step is character-ized by a navigation command N , surrounding agents A,map topology M, and ego state E. Figure 2 contrasts the two modeling paradigms. Direct imitation of expert trajectories jointly maps A and M to the executed trajec-tory T , without explicitly separating intention from style. CausalDrive introduces a nominal trajectory I and excludes the direct influence of A on it, assigning agent dependent execution behavior to the style component. The ground truth trajectory is denoted by τ gt = {pgt  
+
+> t
+
+}Ht=1 , where H is the planning horizon and pgt  
+
+> t
+
+is the future ego pose at step 
+
+t. Conventional behavior cloning trains a driving policy π
+
+by minimizing 
+
+LBC = E ℓ π(N , A, M, E), τ gt  . (1) xA MITxA MT               
+
+> do ( A = ∅)
+> (a) (b)
+> Figure 2. Comparison of causal graphs for trajectory prediction. (a) In conventional methods, the scene representation Xis en-coded into agent( A) and map( M) representations, which jointly determine the executed trajectory T. (b) CausalDrive introduces a nominal trajectory Iand excludes the direct influence of Aon it;
+> Tis determined by Iand the driving style induced by A.
+
+The expert trajectory couples nominal intention with driv-ing style, so Eq. 1 does not explicitly attribute the demon-strated behavior to either factor. We adopt a causal model-ing assumption: navigation command N , map topology M,and ego state E determine the nominal intention, while sur-rounding agents A influence how it is executed. Under this assumption, trajectory generation is conceptually factorized as 
+
+(N , M, E) → τ N , (τ N , A) → τ , (2) where τ N denotes the nominal trajectory and τ denotes the executed trajectory. We interpret the nominal trajectory as a counterfactual approximation of how the ego vehicle would proceed if surrounding agents were removed, with naviga-tion, map context, and the current ego state held fixed: 
+
+τ N ≈ τ | do (A = ∅). (3) 
+
+Framework overview. CausalDrive implements this de-composition with a deterministic nominal trajectory ˆτ N and a probabilistic style residual δS:
+
+ˆτ N = fθ (N , M, E), δS ∼ pϕ
+
+
+
+δ | A , ˆτ N 
+
+, (4) where fθ is the Nominal Intention Planner (NIP) and pϕ
+
+is the Style Execution Policy (SEP). The final trajectory is composed as 
+
+ˆτ = ˆ τ N + δS. (5) As shown in Figure 3, the NIP learns nominal intention from style-free counterfactual targets constructed in Sec-tion 3.2. The SEP learns how that intention is executed by modeling multimodal residuals conditioned on the nominal trajectory and surrounding agents. Eq. 4 summarizes the conceptual factorization. This separation supplies explicit supervision for each factor, reducing the burden of inferring both from an entangled expert trajectory. 3N × Layer Style Execution Policy       
+
+> Multimodal Sample
+> Map feature Agent feature
+> Trajectory feature
+> Map feature Bev feature
+> Status feature
+> Encoder
+> t
+> Map Cross-Attn
+> Ego Cross-Attn
+> MLP
+> NIP
+> SEP Trajectory Ranker
+> Perception
+> Bbox Lane
+> Ego Status
+> Norm
+> Map Cross-Attn
+> Agent Cross-Attn
+> Ego Cross-Attn
+> Modulation
+> MLP
+> DeNorm
+> 𝜏 != 𝑓 "𝒩, ℳ, ℰ 𝛿 #~𝑝 $(𝛿 ∣ 𝒜, 𝜏 !)𝜏 = 𝜏 !+ 𝛿 #
+
+Figure 3. Overview of CausalDrive. The NIP predicts a nominal trajectory from map features, navigation command, and ego state. Conditioned on this trajectory and the complete scene context, the SEP samples multimodal style residuals. Adding each residual to the nominal trajectory yields a set of diverse candidates, from which the trajectory ranker selects the executable trajectory. 
+
+3.2. Nominal Trajectory Construction 
+
+Since the expert trajectory is inherently entangled with driv-ing style, we do not use it to construct the nominal trajec-tory. We organize the nominal trajectory generator R into lane association and topological extension, arc-length ge-ometry, and temporal parameterization. 
+
+Lane association and topological extension. Let x0 and 
+
+ψ0 denote the current ego position and heading, and let 
+
+cℓ(s) be the centerline parameterized by arc length of lane 
+
+ℓ. We collect local lane candidates around ego position and retain those compatible with the navigation command and route topology, forming C. Navigation constrains the ad-missible route, while positional and directional consistency determine the initial lane within this set: 
+
+ℓ0 = arg min 
+
+> ℓ∈C
+
+h
+
+d(x0, c ℓ) + λψ ∆ψ(ψ0, ψ proj  
+
+> ℓ
+
+)
+
+i
+
+, (6) where d is the distance from the point to the centerline, 
+
+ψproj  
+
+> ℓ
+
+is the heading at the ego projection, and ∆ψ is the absolute wrapped angular difference. Candidates inconsis-tent with the ego heading are excluded when feasible. Start-ing from ℓ0, we extend the path along map connectivity. At each branch, Succ( ℓj ) contains only connected successors compatible with the commanded maneuver and route con-tinuation; for example, a turn command excludes connec-tors leading to incompatible exits. We then select the direc-tionally smoothest successor within this set constrained by navigation: 
+
+ℓj+1 = arg min   
+
+> ℓ∈Succ( ℓj)
+
+∆ψ(ψend  
+
+> ℓj
+
+, ψ start  
+
+> ℓ
+
+). (7) The traversal excludes revisited lanes and continues until the required sampling length is covered. 
+
+Ego-to-centerline connection and arc-length geometry. 
+
+Concatenating the selected lane centerlines yields a refer-ence curve γ(s), parameterized by cumulative arc length. We first locate the ego projection on the initial lane: 
+
+s0 = arg min 
+
+> s∈I ℓ0
+
+∥γ(s) − x0∥22, (8) where Iℓ0 is the arc-length interval of the associated lane. When the ego vehicle is laterally offset from the center-line, starting directly at γ(s0) would introduce a positional discontinuity. We therefore prepend an entry curve η :[0 , L e] → R2, parameterized by arc length, that connects the current ego position to a forward merging point γ(sm),with sm ≥ s0. The connector satisfies η(0) = x0 and 
+
+η(Le) = γ(sm), and its endpoint tangents align with the ego heading and the centerline direction, respectively. The complete geometric path is 
+
+Γ( u) = 
+
+(
+
+η(u), 0 ≤ u < L e,γ(sm + u − Le), u ≥ Le. (9) We transform the connected path into ego coordinates as 
+
+˜γn(u) = R(−ψ0)[Γ( u) − x0], (10) where R is the planar rotation matrix. Thus, ˜γn(0) = 0, and subsequent temporal sampling covers both the entry con-nection and the lane-following segment. 
+
+Temporal parameterization. We construct a nominal speed profile vN (t) from the current ego speed and static map constraints, including speed limits, traffic rules, and 4path curvature. Denoting this deterministic refinement by 
+
+V, the longitudinal progress is 
+
+vN (t) = V(˜ γn, M, E)( t), vN (0) = v0,uk =
+
+Z k∆t
+
+> 0
+
+vN (t) d t, k = 1 , . . . , H, (11) where v0 is the current ego speed and ∆t is the waypoint in-terval. The nominal target combines the sampled positions with the corresponding headings along the path tangent: 
+
+¯τ N = R(N , M, E) = 
+
+n 
+
+˜γn(uk), ˜ψn(uk)
+
+o Hk=1 
+
+,
+
+˜ψn(u) = atan2  ˜γ′ 
+
+> n,y
+
+(u), ˜γ′
+
+> n,x
+
+(u) .
+
+(12) We use H = 8 and ∆t = 0 .5 s , yielding a 4 s planning horizon. Both geometric construction and temporal param-eterization use only navigation, map information, and the current ego state, without surrounding agent states or expert future trajectories. The resulting target provides style-free supervision for nominal intention independently of expert demonstrations. 
+
+3.3. Architecture 
+
+CausalDrive encodes multiple view images and LiDAR point clouds with a TransFuser-style fusion backbone [5]. The NIP decoder combines map features with the ego con-dition through cross-attention to predict ˆτ N . The SEP addi-tionally incorporates agent features and conditions residual denoising on the nominal prediction. The sampled residuals are added to the shared nominal trajectory to form candidate plans, which are evaluated by a coarse-to-fine ranker. 
+
+Nominal Intention Planner. The NIP predicts how the ego vehicle would proceed under the nominal intention, without directly imitating the style dependent expert trajec-tory. A cross-attention decoder fuses encoded map features with the navigation command and ego state to predict ˆτ N .The counterfactual target ¯τ N in Eq. 12 provides its super-vision. Agent features are excluded from the NIP decoder, preventing direct conditioning of the nominal prediction on surrounding agent representations. 
+
+Style Execution Policy. The SEP models diverse execu-tions of a given nominal intention as a conditional distri-bution over style residuals. A scene may admit multiple valid interaction responses, such as following, yielding, or overtaking, while the expert trajectory records only one re-alization. Instead of modeling these responses jointly with nominal intention in a distribution over complete trajecto-ries, the SEP represents them as deviations from ˆτ N . For each training sample, the residual target is 
+
+δ0 = τ gt − sg[ˆ τ N ], (13) where sg[ ·] stops gradients through the nominal prediction, preventing the SEP objective from directly changing the nominal target or conditioning trajectory. We use diffusion to capture the conditional multimodality of these residuals rather than regressing a single correction. Within candidate generation, explicit agent features enter through the SEP rather than the NIP. The SEP learns the conditional distribution of style resid-uals through diffusion. During training, Gaussian noise is added to the residual target: 
+
+δs = √¯αs δ0 + √1 − ¯αs ϵ, ϵ ∼ N (0 , I), (14) where s denotes the diffusion step and ¯αs follows the noise schedule. Conditioned on scene features and the stop-gradient nominal trajectory, the decoder ϵϕ is trained to pre-dict the added noise: 
+
+LSEP = E
+
+h
+
+∥ϵ − ϵϕ(δs, s, c)∥22
+
+i
+
+, (15) where c contains map and agent features, the ego condition, and the nominal trajectory. 
+
+Multimodal Trajectory Ranker. The K residuals yield diverse candidates that are not equally suitable for exe-cution. We therefore apply a coarse-to-fine ranker. Alightweight coarse head scores all candidates and retains a subset Cfine at inference. A fine head then predicts the benchmark subscores of each candidate and aggregates them into the official driving score rω (PDMS or EPDMS). We supervise rω on all K candidates with the simulator-computed target sk:
+
+Lrank = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+rω (ˆ τ k) − sk 1. (16) At inference, the final trajectory is the candidate in Cfine 
+
+with the highest rω .
+
+# 4. Experiments 
+
+4.1. Benchmark 
+
+We evaluate on the NAVSIM v1 [8] and NAVSIM v2 [3] benchmarks using their official metrics, PDMS and EPDMS, respectively. NAVSIM provides a suite of real-world, planning-centric driving scenarios built upon Open-Scene [7], which is a compact version of the extensive nu-Plan [2] dataset. The dataset is split into navtrain (1,192 training scenes) and navtest (136 evaluation scenes). 
+
+4.2. Implementation Details 
+
+For a fair comparison with prior NAVSIM methods, we follow TransFuser [5] and use a ResNet-34 backbone [10] with camera–LiDAR fusion. We train from scratch on nav-train and evaluate on navtest , using the same architecture 5Table 1. Comparison on NAVSIM v1 navtest with closed-loop metrics. Best results are in bold and second best are underlined. Method Img. Backbone NC ↑ DAC ↑ TTC ↑ Comf. ↑ EP ↑ PDMS ↑
+
+UniAD [13] ResNet-34 97.8 91.9 92.9 100 78.8 83.4 Transfuser [5] ResNet-34 97.7 92.8 92.8 100 79.2 84.0 GoalFlow [42] ResNet-34 98.3 93.8 94.3 100 79.8 85.7 Hydra-MDP [23] ResNet-34 98.3 96.0 94.6 100 78.7 86.5 Hydra-MDP++ [19] ResNet-34 97.6 96.0 93.1 100 80.4 86.6 DiffusionDrive [25] ResNet-34 98.2 96.2 94.7 100 82.2 88.1 WoTE [20] ResNet-34 98.5 96.8 94.9 99.9 81.9 88.3 DIVER [35] ResNet-34 98.5 96.5 94.9 100 82.6 88.3 ResAD [49] ResNet-34 98.0 97.5 94.1 100 83.3 88.8 DriveSuprim [45] ResNet-34 97.8 97.3 93.6 100 86.7 89.9 DiffusionDriveV2 [50] ResNet-34 98.3 97.9 94.8 99.9 87.5 91.2 
+
+Hydra-MDP [23] V2-99 98.4 97.8 93.9 100 86.5 90.3 ResAD [49] V2-99 98.9 97.8 94.9 100 87.0 90.6 CausalDrive (Ours) ResNet-34 98.4 98.1 95.9 100 86.0 91.2 
+
+Table 2. Comparison on NAVSIM v2 navtest with extended closed-loop metrics. EPDMS ∗ denotes results computed using the original NAVSIM v2 evaluation code, in which human behavior filtering was not applied when calculating EPDMS. This version is reported for fair comparison with prior works. EPDMS denotes results computed using the updated official implementation after the issue was resolved.                                                                                                                                    
+
+> Method Img. Backbone NC ↑DAC ↑DDC ↑TL ↑EP ↑TTC ↑LK ↑HC ↑EC ↑EPDMS ∗↑EPDMS ↑
+> Ego Status MLP ResNet-34 93.1 77.9 92.7 99.6 86.0 91.5 89.4 98.3 85.4 64.0 –Transfuser [5] ResNet-34 96.9 89.9 97.8 99.7 87.1 95.4 92.7 98.3 87.2 76.7 –Hydra-MDP++ [19] ResNet-34 97.2 97.5 99.4 99.6 83.1 96.5 94.4 98.2 70.9 81.4 –DriveSuprim [45] ResNet-34 97.5 96.5 99.4 99.6 88.4 96.6 95.5 98.3 77.0 83.1 –ARTEMIS [9] ResNet-34 98.3 95.1 98.6 99.8 81.5 97.4 96.5 98.3 98.3 83.1 –DiffusionDriveV2 [50] ResNet-34 97.7 96.6 99.2 99.8 88.9 97.2 96.0 97.8 91.0 85.5 87.5 Hydra-MDP++ [19] V2-99 98.4 98.0 99.4 99.8 87.5 97.7 95.3 98.3 77.4 85.1 –DriveSuprim [45] V2-99 97.8 97.9 99.5 99.9 90.6 97.1 96.6 98.3 77.9 86.0 –CausalDrive (Ours) ResNet-34 98.6 97.9 99.5 99.9 87.2 98.1 96.2 98.2 83.3 86.0 89.5
+
+for NAVSIM v1 and v2. We retain the same maximum training budget of 100 epochs as in the previous setting and use AdamW with a learning rate of 6 × 10 −4 and a global batch size of 512 on 8 NVIDIA H20 GPUs. Training has two stages. Stage I trains the backbone and the NIP for 10 epochs on a randomly selected 10% subset of navtrain , us-ing an ℓ1 loss on ¯τ N . Stage II keeps training the NIP with this loss and trains the SEP as a DDPM [11] with S=1000 
+
+steps, conditioned on the NIP prediction with probability 
+
+0.9 and on ¯τ N otherwise; the target is the expert trajectory minus the condition. At inference, we use 2-step DDIM sampling [33] and the same number of samples as Diffu-sionDrive [25]. Each sample is composed with ˆτ N , and the ranker selects one trajectory for execution. 
+
+4.3. Main Results 
+
+Results on NAVSIM v1 and v2. As shown in Tables 1 and 2, CausalDrive achieves 91.2 PDMS on NAVSIM v1 and 89.5 EPDMS on NAVSIM v2 with a ResNet-34 back-bone, attaining the highest reported PDMS and EPDMS among the compared methods. On NAVSIM v1, it achieves the best DAC (98.1) and TTC (95.9); on NAVSIM v2, it achieves the best NC (98.6), TTC (98.1), DDC (99.5), and TL (99.9), together with the best DAC (97.9) among ResNet-34 methods. These results indicate strong collision avoidance and rule compliance, consistent with the com-plementary roles of the two components: the NIP provides an intention-consistent nominal trajectory, while the SEP models the interaction responses required to execute it in surrounding traffic. 
+
+Data Efficiency. We investigate how causally structured supervision improves the utilization of expert demonstra-tions. In Stage I, the backbone and NIP are trained for only 
+
+10 epochs on a randomly selected 10% subset of nav-train , using counterfactual nominal targets to establish an intention consistent nominal reference. This reference cap-tures common nominal behavior independently of the di-verse execution patterns in expert trajectories, allowing sub-sequent expert supervision to focus on the additional behav-ior required to execute that intention. 6t=4s t=0s Top-1 Traj t=4s t=0s Top-5 Traj DiffusionDrive DiffusionDriveV2 CausalDrive           
+
+> DiffusionDrive DiffusionDriveV2 CausalDrive
+> DiffusionDrive DiffusionDriveV2 CausalDrive
+> DiffusionDrive DiffusionDriveV2 CausalDrive
+> Nominal Traj Figure 4. Qualitative comparison in a sharp turn and dense traffic. DiffusionDrive and DiffusionDriveV2 generate route-inconsistent can-didates in the turn and inadequate interaction responses in dense traffic. CausalDrive maintains an intention-consistent nominal reference and models execution adapted to traffic through multimodal style residuals.
+> Figure 5. Data efficiency on NAVSIM v1. CausalDrive is eval-uated with residual ranked and random sampling, while Diffu-sionDrive and DiffusionDriveV2 use random sampling. The three random sampling configurations share the same subsets; residual ranked subsets include large residual scenes first. All configura-tions are evaluated on the fixed navtest split.
+
+In routine scenes, nominal trajectories already approx-imate expert execution, leaving little additional behavior for the SEP to learn. By modeling execution residuals, CausalDrive reduces repeated learning of shared nominal structure and focuses supervision on informative interaction adjustments. We evaluate four configurations at data proportions of 20%, 40%, 60%, 80%, and 100%: CausalDrive with resid-ual ranked sampling, and CausalDrive, DiffusionDrive, and DiffusionDriveV2 with random sampling. The three ran-dom sampling configurations share the same subsets, and all configurations are evaluated on the fixed navtest split. As shown in Figure 5, randomly sampled CausalDrive outper-forms both baselines at reduced data scales, demonstrating improved data utilization through decomposition alone. Its advantage over DiffusionDriveV2 narrows as more training data becomes available. Residual guided data mining further improves data effi-ciency by prioritizing demonstrations with informative ex-ecution behavior. We rank scenes by their residual ratios in descending order and prioritize those with large residuals for training. Using only the top 40% of scenes, CausalDrive achieves a substantial PDMS improvement over random sampling. As the subset grows, the marginal benefit di-minishes, with smaller residual scenes contributing little ad-ditional improvement. These results suggest that effective data utilization depends on the additional execution behav-ior contributed by each demonstration, rather than training set size alone. 
+
+Performance in Challenging Interactive Scenarios. 
+
+Following the residual guided difficulty partition, we com-pare the methods on large residual scenarios on navtest ,7Table 3. Comparison on large residual challenging scenarios in NAVSIM v2, where the expert trajectory departs substantially from the nominal reference. 
+
+Method NC ↑ DAC ↑ DDC ↑ TL ↑ EP ↑ TTC ↑ LK ↑ HC ↑ EC ↑ EPDMS ∗ ↑ EPDMS ↑
+
+DiffusionDrive [25] 96.3 86.7 98.0 99.2 85.9 94.6 96.0 97.9 79.5 67.7 73.7 DiffusionDriveV2 [50] 96.0 90.3 96.3 99.4 86.7 94.9 94.7 93.9 32.6 65.3 72.4 CausalDrive (Ours) 97.5 92.7 99.3 99.4 84.9 97.1 97.0 97.8 82.4 77.6 82.3                                   
+
+> Table 4. Ablation study of each component on NAVSIM v1.
+> NIP SEP Ranker NC ↑DAC ↑TTC ↑Comf. ↑EP ↑PDMS ↑
+> 98.2 96.2 94.7 100 82.2 88.1
+> ✓94.6 97.3 70.7 100 82.5 78.7
+> ✓✓98.3 97.5 95.7 100 84.4 89.9
+> ✓✓✓98.4 98.1 95.9 100 86.0 91.2
+
+where expert execution departs substantially from the nom-inal reference. These scenes include unprotected turns and dense traffic, requiring the policy to preserve nominal in-tention while adapting its execution to surrounding agents. As shown in Table 3, CausalDrive achieves the highest 
+
+EPDMS ∗ (77.6) and EPDMS (82.3). Its EPDMS advan-tage over DiffusionDriveV2 increases from +2 .0 on navtest 
+
+to +9 .9 on these challenging scenarios. This larger mar-gin suggests that separating nominal intention from driving style alleviates the learning difficulty of scenes requiring substantial execution adjustments. Together with the data efficiency results, this comparison highlights the comple-mentary benefits of residual guided selection and decom-posed policy learning: the former identifies demonstrations with additional execution behavior, while the latter models that behavior relative to an explicit nominal reference. 
+
+Qualitative Comparison. Figure 4 compares Diffusion-Drive, DiffusionDriveV2, and CausalDrive in a sharp turn and dense traffic. In the turning scenario, the baselines gen-erate straight-going or off-road candidates, indicating am-biguity between nominal intention and execution behavior. CausalDrive instead anchors its candidates to an intention-consistent nominal trajectory that follows the road curva-ture. In dense traffic, the baselines produce candidates that fail to adequately accommodate surrounding agents, whereas CausalDrive models interaction dependent adjust-ments through style residuals, capturing behaviors such as following, yielding, and overtaking. These examples illus-trate the complementary roles of the NIP and SEP: the for-mer establishes where the vehicle should go, while the latter adapts its execution to surrounding traffic. 
+
+Ablation Studies To validate the efficacy of each com-ponent in CausalDrive, we conduct a comprehensive ab-lation study, as shown in Table 4. The baseline is Dif-fusionDrive, which takes the expert trajectory as supervi-sion. Attached to the DiffusionDrive backbone, given no surrounding agents and supervised by counterfactual nom-inal targets, the NIP favors a trajectory inside the drivable DiffusionDrive CausalDrive 
+
+> Figure 6. t-SNE of final trajectories from DiffusionDrive (left) and driving style residuals from CausalDrive (right). Different colors denote cluster result of CausalDrive. CausalDrive yields compact and separable clusters with high consistency within each category, whereas DiffusionDrive trajectories form a diffuse distribution.
+
+area, raising DAC but TTC and NC fall by 24.0 and 3.6, respectively. Conditioned on this fixed nominal trajectory and surrounding agents, the SEP models following, yield-ing, and overtaking as driving styles for interacting with surrounding agents. TTC and NC then recover by 25.0 and 3.7, respectively. NIP and SEP are complementary: the NIP specifies the nominal intention, while the SEP supplies the driving styles required to execute it in traffic, raising PDMS to 89.9. The ranker then selects among these plausible mul-timodal driving styles, further raising PDMS to 91.2. 
+
+Representation Analysis of Modeling Paradigms. We apply t-SNE to visualize DiffusionDrive trajectories and CausalDrive style residuals across large residual scenarios in Table 3. As shown in Figure 6, DiffusionDrive outputs form a diffuse distribution, reflecting the couple of nom-inal intention and driving style. In contrast, CausalDrive residuals exhibit compact and separated groups. Assign-ing nominal prediction to the NIP allows the SEP to model execution behavior without repeatedly learning the shared nominal component. This separation exposes distinct style distributions that would otherwise be obscured by differ-ences in nominal path geometry, yielding a more structured representation of interaction behaviors such as following, yielding, and overtaking. 
+
+# 5. Conclusion 
+
+We presented CausalDrive , a causal decomposition frame-work that separates deterministic nominal intention predic-tion from probabilistic driving style modeling. By assign-ing shared nominal behavior to an independently supervised planner, CausalDrive reduces redundant learning from rou-tine scenarios and focuses expert supervision on additional execution behaviors. The resulting residual representation 8also enables targeted mining of informative scenarios, prior-itizing demonstrations that require substantial adjustments beyond nominal motion. Experiments on NAVSIM v1 and v2 demonstrate state-of-the-art performance, strong data ef-ficiency, and clear advantages in large residual interactive scenarios. 
+
+# References 
+
+[1] Mayank Bansal, Alex Krizhevsky, and Abhijit S. Ogale. Chauffeurnet: Learning to drive by imitating the best and synthesizing the worst. ArXiv , abs/1812.03079, 2018. [2] Holger Caesar, Juraj Kabzan, Kok Seang Tan, Whye Kit Fong, Eric M. Wolff, Alex Lang, Luke Fletcher, Oscar Beijbom, and Sammy Omari. nuplan: A closed-loop ml-based planning benchmark for autonomous vehicles. ArXiv ,abs/2106.11810, 2021. [3] Wei Cao, Marcel Hallgarten, Tianyu Li, Daniel Dauner, Xunjiang Gu, Caojun Wang, Yakov Miron, Marco Aiello, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap Chitta. Pseudo-simulation for autonomous driving. In Conference on Robot Learning (CoRL) , 2025. [4] Dian Chen, Brady Zhou, Vladlen Koltun, and Philipp Kr¨ ahenb¨ uhl. Learning by cheating. In Conference on Robot Learning (CoRL) , 2019. [5] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao Yu, Katrin Renz, and Andreas Geiger. Transfuser: Imitation with transformer-based sensor fusion for autonomous driv-ing. IEEE Transactions on Pattern Analysis and Machine Intelligence , 45(11):12878–12895, 2023. [6] Felipe Codevilla, Matthias M¨ uller, Antonio L´ opez, Vladlen Koltun, and Alexey Dosovitskiy. End-to-end driving via conditional imitation learning. In 2018 IEEE International Conference on Robotics and Automation , pages 4693–4700, 2018. [7] OpenScene Contributors. Openscene: The largest up-to-date 3d occupancy prediction benchmark in autonomous driv-ing. In Proceedings of the Conference on Computer Vision and Pattern Recognition, Vancouver, Canada , pages 18–22, 2023. [8] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap Chitta. Navsim: Data-driven non-reactive autonomous vehicle simulation and benchmark-ing. In Advances in Neural Information Processing Systems Datasets and Benchmarks Track , 2024. [9] Renju Feng, Ning Xi, Duanfeng Chu, Rukang Wang, Ze-jian Deng, Anzheng Wang, Liping Lu, Jinxiang Wang, and Yanjun Huang. Artemis: Autoregressive end-to-end trajec-tory planning with mixture of experts for autonomous driv-ing. IEEE Robotics and Automation Letters , 11(1):226–233, 2026. [10] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In 2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , pages 770–778, 2016. [11] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-sion probabilistic models. In Proceedings of the 34th Inter-national Conference on Neural Information Processing Sys-tems , pages 6840–6851, 2020. [12] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi Yan, and Dacheng Tao. St-p3: End-to-end vision-based au-tonomous driving via spatial-temporal feature learning. In 
+
+European Conference on Computer Vision , 2022. [13] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, et al. Planning-oriented autonomous driving. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2023. [14] Yi Huang, Zhan Qu, Lihui Jiang, Bingbing Liu, and Hongbo Zhang. Prioritizing perception-guided self-supervision: A new paradigm for causal modeling in end-to-end au-tonomous driving. In Advances in Neural Information Pro-cessing Systems 38: Annual Conference on Neural Informa-tion Processing Systems 2025, NeurIPS 2025, San Diego, CA, USA, December 2-7, 2025 / Mexico City, Mexico, November 30 - December 5, 2025 , 2025. [15] Xiaosong Jia, Yulu Gao, Li Chen, Junchi Yan, Patrick Langechuan Liu, and Hongyang Li. Driveadapter: Breaking the coupling barrier of perception and planning in end-to-end autonomous driving. In IEEE/CVF International Conference on Computer Vision, ICCV 2023, Paris, France, October 1-6, 2023 , pages 7919–7929. IEEE, 2023. [16] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan. Drivetransformer: Unified transformer for scalable end-to-end autonomous driving. In The Thirteenth International Conference on Learning Representations, ICLR 2025, Sin-gapore, April 24-28, 2025 . OpenReview.net, 2025. [17] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. Vad: Vectorized scene representa-tion for efficient autonomous driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,2023. [18] Liyiming Ke, Yunchu Zhang, Abhay Deshpande, Sid-dhartha S. Srinivasa, and Abhishek Gupta. CCIL: continuity-based data augmentation for corrective imitation learning. In 
+
+The Twelfth International Conference on Learning Represen-tations, ICLR 2024, Vienna, Austria, May 7-11, 2024 , 2024. [19] Kailin Li, Zhenxin Li, Shiyi Lan, Yuan Xie, Zhizhong Zhang, Jiayi Liu, Zuxuan Wu, Zhiding Yu, and Jose M Alvarez. Hydra-mdp++: Advancing end-to-end driv-ing via expert-guided hydra-distillation. arXiv preprint arXiv:2503.12820 , 2025. [20] Yingyan Li, Yu-Quan Wang, Yang Liu, Jiawei He, Lue Fan, and Zhaoxiang Zhang. End-to-end driving with online tra-jectory evaluation via bev world model. 2025 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 27137–27146, 2025. [21] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. Recogdrive: A reinforced cog-nitive framework for end-to-end autonomous driving. In 
+
+9The Fourteenth International Conference on Learning Rep-resentations, ICLR 2026, Rio de Janeiro, Brazil, April 23-27, 2026 . proceedings.iclr.cc, 2026. [22] Zhenxin Li, Shihao Wang, Shiyi Lan, Zhiding Yu, Zuxuan Wu, and Jos´ e M. ´Alvarez. Hydra-next: Robust closed-loop driving with open-loop training. In IEEE/CVF Inter-national Conference on Computer Vision, ICCV 2025, Hon-olulu, HI, USA, October 19-25, 2025 , pages 27305–27314. IEEE, 2025. [23] Zhen-Xin Li, Kailin Li, Shihao Wang, Shi-Yi Lan, Zhiding Yu, Yishen Ji, Zhiqi Li, Ziyue Zhu, Jan Kautz, Zuxuan Wu, Yu-Gang Jiang, and Jos´ e M. ´ Alvarez. Hydra-mdp: End-to-end multimodal planning with multi-target hydra-distillation. 
+
+ArXiv , abs/2406.06978, 2024. [24] Yue Liang, Jiatong Du, Ziyi Yang, Yanjun Huang, and Hong Chen. Curve: learning causality-inspired invariant represen-tations for robust scene understanding via uncertainty-guided regularization. arXiv preprint arXiv:2601.20355 , 2026. [25] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang, Qian Zhang, and Xinggang Wang. Diffusiondrive: Truncated diffusion model for end-to-end autonomous driving. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2025. [26] Seokha Moon, Minseung Lee, Joon Seo, Jinkyu Kim, and Jungbeom Lee. Causality-aware end-to-end autonomous driving via ego-centric joint scene modeling. arXiv preprint arXiv:2605.13646 , 2026. [27] Seokha Moon, Minseung Lee, Joo Hyung Seo, Jinkyu Kim, and Jungbeom Lee. Causality-aware end-to-end au-tonomous driving via ego-centric joint scene modeling. 
+
+ArXiv , abs/2605.13646, 2026. [28] Long Nguyen, Micha Fauth, Bernhard Jaeger, Daniel Dauner, Maximilian Igl, Andreas Geiger, and Kashyap Chitta. LEAD: minimizing learner-expert asymmetry in end-to-end driving. In IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition, CVPR 2026, Denver, CO, USA, June 3-7, 2026 , pages 39775–39785. Computer Vision Foundation, 2026. [29] Brian A. Paden, Michal C´ ap, Sze Zheng Yong, Dmitry S. Yershov, and Emilio Frazzoli. A survey of motion planning and control techniques for self-driving urban vehicles. IEEE Transactions on Intelligent Vehicles , 1(1):33–55, 2016. [30] Mozhgan Pourkeshavarz, Junrui Zhang, and Amir Rasouli. Cadet: A causal disentanglement approach for robust trajec-tory prediction in autonomous driving. In IEEE/CVF Con-ference on Computer Vision and Pattern Recognition, CVPR 2024, Seattle, WA, USA, June 16-22, 2024 , pages 14874– 14884. IEEE, 2024. [31] Aditya Prakash, Kashyap Chitta, and Andreas Geiger. Multi-modal fusion transformer for end-to-end autonomous driv-ing. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , pages 7073–7083, 2021. [32] Wilko Schwarting, Javier Alonso-Mora, and Daniela Rus. Planning and decision-making for autonomous vehicles. An-nual Review of Control, Robotics, and Autonomous Systems ,1:187–210, 2018. [33] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denois-ing diffusion implicit models. In International Conference on Learning Representations , 2021. [34] Ziying Song, Caiyan Jia, Lin Liu, Hongyu Pan, Yongchang Zhang, Junming Wang, Xingyu Zhang, Shaoqing Xu, Lei Yang, and Yadan Luo. Don’t shake the wheel: Momentum-aware planning in end-to-end autonomous driving. In 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 22432–22441, 2025. [35] Ziying Song, Lin Liu, Hongyu Pan, Bencheng Liao, Mingzhe Guo, Lei Yang, Yongchang Zhang, Shaoqing Xu, Caiyan Jia, and Yadan Luo. Breaking imitation bottlenecks: Reinforced diffusion powers diverse trajectory generation. 
+
+arXiv e-prints , pages arXiv–2507, 2025. [36] Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang, Haoran Wu, and Sifa Zheng. Sparsedrive: End-to-end autonomous driving via sparse scene representation. In 
+
+IEEE International Conference on Robotics and Automation ,pages 8795–8801, 2025. [37] Jiacheng Tang, Zhiyuan Zhou, Zhuolin He, Jia Zhang, Kai Zhang, and Jian Pu. Causalvad: De-confounding end-to-end autonomous driving via causal intervention. In IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 32124–32133, 2026. [38] Haochen Tian, Tianyu Li, Haochen Liu, Jiazhi Yang, Yihang Qiu, Guang Li, Junli Wang, Yinfeng Gao, Zhang Zhang, Liang Wang, Hangjun Ye, Long Chen, and Hongyang Li. Simscale: Learning to drive via real-world simulation at scale. In IEEE/CVF Conference on Computer Vision and Pattern Recognition, CVPR 2026, Denver, CO, USA, June 3-7, 2026 , pages 36365–36374. Computer Vision Foundation, 2026. [39] Junli Wang, Zhihua Hua, Xueyi Liu, Zebin Xing, Wei Zhang, Kun Ma, Guang Chen, Hangjun Ye, Long Chen, and Qichao Zhang. Beyond imitation: Learning safe end-to-end au-tonomous driving from hard negatives. In Computer Vision - ECCV 2026 - 19th European Conference, Malm¨ o, Sweden, September 8-12, 2026, Proceedings, Part XIII , pages 224– 241. Springer, 2026. [40] Junli Wang, Yinan Zheng, Xueyi Liu, Zebin Xing, Pengfei Li, Kun Ma, Hangjun Ye, Guang Chen, Guang Li, Long Chen, Zhongpu Xia, and Qichao Zhang. Meanfuser: Fast one-step multi-modal trajectory generation and adaptive re-construction via meanflow for end-to-end autonomous driv-ing. In IEEE/CVF Conference on Computer Vision and Pat-tern Recognition, CVPR 2026, Denver, CO, USA, June 3-7, 2026 , pages 17884–17893. Computer Vision Foundation, 2026. [41] Penghao Wu, Li Chen, Hongyang Li, Xiaosong Jia, Junchi Yan, and Yu Qiao. Trajectory-guided control prediction for end-to-end autonomous driving: A simple yet strong base-line. In Advances in Neural Information Processing Systems ,pages 6119–6132, 2022. [42] Zebin Xing, Xingyu Zhang, Yang Hu, Bo Jiang, Tong He, Qian Zhang, Xiaoxiao Long, and Wei Yin. Goalflow: Goal-driven flow matching for multimodal trajectories genera-tion in end-to-end autonomous driving. In 2025 IEEE/CVF 
+
+10 Conference on Computer Vision and Pattern Recognition (CVPR) , pages 1602–1611, 2025. [43] Zhenjie Yang, Xiaosong Jia, Qifeng Li, Xue Yang, Mao-qing Yao, and Junchi Yan. Raw2drive: Reinforcement learn-ing with aligned world models for end-to-end autonomous driving (in CARLA v2). In Advances in Neural Informa-tion Processing Systems 38: Annual Conference on Neural Information Processing Systems 2025, NeurIPS 2025, San Diego, CA, USA, December 2-7, 2025 / Mexico City, Mex-ico, November 30 - December 5, 2025 , 2025. [44] Zhenjie Yang, Yilin Chai, Xiaosong Jia, Qifeng Li, Yuqian Shao, Xuekai Zhu, Haisheng Su, and Junchi Yan. Drivemoe: Mixture-of-experts for vision-language-action model in end-to-end autonomous driving. In IEEE/CVF Conference on Computer Vision and Pattern Recognition, CVPR 2026, Den-ver, CO, USA, June 3-7, 2026 , pages 10678–10688. Com-puter Vision Foundation, 2026. [45] Wenhao Yao, Zhenxin Li, Shiyi Lan, Zi Wang, Xinglong Sun, Jos´ e M. ´ Alvarez, and Zuxuan Wu. Drivesuprim: To-wards precise trajectory selection for end-to-end planning. In AAAI Conference on Artificial Intelligence , pages 11910– 11918, 2026. [46] Rui Yu, Xianghang Zhang, Runkai Zhao, Huaicheng Yan, and Meng Wang. Distilldrive: End-to-end multi-mode au-tonomous driving distillation by isomorphic hetero-source planning model. In IEEE/CVF International Conference on Computer Vision, ICCV 2025, Honolulu, HI, USA, October 19-25, 2025 , pages 26188–26197. IEEE, 2025. [47] Rui Zhao, Yuze Fan, Ziguo Chen, Fei Gao, and Zhenhai Gao. Diffe2e: Rethinking end-to-end driving with a hy-brid diffusion-regression-classification policy. In Advances in Neural Information Processing Systems 38: Annual Con-ference on Neural Information Processing Systems 2025, NeurIPS 2025, San Diego, CA, USA, December 2-7, 2025 / Mexico City, Mexico, November 30 - December 5, 2025 ,2025. [48] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming Zhang, and Long Chen. Genad: Generative end-to-end au-tonomous driving. In European Conference on Computer Vision , pages 87–104, 2024. [49] Zhiyu Zheng, Shaoyu Chen, Haoran Yin, Xinbang Zhang, Jialv Zou, Xinggang Wang, Qian Zhang, and Lefei Zhang. Resad: Normalized residual trajectory modeling for end-to-end autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 3729–3739, 2026. [50] Jialv Zou, Shaoyu Chen, Bencheng Liao, Zhiyu Zheng, Yue-hao Song, Lefei Zhang, Qian Zhang, Wenyu Liu, and Xing-gang Wang. Diffusiondrivev2: Reinforcement learning-constrained truncated diffusion modeling in end-to-end au-tonomous driving. arXiv preprint arXiv:2512.07745 , 2025. 
+
+11
