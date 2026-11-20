@@ -25,3 +25,71 @@ subscriptions:
     stage: A
     diff_threshold_pct: 15
   keyword_recall_mode: or
+  intent_profiles:
+    - tag: kg-rag-agent
+      description: 面向知识增强车载/自动驾驶智能体的检索规划，关注知识图谱、GraphRAG、因果推理用于场景理解与决策，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: knowledge graph
+          keyword_cn: 知识图谱
+          query: knowledge graph representations for external knowledge in intelligent agents
+        - keyword: graph retrieval augmentation
+          keyword_cn: 图检索增强
+          query: graph-based retrieval augmented generation over structured knowledge for reasoning
+        - keyword: autonomous driving agent
+          keyword_cn: 自动驾驶智能体
+          query: large language model agents for autonomous driving and in-vehicle decision support
+        - keyword: in-vehicle agent
+          keyword_cn: 车载智能体
+          query: knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning
+        - keyword: knowledge base poisoning
+          keyword_cn: 知识库投毒
+          query: poisoning attacks that corrupt external knowledge bases used by retrieval augmented agents
+        - keyword: agent security
+          keyword_cn: 智能体安全
+          query: security and defense methods for knowledge-enhanced large language model agents
+      intent_queries:
+        - query: >-
+            knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding
+            and decision making
+          query_cn: 用于自动驾驶场景理解与决策的知识图谱和图检索增强生成方法
+          enabled: true
+          source: manual
+          note: ''
+        - query: >-
+            poisoning, retrieval contamination, and indirect prompt injection attacks on retrieval augmented large
+            language model agents with detection and defense
+          query_cn: 检索增强大模型智能体中的投毒、检索污染和间接提示注入攻击及检测防御
+          enabled: true
+          source: manual
+          note: ''
+        - query: >-
+            propagation of errors and small knowledge modifications through retrieval, multi hop reasoning, and causal
+            reasoning to alter model judgments
+          query_cn: 错误和小幅知识修改如何经检索、多跳推理与因果推理传播并改变模型判断
+          enabled: true
+          source: manual
+          note: ''
+        - query: counterfactual robustness evaluation and safety benchmarking of knowledge enhanced in vehicle agents
+          query_cn: 知识增强车载智能体的反事实鲁棒性评测与安全基准
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-11-20T04:31:21.225Z'
+source_backends:
+  arxiv:
+    papers_table: arxiv_papers
+    use_vector_rpc: true
+    vector_rpc: match_arxiv_papers
+    vector_rpc_exact: match_arxiv_papers_exact
+    use_bm25_rpc: true
+    bm25_rpc: match_arxiv_papers_bm25
+    sync_table: arxiv_sync_status
+    sync_success_value: success
+    schema: public
+    kind: supabase
+    enabled: true
+    url: https://lyucdwgefyfbmaiopjbk.supabase.co
+    anon_key: sb_publishable_lX-oi64Uxyd7SIVv3_w2Uw_MTOojeKq
