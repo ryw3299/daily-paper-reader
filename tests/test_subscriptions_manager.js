@@ -10,6 +10,7 @@ require('../app/subscriptions.manager.js');
 
 const {
   normalizeSubscriptions,
+  saveDraftConfig,
   isConferenceYearSelectable,
   refreshQuickRunButtons,
   clearQuickRunUnsavedMessage,
@@ -137,6 +138,44 @@ function testNormalizeSubscriptionsConvertsChineseTagToEnglishFallback() {
 
   const normalized = normalizeSubscriptions(config);
   assert.equal(normalized.subscriptions.intent_profiles[0].tag, 'rl');
+}
+
+async function testSaveDraftKeepsCurrentRepositoryBackend() {
+  const draft = buildBaseConfig();
+  draft.source_backends.arxiv.enabled = true;
+  draft.supabase = { enabled: true };
+
+  const current = buildBaseConfig();
+  current.source_backends.arxiv.enabled = false;
+  current.supabase = { enabled: false };
+  current.arxiv_paper_setting = { prefer_supabase_read: false };
+  current.subscriptions.keyword_recall_mode = 'and';
+
+  const manager = window.SubscriptionsManager;
+  let saved;
+  window.SubscriptionsGithubToken = {
+    loadConfig: async () => ({ config: draft }),
+    updateConfig: async (update) => { saved = update(current); },
+  };
+  try {
+    await manager.loadSubscriptions();
+    manager.updateDraftConfig((config) => {
+      const profile = config.subscriptions.intent_profiles[0];
+      profile.paper_sources = ['arxiv'];
+      profile.keywords[0].keyword = 'automated driving';
+      return config;
+    });
+
+    await saveDraftConfig();
+    assert.equal(saved.source_backends.arxiv.enabled, false);
+    assert.deepEqual(saved.supabase, current.supabase);
+    assert.deepEqual(saved.arxiv_paper_setting, current.arxiv_paper_setting);
+    assert.equal(saved.subscriptions.keyword_recall_mode, 'and');
+    assert.equal(saved.subscriptions.intent_profiles[0].keywords[0].keyword, 'automated driving');
+    assert.equal(manager.getDraftConfig().source_backends.arxiv.enabled, false);
+  } finally {
+    delete window.SubscriptionsGithubToken;
+  }
 }
 
 async function testRunProfileQuickFetchPassesProfileTagToWorkflow() {
@@ -568,6 +607,7 @@ async function testLongRangeSelectionDispatchesAndCanCancel() {
   testNormalizeSubscriptionsAddsBiorxivBackend();
   testNormalizeSubscriptionsPreservesCustomBiorxivBackendFields();
   testNormalizeSubscriptionsConvertsChineseTagToEnglishFallback();
+  await testSaveDraftKeepsCurrentRepositoryBackend();
   await testRunProfileQuickFetchPassesProfileTagToWorkflow();
   testConferenceCurrentYearDisabledForPendingSources();
   testConferenceDefaultYearOnlySelects2025();

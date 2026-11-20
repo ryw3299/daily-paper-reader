@@ -339,6 +339,7 @@ window.SubscriptionsGithubToken = (function () {
     const res = await fetch(
       `https://api.github.com/repos/${info.owner}/${info.repo}/contents/config.yaml`,
       {
+        cache: 'no-store',
         headers: {
           Authorization: `token ${info.token}`,
           Accept: 'application/vnd.github.v3+json',

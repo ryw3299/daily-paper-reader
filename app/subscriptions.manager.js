@@ -1699,7 +1699,7 @@ window.SubscriptionsManager = (function () {
       setMessage('正在保存中，请稍后...', '#666');
       return;
     }
-    if (!window.SubscriptionsGithubToken || !window.SubscriptionsGithubToken.saveConfig) {
+    if (!window.SubscriptionsGithubToken || !window.SubscriptionsGithubToken.updateConfig) {
       setMessage('当前无法保存配置，请先完成 GitHub 登录。', '#c00');
       return;
     }
@@ -1719,11 +1719,22 @@ window.SubscriptionsManager = (function () {
         return;
       }
       setMessage('正在保存配置...', '#666');
-      await window.SubscriptionsGithubToken.saveConfig(
-        toSave,
+      let savedConfig;
+      await window.SubscriptionsGithubToken.updateConfig(
+        (current) => {
+          // Pages may still serve an older snapshot. Apply only the edited profiles to the current file.
+          savedConfig = normalizeSubscriptions({
+            ...current,
+            subscriptions: {
+              ...current.subscriptions,
+              intent_profiles: toSave.subscriptions.intent_profiles,
+            },
+          });
+          return savedConfig;
+        },
         'chore: save smart query config from dashboard',
       );
-      draftConfig = toSave;
+      draftConfig = savedConfig;
       hasUnsavedChanges = false;
       refreshQuickRunButtons();
       clearQuickRunUnsavedMessage();
@@ -2032,6 +2043,7 @@ window.SubscriptionsManager = (function () {
     validateDraftConfig: () => validateIntentProfiles(draftConfig || {}),
     runProfileQuickFetch: (profileTag, days, runOptions) => runProfileQuickFetch(profileTag, days, runOptions),
     __test: {
+      saveDraftConfig,
       initializeTopicSelection,
       setTopicProfileSelection,
       getTopicResearchProfiles,

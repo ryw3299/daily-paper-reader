@@ -10,6 +10,9 @@ import time
 
 import requests
 
+POLL_INTERVAL = 10
+MAX_FAILED_POLLS = 7  # Give a replacement build about a minute to appear.
+
 
 def request_build(api, repository, branch, commit, *, timeout=600, sleep=time.sleep):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
@@ -32,20 +35,25 @@ def request_build(api, repository, branch, commit, *, timeout=600, sleep=time.sl
         raise RuntimeError("Pages REST 构建要求默认分支，当前分支不匹配；未改变配置")
     api("POST", base + "/pages/builds")
     deadline = time.monotonic() + timeout
+    failed_polls = 0
     while time.monotonic() < deadline:
         build = api("GET", base + "/pages/builds/latest")
         # POST 仅返回 latest 地址，旧版本构建完成不等于本次提交已发布。
-        if build.get("commit") == commit:
-            status = build.get("status")
-            if status == "built":
-                print(f"Pages 构建已完成，提交 {commit[:12]}", flush=True)
-                return build
-            if status in {"errored", "failed", "cancelled"}:
+        status = build.get("status") if build.get("commit") == commit else None
+        if status == "built":
+            print(f"Pages 构建已完成，提交 {commit[:12]}", flush=True)
+            return build
+        if status in {"errored", "failed", "cancelled"}:
+            failed_polls += 1
+            if failed_polls >= MAX_FAILED_POLLS:
                 raise RuntimeError(
-                    "本次提交的 Pages 构建失败，请查看仓库 Pages 构建日志"
+                    "本次提交的 Pages 构建失败，等待后仍未恢复，请查看仓库 Pages 构建日志"
                 )
-        print("等待 Pages 构建本次提交……", flush=True)
-        sleep(min(10, max(0, deadline - time.monotonic())))
+            print("Pages 构建暂时报错，继续检查同一提交的后续构建……", flush=True)
+        else:
+            failed_polls = 0
+            print("等待 Pages 构建本次提交……", flush=True)
+        sleep(min(POLL_INTERVAL, max(0, deadline - time.monotonic())))
     raise TimeoutError("等待 Pages 本次提交构建超时；代码已推送，但未确认线上更新")
 
 

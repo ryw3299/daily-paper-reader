@@ -56,13 +56,27 @@ class PagesBuildTests(unittest.TestCase):
     def test_failed_and_timed_out_builds_fail_workflow(self):
         with self.assertRaises(RuntimeError):
             pages.request_build(
-                self.api([{"commit": "a" * 40, "status": "errored"}]),
+                self.api([{"commit": "a" * 40, "status": "errored"}] * pages.MAX_FAILED_POLLS),
                 "owner/repo",
                 "main",
                 "a" * 40,
+                sleep=lambda _: None,
             )
         with self.assertRaises(TimeoutError):
             pages.request_build(self.api([]), "owner/repo", "main", "a" * 40, timeout=0)
+
+    def test_waits_for_replacement_after_failed_build(self):
+        api = self.api(
+            [
+                {"commit": "a" * 40, "status": "errored"},
+                {"commit": "a" * 40, "status": "building"},
+                {"commit": "a" * 40, "status": "built"},
+            ]
+        )
+        result = pages.request_build(
+            api, "owner/repo", "main", "a" * 40, sleep=lambda _: None
+        )
+        self.assertEqual(result["status"], "built")
 
     def test_workflow_explicit_pages_and_narrow_hidden_artifact(self):
         text = (ROOT / ".github/workflows/starter-pack.yml").read_text()
