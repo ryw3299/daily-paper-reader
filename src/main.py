@@ -67,6 +67,14 @@ def should_skip_fetch(config: dict | None = None) -> bool:
     return True
 
 
+def resolve_arxiv_fetch_script(config: dict | None = None) -> str:
+    if config is None:
+        config = _load_full_config()
+    if not get_source_backend(config, "arxiv").get("enabled", False):
+        return os.path.join(SRC_DIR, "fetch_arxiv_direct.py")
+    return os.path.join(SRC_DIR, "maintain", "fetchers", "fetch_arxiv.py")
+
+
 def build_sidebar_date_label(days: int) -> str:
     safe_days = max(int(days), 1)
     end_date = datetime.now(timezone.utc).date()
@@ -656,7 +664,7 @@ def main() -> None:
             "Step 1 - fetch arxiv",
             [
                 python,
-                os.path.join(SRC_DIR, "maintain", "fetchers", "fetch_arxiv.py"),
+                resolve_arxiv_fetch_script(),
                 *(["--days", str(args.fetch_days)] if args.fetch_days is not None else []),
                 *(["--ignore-seen"] if args.fetch_ignore_seen else []),
             ],
