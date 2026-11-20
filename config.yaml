@@ -32,12 +32,6 @@ subscriptions:
       paper_sources:
         - arxiv
       keywords:
-        - keyword: knowledge graph
-          keyword_cn: 知识图谱
-          query: knowledge graph representations for external knowledge in intelligent agents
-        - keyword: graph retrieval augmentation
-          keyword_cn: 图检索增强
-          query: graph-based retrieval augmented generation over structured knowledge for reasoning
         - keyword: autonomous driving agent
           keyword_cn: 自动驾驶智能体
           query: large language model agents for autonomous driving and in-vehicle decision support
@@ -52,7 +46,7 @@ subscriptions:
           enabled: true
           source: manual
           note: ''
-      updated_at: '2026-11-20T06:02:18.894Z'
+      updated_at: '2026-11-20T06:56:04.673Z'
 source_backends:
   arxiv:
     papers_table: arxiv_papers
