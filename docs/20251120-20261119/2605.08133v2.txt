@@ -1,0 +1,1146 @@
+1
+VLADriver-RAG: Retrieval-Augmented
+Vision-Language-Action Models for Autonomous
+Driving
+Rui Zhao1,2, Haofeng Hu1,2, Zhenhai Gao1,2, Jiaqiao Liu3, and Gao Fei1,2
+1College of Automotive Engineering, Jilin University,
+2The National Key Laboratory of Automotive Chassis Integration and Bionics, Jilin University,
+3ReeFocus AI Technology
+Abstract— Vision-Language-Action (VLA) models have
+emerged as a promising paradigm for end-to-end au-
+tonomous driving, yet their reliance on implicit paramet-
+ric knowledge limits generalization in long-tail scenarios.
+While Retrieval-Augmented Generation (RAG) offers a so-
+lution by accessing external expert priors, standard visual
+retrieval suffers from high latency and semantic ambiguity.
+To address these challenges, we propose VLADriver-RAG,
+a framework that grounds planning in explicit, structure-
+aware historical knowledge. Specifically, we abstract sen-
+sory inputs into spatiotemporal semantic graphs via a
+Visual-to-Scenario mechanism, effectively filtering visual
+noise. To ensure retrieval relevance, we employ a Scenario-
+Aligned Embedding Model that utilizes Graph-DTW met-
+ric alignment to prioritize intrinsic topological consistency
+over superficial visual similarity. These retrieved priors
+are then fused within a query-based VLA backbone to
+synthesize precise, disentangled trajectories. Extensive
+experiments on the Bench2Drive benchmark establish a
+new state-of-the-art, achieving a Driving Score of 89.12.
+The project page is available at: https://github.com/
+InfiniDrive/VLADriver-RAG.
+Index Terms— Autonomous driving, Vision-Language-
+Action Models, Retrieval-Augmented Generation, End-to-
+End Planning.
+I. INTRODUCTION
+R
+ECENT strides in Vision-Language Models (VLMs)
+have endowed multimodal foundation models with open-
+world knowledge and zero-shot generalization capabilities [1,
+2]. Incorporating these pre-trained paradigms into autonomous
+driving frameworks presents a promising avenue to bolster
+system resilience, particularly when navigating heterogeneous
+traffic scenarios [3]. Moreover, this integration facilitates more
+intuitive human-vehicle interaction.
+Compared to traditional end-to-end autonomous driving
+models that mainly rely on task-specific implicit represen-
+tations for perception, decision-making, and planning [4–8],
+the paradigm is now shifting toward Vision-Language-Action
+(VLA) models, which incorporate explicit semantic under-
+standing into physical control. Capitalizing on the foundational
+Fig. 1: Conceptual comparison between a standard VLA
+model (Top) and our proposed RAG-augmented VLA frame-
+work (Bottom).
+reasoning capabilities of VLMs, recent frameworks have val-
+idated that enabling models to reason in 3D space and align
+with behavioral planning states significantly enhances their
+decision-making robustness in open-world scenarios [3, 9, 10].
+Unlike conventional VLMs, which primarily interpret the driv-
+ing environment through textual outputs, VLA models extend
+this capability to action generation by directly producing con-
+trol commands or trajectory waypoints [11, 12]. By coupling
+semantic understanding with embodied decision-making, VLA
+models enable a tighter integration between perception and
+execution, leading to more effective end-to-end autonomous
+driving. By unifying perception and execution equipped with
+semantic reasoning, VLAs serve as the next-generation end-
+to-end foundation models for autonomous driving [13].
+Nevertheless, despite their advancements, both VLMs and
+VLA architectures face a shared critical bottleneck: the long-
+tail distribution of driving data [5, 14]. Dependence on im-
+plicit parametric knowledge often limits the model’s ability to
+generalize to rare scenarios that are sparsely represented in
+training datasets. Such reliance renders the model susceptible
+to catastrophic forgetting and ungrounded decision-making
+when exposed to out-of-distribution (OOD) scenarios.
+To surmount these constraints, the research community has
+increasingly adopted Retrieval-Augmented Generation (RAG).
+Initially developed for Large Language Models (LLMs) with
+arXiv:2605.08133v2  [cs.CV]  12 May 2026
+
+
+2
+external textual knowledge bases [15, 16], RAG retrieves
+relevant evidence to ground generation, reducing hallucina-
+tions and improving factual accuracy. It also has recently
+shown promise in extending the capabilities of embodied
+agents [17, 18]. By accessing a non-parametric memory of
+past experiences, these systems can theoretically transcend
+the limitations of fixed training sets, effectively mitigating
+the challenges posed by long-tail distributions and rare corner
+cases. As illustrated in Fig.1, this capability establishes a
+critical advantage over standard non-augmented VLA archi-
+tectures. While a baseline model, constrained by parametric
+limitations, risks hallucinating unsafe trajectories in rare, open-
+world scenarios, VLA with RAG leverages these retrieved
+expert priors to synthesize grounded maneuvering policies,
+thereby providing the foundation model with reliable, context-
+aware guidance during critical inference phases.
+Despite the theoretical promise of retrieval-augmented
+frameworks, their direct adaptation to the high-stakes domain
+of autonomous driving is impeded by two fundamental chal-
+lenges. First, regarding real-time efficiency, the high dimen-
+sionality of dense visual streams imposes excessive compu-
+tational overhead, rendering raw retrieval incompatible with
+the strict millisecond-level latency constraints of closed-loop
+control [19, 20]. Second, regarding scenario distinguishability,
+direct visual matching often suffers from high visual similar-
+ity; scenarios with identical static backgrounds but distinct
+semantic logic (e.g., different traffic light phases) are difficult
+to differentiate based solely on pixel-level features, leading to
+the retrieval of confused guidance [21].
+To address these challenges, we propose VLADriver-RAG,
+a Retrieval-Augmented Vision-Language-Action framework
+specifically engineered for autonomous driving. Acknowledg-
+ing that visual data constitutes the primary information carrier
+in driving tasks, our paradigm seeks to operationalize this
+dense sensory information rather than discarding it. The core
+philosophy of our approach is to shift the retrieval focus from
+surface-level visual appearance to the underlying interaction
+logic. By abstracting continuous observations into discrete
+semantic representations, we establish a retrieval mechanism
+governed by geometric consistency. This ensures that the
+system identifies historical scenarios sharing similar spatial
+constraints and navigation challenges.
+Our contributions are as follows:
+• We propose a ”Visual-to-Scenario” construction mecha-
+nism that distills high-dimensional sensory streams into
+structured semantic snapshots. By extracting key driving
+elements and their spatial attributes, this mechanism
+bridges the semantic gap between raw pixels and decision
+logic, transforming visual data into a queryable format for
+efficient, noise-robust indexing.
+• We design a RAG module underpinned by a Scenario-
+Aligned Embedding Model. Leveraging a Relation Graph
+Convolutional Network (R-GCN), this model encodes
+semantic graphs into a compact latent space. By explicitly
+capturing geometric topology and interaction logic, the
+model establishes a discriminative metric space where
+scenario differentiation is determined by vector distance.
+This mechanism effectively disentangles visually akin
+but topologically distinct scenarios by enforcing a large
+distance margin between them, ensuring alignment based
+on intrinsic maneuvering context rather than superficial
+pixel-level similarity.
+• We propose a retrieval-augmented VLA architecture to
+bridge the gap between fixed parametric knowledge and
+open-world generalization. By integrating direct percep-
+tion with dynamically retrieved context-aware expert
+demonstrations, the proposed framework enables more
+reliable planning in sparse and challenging corner cases.
+Experiments on Bench2Drive show that our method
+achieves 89.12 DS and 70.42% SR, outperforming state-
+of-the-art (SOTA) baselines.
+II. RELATED WORK
+A. Vision-Language-Models in Autonomous Driving
+Motivated by the exceptional contextual reasoning and
+comprehensive world knowledge intrinsic to VLMs, recent
+research has extensively integrated them into autonomous
+driving systems. One line of work [9, 22, 23] directly employs
+VLMs for environmental perception and explainable trajectory
+prediction; for instance, Omnidrive [9] bridges the 3D vision-
+language gap to generate textual trajectories via feature com-
+pression, while EMMA [22] utilizes Gemini [24] to output
+discrete motion plans with strong open-loop performance.
+ORION [3] aligns the semantic reasoning and numerical
+action spaces to generate precise multi-modal trajectories via a
+generative planner instructed by a specialized planning token.
+To better balance high-level reasoning with low-level con-
+trol, recent studies have increasingly adopted hierarchical
+architectures that integrate VLMs with downstream planners.
+Initially, this paradigm leveraged VLMs as semantic advisors
+that output explicit natural language guidance, such as graph-
+structured visual question answering in DriveLM [25] or
+interpretable textual driving intentions in DriveGPT4 [26].
+Building upon this language-guided foundation, subsequent
+frameworks advanced to generating discrete spatial or be-
+havioral guidance—such as coarse waypoints in DriveVLM
+[27] or meta-actions in Senna [28]—which are subsequently
+instantiated into smooth trajectories by a low-level planner.
+While frameworks like DriveMLM [10] and LMDrive [29]
+successfully extended these discrete strategies to closed-loop
+settings, these stratified methods often struggle to bridge the
+fundamental gap between high-level semantic tokens and high-
+frequency vehicular dynamics. To eliminate this cascading
+error, the paradigm is shifting towards continuous VLA mod-
+els. Functioning as fully embodied agents, continuous VLAs
+directly translate multi-modal semantic understanding into
+execution—such as directly outputting 3D dense trajectory
+waypoints in OmniDrive [9] or predicting continuous physical
+control commands in Orion [3]—thereby achieving a seamless
+unification of reasoning and physical action.
+B. Retrieval-Augment Generation in Large Language
+Model
+Addressing the limitations of static parametric knowledge
+and the hallucination issues inherent in LLMs, RAG has
+
+
+3
+Fig. 2: The overall architecture of the proposed framework. The system is orchestrated across three interconnected
+components: The Visual-to-Scenario module abstracts unstructured visual data into discrete spatiotemporal semantic graphs,
+representing scenario primitives (Top). The Scenario-Aligned Embedding Model projects these semantic graphs into a metric-
+preserving latent space supervised by a Graph-DTW metric, enabling the retrieval of pertinent historical driving priors (Middle).
+The Vision Language Model synergizes real-time vision tokens, text instructions, and retrieved context tokens, leveraging the
+LLM to synthesize the final path and speed planning (Bottom).
+emerged as a dominant paradigm to incorporate external
+information. Foundational frameworks [30–32] typically adopt
+a ”retrieve-then-generate” pipeline, where a dense retriever
+fetches relevant passages to condition the generation process.
+For instance, REALM [30] integrates a latent knowledge re-
+triever into the pre-training stage, while the seminal RAG [31]
+combines pre-trained parametric memory with non-parametric
+data. To further enhance the synergy between retrieval and
+generation, recent studies have evolved towards dynamic
+approaches: RETRO [32] scales up capabilities via cross-
+attention chunk retrieval, FLARE [33] actively decides when
+to retrieve based on generation confidence, and Self-RAG [34]
+introduces reflection tokens to critique retrieved content.
+However, extending this paradigm to the demanding domain
+of autonomous driving presents significant challenges. Recent
+frameworks have attempted to bridge this gap; for example,
+RAG-Driver [18] leverages retrieved expert demonstrations
+to enhance interpretability via in-context learning, and Spa-
+tial Retrieval AD [20] introduces a map-based paradigm
+augmenting onboard sensors with offline geographic images.
+Despite these advancements, most existing methods struggle
+to simultaneously reconcile retrieval efficiency with semantic
+fidelity, as computational latency and topological mismatches
+inevitably degrade the closed-loop performance of autonomous
+driving systems. To surmount these bottlenecks, we propose
+VLADriver-RAG, a retrieval-augmented VLA architecture that
+distills high-dimensional visual streams into structured seman-
+tic graphs and leverages a topology-aware embedding model
+to retrieve geometrically consistent expert demonstrations,
+thereby establishing a dual-stream reasoning paradigm for
+robust open-world decision-making.
+III. METHOD
+The fundamental goal of an autonomous driving task is to
+synthesize a smooth, collision-free trajectory over a future
+horizon, conditioned on the current observation and intent.
+However, exclusive reliance on implicit parametric knowledge
+limits generalization in long-tail scenarios. To address this,
+we reformulate the task as a Retrieval-Augmented Generation
+problem by introducing topologically aligned retrieval Kret
+
+
+4
+Fig. 3: The detailed process of Visual-to-Scenario and Physical States
+from an external expert knowledge base. Let Icam denote the
+sensor inputs, Inav the navigation information, and Sego the
+ego state (e.g., ego speed). The end-to-end driving policy Φ
+typically formulates this as a direct mapping problem:
+ξtraj = Φ(Icam, Inav, Sego, Kret)
+(1)
+where ξtraj ∈RT ×4 denotes the future T time step waypoints,
+decoupled into path coordinates ξpath ∈RT ×2 and target
+speeds ξspeed ∈RT ×2, effectively bridging semantic reasoning
+with precise kinematic control.
+As systematically depicted in Fig. 2, the framework is or-
+chestrated across three interconnected components to support
+this process: first, the Visual-to-Scenario Abstraction module
+transforms unstructured visual data into explicit spatiotemporal
+semantic graphs; second, the Scenario-Aligned Embedding
+Model projects these representations into a metric-preserving
+latent space to retrieve pertinent historical driving priors; and
+finally, the Multi-modal Vision-Language Planner synergizes
+real-time perception with these retrieved contexts, leveraging
+the inferential capabilities of LLM to synthesize the final
+planning outputs.
+A. The Definition of Visual-to-Scenario
+To capture the intrinsic semantics of driving scenes and
+optimize data for model ingestion, it is essential to transform
+raw visual sensor inputs Icam into structured representations
+enriched with topological information. To this end, we pro-
+pose the Visual-to-Scenario Mechanism. As illustrated in the
+“Visual-to-Scenario” component of Fig. 2, this mechanism
+functions as a semantic bridge, mapping high-dimensional
+visual information—representing raw driving scenarios—into
+structured, queryable Scenario Primitives, thereby facilitating
+efficient topological retrieval.
+A Scenario Primitive is defined as the fundamental unit of
+a driving episode, encapsulating a complete decision-making
+process. As shown in Fig. 3, for a given scene at time t (Sce-
+nario K or L), we distill visual inputs into abstract topological
+information, instantiated as concrete Semantic Graphs (Graph
+GK
+t
+or GL
+t ). This graph construction is ego-centric (anchored
+at node ”0”), establishing structure by linking the ego-vehicle
+to surrounding traffic participants (e.g., ”203”, ”403”, or ”light
+1”) and road topologies (e.g., lane ”5”, lane ”6”) through
+distinct logical relationships.
+1) Mathematical Formulation: We define a Scenario Prim-
+itive at timestamp t, denoted as Pt, as a structured tuple
+capturing the instantaneous decision-making context centered
+on the ego vehicle. Pt is formalized as:
+Pt = {Et, Rt, St}
+(2)
+The components are defined as follows:
+• Interaction Elements (Et): The set of critical objects
+interacting with the ego vehicle is defined as Et ⊆
+E = {Vego, Vadj, Msign, Msignal, Mlane}. Here, Vego,
+Vadj, Msign, Msignal and Mlane denote the ego vehicle,
+adjacent vehicles, relevant traffic signs, traffic signals, and
+traffic lane geometries, respectively.
+• Semantic Relationships (Rt): The topological con-
+straints governing interactions is defined as Rt ⊆R =
+{Rlead, Ractive, Rinert, Ron}. Here, Rlead, Ractive, Rinert
+and Ron denote longitudinal precedence, active causal
+constraints, passive contextual elements and the driving-
+on constraint, respectively.
+• Physical States (St): To comprehensively characterize
+the driving environment and its constituent entities, the
+collective state of Interaction Elements is denoted as
+St = {Sego, Sadj, Ssign, Ssignal, Slane}. While Sego rep-
+resents the singular state of the ego vehicle, the remaining
+components are formulated as sets containing the states
+of multiple observed entities at the current time step. The
+detailed attributes for each entity type are illustrated in
+Fig. 3.”
+
+
+5
+Fig. 4: The detailed architecture of Embedding model
+2) Semantic Graph Construction: To turn this abstract def-
+inition into an actionable formulation, we project Pt into a
+Semantic Graph Gt = (N, E).
+• Nodes (N): The elements in Et are instantiated as graph
+nodes, storing state information St as node attributes.
+• Edges (E): The set of directed edges E instantiates the
+topological constraints Rt. Each edge encodes a specific
+interaction type, transforming the discrete node set into
+a heterogeneous semantic graph.
+The Scenario Primitives offers critical benefits over raw
+visual embeddings by decoupling interaction logic from visual
+information, filtering out environmental noise. Unlike implicit
+feature maps, the semantic graph explicitly encodes geometric
+constraints , enabling the retrieval system to identify scenarios
+that share intrinsic navigation logic despite superficial visual
+disparities. Furthermore, converting dense sensory streams
+into sparse graph representations significantly enhances data
+efficiency, minimizing storage redundancy while preserving
+the core decision-making primitives required for planning.
+B. Scenario-Aligned Embedding Model
+The Scenario-Aligned Embedding Model is designed to
+map the semantic graph G into compact, measurable latent
+representations. Utilizing an encoder-decoder architecture, the
+model is trained via a dual-objective strategy that jointly opti-
+mizes self-supervised graph restoration to preserve topological
+semantics and Graph Dynamic Time Warping (Graph-DTW)
+[35] metric alignment to ensure the latent space accurately
+reflects physical scenario similarities. In the indexing process,
+the trained encoder alone is employed to compress extensive
+historical driving priors into a searchable vector database.
+Subsequently, during the online runtime process, the model
+encodes real-time perception result Gp into query vectors
+to retrieve relevant historical contexts, thereby augmenting
+the downstream LLM with planning references. The detailed
+architecture of the embedding model is illustrated in Fig. 4.
+1) Encoder Architecture: The primary objective of the en-
+coder is to transform the semantic graphs into a compact
+latent vector that encapsulates both spatial interactions and
+temporal evolution. The input is defined as a sequence of
+semantic graphs {G1, G2, ..., Gt}. To capture the spatial de-
+pendencies within each frame, we employ a Relational Graph
+Convolutional Network (RGCN) which specifically handles
+the heterogeneous nature of traffic relations. For a node i at
+layer l + 1, the hidden feature f l+1
+i
+is aggregated from its
+neighbors N r
+i under relation r ∈R as follows:
+f l+1
+i
+= σ
+
+X
+r∈R
+X
+j∈Nr
+i
+1
+cr
+i di,j
+W l
+rf l
+j + W l
+0f l
+i
+
+, cr
+i = |N r
+i | (3)
+where σ denotes the activation function, W l
+r is the learnable
+weight matrix for relation r, cr
+i is a normalization constant,
+and di,j represents the interaction strength between nodes.
+To capture the temporal evolution across the graph se-
+quence, the spatially encoded features are subsequently pro-
+cessed by a Transformer encoder equipped with a multi-head
+attention mechanism with h heads. This allows the model to
+weigh the significance of different time steps dynamically. For
+the m-th attention head, the Query, Key, and Value matrices
+are computed via linear projections:
+Qm = qW q
+m,
+Km = kW k
+m,
+Vm = vW v
+m
+(4)
+The outputs from heads are concatenated to form the final
+spatiotemporal latent representation S:
+headm = Attention(Qm, Km, Vm) = softmax
+QmKT
+m
+√dk
+
+Vm
+(5)
+S = Concat(head1, ..., headh)W 0
+(6)
+where W 0 ∈Rd×d serves as a linear projection matrix
+that integrates the distinct contextual features captured by
+individual attention heads and the latent vector S is the
+compressed representation of the scenario primitive.
+2) Self-Supervised Restoration: To ensure that the com-
+pressed latent vector S retains the fundamental semantic
+topology of the original scenario, we introduce a decoder
+module that operates in a self-supervised manner. The decoder
+aims to reconstruct the semantic graph G′ from the latent
+vector S, effectively functioning as an auto-encoder.
+This reconstruction process is critical for preventing infor-
+mation loss during the dimensionality reduction in the encoder.
+The optimization objective here is to maximize the structural
+similarity between the input graph adjacency matrix and the
+predicted one.
+3) Metric-Aligned Optimization: While the restoration loss
+ensures semantic fidelity, it does not guarantee that the
+geometric distance between two latent vectors reflects the
+actual physical similarity of the driving scenarios. To enable
+accurate retrieval, the latent space must be metric-preserving.
+We achieve this by aligning the latent space with Graph-
+DTW, a robust metric for measuring the distance between
+spatiotemporal graphs.
+This dual-optimization strategy ensures that the resulting
+embeddings are both structurally informative and mathemat-
+ically searchable, enabling the efficient retrieval of relevant
+historical driving primitives during the runtime phase.
+
+
+6
+Fig. 5: Overview of the VLA Backbone architecture
+C. VLA Backbone
+The VLA Backbone serves as the central reasoning engine
+of our framework, designed to orchestrate the transition from
+multi-modal perception to executable driving actions. As de-
+picted in Fig. 5, this module integrates visual observations,
+retrieved historical priors, and navigation commands into a
+unified embedding space. By leveraging a query-based atten-
+tion mechanism, the backbone selectively aggregates salient
+features from this fused context, effectively distilling complex
+semantics into disentangled path and speed waypoints.
+1) Multi-modal Tokenization and Fusion: To enable the LLM
+to reason over heterogeneous data sources, we first align visual
+observations, instructions, and retrieved historical priors into
+a unified high-dimensional embedding space. As illustrated in
+Fig. 5, the input stage processes three distinct data streams via
+specific encoders and projection layers.
+Visual Encoding : The raw visual input Icam ∈RH×W ×3
+is processed by a frozen Vision Tower to extract high-
+dimensional semantic features. These features are projected
+directly to form the sequence of visual tokens ev ∈RNv×D,
+serving as the primary visual context for the LLM.
+Perception-Aided Retrieval Encoding: Parallel to visual
+token generation, the vision tower features are fed into a
+Perception Module with two lightweight decoder heads, as
+illustrated in Fig. 5. Specifically, a classification head pre-
+dicts category scores, while a regression head estimates 4-
+dimensional box parameters, together producing structured
+perception results.
+This structured graph Gp
+t is utilized to query the offline
+scenario database. The retrieved historical scenario primitives
+are then mapped via an MLP projection layer to form the
+retrieved tokens er ∈RNr×D, providing the model with
+relevant driving priors.
+Instruction Encoding: To explicitly guide the trajectory
+generation, we utilize numerical navigation commands rather
+than natural language. The target points and ego-velocity are
+encoded into high-dimensional tokens using specific trainable
+MLPs. Formally, these kinematic inputs are projected to form
+the unified instruction tokens ei = [enav, espd], where ei ∈
+RNI×D aligns with the embedding dimension of the backbone
+model.
+Fusion: Finally, these three distinct token sequences are
+concatenated to construct the comprehensive input sequence
+Xin for the reasoning backbone:
+Xin = [ev, ei, er]
+(7)
+Through dimensional alignment, the embeddings ev, ei, and
+er are fused into a unified sequence, which serves as the
+prompt for the reasoning backbone.
+2) Query-Based Reasoning Backbone: The core of our
+planning framework is a generative LLM that functions as a
+multi-modal reasoner. Unlike standard VLM approaches that
+rely solely on auto-regressive text generation, we adopt a
+query-based mechanism to extract structured planning infor-
+mation efficiently.
+We initialize two sets of learnable query embeddings: Path
+Queries qp ∈RNp×D and Speed Queries qs ∈RNs×D.
+These queries are appended to the input sequence Tin and
+fed into the LLM. Through the self-attention mechanism, these
+queries interact with the multi-modal context (vision, text, and
+retrieval) to aggregate specific features required for trajectory
+planning and velocity control, respectively.
+The LLM outputs a sequence of hidden states, where the
+states corresponding to the query positions contain the distilled
+planning information:
+[Hpath, Hspeed] = LLM([Xin, qp, qs])
+(8)
+Here, Hpath and Hspeed represent the high-level semantic
+features for the vehicle’s path and speed waypoints.
+3) Task-Specific Decoding and Optimization: To translate
+high-level semantic features into executable control com-
+mands, we employ a disentangled output representation. The
+framework utilizes two lightweight MLP decoding heads to
+regress specific action parameters from the query outputs.
+• Path Head (Geometric): The path states Hpath are
+projected to predict future path waypoints ξpath
+=
+{p1, ..., pNp} in the bird’s-eye view (BEV) space, focus-
+ing solely on the spatial geometry of the maneuver (e.g.,
+lane changes, turns).
+• Speed Head (Temporal): The speed states Hspeed are
+projected to predict the temporal velocity waypoints
+ξspeed = {v1, ..., vNs}, determining how fast the vehicle
+traverses the path.
+D. Training Strategy
+To mitigate gradient instability caused by jointly optimizing
+multiple heterogeneous modules, we adopt a three-stage cur-
+riculum that progressively trains the embedding, perception,
+
+
+7
+TABLE I: Closed-loop results on B2D. DS denotes Driving
+Score, and SR denotes Success Rate (%).
+Method
+Paradigm
+DS↑
+SR↑
+AD-MLP [8]
+E2E
+18.05
+00.00
+TCP [36]
+E2E
+40.70
+15.00
+TCP-traj [36]
+E2E
+59.90
+30.00
+UniAD-Base [6]
+E2E
+45.81
+16.36
+VAD [7]
+E2E
+42.35
+15.00
+ThinkTwice [5]
+E2E
+62.44
+31.23
+DriverAdapter [4]
+E2E
+64.22
+33.08
+ORION [3]
+VLA
+77.74
+54.62
+Simlingo [13]
+VLA
+85.07
+67.27
+VLADriver-RAG
+VLA
+89.12 +4.05
+70.42 +3.15
+and planning components. In the following, we detail the
+objective and the role of each stage.
+Stage 1: Embedding Pre-training. We first train the
+Scenario-Aligned Embedding Model by minimizing a com-
+posite loss
+Ltotal = λrLrestore + λaLalign,
+(9)
+where λr and λa are weighting coefficients. The restoration
+loss Lrestore is built upon an Intersection over Union (IoU)
+objective that forces the model to preserve the dynamic inter-
+action graph between traffic agents. Concretely, it is defined
+as
+Lrestore = 1
+B
+B
+X
+k=1
+
+1 −1
+Nk
+Nk
+X
+j=1
+|Epred
+kj
+∩Egt
+kj|
+|Epred
+kj
+∪Egt
+kj|
+
+,
+(10)
+where B is the batch size, Nk denotes the number of frames
+in the k-th scenario, j indexes the frames within that scenario,
+and Epred
+kj
+and Egt
+kj are the predicted and ground-truth edge
+sets, respectively. By minimizing Lrestore, the latent embed-
+ding is driven to encode enough information to reconstruct the
+scenario’s evolving interaction graph.
+To enforce cross-scenario alignment, we introduce a con-
+trastive distance loss that constrains the Euclidean distance
+between latent representations to match their Graph-DTW
+dissimilarity. Formally, the alignment loss is
+Lalign =
+2
+B(B −1)
+X
+1≤k<l≤B
+ ∥Sk −Sl∥2 −dDT W
+kl
+2 ,
+(11)
+where Sk and Sl are the latent vectors of scenario k and l,
+and dDT W
+kl
+is the pre-computed Graph-DTW distance. This
+term ensures that structurally similar scenarios stay close in
+the embedding space.
+Stage 2: Perception Alignment. With With the embedding
+model frozen, we shift focus to the Perception Module. The
+multi-task objective for this stage is
+Lperc = λcLcls + λeLreg,
+(12)
+where λc and λe are balancing coefficients. The classification
+component Lcls employs the Focal Loss to handle the class
+Fig. 6: Qualitative comparison of planning trajectories in
+two driving scenarios. (a) denotes the model w/o Retrieval;
+(b) denotes VLADriver-RAG.
+imbalance in interaction detection:
+Lcls = −
+1
+Npos
+X
+i
+
+α(1 −pi)γ log(pi)
++ (1 −α)pγ
+i log(1 −pi)
+
+.
+(13)
+Here pi is the predicted probability, γ is the focusing
+parameter, α balances positive and negative samples, and Npos
+is the total number of positive samples. For the physical
+attributes, we use the SmoothL1 loss Lreg computed over
+positive samples:
+Lreg =
+1
+Npos
+X
+i∈P
+SmoothL1(ˆsi −si),
+(14)
+where ˆsi and si are the predicted and ground-truth state
+vectors, and P is the index set of positive samples.
+Stage 3: Policy Optimization. In the final stage, we train
+the model end-to-end to learn the planning policy. We adopt
+L2 loss for trajectory regression to improve stability against
+outliers, and define the total loss as a weighted combination
+of path and speed regression:
+Ltotal = λp
+Np
+X
+g=1
+∥pg −ˆpg∥2
+2 + λs
+Nk
+X
+g=1
+∥vg −ˆvg∥2
+2,
+(15)
+with ˆpg, ˆvg the ground-truth path and speed values. This
+disentangled supervision ensures precise lateral control via the
+path head and smooth longitudinal control via the speed head.
+IV. EXPERIMENTS
+In this section, we conduct a comprehensive evaluation
+to verify the effectiveness and robustness of our proposed
+framework in closed-loop driving scenarios. We begin by
+introducing the datasets and metrics. Subsequently, we provide
+
+
+8
+the specific implementation details of our model architecture
+and training strategies. We then present a comparative analysis
+against SOTA methods to demonstrate our superior planning
+performance. Finally, we conduct ablation studies to investi-
+gate the contribution of each core component.
+TABLE II: Ablation studies on the VLADriver-RAG sys-
+tem. GBR: employing the proposed Graph-Based Retrieval
+which matches topological structures. VSR: utilizing Visual-
+Similarity Retrieval based on raw image feature cosine similar-
+ity. Emb-Rec: training the embedding model using exclusively
+the restoration loss. Emb-Full: training the embedding model
+with the total composite loss objectives.
+GBR
+VSR
+Emb-Rec
+Emb-Full
+DS↑
+SR↑
+w/o Retrieval
+-
+-
+-
+-
+85.14
+66.56
+with Retrieval
+-
+✓
+-
+✓
+86.65
+67.21
+✓
+-
+✓
+-
+88.92
+69.10
+✓
+-
+-
+✓
+89.12
+70.42
+A. Datasets and Metrics
+We evaluate our approach exclusively on the closed-loop
+simulation benchmark Bench2Drive (B2D), a CARLA-based
+platform designed for rigorous end-to-end driving assessment.
+The dataset comprises 10,000 sampled driving segments for
+training, while the evaluation set consists of 220 short routes,
+each characterizing a distinct and safety-critical driving sce-
+nario that challenges the agent’s planning capabilities. To
+quantitatively measure performance, we adopt the two official
+metrics defined by the benchmark: Success Rate (SR), which
+reflects the percentage of driving tasks successfully completed
+without collision or critical failure, and Driving Score (DS), a
+composite measure that integrates route completion progress
+with penalties for driving infractions, providing a granular
+assessment of both safety and efficiency.
+B. Implementation Details
+We implement our framework using PyTorch. For the visual
+component, we utilize CLIP-ViT as the vision encoder. The
+reasoning backbone is a lightweight 50M-parameter Trans-
+former decoder based on the LLaMA architecture, which is
+initialized and trained from scratch. The comprehensive input
+sequence Xin is injected into this backbone.
+We follow the progressive training strategy described in
+Sec. III-D. Specifically, the embedding model (Stage 1) is pre-
+trained for 10 epochs with a batch size of 128. Subsequently,
+the perception module (Stage 2) is optimized while keeping
+the vision encoder frozen. Finally, for the end-to-end policy
+learning (Stage 3), we train for 30 epochs with a global batch
+size of 48. We use the AdamW optimizer with an initial
+learning rate of 3e−5.
+For the optimization objective, we balance the regression
+tasks by setting the loss weights {λr, λa, λc, λe, λp, λs} =
+{1, 1, 1, 5, 1, 1}. In the query-based reasoning module, we
+initialize Np = 20 path queries and Ns = 10 speed queries to
+cover the planning horizon. For the retrieval-augmented com-
+ponent, we construct a scenario database containing 800,000
+primitives, from which the top Nr
+= 10 most relevant
+priors are retrieved for each query. The multi-head attention
+mechanism operates with h = 8 heads. All experiments are
+conducted on a server equipped with 2× NVIDIA A100 GPUs.
+C. Main Results on Driving Benchmarks
+As quantitatively summarized in Table I, our framework es-
+tablishes a new SOTA on the B2D benchmark, surpassing the
+strong VLA baseline Simlingo [13]. Specifically, we achieve
+a SR of 70.42% and a DS of 89.12, representing significant
+gains of 3.15% and 4.05, respectively.
+The comprehensive improvement in both safety and driving
+quality is likely related to the proposed graph-based retrieval
+mechanism. By retrieving and conditioning on relevant his-
+torical scenarios, the model acquires high-quality, structure-
+aware priors that serve as explicit references. This external
+knowledge not only helps the planner resolve perceptual
+ambiguities in long-tail scenarios—thereby preventing failures
+and boosting SR—but also guides the generation of more com-
+pliant and human-like trajectories, which directly translates to
+a higher DS by minimizing infractions and optimizing route
+progress.
+D. Ablation
+To rigorously validate the architectural design and opti-
+mization strategies of our framework, we conduct extensive
+ablation studies on the B2D benchmark. We structure our
+analysis into three dimensions: the design of the retrieval
+mechanism, the objective of knowledge embedding, and the
+training curriculum.
+1) design of the retrieval mechanism: We perform a sys-
+tematic decomposition of our framework, as detailed in Table
+II, to isolate and verify the contribution of each component.
+This analysis specifically scrutinizes the impact of the retrieval
+mechanism itself, the retrieval modality efficiency, and the
+embedding optimization objectives.
+a) Impact of Retrieval-Augmented Paradigm.: We first eval-
+uate the effect of the retrieval mechanism by comparing the
+baseline with the full model. As shown in Table II, the w/o
+Retrieval variant (row 1), which relies only on current visual
+inputs, achieves the worst performance, while VLADriver-
+RAG (row 4) delivers clear improvements. This result indicates
+that historical references are crucial for robust decision-making
+in complex long-tail scenarios. The qualitative examples in
+Fig. 6 further support this finding: the baseline fails in corner-
+case driving scenarios, whereas VLADriver-RAG successfully
+plans a safe trajectory. Together, these results show that
+retrieved knowledge effectively improves planning stability in
+uncertain environments.
+b) Retrieval Modality Efficiency.: Next, we investigate the
+retrieval modality by comparing the Visual-Similarity Re-
+trieval (VSR) variant (row 2) in against our proposed Graph-
+Based Retrieval (GBR) employed in the full model (row 4).
+Specifically, in the VSR setting, we construct a visual features
+database with the same size as in the previous experiments,
+and use CLIP-ViT as the embedding model. Retrieval is then
+performed by computing and ranking the cosine similarity
+
+
+9
+Fig. 7: Comparison of retrieval time and driving score under
+different retrieval modality
+between the current observation embedding and the stored
+visual features. Results indicate that relying purely on visual
+similarity yields suboptimal gains. We attribute this to the fact
+that visually similar scenes may require vastly different driving
+logic. In contrast, our GBR approach ensures that priors are
+topologically consistent with the current challenge.
+c) Embedding Optimization Objectives.: Finally, we validate
+the training objectives of the embedding model by compar-
+ing Emb-Rec (row 3) with Emb-Full (row 4). The Emb-
+Rec variant, trained only with the restoration loss, preserves
+graph structure but yields inferior performance, indicating that
+reconstruction alone is insufficient for learning semantically
+meaningful embeddings. By further introducing the alignment
+loss, Emb-Full produces a more semantically organized em-
+bedding space. As shown in Fig. 8, this leads to retrieved priors
+with higher semantic consistency, which in turn improves
+downstream planning performance.
+2) objective of knowledge embedding: We analyze the sen-
+sitivity of the model to the size of the retrieval vector database
+ND. As illustrated in Fig. 7, enlarging the database generally
+improves driving performance by providing a broader pool of
+historical priors. However, this benefit comes at the cost of
+increased retrieval latency. These results reveal a clear trade-
+off between planning performance and retrieval efficiency,
+indicating that the database size should be chosen to balance
+driving score and inference speed.
+We further study whether incorporating the current percep-
+tion result , Gp
+t , into the retrieval sequence is necessary. We
+compare a variant using only retrieved historical priors with
+our strategy that additionally includes Gp
+t . As shown in Table
+III, incorporating Gp
+t brings a clear performance gain. We
+attribute this improvement to the fact that Gp
+t provides an
+explicit semantic anchor for the current scene, helping the
+model better align retrieved priors with the current context
+and suppress irrelevant noise.
+3) training curriculum: Finally, we compare the proposed
+three-stage training strategy with a simplified two-stage base-
+line in Table III. In the two-stage setting, the embedding
+model is first pre-trained, after which the perception module
+and driving policy are jointly optimized from scratch. In
+contrast, the three-stage strategy further pre-aligns the per-
+ception module before the final end-to-end policy learning
+stage. The results show that the three-stage design yields
+Fig. 8: Visualization of retrieval quality. (a) Retrieval sce-
+nario from Emb-Rec (b) Retrieval scenario from Emb-Full
+TABLE III: Ablation studies on graph prior and training
+strategy.
+Graph prior
+DS ↑
+SR ↑
+Training strategy
+DS ↑
+SR ↑
+w/o Gp
+t
+88.23
+69.00
+Two-stage
+86.76
+66.95
+with Gp
+t
+89.12
+70.42
+Three-stage
+89.12
+70.42
+better planning performance, demonstrating the effectiveness
+of staged optimization.
+V. CONCLUSION
+In this paper, we presented VLADriver-RAG, a holistic
+retrieval-augmented framework designed to overcome the gen-
+eralization bottlenecks of parametric VLA models in au-
+tonomous driving. By introducing the Visual-to-Scenario ab-
+straction and a Scenario-Aligned Embedding Model, we shift
+the retrieval paradigm from inefficient visual matching to
+precise topological alignment. This structure-aware retrieval
+enables our query-based VLA backbone to effectively fuse
+expert priors with real-time perception for robust planning.
+Extensive evaluations on the B2D benchmark confirm that
+our framework establishes a new SOTA, demonstrating that
+integrating non-parametric, logic-driven memory is essential
+for navigating complex open-world environments. Future work
+will explore scaling the scenario database to millions of entries
+and investigating continual learning mechanisms to dynami-
+cally update the knowledge base from online experiences.
+REFERENCES
+[1]
+Z. Chen et al., “Internvl: Scaling up vision foundation
+models and aligning for generic visual-linguistic tasks,”
+in Proceedings of the IEEE/CVF conference on com-
+puter vision and pattern recognition, 2024, pp. 24 185–
+24 198.
+[2]
+P. Wang et al., “Qwen2-vl: Enhancing vision-language
+model’s perception of the world at any resolution,”
+arXiv preprint arXiv:2409.12191, 2024.
+[3]
+H. Fu et al., “Orion: A holistic end-to-end autonomous
+driving framework by vision-language instructed action
+generation,” arXiv preprint arXiv:2503.19755, 2025.
+[4]
+X. Jia, Y. Gao, L. Chen, J. Yan, P. L. Liu, and H. Li,
+“Driveadapter: Breaking the coupling barrier of percep-
+tion and planning in end-to-end autonomous driving,” in
+Proceedings of the IEEE/CVF International Conference
+on Computer Vision, 2023, pp. 7953–7963.
+
+
+10
+[5]
+X. Jia et al., “Think twice before driving: Towards
+scalable decoders for end-to-end autonomous driving,”
+in Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition, 2023, pp. 21 983–
+21 994.
+[6]
+Y. Hu et al., “Planning-oriented autonomous driving,”
+in Proceedings of the IEEE/CVF conference on com-
+puter vision and pattern recognition, 2023, pp. 17 853–
+17 862.
+[7]
+B. Jiang et al., “Vad: Vectorized scene representation
+for efficient autonomous driving,” in Proceedings of
+the IEEE/CVF International Conference on Computer
+Vision, 2023, pp. 8340–8350.
+[8]
+J.-T. Zhai et al., “Rethinking the open-loop evaluation
+of end-to-end autonomous driving in nuscenes,” arXiv
+preprint arXiv:2305.10430, 2023.
+[9]
+S. Wang et al., “Omnidrive: A holistic llm-agent frame-
+work for autonomous driving with 3d perception, rea-
+soning and planning,” CoRR, 2024.
+[10]
+W. Wang et al., “Drivemlm: Aligning multi-modal large
+language models with behavioral planning states for
+autonomous driving,” arXiv preprint arXiv:2312.09245,
+2023.
+[11]
+K. Black et al., “π0: A vision-language-action flow
+model
+for
+general
+robot
+control,”
+arXiv
+preprint
+arXiv:2410.24164, 2024.
+[12]
+P. Intelligence et al., “π0.5: A vision-language-action
+model with open-world generalization,” arXiv preprint
+arXiv:2504.16054, 2025.
+[13]
+K. Renz, L. Chen, E. Arani, and O. Sinavski, “Sim-
+lingo: Vision-only closed-loop autonomous driving with
+language-action alignment,” in Proceedings of the Com-
+puter Vision and Pattern Recognition Conference, 2025,
+pp. 11 993–12 003.
+[14]
+Z. Li et al., “Is ego status all you need for open-loop
+end-to-end autonomous driving?” In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, 2024, pp. 14 864–14 873.
+[15]
+K. Sun, Z. Zhao, H. Yang, J. Zhang, and G. Q. Huang,
+“Curriculum engineering: Structured learning for large
+language models (llms) through curriculum based re-
+trieval,” IEEE Transactions on Industrial Informatics,
+2025.
+[16]
+L. Peifeng, L. Qian, X. Zhao, and B. Tao, “Joint
+knowledge graph and large language model for fault
+diagnosis and its application in aviation assembly,”
+IEEE Transactions on Industrial Informatics, vol. 20,
+no. 6, pp. 8160–8169, 2024.
+[17]
+M. M. Hussien, A. N. Melo, A. L. Ballardini, C. S.
+Maldonado, R. Izquierdo, and M. A. Sotelo, “Rag-
+based explainable prediction of road users behaviors for
+automated driving using knowledge graphs and large
+language models,” Expert Systems with Applications,
+vol. 265, p. 125 914, 2025.
+[18]
+J. Yuan et al., “Rag-driver: Generalisable driving ex-
+planations with retrieval-augmented in-context learning
+in multi-modal large language model,” arXiv preprint
+arXiv:2402.10828, 2024.
+[19]
+S. Yu et al., “Visrag: Vision-based retrieval-augmented
+generation
+on
+multi-modality
+documents,”
+arXiv
+preprint arXiv:2410.10594, 2024.
+[20]
+X. Jia et al., “Spatial retrieval augmented autonomous
+driving,” arXiv preprint arXiv:2512.06865, 2025.
+[21]
+C. Chang, J. Ge, J. Guo, Z. Guo, B. Jiang, and L.
+Li, “Driving-rag: Driving scenarios embedding, search,
+and rag applications,” arXiv preprint arXiv:2504.04419,
+2025.
+[22]
+J.-J.
+Hwang
+et
+al.,
+“Emma:
+End-to-end
+multi-
+modal model for autonomous driving,” arXiv preprint
+arXiv:2410.23262, 2024.
+[23]
+S. Xing et al., “Openemma: Open-source multimodal
+model for end-to-end autonomous driving,” in Pro-
+ceedings of the Winter Conference on Applications of
+Computer Vision, 2025, pp. 1001–1009.
+[24]
+G. Team et al., “Gemini: A family of highly capable
+multimodal models,” arXiv preprint arXiv:2312.11805,
+2023.
+[25]
+C. Sima et al., “Drivelm: Driving with graph visual
+question answering,” in European conference on com-
+puter vision, Springer, 2024, pp. 256–274.
+[26]
+Z. Xu et al., “Drivegpt4: Interpretable end-to-end au-
+tonomous driving via large language model,” IEEE
+Robotics and Automation Letters, vol. 9, no. 10,
+pp. 8186–8193, 2024.
+[27]
+X. Tian et al., “Drivevlm: The convergence of au-
+tonomous driving and large vision-language models,”
+arXiv preprint arXiv:2402.12289, 2024.
+[28]
+B. Jiang et al., “Senna: Bridging large vision-language
+models and end-to-end autonomous driving,” arXiv
+preprint arXiv:2410.22313, 2024.
+[29]
+H. Shao et al., “Lmdrive: Closed-loop end-to-end driv-
+ing with large language models,” in Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, 2024, pp. 15 120–15 130.
+[30]
+K. Guu, K. Lee, Z. Tung, P. Pasupat, and M. Chang,
+“Retrieval augmented language model pre-training,” in
+International conference on machine learning, PMLR,
+2020, pp. 3929–3938.
+[31]
+P. Lewis et al., “Retrieval-augmented generation for
+knowledge-intensive nlp tasks,” Advances in neural
+information processing systems, vol. 33, pp. 9459–9474,
+2020.
+[32]
+S. Borgeaud et al., “Improving language models by
+retrieving from trillions of tokens,” in International con-
+ference on machine learning, PMLR, 2022, pp. 2206–
+2240.
+[33]
+Z. Jiang et al., “Active retrieval augmented generation,”
+in Proceedings of the 2023 Conference on Empiri-
+cal Methods in Natural Language Processing, 2023,
+pp. 7969–7992.
+[34]
+A. Asai, Z. Wu, Y. Wang, A. Sil, and H. Hajishirzi,
+“Self-rag: Learning to retrieve, generate, and critique
+through self-reflection,” 2024.
+[35]
+C. Chang et al., “Vistascenario: Interaction scenario
+engineering for vehicles with intelligent systems for
+
+
+11
+transport automation,” IEEE Transactions on Intelligent
+Vehicles, 2024.
+[36]
+P. Wu, X. Jia, L. Chen, J. Yan, H. Li, and Y. Qiao,
+“Trajectory-guided control prediction for end-to-end
+autonomous driving: A simple yet strong baseline,”
+Advances in Neural Information Processing Systems,
+vol. 35, pp. 6119–6132, 2022.

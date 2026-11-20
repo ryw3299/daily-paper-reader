@@ -1,0 +1,1415 @@
+Cognitive Dual-Process Planning for Autonomous Driving with
+Structured Scene Knowledge and Verifiable Reasoning-Action
+Consistency⋆
+Zhongyao Yanga,b,1, Haoyu Lia,b,1, Yu Yana,b, Zhuangxuan Yua,b, Jiangfeng Nanc and Jinrui Nana,b,∗
+aSchool of Mechanical Engineering, Beijing Institute of Technology, Beijing, 100081, Beijing, China
+bNational Engineering Research Center of Electric Vehicles, Beijing Institute of Technology, Beijing, 100081, Beijing, China
+cSchool of Mechanical Engineering, Southeast University, Nanjing, 211189, Jiangsu, China
+A R T I C L E I N F O
+Keywords:
+Autonomous driving
+Vision-language models
+Dual-process planning
+Knowledge representation
+Structured scene knowledge
+Reinforcement learning with verifiable
+rewards
+A B S T R A C T
+High-level planning for autonomous driving is a knowledge-intensive engineering decision task that
+requires accurate scene understanding, timely inference, and internally consistent action selection.
+Vision-language models (VLMs) can make intermediate reasoning explicit, but their use in deployed
+planners is constrained by costly structured supervision, unnecessary reasoning in routine scenes, and
+possible inconsistencies between generated rationales and driving actions. We present a cognitive
+dual-process planning framework that represents planning-relevant scene knowledge in a machine-
+parsable structured chain-of-thought (S-CoT) schema. An automated data engine integrates perception
+foundation models, critical-path filtering, and an expert VLM to generate S-CoT supervision without
+manual annotation of individual rationales. A lightweight visual Arbiter estimates scene complexity
+from multilevel vision-encoder features before language decoding and routes each input to either fast
+meta-action prediction or slow structured reasoning. For slow-path outputs, a deterministic rule-based
+validator checks whether the parsed S-CoT fields are consistent with the final meta-action and provides
+verifiable rewards for Group Relative Policy Optimization (GRPO). In a 195-scene manual audit, the
+generated annotations achieve 91.8% CoT accuracy and a 98.5% Logical Consistency Score (LCS).
+On 574 manually verified NAVSIM test samples, the planner achieves 80.14% planning accuracy and
+97.20% LCS while reducing average latency by 17.39% relative to applying slow reasoning to every
+scene. Evaluation on external long-tail subsets further identifies conditions under which routing and
+planning performance degrade. Together, these results show how explicit scene knowledge can be
+operationalized through adaptive reasoning and rule-based verification to support high-level VLM
+planning decisions.
+1. Introduction
+High-level planning for autonomous driving converts
+visual observations, ego-vehicle states, and navigation in-
+structions into driving decisions subject to latency and safety
+constraints. End-to-end models reduce hand-engineered in-
+terfaces by learning this mapping directly from data [3, 11,
+20, 55]. Their performance can nevertheless degrade in long-
+tail and out-of-distribution scenes, where a decision depends
+on relations among traffic participants, road structure, sig-
+nals, and route constraints [65, 7]. These challenges are
+amplified by adverse weather or sensor degradation, which
+can corrupt object- and road-structure cues before they reach
+downstream planning modules [26]. High-level planning is
+therefore more than an action-prediction problem: it requires
+explicit representations of planning-relevant scene knowl-
+edge, adaptive allocation of reasoning resources, and con-
+sistency checks between inferred scene factors and selected
+actions.
+⋆This work was supported by the Key Research and Development
+Program of Shanxi Province (No. 202202070301005).
+∗Corresponding author
+3220240509@bit.edu.cn (Z. Yang); rabbit.yujixyz@gmail.com (H.
+Li); 3220253023@bit.edu.cn (Y. Yan); 3220253022@bit.edu.cn (Z. Yu);
+njf@seu.edu.cn (J. Nan); nanjinrui@bit.edu.cn (J. Nan)
+ORCID(s):
+1These authors contributed equally.
+Vision-language models (VLMs) can support this for-
+mulation because they combine visual representations with
+language-based task knowledge [2, 31, 9]. Their language
+decoders can generate explicit chain-of-thought (CoT) ra-
+tionales that link scene factors to driving decisions [59,
+56, 50]. However, studies of large models for intelligent
+transportation identify task alignment and inference cost
+as central deployment constraints [15]. Lightweight driving
+VLMs likewise treat model complexity and response time
+as first-order design requirements [14]. Nevertheless, three
+interrelated challenges remain when VLM reasoning is used
+for high-level planning.
+1) Structured supervision at scale. Free-form ratio-
+nales are costly to annotate and difficult to convert into
+reusable or verifiable knowledge. Explicit process-knowledge
+representations have been shown to improve the trace-
+ability and reuse of decision information in complex en-
+gineered systems [48]. However, high-level driving still
+lacks a machine-parsable schema that explicitly connects
+environmental conditions, critical objects, lane and route
+constraints, decision intentions, and final actions.
+2) Reasoning-resource allocation. Applying full CoT
+reasoning to every scene increases latency in routine situa-
+tions. Fast–slow architectures and self-routing methods seek
+to reduce this overhead [45, 57, 37, 66, 33]. However, routing
+within an autoregressive language model often couples the
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 1 of 12
+arXiv:2607.19194v2  [cs.RO]  22 Jul 2026
+
+
+routing decision to text generation and offers limited control
+over the false-negative rate for complex scenes. These limi-
+tations motivate a separate routing mechanism that operates
+directly on intermediate visual features and exposes a con-
+tinuous, threshold-controlled operating point.
+3) Verifiable reasoning–action consistency. A gener-
+ated rationale may identify a relevant hazard yet produce
+an incompatible driving action. Standard supervised fine-
+tuning learns output sequences but does not itself enforce
+consistency among parsed scene factors, reasoning inten-
+tions, and actions under a shared set of traffic constraints.
+Existing language–action alignment methods improve task
+coupling [54, 38]; we complement them with a deterministic
+signal that verifies structured reasoning–action consistency.
+We address these problems with a cognitive dual-process
+framework for high-level VLM planning. An automated data
+engine combines perception foundation models, critical-
+path filtering, and an expert VLM to encode planning-
+relevant scene knowledge in a machine-parsable structured
+CoT (S-CoT) schema. A decoupled visual Arbiter estimates
+scene complexity from multilevel vision-encoder features
+and routes each input to fast meta-action prediction or slow
+structured reasoning. For slow-path outputs, a rule-based
+validator parses the S-CoT fields and checks their consis-
+tency with the final meta-action. These structured outputs
+enable the computation of base-task, logical-consistency,
+and risk-aversion rewards for Group Relative Policy Op-
+timization (GRPO) within a Reinforcement Learning with
+Verifiable Rewards (RLVR) procedure.
+We train and validate the framework on a high-level
+planning dataset sampled from the NAVSIM trainval split
+and evaluate it on a manually verified subset of the NAVSIM
+test split [5, 12]. The automated annotations reach 91.8%
+CoT accuracy and 98.5% Logical Consistency Score (LCS).
+The resulting planner achieves 80.14% planning accuracy
+and 97.20% LCS while reducing average latency by 17.39%
+relative to static slow reasoning. Targeted external long-
+tail subsets probe behavior beyond the NAVSIM-derived
+distribution and reveal reduced robustness in low-visibility
+and traffic-sign reasoning scenarios. The main contributions
+are summarized as follows.
+• We introduce an S-CoT knowledge representation that
+organizes scene evidence, lane and route constraints,
+reasoning intentions, and meta-actions into machine-
+parsable fields, together with an automated data en-
+gine that generates grounded supervision without
+manual annotation of individual rationales.
+• We develop a decoupled visual Arbiter that esti-
+mates a continuous scene-complexity score from mul-
+tilevel vision-encoder features, enabling threshold-
+controlled routing between direct meta-action predic-
+tion and structured slow reasoning.
+• We integrate a deterministic rule-based validator with
+GRPO to train the slow reasoning path using base-
+task, logical-consistency, and risk-aversion rewards
+that target inconsistencies between parsed S-CoT
+fields and discrete meta-actions.
+2. Related Work
+2.1. High-Level Planning for Autonomous Driving
+Classical autonomous driving systems separate percep-
+tion, prediction, and planning into modular components [10,
+27]. This decomposition provides explicit interfaces, but er-
+rors can propagate across them. End-to-end planners instead
+learn a direct mapping from sensor observations to trajecto-
+ries or driving decisions [20, 41, 55, 22, 28, 44, 29]. Many
+of these methods optimize geometric trajectories and closed-
+loop driving scores. Their latent representations do not nec-
+essarily expose how scene knowledge supports a high-level
+decision, making knowledge–action consistency difficult to
+inspect directly. Related surveys identify task-alignment and
+deployment constraints when large language models are
+introduced into the intelligent-transportation planning stack
+[15].
+VLM-based planners add semantic scene interpretation
+and language-conditioned reasoning. DriveGPT4 generates
+natural-language explanations alongside vehicle control sig-
+nals [59], while Senna separates VLM-based high-level
+planning from low-level control [21]. OpenDriveVLA uni-
+fies multimodal reasoning and action generation within a
+vision–language–action model [64]. Reason2Drive focuses
+on evaluating the causal structure of driving explanations
+rather than executable planning [35]. Together, these meth-
+ods connect perception, textual reasoning, and control at
+different levels of the planning stack. In contrast, the present
+study predicts discrete high-level meta-actions and evaluates
+whether machine-parsable scene knowledge is consistent
+with the selected actions.
+2.2. Structured and Adaptive VLM Reasoning
+Recent driving VLMs further introduce structured inter-
+mediate reasoning to improve action prediction and long-
+tail generalization [52]. Chain-of-thought (CoT) methods
+generate intermediate steps before a final output, with exten-
+sions based on self-consistency, search, and program-aided
+reasoning [53, 51, 61, 16]. In autonomous driving, VLM-AD
+uses teacher-generated free-form reasoning for supervision
+[58], and Think-Driver produces textual explanations linking
+scene understanding to decisions [62]. Free-form rationales
+are readable but difficult to translate into machine-checkable
+planning constraints. Structured alternatives narrow the out-
+put space: SOLVE incorporates intermediate reasoning into
+trajectory prediction [8], while DriveRX organizes reason-
+ing through cross-task visual question answering [13]. These
+approaches connect structured reasoning with planning, but
+their focus is the reasoning structure itself rather than pre-
+decoding routing between direct prediction and structured
+reasoning.
+Adaptive reasoning seeks to reduce the computational
+cost of invoking full CoT for every scene. DriveVLM-Dual
+combines a VLM reasoning branch with a conventional
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 2 of 12
+
+
+Figure 1: Overview of the proposed dual-process architecture. The planner takes front-view images, navigation commands, and
+ego-vehicle states as input. A lightweight Arbiter estimates scene complexity and routes each input to fast meta-action prediction or
+slow structured reasoning. The automated data engine provides structured chain-of-thought (S-CoT) supervision, while rule-based
+verification supplies rewards that target consistency between the parsed reasoning fields and the final meta-action.
+driving stack [45], and FASIONAD coordinates fast and
+slow systems through score distributions and feedback [37].
+AutoVLA and AdaThinkDrive train autoregressive models
+to select between direct planning and CoT-assisted genera-
+tion [66, 33]. Model compression and visual-token refine-
+ment provide complementary approaches to reducing VLM
+latency [14]. These methods typically couple routing to
+branch fusion, generated tokens, or the planning policy. In
+contrast, we formulate routing as a separately supervised
+visual decision made before language decoding and evaluate
+its operating point in terms of false-negative rate (FNR),
+latency, and planning accuracy.
+2.3. Automated Supervision and Verifiable Policy
+Alignment
+Recent studies use foundation models to generate driving
+data and supervision. GAIA-2 generates controllable multi-
+view driving scenes [39], whereas OmniDrive uses coun-
+terfactual synthetic annotations to connect 3D perception,
+reasoning, and planning [49]. These pipelines can reduce de-
+pendence on manually created data or annotations, but their
+outputs target scene generation, visual question answering,
+or trajectory supervision. Our data engine instead produces
+a fixed schema of scene and intention fields for structured
+reasoning; these fields can be checked before training.
+Reinforcement fine-tuning provides a second mechanism
+for task alignment. Proximal Policy Optimization (PPO)
+is widely used in Reinforcement Learning from Human
+Feedback (RLHF) to optimize language models with learned
+or human-derived reward signals [40, 43, 36], whereas
+GRPO removes the learned critic and uses relative rewards
+within sampled groups [42, 19]. In autonomous driving,
+AlphaDrive defines GRPO rewards for planning and reason-
+ing [23], whereas knowledge-transfer and teacher–student
+reinforcement-learning frameworks improve training safety
+and efficiency as the decision environment becomes increas-
+ingly complex [63]. These methods mainly optimize policy
+performance, training efficiency, or behavioral safety. In
+contrast, our framework uses deterministic domain rules to
+verify consistency among parsed scene knowledge, reason-
+ing intentions, and final discrete meta-actions.
+3. Method
+3.1. Overview
+The framework adopts Qwen3-VL as the VLM back-
+bone [1] and uses DeepStack features from multiple vision-
+encoder layers [34]. As shown in Figure 1, the automated
+data engine generates S-CoT supervision and labels of scene
+complexity for subsequent offline training. During deploy-
+ment, the visual Arbiter estimates complexity before lan-
+guage decoding and routes each input either to direct meta-
+action prediction or to structured slow reasoning. SFT estab-
+lishes the two output modes, after which RLVR optimizes
+consistency among scene factors, reasoning intentions, and
+final meta-actions for slow-path samples.
+3.2. Automated Data Engine and S-CoT
+Generation
+The automated data engine converts raw sensory inputs
+into structured S-CoT supervision organized into prede-
+fined reasoning fields, without requiring manual rationale
+annotation for each sample (Figure 2). The offline pipeline
+comprises perception-prior extraction, critical-path filtering,
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 3 of 12
+
+
+Figure 2: Automated data engine and hierarchical training workflow. The offline pipeline uses perception foundation models
+and an expert vision-language model (VLM) in sequence to generate structured chain-of-thought (S-CoT) annotations and
+scene-complexity labels. Training comprises a backbone supervised fine-tuning (SFT) warm-up followed by independent Arbiter
+calibration and Group Relative Policy Optimization (GRPO)-based slow-path optimization.
+expert annotation, scene-complexity labeling, and action-
+anchored rationale generation.
+Perception Prior Extraction. We use perception foun-
+dation models to obtain object-level spatial priors from
+each image. Grounding DINO [32] detects traffic elements
+and dynamic or static objects, while the Segment Any-
+thing Model [25] and Depth Anything Model [60] provide
+instance masks and relative depth estimates, respectively.
+These outputs support the subsequent filtering and annota-
+tion stages.
+Critical Path Filtering. To refine these detections, we
+apply VLM-based filtering to the extracted entities to re-
+duce false positives. During offline annotation, a critical-
+path filter then categorizes the validated objects relative
+to a perspective-scaled driving corridor projected from the
+future ego trajectory provided by the dataset. The pixel-
+wise intersection between the instance masks and this spatial
+corridor distinguishes on-path critical objects that may affect
+driving decisions from peripheral context. The perception
+foundation models and future trajectory are used only for
+offline data construction and are not available to the deployed
+Arbiter or planner.
+Offline Expert Annotation and Complexity Labeling.
+Qwen3-VL-235B-A22B serves as the offline expert annota-
+tor, whereas the deployed planner is obtained by fine-tuning
+Qwen3-VL-4B. This separation confines the larger model
+to dataset construction and prevents the target planner from
+generating its own reasoning supervision. Scene-complexity
+labels are derived from the extracted physical priors and
+route context. A scene is labeled as simple only when it
+corresponds to unobstructed cruising or stable car-following
+without peripheral threats. A scene is labeled as complex
+if at least one of three risk dimensions is present: (1) en-
+vironmental risk, including traffic lights, nighttime, adverse
+weather, construction zones, or complex intersections; (2)
+density risk, including multiple nearby dynamic vehicles
+or pedestrians; or (3) strategic-interaction risk, in which
+an on-path object or lane conflict requires a non-cruising
+maneuver.
+Structured Knowledge Injection and Formulation.
+The categorized objects are formatted as structured text
+(class, region, and depth) and supplied to the expert VLM,
+together with the visual input, through a multimodal prompt.
+The prompt also includes the ego-vehicle state, naviga-
+tion command, critical-object category, lane availability,
+and relative-depth ordering. The model generates the S-
+CoT according to a strict template comprising environmental
+condition, critical objects, lane availability, action planning,
+and brief reasoning. We introduce discrete labels such as
+uncertain and conditional into the perceptual stages to train
+the model to represent environmental ambiguity.
+Action-Anchored Reverse-Order Annotation. To re-
+duce contradictions between generated rationales and meta-
+action labels, we reverse the output order during offline
+annotation. Unlike online inference, offline annotation first
+requires the expert VLM to predict the discrete meta-action
+and then generate an action-conditioned rationale while
+keeping the selected action fixed. Before SFT, the result-
+ing annotations are reordered into the standard inference
+sequence, with the rationale preceding the final meta-action.
+This procedure uses the action as an annotation anchor while
+preserving the reasoning-before-action sequence during de-
+ployment.
+3.3. Scene Arbiter Module
+The Arbiter draws on robotic arbitration architectures
+that select among control systems [30, 4]. It predicts scene
+complexity directly from intermediate visual features before
+text generation, rather than performing routing within the
+autoregressive language model. Separating visual arbitration
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 4 of 12
+
+
+from autoregressive language generation also makes the in-
+vocation of structured reasoning independently inspectable.
+This design is consistent with engineering XAI principles
+that expose semantically meaningful intermediate informa-
+tion rather than relying solely on post-hoc explanations of a
+monolithic prediction [17].
+The decoupled Arbiter is a lightweight Transformer [47]
+that receives features 𝐹𝑙∈ℝ𝑁×𝑑model from 𝑀= 4 ViT
+layers, where 𝑑model
+= 2560. To process these diverse
+visual cues, it uses 𝐾learnable queries 𝑄arbiter ∈ℝ𝐾×𝑑model.
+The first query is a global complexity token 𝑞cls, and the
+remaining 𝐾−1 queries extract localized cues. Within
+each Transformer block, the local queries perform cross-
+attention over the concatenated multilevel features to extract
+fine-grained, localized risks, while self-attention exchanges
+evidence among all queries and aggregates it into 𝑞cls. The
+updated complexity token is then passed directly to the
+classification head:
+𝐻cls = Decoder(𝑄arbiter, Concat(𝐹1, … , 𝐹𝑀)).
+(1)
+The classification head converts 𝐻cls into a continuous
+scene-complexity probability:
+𝑃complex = 𝜎(MLPhead(𝐻cls)),
+(2)
+where 𝜎denotes the sigmoid function.
+The Arbiter is trained independently as a binary clas-
+sifier. Because routing a complex scene incorrectly to the
+fast path constitutes a safety-relevant classification error, the
+objective includes a false-negative penalty:
+arbiter = BCE + 𝑤r ⋅risk,
+(3)
+risk = −𝐶r ⋅log 𝑃complex,
+(4)
+where 𝑤r weights the penalty. For complex training samples,
+risk increases as 𝑃complex decreases. The coefficient 𝐶r rep-
+resents the offline-estimated consequence of skipping slow
+reasoning for that sample.
+To avoid circular dependence between routing and plan-
+ning, 𝐶r is computed offline with the SFT planner frozen. Let̂
+𝑎fast(𝑥) denote the meta-action obtained by forcing the use
+of the fast-path prompt. The cost increases when this action
+disagrees with the ground-truth action or violates a validator
+rule:
+𝐶r(𝑥) = 𝛼
+{
+1,̂
+𝑎fast(𝑥) ≠𝑎gt(𝑥),
+0,
+otherwise,
++ 𝛾(̂𝑎fast(𝑥), 𝑥) ,
+(5)
+where (̂𝑎fast(𝑥), 𝑥) evaluates the fast-path action against the
+parsed scene context for sample 𝑥and returns 1 if a validator
+rule is violated. We set 𝛼= 𝛾= 1 and keep 𝐶r fixed during
+Arbiter training.
+3.4. Supervised Fine-Tuning
+SFT trains the VLM backbone using separate fast- and
+slow-path prompts with a cross-entropy objective.
+For simple scenes, the VLM is trained to output meta-
+actions directly:
+𝐿fast = 𝐿CE(𝜋𝜃(𝑜|𝑞, Promptfast), ActionGT),
+(6)
+where 𝑞is the visual input and 𝑜is the meta-action token
+output. For complex scenes routed to the slow path, the VLM
+is trained to output the complete S-CoT sequence using a
+segment-wise weighted cross-entropy loss:
+𝐿slow = −𝜆⋅
+𝑇∑
+𝑡=1
+𝑤𝑡⋅log(𝜋𝜃(𝑜𝑡|𝑜<𝑡, 𝑞, Promptslow)),
+(7)
+where 𝑤𝑡weights each S-CoT segment and 𝜆is a global
+balancing coefficient.
+3.5. Reinforcement Learning with Verifiable
+Rewards
+Starting from the SFT model, RLVR applies GRPO
+to compare sampled slow-path outputs using task-specific
+verifiable rewards, without training a separate critic [42].
+The policy 𝜋𝜃is optimized using the composite reward:
+= base + logic + risk.
+(8)
+Base Task Reward. The reward base scores adherence
+to the S-CoT format and final-action accuracy. A sigmoid
+length penalty discourages verbose rationales, and additional
+credit for correct non-conservative maneuvers, such as lane
+changes, reduces bias toward overly conservative actions.
+Logical Consistency Reward. For complex scenes,
+logic rewards accurate intermediate perception to preserve
+the perceptual capability acquired during SFT and uses a
+rule-based validator to penalize reasoning–action contradic-
+tions. For example, a deterministic penalty is applied when
+the output identifies an immediate frontal hazard but fails to
+select a deceleration action.
+Risk Aversion Reward. The reward risk promotes
+prudent model behavior in high-risk situations. It rewards
+outputs that recall prudent behaviors and provides additional
+reinforcement when uncertainty is appropriately expressed
+through the discrete ambiguity labels defined in the S-CoT
+schema.
+Deterministic Consistency Validator. The validator
+parses a fixed set of S-CoT slots and applies the traffic-
+scene rules in Table 1. A sample passes only if no hard
+contradiction is detected. During RLVR, the same rules
+compute logic for sampled outputs. For the reasoning-
+intention check, we parse a small set of constrained intention
+verbs used during data generation and compare them with
+the final meta-action.
+Policy Optimization. During GRPO, given a visual
+input 𝑞and a policy context 𝑐determined by the frozen
+Arbiter, the VLM policy samples a group of candidate
+outputs {𝑜1, … , 𝑜𝐺}. The group-wise relative advantage 𝐴𝑖
+is computed as:
+𝐴𝑖=
+𝑖−mean({𝑗}𝐺
+𝑗=1)
+std({𝑗}𝐺
+𝑗=1) + 𝜖
+.
+(9)
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 5 of 12
+
+
+Table 1
+Rule-based conditions used by the validator during RLVR training and LCS evaluation.
+S-CoT
+field
+Trigger
+condition
+Behavioral
+constraint
+Violation
+type
+Critical objects
+Immediate obstacle on the ego path
+The longitudinal action must be
+decelerate or stop
+Hazard ignorance
+Environmental
+condition
+Red light or stop sign affecting the ego
+lane
+The longitudinal action must be stop
+Right-of-way violation
+Critical objects
+Pedestrian or vulnerable road user on
+the ego path
+The longitudinal action must be
+decelerate or stop
+Vulnerable-user risk
+Critical objects
+Close leading or cut-in vehicle ahead
+accelerate is forbidden
+Following-risk violation
+Lane availability
+Target lane is blocked or unavailable
+A lane change toward the blocked side
+is forbidden
+Invalid lane
+commitment
+Lane availability and
+route
+The route requires a transition to an
+available target lane
+The lateral action must change toward
+the target lane
+Missed route-lane
+response
+Ambiguity label
+A critical object, lane state, or visibility
+condition is uncertain
+accelerate is forbidden
+Overconfident
+reasoning
+Critical objects and
+lanes
+No active signal constraint or critical
+object exists, and the current lane is
+free
+An unexplained stop or decelerate is
+penalized
+Phantom braking
+Reasoning intention
+and meta-action
+The rationale contains constrained
+lateral or longitudinal intention verbs
+The final meta-action must be
+compatible with the stated intention
+Intention–action
+inconsistency
+The final objective uses a clipped loss with clipping pa-
+rameter 𝜖and a KL divergence penalty to prevent excessive
+deviation from the SFT reference model. It is formulated as
+follows:
+𝐽(𝜃) = 𝔼𝑞,𝑐,{𝑜𝑖}
+[𝐿policy(𝜃) −𝛽𝔻KL(𝜃)] ,
+𝐿policy(𝜃) =
+𝐺
+∑
+𝑖=1
+min (𝑟𝑖(𝜃)𝐴𝑖, clip(𝑟𝑖(𝜃), 1 −𝜖, 1 + 𝜖)𝐴𝑖
+) ,
+(10)
+where 𝐿policy denotes the policy optimization term, 𝔻KL
+denotes the KL divergence regularization term, and 𝑟𝑖(𝜃) =
+𝜋𝜃(𝑜𝑖|𝑞,𝑐)
+𝜋𝜃old(𝑜𝑖|𝑞,𝑐) is the importance sampling ratio.
+4. Experiments
+4.1. Experimental Setup
+Dataset. Training and validation samples are drawn
+from disjoint driving logs in the NAVSIM trainval split,
+whereas evaluation samples are drawn from the test split
+[12]. The resulting dataset comprises 69,842 training sam-
+ples (42,163 simple and 27,679 complex), 2,346 validation
+samples (1,407 simple and 939 complex), and 574 manually
+verified test samples (146 simple and 428 complex). Model
+checkpoints, the routing threshold, and reward weights are
+selected using the validation set, while the held-out test set
+is reserved for final evaluation. To probe behavior under
+selected out-of-distribution (OOD) and long-tail conditions,
+we construct external evaluation subsets containing 96–108
+samples each. These consist of construction-zone cases from
+a public roadwork dataset [18], traffic-sign reasoning cases
+from a public map-and-sign dataset [6], and non-public real-
+world cases covering night driving, adverse weather, com-
+plex intersections, and dense urban interactions. All external
+subsets are used exclusively for evaluation and are excluded
+from both SFT and RLVR training.
+Metrics. Planning performance is quantified by exact-
+match accuracy for the joint pair of lateral and longitudinal
+meta-actions and by classwise F1 scores within each action
+dimension. Routing performance is quantified by routing F1
+and the false-negative rate (FNR) on complex scenes. CoT
+accuracy is reported only for the manual audit of data-engine
+outputs on complex scenes. An audited output is considered
+correct only if its planning-relevant reasoning and both
+meta-actions are correct. 𝐹1per denotes the sample-averaged
+set-based F1 score between the predicted and reference sets
+of perception items. The Logical Consistency Score (LCS)
+is computed using the validator in Table 1:
+𝐿𝐶𝑆=
+𝑁pass
+𝑁complex
+,
+(11)
+where 𝑁pass denotes the number of samples in the complex-
+scene evaluation set that pass all logical-consistency rules,
+and 𝑁complex denotes the total number of samples in that
+set. LCS therefore quantifies rule-based internal consistency
+between the parsed reasoning fields and final meta-actions
+within the complex-scene evaluation set.
+Implementation Details. We use Qwen3-VL-4B as the
+VLM backbone. Each model input comprises a front-view
+image, ego-vehicle state variables, and navigation instruc-
+tions. The learning rate is 5 × 10−6 for both supervised fine-
+tuning and GRPO-based alignment of the VLM backbone.
+The decoupled Arbiter is trained with a learning rate of 1 ×
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 6 of 12
+
+
+10−5, and its default routing threshold is 𝜏= 0.7. All training
+stages of the proposed framework are run on eight NVIDIA
+H20 GPUs. Inference latency is measured with a batch size
+of 1 on a single NVIDIA H20 GPU using BF16 precision
+after model warm-up. Table 3 reports the mean per-sample
+latency across the 574-sample test set. For comparison, we
+evaluate zero-shot VLMs, SFT-only VLMs, AlphaDrive, a
+2B variant of the proposed framework, and two lightweight
+non-reasoning planners: IDM+MOBIL [46, 24] and a CIL-
+style behavior-cloning model adapted to the same discrete
+meta-action space [11].
+4.2. Data Engine Quality
+We compare the quality of the S-CoT annotations gen-
+erated by the proposed data engine with those produced by
+a single-pass autoregressive (AR) pipeline and a modular-
+perception prompting pipeline. Because the perception mod-
+ules run locally, the annotation-cost calculation includes
+only calls to the expert VLM. The data-engine stage that
+invokes the expert VLM requires approximately six calls
+per sample, corresponding to approximately 16 annotated
+samples per minute at the measured service throughput.
+This offline annotation throughput is distinct from the online
+inference latency reported in Table 3.
+For the manual audit, 195 complex scenes are sampled
+from the training set. Outputs produced by all three pipelines
+are anonymized and independently reviewed by two anno-
+tators. An output is judged correct only if its reasoning
+and both meta-actions are correct. To provide a limited
+validity check for the rule-based validator, the annotators
+separately assess reasoning–action consistency without con-
+sidering factual correctness. The validator agrees with the
+resulting consensus consistency labels for 563 of the 585
+outputs (96.2%; Cohen’s 𝜅= 0.73).
+Figure 3 reports CoT accuracy and LCS for annota-
+tions generated by the three pipelines. The single-pass AR
+pipeline achieves a CoT accuracy of 80.5% and an LCS of
+88.7%; these lower scores are consistent with its suscepti-
+bility to perception hallucinations. The modular-perception
+pipeline improves both metrics, but both remain below those
+achieved by the complete data engine. The complete data
+engine achieves 91.8% CoT accuracy and 98.5% LCS, the
+highest values among the three pipelines.
+4.3. Main Results
+Table 2 compares planning, perception, and logical-
+consistency performance on the NAVSIM test set. The
+rule-based IDM+MOBIL and CIL-BC baselines serve as
+lightweight planning-only references but yield lower F1
+scores, particularly for non-default lateral and longitudi-
+nal maneuvers. The zero-shot VLMs achieve exact-match
+planning accuracies of only 13.07% and 17.77%, indicat-
+ing limited transfer without task-specific fine-tuning. SFT
+substantially improves planning accuracy for both VLM
+backbones; however, LCS values of 66.82% and 62.15%
+for the corresponding SFT models indicate that supervised
+training alone does not reliably enforce reasoning–action
+consistency.
+Figure 3: Chain-of-thought (CoT) accuracy and Logical Con-
+sistency Score (LCS) of structured chain-of-thought (S-CoT)
+annotations generated by the three data pipelines on the 195-
+scene audit subset.
+Figure 4: Qualitative comparison of reasoning–action consis-
+tency in a complex scene. The supervised fine-tuning (SFT)
+baseline produces an action that contradicts the perceived haz-
+ard, whereas the Group Relative Policy Optimization (GRPO)-
+aligned policy produces an action consistent with its stated
+reasoning.
+The verifiable reinforcement-learning stage strengthens
+this alignment. Relative to the Qwen3-VL SFT baseline, the
+GRPO-aligned policy increases LCS by 35.05 percentage
+points, from 62.15% to 97.20%, while increasing planning
+accuracy from 70.73% to 80.14% and 𝐹1per from 78.62%
+to 88.46%. Figure 4 provides a qualitative example: in the
+illustrated complex scene, the SFT model produces an action
+that contradicts the perceived hazard, whereas the GRPO-
+aligned policy produces an action consistent with its stated
+reasoning.
+4.4. Reasoning Efficiency and Over-Reasoning
+Mitigation
+As shown in Table 3, the Dual-Process model improves
+planning accuracy by 6.27 percentage points relative to
+static fast-path inference (Fast-Plan), at the cost of a 7.02%
+increase in latency. Relative to static slow-path inference
+with CoT enabled for every scene (Slow-Think), it improves
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 7 of 12
+
+
+Table 2
+Planning, perception, and Logical Consistency Score (LCS) results on the manually verified 574-sample NAVSIM test set. All
+reported performance metrics are percentages. † denotes a model trained only by supervised fine-tuning (SFT).
+Method
+Size
+Plan. Acc.
+Lateral (F1)
+Longitudinal (F1)
+𝐹1per
+LCS
+straight
+left
+right
+keep
+accel.
+decel.
+stop
+InternVL3.5
+4B
+13.07
+27.25
+17.48
+15.33
+47.88
+4.42
+12.74
+9.54
+34.61
+74.30
+Qwen3-VL
+4B
+17.77
+33.64
+18.74
+16.42
+42.34
+11.43
+17.53
+12.27
+43.52
+72.20
+IDM+MOBIL
+Rule
+58.36
+81.46
+54.82
+56.13
+70.28
+24.71
+43.96
+51.34
+-
+-
+CIL-BC
+25M
+63.76
+84.73
+68.14
+69.02
+73.65
+35.20
+52.48
+60.13
+-
+-
+InternVL3.5†
+4B
+66.38
+85.19
+76.64
+78.42
+77.25
+41.66
+63.72
+72.24
+72.37
+66.82
+Qwen3-VL†
+4B
+70.73
+88.98
+86.34
+84.75
+77.14
+46.05
+70.74
+75.83
+78.62
+62.15
+AlphaDrive
+2B
+73.52
+95.24
+89.62
+87.41
+82.42
+60.33
+70.41
+83.54
+-
+-
+Dual-Process (2B)
+2B
+77.35
+95.57
+91.23
+88.85
+85.29
+64.02
+72.44
+82.06
+83.37
+96.73
+Dual-Process (Ours)
+4B
+80.14
+96.35
+93.71
+91.41
+87.67
+67.26
+76.22
+83.43
+88.46
+97.20
+Figure 5: Qualitative example of over-reasoning in a simple
+scene. In this example, full structured reasoning produces a
+hallucinated risk and an unnecessary conservative maneuver,
+whereas dynamic routing avoids invoking the slow reasoning
+path.
+Table 3
+Inference latency, routing performance, and planning accuracy
+under four reasoning modes.
+Method
+Latency (ms) Routing F1 Plan. Acc.
+Fast-Plan
+401.62
+-
+73.87
+Slow-Think
+520.26
+-
+77.87
+Implicit-Routing
+445.25
+82.41
+78.57
+Dual-Process (Ours)
+429.81
+89.46
+80.14
+planning accuracy by 2.27 percentage points while reducing
+mean latency by 17.39%.
+The lower accuracy of Slow-Think relative to Dual-
+Process (77.87% versus 80.14%), together with the qualita-
+tive example in Figure 5, suggests an over-reasoning effect.
+In unobstructed cruising scenes, a complete reasoning chain
+may redirect attention toward peripheral entities and elicit
+responses to weak or hallucinated risks. Selective routing
+may reduce this type of failure by reserving slow-path rea-
+soning for scenes with stronger visual or semantic evidence
+of complexity.
+4.5. Long-Tail Robustness and Failure Analysis
+We evaluate the framework on the external long-tail
+subsets defined in the experimental setup. As shown in
+Table 4, the average routing F1, planning accuracy, and FNR
+across the six subsets are 75.55%, 65.47%, and 25.10%,
+respectively. The average LCS decreases from 97.20% on
+the NAVSIM test set to 85.18% on the external subsets, indi-
+cating that rule-aligned consistency transfers only partially
+beyond the training distribution. The traffic-sign reasoning
+subset yields the lowest values, and the low-visibility subset
+the second-lowest values, for routing F1, planning accuracy,
+perception F1, and LCS; the other four subsets yield higher
+but heterogeneous results across these metrics.
+The false-negative examples in Figure 6 illustrate two
+failure modes. In low-visibility scenes involving rain or
+snow, visual degradation may obscure small obstacles, blur
+lane boundaries, and weaken the local cues available to
+the Arbiter. In traffic-sign reasoning scenes, relevant signs
+are often small, peripheral, or overlap only weakly with
+the ego vehicle’s driving corridor; the current critical-path
+filter and Arbiter may therefore underestimate their plan-
+ning relevance. These observations motivate future work on
+sign-aware grounding, feature calibration robust to adverse
+weather, and more explicit long-tail priors for routing.
+4.6. Ablation Studies and Sensitivity Analysis
+Reward ablation. Table 5 isolates the incremental ef-
+fects of the reward components used for GRPO. Relative to
+configuration 1, adding logic in configuration 2 increases
+LCS from 71.50% to 96.96% and 𝐹1per from 77.68% to
+90.34%, identifying it as the primary contributor to the
+observed consistency gain. Adding risk in configuration 3
+further increases planning accuracy from 79.27% to 80.14%
+and LCS from 96.96% to 97.20%, although 𝐹1per decreases
+from 90.34% to 88.46%. The risk-aversion reward addresses
+an early-training observation that cross-entropy loss and
+planning performance can diverge in ambiguous scenes,
+where the policy may become overconfident. It targets this
+behavior by rewarding explicit uncertainty and penalizing
+aggressive maneuvers under ambiguity. Thus, the complete
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 8 of 12
+
+
+Table 4
+Routing, planning, perception, and Logical Consistency Score (LCS) performance on six external out-of-distribution (OOD) and
+long-tail driving subsets.
+Evaluation subset
+FNR (%) ↓
+Routing F1 (%) ↑
+Planning Acc. (%) ↑
+𝐹1per (%) ↑
+LCS (%) ↑
+Night driving
+19.84
+78.92
+71.26
+76.88
+88.47
+Low visibility in rain or snow
+33.76
+69.84
+59.72
+68.41
+80.92
+Construction zones
+16.73
+83.18
+66.84
+79.15
+89.12
+Complex intersections
+20.46
+78.34
+69.38
+75.82
+87.52
+Dense urban interactions
+21.18
+77.56
+68.71
+76.34
+86.18
+Traffic-sign reasoning scenes
+38.62
+65.47
+56.88
+65.23
+78.84
+Average
+25.10
+75.55
+65.47
+73.64
+85.18
+Figure 6: Qualitative routing analysis in out-of-distribution (OOD) and long-tail driving scenarios. The left panel shows correctly
+routed examples, with simple scenes assigned to the fast path and complex scenes assigned to the slow path. The right panel
+shows false-negative cases in which complex scenes receive low complexity scores and are incorrectly assigned to the fast path.
+With the routing threshold set to 𝜏= 0.70, samples satisfying 𝑃complex ≥𝜏are assigned to the slow path.
+reward configuration achieves the highest planning accuracy
+and LCS, with a modest reduction in perception F1 relative
+to configuration 2.
+Training paradigm. Table 6 compares the training
+paradigms. The SFT-only model reaches 70.73% plan-
+ning accuracy but 62.15% LCS, whereas RL-only training
+reaches 85.75% LCS but only 42.51% planning accuracy
+without a supervised initialization. Although using an LLM-
+as-a-Judge improves upon pure SFT, its probabilistic reward
+signals introduce evaluation noise and less directly enforce
+driving-specific logical constraints. Combining SFT initial-
+ization with deterministic RLVR yields the highest Acc.,
+𝐹1per, and LCS in this comparison.
+Sensitivity analysis. Figure 7 examines sensitivity to
+the Arbiter threshold and the two verifiable-reward weights.
+At 𝜏= 0.6, planning accuracy is marginally higher than
+at 𝜏
+= 0.7 (80.22% versus 80.14%) and FNR is lower
+(3.42% versus 6.65%). However, routing F1 decreases from
+89.46% to 72.35%, and latency increases from 429.81 to
+471.48 ms, indicating excessive use of the slow path. At
+𝜏= 0.8, latency decreases to 415.74 ms, but routing F1
+and planning accuracy decrease to 76.28% and 78.56%,
+respectively, while FNR increases to 12.02%. We therefore
+retain 𝜏= 0.7 as a practical operating point that balances
+routing quality, planning accuracy, and inference cost. The
+reward-weight analysis indicates that logic is the primary
+driver of LCS improvement, whereas risk has a smaller but
+consistent effect. Increasing either weight beyond 1.0 yields
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 9 of 12
+
+
+Table 5
+Effects of the verifiable reward components used in Group Relative Policy Optimization (GRPO) on planning, perception, and
+Logical Consistency Score (LCS) metrics.
+ID
+base
+logic
+risk
+Lateral (F1)
+Longitudinal (F1)
+𝐹1per
+LCS
+Plan. Acc.
+straight
+left
+right
+keep
+accel.
+decel.
+stop
+1
+✓
+90.46
+92.41
+89.43
+83.58
+60.78
+70.54
+72.66
+77.68
+71.50
+75.61
+2
+✓
+✓
+94.38
+94.12
+90.86
+86.42
+65.63
+75.34
+82.26
+90.34
+96.96
+79.27
+3
+✓
+✓
+✓
+96.35
+93.71
+91.41
+87.67
+67.26
+76.22
+83.43
+88.46
+97.20
+80.14
+Figure 7: Sensitivity to the Arbiter threshold and verifiable-reward weights. The left panel reports planning accuracy and false-
+negative rate (FNR) at five thresholds; the dotted line marks the default setting (𝜏= 0.7), selected based on the joint trade-off
+among planning accuracy, FNR, routing F1, and latency. In the right panel, each verifiable-reward weight is varied while the other
+remains at its default value of 1.0 and the base-task reward is held fixed.
+Table 6
+Comparison of supervised fine-tuning (SFT), reinforcement
+learning (RL)-only training, large-language-model (LLM)-
+judged RL, and deterministic Reinforcement Learning with
+Verifiable Rewards (RLVR).
+Paradigm
+Planning Acc. (%)
+𝐹1per (%)
+LCS (%)
+𝜋𝑆𝐹𝑇
+70.73
+78.62
+62.15
+𝜋𝑅𝐿-𝑜𝑛𝑙𝑦
+42.51
+62.31
+85.75
+𝜋𝑆𝐹𝑇→𝑅𝐿-𝐿𝐿𝑀
+77.18
+81.33
+90.65
+𝝅𝑺𝑭𝑻→𝑹𝑳𝑽𝑹
+𝟖𝟎.𝟏𝟒
+𝟖𝟖.𝟒𝟔
+𝟗𝟕.𝟐𝟎
+only limited additional LCS gains and slightly reduces plan-
+ning accuracy, suggesting that overweighting the verification
+terms can induce overly conservative behavior.
+5. Conclusion
+This study presents a cognitive dual-process framework
+for integrating structured scene knowledge and adaptive
+reasoning into the knowledge-intensive task of high-level
+VLM planning. The framework combines an automated data
+engine that constructs machine-parsable S-CoT supervision,
+a pre-decoding visual Arbiter that routes scenes between
+direct planning and structured reasoning, and deterministic
+verification that supplies training signals for consistency
+between parsed scene factors and discrete meta-actions. In
+the manual audit, the generated annotations achieve 91.8%
+CoT accuracy and 98.5% LCS. On the manually verified
+574-sample NAVSIM test set, the planner achieves 80.14%
+planning accuracy and 97.20% LCS while reducing mean
+latency by 17.39% relative to static slow reasoning. Results
+on the external long-tail subsets show partial transfer beyond
+the training distribution but also identify the largest perfor-
+mance degradations in low-visibility and traffic-sign reason-
+ing scenes. Taken together, the results indicate that adaptive
+routing can reduce redundant VLM inference, while explicit
+scene-knowledge representation and rule-based verification
+support planning performance and reasoning–action consis-
+tency within the evaluated high-level planning setting.
+Several limitations remain. Although the Arbiter pro-
+duces a continuous complexity score, the visual evidence
+supporting an individual routing decision is not yet directly
+interpretable. The current S-CoT schema and validator cover
+a fixed set of scene factors and may not capture uncom-
+mon interactions, particularly under severe visual degrada-
+tion. Moreover, the external evaluation uses targeted sub-
+sets rather than a comprehensive cross-dataset benchmark;
+broader generalization therefore remains to be established.
+Finally, the planner predicts discrete meta-actions rather
+than executable trajectories, so the present results do not
+establish closed-loop driving performance. Future work will
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 10 of 12
+
+
+investigate routing attribution and calibration, extend the S-
+CoT schema and validator to additional long-tail conditions,
+and integrate high-level reasoning with trajectory generation
+and closed-loop evaluation.
+CRediT authorship contribution statement
+Zhongyao Yang: Conceptualization, Methodology, Val-
+idation, Investigation, Writing – original draft, Writing –
+review & editing, Visualization. Haoyu Li: Conceptual-
+ization, Methodology, Investigation, Writing – review &
+editing, Visualization. Yu Yan: Methodology, Investigation.
+Zhuangxuan Yu: Methodology, Investigation. Jiangfeng
+Nan: Methodology, Investigation. Jinrui Nan: Conceptual-
+ization, Supervision, Project administration, Funding acqui-
+sition.
+References
+[1] Bai, S., Cai, Y., Chen, R., Chen, K., Chen, X., Cheng, Z., Deng, L.,
+Ding, W., Gao, C., Ge, C., et al., 2025a. Qwen3-vl technical report.
+arXiv preprint arXiv:2511.21631 .
+[2] Bai, S., Chen, K., Liu, X., Wang, J., Ge, W., Song, S., Dang, K., Wang,
+P., Wang, S., Tang, J., et al., 2025b. Qwen2.5-vl technical report.
+arXiv preprint arXiv:2502.13923 .
+[3] Bojarski, M., Del Testa, D., Dworakowski, D., Firner, B., Flepp, B.,
+Goyal, P., Jackel, L.D., Monfort, M., Muller, U., Zhang, J., et al.,
+2016.
+End to end learning for self-driving cars.
+arXiv preprint
+arXiv:1604.07316 .
+[4] Brooks, R., 1986. A robust layered control system for a mobile robot.
+IEEE journal on robotics and automation 2, 14–23.
+[5] Caesar, H., Kabzan, J., Tan, K.S., Fong, W.K., Wolff, E., Lang, A.,
+Fletcher, L., Beijbom, O., Omari, S., 2021. nuplan: A closed-loop ml-
+based planning benchmark for autonomous vehicles. arXiv preprint
+arXiv:2106.11810 .
+[6] Chang, X., Xue, M., Liu, X., Pan, Z., Wei, X., 2025.
+Driving by
+the rules: A benchmark for integrating traffic sign regulations into
+vectorized hd map, in: Proceedings of the Computer Vision and
+Pattern Recognition Conference, pp. 6823–6833.
+[7] Chen, L., Wu, P., Chitta, K., Jaeger, B., Geiger, A., Li, H., 2024a.
+End-to-end autonomous driving: Challenges and frontiers.
+IEEE
+Transactions on Pattern Analysis and Machine Intelligence .
+[8] Chen, X., Huang, L., Ma, T., Fang, R., Shi, S., Li, H., 2025. Solve:
+Synergy of language-vision and end-to-end networks for autonomous
+driving, in: Proceedings of the Computer Vision and Pattern Recog-
+nition Conference, pp. 12068–12077.
+[9] Chen, Z., Wu, J., Wang, W., Su, W., Chen, G., Xing, S., Zhong, M.,
+Zhang, Q., Zhu, X., Lu, L., et al., 2024b. Internvl: Scaling up vision
+foundation models and aligning for generic visual-linguistic tasks, in:
+Proceedings of the IEEE/CVF conference on computer vision and
+pattern recognition, pp. 24185–24198.
+[10] Chu, F., Li, H., Xie, L., Zhao, J., 2025. A survey of transformer archi-
+tectures for autonomous driving. Expert Systems with Applications ,
+130338.
+[11] Codevilla, F., Müller, M., López, A., Koltun, V., Dosovitskiy, A.,
+2018. End-to-end driving via conditional imitation learning, in: 2018
+IEEE international conference on robotics and automation (ICRA),
+IEEE. pp. 4693–4700.
+[12] Dauner, D., Hallgarten, M., Li, T., Weng, X., Huang, Z., Yang, Z., Li,
+H., Gilitschenski, I., Ivanovic, B., Pavone, M., et al., 2024. Navsim:
+Data-driven non-reactive autonomous vehicle simulation and bench-
+marking. Advances in Neural Information Processing Systems 37,
+28706–28719.
+[13] Diao, M., Yang, L., Yin, H., Wang, Z., Wang, Y., Tian, D., Liang,
+K., Ma, Z., 2025. Driverx: A vision-language reasoning model for
+cross-task autonomous driving. arXiv preprint arXiv:2505.20665 .
+[14] Gan, L., Chen, Z., Hu, Q., Tang, X., Luo, X., Chu, W., Li, G., 2026.
+Performance and lightweight coexistence: Vision-language model for
+visual scene question answering in autonomous driving. Advanced
+Engineering Informatics 71, 104424.
+[15] Gan, L., Chu, W., Li, G., Tang, X., Li, K., 2024. Large models for
+intelligent transportation systems and autonomous vehicles: A survey.
+Advanced Engineering Informatics 62, 102786.
+[16] Gao, L., Madaan, A., Zhou, S., Alon, U., Liu, P., Yang, Y., Callan,
+J., Neubig, G., 2023.
+Pal: Program-aided language models, in:
+International Conference on Machine Learning, PMLR. pp. 10764–
+10799.
+[17] Geyer, P., Singh, M.M., Chen, X., 2024.
+Explainable ai for en-
+gineering design: A unified approach of systems engineering and
+component-based deep learning demonstrated by energy-efficient
+building design. Advanced Engineering Informatics 62, 102843.
+[18] Ghosh, A., Zheng, S., Tamburo, R., Vuong, K., Alvarez-Padilla,
+J., Zhu, H., Cardei, M., Dunn, N., Mertz, C., Narasimhan, S.G.,
+2025. Roadwork: A dataset and benchmark for learning to recognize,
+observe, analyze and drive through work zones, in: Proceedings of the
+IEEE/CVF International Conference on Computer Vision, pp. 6132–
+6142.
+[19] Guo, D., Yang, D., Zhang, H., Song, J., Zhang, R., Xu, R., Zhu, Q.,
+Ma, S., Wang, P., Bi, X., et al., 2025. Deepseek-r1: Incentivizing rea-
+soning capability in llms via reinforcement learning. arXiv preprint
+arXiv:2501.12948 .
+[20] Hu, Y., Yang, J., Chen, L., Li, K., Sima, C., Zhu, X., Chai, S., Du,
+S., Lin, T., Wang, W., et al., 2023. Planning-oriented autonomous
+driving, in: Proceedings of the IEEE/CVF conference on computer
+vision and pattern recognition, pp. 17853–17862.
+[21] Jiang, B., Chen, S., Liao, B., Zhang, X., Yin, W., Zhang, Q.,
+Huang, C., Liu, W., Wang, X., 2024. Senna: Bridging large vision-
+language models and end-to-end autonomous driving. arXiv preprint
+arXiv:2410.22313 .
+[22] Jiang, B., Chen, S., Xu, Q., Liao, B., Chen, J., Zhou, H., Zhang,
+Q., Liu, W., Huang, C., Wang, X., 2023.
+Vad: Vectorized scene
+representation for efficient autonomous driving, in: Proceedings of the
+IEEE/CVF International Conference on Computer Vision, pp. 8340–
+8350.
+[23] Jiang, B., Chen, S., Zhang, Q., Liu, W., Wang, X., 2025. Alphadrive:
+Unleashing the power of vlms in autonomous driving via reinforce-
+ment learning and reasoning. arXiv preprint arXiv:2503.07608 .
+[24] Kesting, A., Treiber, M., Helbing, D., 2007. General lane-changing
+model mobil for car-following models.
+Transportation Research
+Record 1999, 86–94.
+[25] Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L.,
+Xiao, T., Whitehead, S., Berg, A.C., Lo, W.Y., et al., 2023. Segment
+anything, in: Proceedings of the IEEE/CVF international conference
+on computer vision, pp. 4015–4026.
+[26] Li, H., Zhang, X., Zhong, J., Chen, Z., Zhao, Y., Wang, B., Leng,
+J., Sun, C., 2026. Robo-detr: Robustness-aware depth-guided trans-
+former for monocular 3d object detection under adverse visual condi-
+tions. IEEE Internet of Things Journal .
+[27] Li, H., Zhao, Y., Zhong, J., Wang, B., Sun, C., Sun, F., 2025.
+Delving into the secrets of bev 3d object detection in autonomous
+driving: a comprehensive survey. IEEE Transactions on Intelligent
+Transportation Systems 27, 119–144.
+[28] Li, Z., Li, K., Wang, S., Lan, S., Yu, Z., Ji, Y., Li, Z., Zhu, Z., Kautz,
+J., Wu, Z., et al., 2024. Hydra-mdp: End-to-end multimodal planning
+with multi-target hydra-distillation. arXiv preprint arXiv:2406.06978
+.
+[29] Liao, B., Chen, S., Yin, H., Jiang, B., Wang, C., Yan, S., Zhang, X.,
+Li, X., Zhang, Y., Zhang, Q., et al., 2025. Diffusiondrive: Truncated
+diffusion model for end-to-end autonomous driving, in: Proceedings
+of the Computer Vision and Pattern Recognition Conference, pp.
+12037–12047.
+[30] Liberzon, D., Morse, A.S., 1999.
+Basic problems in stability and
+design of switched systems. IEEE control systems magazine 19, 59–
+70.
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 11 of 12
+
+
+[31] Liu, H., Li, C., Wu, Q., Lee, Y.J., 2023. Visual instruction tuning.
+Advances in neural information processing systems 36, 34892–34916.
+[32] Liu, S., Zeng, Z., Ren, T., Li, F., Zhang, H., Yang, J., Jiang, Q., Li,
+C., Yang, J., Su, H., et al., 2024. Grounding dino: Marrying dino
+with grounded pre-training for open-set object detection, in: European
+conference on computer vision, Springer. pp. 38–55.
+[33] Luo, Y., Li, F., Xu, S., Lai, Z., Yang, L., Chen, Q., Luo, Z., Xie,
+Z., Jiang, S., Liu, J., et al., 2025. Adathinkdrive: Adaptive thinking
+via reinforcement learning for autonomous driving. arXiv preprint
+arXiv:2509.13769 .
+[34] Meng, L., Yang, J., Tian, R., Dai, X., Wu, Z., Gao, J., Jiang, Y.G.,
+2024. Deepstack: Deeply stacking visual tokens is surprisingly simple
+and effective for lmms. Advances in Neural Information Processing
+Systems 37, 23464–23487.
+[35] Nie, M., Peng, R., Wang, C., Cai, X., Han, J., Xu, H., Zhang, L., 2024.
+Reason2drive: Towards interpretable and chain-based reasoning for
+autonomous driving, in: European Conference on Computer Vision,
+Springer. pp. 292–308.
+[36] Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin,
+P., Zhang, C., Agarwal, S., Slama, K., Ray, A., et al., 2022. Training
+language models to follow instructions with human feedback. Ad-
+vances in neural information processing systems 35, 27730–27744.
+[37] Qian, K., Ma, Z., He, Y., Luo, Z., Shi, T., Zhu, T., Li, J., Wang, J.,
+Chen, Z., He, X., et al., 2024. Fasionad: Fast and slow fusion thinking
+systems for human-like autonomous driving with adaptive feedback.
+arXiv preprint arXiv:2411.18013 .
+[38] Renz, K., Chen, L., Arani, E., Sinavski, O., 2025. Simlingo: Vision-
+only closed-loop autonomous driving with language-action align-
+ment, in: Proceedings of the Computer Vision and Pattern Recogni-
+tion Conference, pp. 11993–12003.
+[39] Russell, L., Hu, A., Bertoni, L., Fedoseev, G., Shotton, J., Arani,
+E., Corrado, G., 2025.
+Gaia-2: A controllable multi-view gen-
+erative world model for autonomous driving.
+arXiv preprint
+arXiv:2503.20523 .
+[40] Schulman, J., Wolski, F., Dhariwal, P., Radford, A., Klimov, O.,
+2017.
+Proximal policy optimization algorithms.
+arXiv preprint
+arXiv:1707.06347 .
+[41] Shao, H., Wang, L., Chen, R., Waslander, S.L., Li, H., Liu, Y., 2023.
+Reasonnet: End-to-end driving with temporal and global reasoning,
+in: Proceedings of the IEEE/CVF conference on computer vision and
+pattern recognition, pp. 13723–13733.
+[42] Shao, Z., Wang, P., Zhu, Q., Xu, R., Song, J., Bi, X., Zhang, H., Zhang,
+M., Li, Y., Wu, Y., et al., 2024. Deepseekmath: Pushing the limits
+of mathematical reasoning in open language models. arXiv preprint
+arXiv:2402.03300 .
+[43] Stiennon, N., Ouyang, L., Wu, J., Ziegler, D., Lowe, R., Voss, C., Rad-
+ford, A., Amodei, D., Christiano, P.F., 2020. Learning to summarize
+with human feedback. Advances in neural information processing
+systems 33, 3008–3021.
+[44] Sun, W., Lin, X., Shi, Y., Zhang, C., Wu, H., Zheng, S., 2025.
+Sparsedrive: End-to-end autonomous driving via sparse scene repre-
+sentation, in: 2025 IEEE International Conference on Robotics and
+Automation (ICRA), IEEE. pp. 8795–8801.
+[45] Tian, X., Gu, J., Li, B., Liu, Y., Wang, Y., Zhao, Z., Zhan, K.,
+Jia, P., Lang, X., Zhao, H., 2024.
+Drivevlm: The convergence of
+autonomous driving and large vision-language models. arXiv preprint
+arXiv:2402.12289 .
+[46] Treiber, M., Hennecke, A., Helbing, D., 2000. Congested traffic states
+in empirical observations and microscopic simulations.
+Physical
+review E 62, 1805.
+[47] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez,
+A.N., Kaiser, Ł., Polosukhin, I., 2017.
+Attention is all you need.
+Advances in neural information processing systems 30.
+[48] Wang, R., Nellippallil, A.B., Wang, G., Yan, Y., Allen, J.K., Mistree,
+F., 2021. A process knowledge representation approach for decision
+support in design of complex engineered systems. Advanced Engi-
+neering Informatics 48, 101257.
+[49] Wang, S., Yu, Z., Jiang, X., Lan, S., Shi, M., Chang, N., Kautz, J.,
+Li, Y., Alvarez, J.M., 2025a. Omnidrive: A holistic vision-language
+dataset for autonomous driving with counterfactual reasoning, in: Pro-
+ceedings of the computer vision and pattern recognition conference,
+pp. 22442–22452.
+[50] Wang, T., Xie, E., Chu, R., Li, Z., Luo, P., 2024. Drivecot: Integrating
+chain-of-thought reasoning with end-to-end driving. arXiv preprint
+arXiv:2403.16996 .
+[51] Wang, X., Wei, J., Schuurmans, D., Le, Q., Chi, E., Narang,
+S., Chowdhery, A., Zhou, D., 2022.
+Self-consistency improves
+chain of thought reasoning in language models.
+arXiv preprint
+arXiv:2203.11171 .
+[52] Wang, Y., Luo, W., Bai, J., Cao, Y., Che, T., Chen, K., Chen, Y.,
+Diamond, J., Ding, Y., Ding, W., et al., 2025b. Alpamayo-r1: Bridging
+reasoning and action prediction for generalizable autonomous driving
+in the long tail. arXiv preprint arXiv:2511.00088 .
+[53] Wei, J., Wang, X., Schuurmans, D., Bosma, M., Xia, F., Chi, E.,
+Le, Q.V., Zhou, D., et al., 2022. Chain-of-thought prompting elicits
+reasoning in large language models. Advances in neural information
+processing systems 35, 24824–24837.
+[54] Wen, L., Fu, D., Li, X., Cai, X., Ma, T., Cai, P., Dou, M., Shi,
+B., He, L., Qiao, Y., 2023.
+Dilu: A knowledge-driven approach
+to autonomous driving with large language models. arXiv preprint
+arXiv:2309.16292 .
+[55] Weng, X., Ivanovic, B., Wang, Y., Wang, Y., Pavone, M., 2024. Para-
+drive: Parallelized architecture for real-time autonomous driving, in:
+Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pp. 15449–15458.
+[56] Xing, S., Qian, C., Wang, Y., Hua, H., Tian, K., Zhou, Y., Tu, Z.,
+2025.
+Openemma: Open-source multimodal model for end-to-end
+autonomous driving, in: Proceedings of the Winter Conference on
+Applications of Computer Vision, pp. 1001–1009.
+[57] Xu, C., Liu, J., Guo, Y., Zhang, Y., Hang, P., Sun, J., 2025. Towards
+human-centric autonomous driving: A fast-slow architecture inte-
+grating large language model guidance with reinforcement learning.
+arXiv preprint arXiv:2505.06875 .
+[58] Xu, Y., Hu, Y., Zhang, Z., Meyer, G.P., Mustikovela, S.K., Srinivasa,
+S., Wolff, E.M., Huang, X., 2024a. Vlm-ad: End-to-end autonomous
+driving through vision-language model supervision. arXiv preprint
+arXiv:2412.14446 .
+[59] Xu, Z., Zhang, Y., Xie, E., Zhao, Z., Guo, Y., Wong, K.Y.K., Li, Z.,
+Zhao, H., 2024b. Drivegpt4: Interpretable end-to-end autonomous
+driving via large language model. IEEE Robotics and Automation
+Letters .
+[60] Yang, L., Kang, B., Huang, Z., Zhao, Z., Xu, X., Feng, J., Zhao, H.,
+2024. Depth anything v2. Advances in Neural Information Processing
+Systems 37, 21875–21911.
+[61] Yao, S., Yu, D., Zhao, J., Shafran, I., Griffiths, T., Cao, Y.,
+Narasimhan, K., 2023. Tree of thoughts: Deliberate problem solving
+with large language models. Advances in neural information process-
+ing systems 36, 11809–11822.
+[62] Zhang, Q., Zhu, M., Yang, H.F., 2024. Think-driver: From driving-
+scene understanding to decision-making with vision language models,
+in: European Conference on Computer Vision Workshop.
+[63] Zhou, R., Huang, J., Li, M., Li, H., Cao, H., Song, X., 2025a.
+Knowledge transfer from simple to complex: A safe and efficient
+reinforcement learning framework for autonomous driving decision-
+making. Advanced Engineering Informatics 65, 103188.
+[64] Zhou, X., Han, X., Yang, F., Ma, Y., Knoll, A.C., 2025b.
+Open-
+drivevla: Towards end-to-end autonomous driving with large vision
+language action model. arXiv preprint arXiv:2503.23463 .
+[65] Zhou, X., Liu, M., Yurtsever, E., Zagar, B.L., Zimmer, W., Cao, H.,
+Knoll, A.C., 2024. Vision language models in autonomous driving:
+A survey and outlook. IEEE Transactions on Intelligent Vehicles .
+[66] Zhou, Z., Cai, T., Zhao, S.Z., Zhang, Y., Huang, Z., Zhou, B., Ma,
+J., 2025c. Autovla: A vision-language-action model for end-to-end
+autonomous driving with adaptive reasoning and reinforcement fine-
+tuning. arXiv preprint arXiv:2506.13757 .
+Z. Yang & H. Li et al.: Preprint submitted to Elsevier
+Page 12 of 12
