@@ -33,7 +33,6 @@ subscriptions:
       enabled: true
       paper_sources:
         - arxiv
-        - biorxiv
       keywords:
         - keyword: autonomous driving agent
           keyword_cn: 自动驾驶智能体
