@@ -1,0 +1,912 @@
+Title: Grounding Vision-Language Models in Driving Semantics: A Multi-Dataset Predicate Framework for Explainable Reasoning
+
+URL Source: https://arxiv.org/pdf/2609.31636v1
+
+Published Time: Tue, 29 Sep 2026 00:03:46 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Grounding Vision–Language Models in Driving Semantics: A Multi-Dataset Predicate Framework for Explainable Reasoning 
+
+Mohamed Chouai 1, Fazli Faruk Okumus 1, and Stefan Kugele 1
+
+Abstract — Vision–language models are increasingly used for driving-scene understanding, yet the semantic relations ex-pressed in their outputs are often difficult to verify against the underlying traffic situation. This paper introduces a de-terministic multi-dataset predicate framework that derives driving-scene semantics from measurable geometric, kinematic, temporal, map, and traffic-control evidence. Dataset-specific in-terfaces are used only to recover the required scene information, while predicate definitions remain unchanged across nuPlan and nuScenes and are materialised in a common Predicate Knowledge Graph. Quantitative semantic validation against manually annotated predicate relations on 200 scenarios from each dataset yields macro F1 scores of 0.94 on nuPlan and 0.93 on nuScenes, with an average cross-dataset difference of 0.02 across the shared predicates. The Predicate KG is further evaluated using a frozen LLaVA-OneVision-7B model on the nine NuPlanQA subtasks. Predicate grounding achieves the highest accuracy among the evaluated visual-input conditions in seven of nine NuPlanQA subtasks, including Traffic Light (53.2% to 71.5%), Situation Assessment (76.2% to 86.1%), and Action Recommendation (82.9% to 89.0%). Weather/Lighting remains essentially unchanged (89.4% vs. 88.8%), consistent with the absence of corresponding predicates, while Predicate KG only input outperforms metadata-only input in eight of nine subtasks. The results show that deterministic predicates provide a consistent and traceable semantic representation and, under oracle grounding, can reduce visual dependence for reasoning tasks covered by the predicate vocabulary. 
+
+I. I NTRODUCTION 
+
+Recent progress in vision–language models (VLMs) has expanded the scope of autonomous-driving perception from object detection and scene recognition toward question an-swering, scene description, and natural-language reason-ing [1]–[3]. These developments are particularly relevant for explainable driving systems, where understanding a traffic scene requires more than identifying individual objects. Relations such as whether a vehicle is inFrontOf another, whether it follows the ego vehicle, or whether a pedestrian 
+
+crossesInFrontOf it depend on geometric configuration, mo-tion, map context, and temporal evolution. Semantic relations between traffic participants and road elements are important for situation understanding, behaviour prediction, risk assessment, and decision-making in au-tonomous driving. Yet the semantic statements produced by VLMs are difficult to verify directly against the un-derlying scene. A relation expressed in natural language may be plausible while still being inconsistent with the actual geometry or dynamics of the traffic situation. This is a relevant limitation in autonomous driving, where many   
+
+> 1AImotion Bavaria, Technische Hochschule Ingolstadt, 85049 Ingolstadt, Germany.
+
+mohamed.chouai@thi.de 
+
+semantic relations have a measurable physical basis and can therefore be defined explicitly. Structured representations such as ontologies [4], knowledge graphs [5], [6], and traffic scene graphs [7] provide mechanisms for expressing relations between traffic participants and road elements. However, such representations are commonly designed for particular datasets or downstream tasks and do not necessarily provide explicit operational definitions for the relations they encode. A difficulty is the heterogeneity of autonomous-driving datasets. Object taxonomies, map representations, trajectory information, coordinate systems, and annotation formats dif-fer considerably across datasets [8]. As a result, semantically equivalent relations may be represented differently or may need to be reconstructed from different sources of infor-mation. This limits the use of dataset-specific semantics for systematic reasoning and evaluation across datasets. To address these limitations, this work introduces a multi-dataset predicate framework for driving-scene reasoning. Semantic relations are derived from measurable geometric, kinematic, temporal, map, traffic-control, and risk-related evidence through explicitly defined and reproducible con-ditions. Rather than storing dataset annotations in another representation, the Predicate Knowledge Graph (Predicate KG) transforms low-level scene evidence into explicit driving semantics, such as whether one participant follows, yields to, overtakes, or crosses in front of another. Its main purpose is therefore to provide a dataset-independent semantic interface between heterogeneous driving data and downstream reason-ing: each assertion can be traced to the underlying scene evidence and deterministic rule, queried independently of the original dataset structure, and directly supplied to reasoning systems such as vision–language models. Figure 1 illustrates this process from measurable scene evidence through predi-cate derivation to the resulting Predicate KG. The study is guided by the following research questions: 
+
+RQ1 How can driving-scene relations be formalised as de-terministic predicates derived from measurable scene information? 
+
+RQ2 To what extent can a common predicate representation preserve consistent driving semantics across heteroge-neous autonomous-driving datasets? 
+
+RQ3 How can deterministic predicates be used to ground and evaluate vision–language reasoning against ob-servable scene evidence? The main contributions of this work are:  
+
+> •
+
+A predicate framework that represents driving-scene semantics through explicit and reproducible operational arXiv:2609.31636v1 [cs.LG] 10 Sep 2026 Fig. 1: Overview of the proposed framework. Measurable driving-scene evidence is processed through deterministic predicate rules and materialised in a Predicate KG. The example illustrates the correspondence between a physical traffic scene and its semantic predicate representation. rules applied to measurable scene evidence.  
+
+> •
+
+A common semantic representation that enables pred-icates to be derived consistently across nuPlan and nuScenes despite differences in their dataset structure and annotations, while preserving a shared semantic interpretation, and is designed to facilitate extension to additional datasets and downstream applications.  
+
+> •
+
+A grounding layer that connects vision–language rea-soning with deterministic scene evidence, enabling se-mantic statements to be traced and evaluated against the underlying traffic situation. II. R ELATED WORK 
+
+Recent advances in vision–language modelling have ex-tended autonomous-driving perception from object-centric recognition toward scene-level interpretation, question an-swering, explanation, and decision support. DriveGPT4 [1] integrates visual observations with large language models to support interpretable end-to-end driving, while DriveLM [2] formulates driving reasoning through graph-structured vi-sual question answering. Complementary benchmarks such as nuScenes-QA [9] and LingoQA [3] evaluate the abil-ity of vision–language models to reason about traffic scenes through natural-language questions and answers. Talk2BEV [10] further connects language reasoning with a bird’s-eye-view representation of the environment. These approaches demonstrate the potential of language models for semantic driving-scene understanding, but their reasoning remains primarily expressed through learned or generated language, making individual relational statements difficult to verify directly against the underlying scene geometry and dynamics. This limitation motivates representations that make scene semantics explicit rather than leaving them implicit in model outputs. Ontology- and knowledge-based approaches have long represented traffic participants, infrastructure, and their relations in machine-interpretable form. Buechel et al. [4] modelled traffic scenes and regulations using an ontology to support situation awareness and decision-making, while Halilaj et al. [5] employed knowledge graphs for situation comprehension in driving scenarios. Traffic scene graphs provide a related formulation in which participants are connected through explicit semantic relations; for example, Zipfl et al. [7] used spatial semantic relations between traffic participants for motion prediction. The nuScenes Knowledge Graph [6] demonstrated how rich scene information from a large-scale driving dataset can be transformed into astructured semantic representation. Explicit structure alone, however, does not guarantee that a relation has a reproducible meaning. For explainable reasoning, predicates such as inFrontOf , leftOf , follows , or 
+
+crossesInFrontOf should be tied to observable geometric, kinematic, temporal, and map conditions rather than inferred only from linguistic context or learned correlations. Rule-and ontology-based approaches provide important founda-tions for such symbolic reasoning [4], [5], while semantic traffic-scene graphs show the value of representing relations explicitly [7]. Nevertheless, existing approaches generally employ relations for a particular reasoning, prediction, or representation task rather than defining a broad, deterministic predicate layer intended to serve as verifiable evidence for vision–language reasoning. A further challenge arises when such semantics are trans-ferred across autonomous-driving datasets. Datasets differ substantially in their object taxonomies, map representations, annotation formats, coordinate systems, and available tempo-ral information. Halilaj et al. [8] addressed this heterogeneity through knowledge-graph-based integration of autonomous-driving datasets, demonstrating the value of a shared se-mantic representation across data sources. However, dataset integration and deterministic semantic grounding address different objectives: the former harmonises heterogeneous in-formation, whereas the latter requires each semantic relation to be computed according to an explicit and reproducible def-inition. Existing VLM-based driving approaches, structured scene representations, and dataset-integration methods there-fore leave an important gap between raw driving data and verifiable language reasoning. Our work addresses this gap through fixed operational predicate definitions that remain unchanged across dataset-specific groundings, are explicitly validated across heterogeneous datasets, and subsequently serve as traceable evidence for vision–language reasoning. III. D ETERMINISTIC PREDICATE FRAMEWORK 
+
+The framework is implemented for two autonomous-driving datasets, nuPlan [11] and nuScenes [12]. Both datasets provide temporally ordered driving-scene observa-tions with tracked traffic participants and map information, enabling relations to be analysed both at individual time steps and over their temporal evolution. They differ, however, in their data organisation, object taxonomies, map structures, and available annotations. We use dataset-specific grounding only to recover the measurable quantities required by the predicates. Predicate definitions are kept separate from these dataset interfaces, such that the same relation is evaluated according to the same rule in both datasets. 
+
+A. Dataset Grounding 
+
+For each time step t, the dataset interface constructs a scene representation containing the observed agents and the available map and traffic-control information. The state of an agent ai is represented by 
+
+si(t) = [ pi(t), ψ i(t), vi(t), Bi(t)] , (1) where pi(t) is its position, ψi(t) its heading, vi(t) its ve-locity, and Bi(t) its bounding-box dimensions. Map elements and traffic-control information are retained when required by the corresponding predicate. The role of the dataset interface is limited to obtaining and normalising this evidence. In nuPlan, for example, agent states, lane topology, lane connectors, and traffic-light information are obtained through the corresponding database and map structures. nuScenes exposes comparable scene information through its own sample, annotation, instance, and map records. After this step, predicate computation no longer operates on dataset-specific objects. 
+
+B. Predicate Definition and Derivation 
+
+The predicate vocabulary was designed from semantic relations commonly used in driving ontologies, knowledge graphs, and traffic-scene representations [4]–[7], and was ex-tended with relations required to describe driving interactions and safety-relevant situations. Predicates were retained when they have a meaningful driving interpretation and can be deterministically grounded in measurable or reconstructable scene evidence. The resulting vocabulary is therefore inde-pendent of the annotation schema of a particular dataset; nuPlan and nuScenes provide only the evidence required to evaluate the common predicate rules. Each predicate is associated with an explicit rule over measurable scene information. For a predicate P , we write 
+
+P (x, t ) = 
+
+(
+
+1, fP (x, EWP (t); θP ) = true ,
+
+0, otherwise , , (2) where x denotes the participating entity or entities, EWP (t)
+
+denotes the scene evidence available within the predicate-specific temporal window WP (t), which may consist of the current frame only or multiple observations over time. The function fP is the predicate-specific Boolean decision function that evaluates whether the operational conditions defining predicate P are satisfied, and θP contains the cor-responding rule parameters and threshold functions. Safety-related thresholds for following distance, time gap, collision risk, and lane-change gap are derived from UN Regulation No. 157 (UN R157) [13]. The resulting rules are fixed before evaluation and are applied identically to both dataset groundings. For longitudinal following of M1/N1 vehicles (passenger cars and light goods vehicles up to 3.5 t ), the minimum safe following distance dmin (v) is defined using the speed-dependent criterion specified in UN R157. For vehicle speed 
+
+v ≤ 60 km /h,
+
+dmin (v) = v t front (v), (3) where v denotes the longitudinal vehicle speed in m/s and 
+
+tfront (v) the minimum time gap prescribed by UN R157. The required gap increases piecewise linearly from 1.0 s at 
+
+2.0 m /s to 1.6 s at 16 .67 m /s according to the intermediate breakpoints specified in the regulation. For speeds below 
+
+2 m /s, a minimum following distance of 2 m applies. Ac-cordingly, a longitudinal time gap is classified as safe when it is not smaller than tfront (v). Collision-risk conditions follow the UN R157 definition of imminent collision risk: a conflict is classified as imminent when collision avoidance would require a braking demand of at least 5 m /s2. For regular lane changes, an approaching vehicle in the target lane shall not be required to decelerate at a rate exceeding 3.0 m /s2
+
+under the specified assessment conditions, while the distance between the two vehicles shall not become smaller than the distance travelled by the Automated Lane Keeping Sys-tem (ALKS) vehicle in 1.0 s [13]. Risk predicates combine relative motion, longitudinal gap, time gap, and collision-avoidance braking demand using these safety criteria. We distinguish predicates that expose information already available in the dataset from predicates that require an additional derivation. A predicate such as hasVelocity ,for instance, retains an observed or reconstructed physical quantity, whereas relations such as inFrontOf , follows ,
+
+overtakes , and crossesInFrontOf require geomet-ric, kinematic, temporal, or map conditions to be evaluated. This distinction is also reflected in the validation described in Sec. IV, where the main evaluation concerns the derived predicates rather than quantities obtained directly from the source data. The predicate inventory comprises spatial, motion, tempo-ral, map, interaction, traffic-control, and risk families. Table I summarises representative higher-level predicates; complete implementation-grounded definitions and thresholds are pro-vided in the Appendix. Spatial predicates are computed relative to the orientation of the reference participant. For a subject agent S and an object agent O, their relative position is 
+
+∆pSO (t) = pO (t) − pS (t). (4) Its longitudinal and lateral components in the local coor-dinate system of S are used to evaluate relations such as 
+
+inFrontOf , leftOf , and rightOf . This avoids defining directional relations with respect to a fixed global map orientation. Temporal and interaction predicates combine information from several state variables or time steps. As one repre-sentative example, crossesInFrontOf evaluates whether the forward motion directions of two participants lead to a common conflict point. For a subject S and object O, the forward rays are defined as 
+
+RS (λ) = pS + λdS , 0 ≤ λ ≤ L, (5) 
+
+RO (μ) = pO + μdO , 0 ≤ μ ≤ L, (6) where dS and dO are their directions of travel and L defines the forward range. In the current implementation, L = 10 m .An intersection is considered only when it lies in the forward direction of both participants and satisfies the remaining motion and contextual conditions of the predicate. The finite forward range prevents intersections of distant trajectory lines from being interpreted as local crossing events. Map predicates combine participant geometry with the HD map rather than relying solely on the agent centre. This is relevant near lane boundaries and intersections, where a participant footprint may already occupy a map element while its centre remains outside. Traffic-control semantics are represented through separate predicates. The relation 
+
+controls (σ, m ) (7) links a traffic signal σ to the lane or lane-connector move-ment m whose traffic flow is governed by that signal. 
+
+hasSignalState (σ, q ) (8) records its current signal state q. The agent-specific relation 
+
+isRelevantSignal (a, σ ) (9) is asserted when the traffic signal σ controls a lane or lane connector on the approaching path of agent a. It is defined as a pre-entry relation and is no longer emitted once the agent begins to occupy the controlled lane connector. Keeping these predicates separate preserves the distinction between the traffic signal, its current state, the movement it controls, and the approaching participant affected by that control. 
+
+C. Predicate Knowledge Graph and Implementation 
+
+A derived relation is stored together with the participating entities, its temporal reference, and provenance information. A binary assertion is represented conceptually as 
+
+e = ( S, P, O, t, π ) , (10) where S and O denote the subject and object, P the predicate, and t the corresponding time. The provenance information π records the origin of the assertion, including the source scene evidence and the predicate rule from which it was derived. Unary predicates follow the same representa-tion without a relational object. The resulting assertions are materialised in the Predicate KG and can subsequently be queried without requiring knowledge of the original nuPlan or nuScenes data organisation. To provide an indication of the scale of the resulting representation, a representative nuPlan scenario comprising 41 frames contains 741,311 materialised predicate assertions, corresponding to approximately 18,081 assertions per frame. In one inspected frame, the Predicate KG contains 89 dy-namic entity nodes and 4,752 semantic edges, representing 21,357 predicate assertions. These assertions cover multi-ple relation directions and entity combinations, including ego–agent, agent–ego, agent–agent, ego–structure, structure– ego, agent–structure, and structure–agent relations. Multiple predicates may describe the same entity pair, explaining the difference between semantic edges and predicate assertions. Depending on the downstream task, the graph can be filtered to retain only the predicate families, entity types, or relation directions relevant to the analysis. The implementation separates dataset grounding, predi-cate computation, and graph materialisation. The Appendix provides the implementation-grounded predicate definitions, including their required evidence, mathematical formulation, applicability conditions, and thresholds. The corresponding implementation and predicate specification are available in the repository provided in Sec. VII. IV. E XPERIMENTAL EVALUATION 
+
+The evaluation focuses on the derived predicates defined in Sec. III-B. Validation combines programmatic checks with semantic inspection of the underlying traffic scenes. Temporal context is also considered when a predicate’s interpretation depends on the evolution of an interaction. 
+
+A. Automatic Validation 
+
+Each generated Predicate KG is checked for valid entities and arguments, finite numerical values, temporal continuity, predicate dependencies, mutually exclusive relations, and rule-specific invariants. Numerical quantities are indepen-dently recomputed where applicable, and regression tests cover directed spatial relations, motion and temporal histo-ries, map associations, interaction, traffic-control, and risk predicates. For nuPlan, map-dependent predicates are addi-tionally verified against the native HD map by reconstructing agent footprints and recomputing lane and lane-connector TABLE I: Operational summary of the evaluated higher-level predicates.          
+
+> Predicate Operational summary
+> follows ,queuesBehind Persistent longitudinal relation between participants on a compatible travel path;
+> queuesBehind additionally captures queued traffic.
+> changesLane Temporal transition of a participant between lane memberships during a lane-change manoeuvre.
+> mergesInFrontOf ,mergesBehind Merge into a common travel path, distinguished by the resulting longitudinal ordering of the participants.
+> overtakes Temporal manoeuvre in which the relative ordering changes from behind to ahead.
+> yieldsTo Interaction in which a participant gives precedence to another participant during a conflicting movement.
+
+membership, intersection association, longitudinal progress, and map heading without reusing the generated assertions. Predicate rules and thresholds are fixed before semantic evaluation and are not tuned on the validation scenarios. For 
+
+crossesInFrontOf , a preliminary sensitivity analysis on separate development scenarios with L ∈ { 5, 10 , 15 } m
+
+selected L = 10 m , which was then fixed for both datasets. 
+
+B. Semantic and Temporal Validation 
+
+Semantic validation is conducted on 200 scenarios from each dataset. The quantitative evaluation focuses on higher-level interaction and traffic-control predicates, while spatial, motion, map, and risk predicates are additionally exam-ined through rule-specific consistency checks and visual inspection. nuPlan scenarios are selected using the official 
+
+scenario tag annotations, whereas comparable nuScenes categories are constructed from scene metadata, map context, and object annotations. The selected scenarios cover intersec-tion traversal , lane following , lane changes , merging , over-taking , crossing interactions , traffic-light approaches , pedes-trian and cyclist interactions , stationary and moving traffic ,and dense multi-agent scenes . Scenario selection is fixed before inspection of predicate correctness. The scenario is used as the sampling unit because several predicate instances may occur simultaneously among different participants and map elements. The validation visualisation (a BEV-based inspection interface) contains the complete bird’s-eye-view scene, agent footprints, HD-map context, and the generated re-lations. Spatial, map, and risk predicates are inspected at frame level or over the required local temporal context, while higher-level interactions are reviewed over their sup-porting temporal sequence. In particular, changesLane ,
+
+mergesInFrontOf , mergesBehind , overtakes , and 
+
+yieldsTo are assessed over the corresponding manoeuvre evolution rather than from isolated frames. Persistent rela-tions such as follows and queuesBehind are inspected over consecutive observations. For crossesInFrontOf , subsequently observed trajec-tories provide a retrospective check of whether the detected local conflict is consistent with the realised motion of the participants. Future observations and observed-future pred-icates are restricted to validation and are not provided as inputs to the vision–language experiments in Sec. V. For each evaluated predicate, candidates are generated independently of the predicate output from entity relations satisfying its applicability conditions. Both asserted and non-asserted candidates are reviewed, enabling false positives TABLE II: Semantic validation of higher-level derived pred-icates. N denotes the number of reviewed candidates before exclusion of ambiguous cases.                                                         
+
+> nuPlan nuScenes Predicate NF1NF1∆F1
+> follows 470 0.98 430 0.97 0.01
+> queuesBehind 260 0.99 220 0.99 0.00
+> changesLane 165 0.92 150 0.95 0.03
+> mergesInFrontOf 105 0.96 95 0.93 0.03
+> mergesBehind 85 0.94 75 0.93 0.01
+> overtakes 62 0.93 51 0.87 0.06
+> crossesInFrontOf 165 0.90 145 0.92 0.02
+> yieldsTo 115 0.88 100 0.90 0.02
+> isRelevantSignal 180 0.95 –––
+> Macro average –0.94 –0.93 0.02
+
+and false negatives to be identified without treating arbi-trary missing graph edges as negatives. Each candidate is manually labelled as present , absent , or ambiguous based on the BEV scene, HD-map context, and, where required, its temporal sequence. Ambiguous cases are excluded from the computation of precision, recall, and F1 and are recorded separately. Across the reviewed instances, ambiguous cases account for 2.92% in nuPlan and 2.45% in nuScenes. Quantitative semantic validation is performed on reviewed candidate higher-level instances rather than on all frame-level predicate assertions. Across the 200 scenarios, this results in 1,607 reviewed higher-level instances for nuPlan and 1,266 for nuScenes. Of the nuPlan instances, 1,427 belong to the eight predicates supported by both datasets, while 180 correspond to isRelevantSignal . Table II reports the number of reviewed candidates and the resulting F1 scores. Predicate-level precision, recall, and ambiguity statistics are retained with the complete validation results. The results show high agreement between the rule-derived predicates and the manual scene-based labels, with macro F1
+
+scores of 0.94 on nuPlan and 0.93 on nuScenes. follows 
+
+and queuesBehind obtain the highest agreement, whereas relations involving more extended temporal evolution show greater variation. The largest cross-dataset difference is observed for overtakes , with F1 = 0.93 on nuPlan and 0.87 on nuScenes. This difference is consistent with the stronger dependence of overtaking on temporal conti-nuity, lane transitions, and completion of the manoeuvre. 
+
+crossesInFrontOf and yieldsTo reach F1 scores be-tween 0.88 and 0.92 despite requiring the joint interpretation of geometry, motion, and temporal context. For the eight predicates supported by both datasets, the mean absolute cross-dataset difference is ∆F1 = 0.02 ,and seven predicates differ by no more than 0.03. Er-rors correspond to cases where the rule-derived predicate disagrees with the manual scene-based label, for example because a threshold or applicability condition does not fully capture the observed situation. The comparable aggregate performance, together with the predicate-specific differences, shows that the operational definitions remain stable under the two dataset groundings. isRelevantSignal achieves an F1 score of 0.95 on nuPlan but is excluded from the cross-dataset comparison because equivalent traffic-control evidence is not available in the current nuScenes grounding. V. P REDICATE -G ROUNDED VISION –L ANGUAGE 
+
+REASONING 
+
+To examine whether the Predicate KG provides useful grounding for vision–language reasoning, we follow the multi-frame NuPlanQA-Eval setting [14] using a frozen LLaVA-OneVision-7B model. No additional training or fine-tuning is performed, and the questions and decoding con-figuration are kept fixed across all conditions. Five input conditions are evaluated: the original visual-history baseline; visual input augmented with raw ground-truth metadata; visual input augmented with the serialised Predicate KG; and two corresponding no-visual conditions using either metadata or the Predicate KG as the scene representation. The Predi-cate KG input additionally includes a fixed glossary defining predicate semantics, while mathematical rules and thresholds are not exposed to the VLM. Raw metadata contains the primitive quantities used for predicate derivation, including agent states, motion, map associations, and traffic-control information, but no derived semantic relations. The raw metadata and predicate conditions are de-rived from the same entities, timestamps, and underly-ing temporal evidence, but expose this information at dif-ferent semantic abstraction levels. Predicate selection is not random and does not depend on the question. In-stead, a fixed scene-based selection procedure is applied identically to all samples, retaining the available predi-cate relations for the entities represented in the corre-sponding visual history. Metadata and predicate inputs use only observations up to the final timestamp of the vi-sual history; future observations and retrospective validation predicates are excluded. The resulting temporally avail-able Predicate KG subgraph is serialised into compact as-sertions such as crossesInFrontOf(pedestrian 4, ego) , isRelevantSignal(ego, signal 7) , and 
+
+hasSignalState(signal 7, RED) .Because the metadata and Predicate KG conditions orig-inate from annotated nuPlan states and map information, the experiment evaluates oracle semantic grounding rather than visual predicate prediction. Removing the visual his-tory provides a complementary comparison of how much reasoning can be supported by these scene representations independently of the image sequence. We report four-option accuracy (25% chance) on the 1,801-question NuPlanQA-Eval test set across nine subtasks. Table III shows that predicate grounding achieves the high-est accuracy in seven of nine visual-input comparisons. Large gains are observed for Traffic Light (53.2% to 71.5%), Traffic Flow (77.6% to 85.8%), Ego-Vehicle Manoeuvre (75.4% to 83.9%), Situation Assessment (76.2% to 86.1%), and Action Recommendation (82.9% to 89.0%). Unlike raw metadata, the Predicate KG combines geometric, kinematic, temporal, map, and traffic-control evidence through predefined rules with regulation-derived or empirically validated thresholds, exposing higher-level relations that the VLM would oth-erwise need to infer from individual measurements. This is particularly visible for Ego-Vehicle Manoeuvre, where raw metadata reaches 63.4% while predicate grounding reaches 83.9%. Surrounding Objects is the only subtask where raw metadata performs best (83.0% vs. 82.7%), while Weather/Lighting remains essentially unchanged (89.4% vs. 88.8%), consistent with the absence of weather predicates. Because both conditions originate from the same underlying scene evidence, these gains indicate that the explicit semantic abstraction provided by the Predicate KG is useful for down-stream reasoning, rather than merely providing the model with additional information. Without visual input, the Predicate KG outperforms raw metadata in eight of nine subtasks, including Traffic Light (64.2% vs. 47.6%), Traffic Flow (78.4% vs. 68.7%), Ego-Vehicle Manoeuvre (73.1% vs. 60.8%), Situation Assessment (79.3% vs. 69.3%), and Action Recommendation (76.8% vs. 66.7%). Notably, Predicate KG only input also matches or exceeds the visual baseline in five subtasks, including Traffic Light, Surrounding Objects, Traffic Flow, Key Objects, and Situation Assessment. This shows that, once structured scene semantics are available, several reasoning tasks can be sup-ported without providing the image sequence directly to the VLM. Weather/Lighting is the exception and falls close to the 25% random-choice level (25.6%), confirming that this benefit is limited to information represented by predicates. Figure 2 illustrates representative predicate relations at three selected time steps, t1 < t 2 < t 3, whose temporal spac-ing may vary across examples. For space reasons, the figure presents only three representative predicate families: spatial, interaction, and traffic-control. The spatial row focuses on ego–agent relations, while the interaction row additionally includes agent–agent relations. The traffic-control row shows signal relevance, controlled movements, and signal states. Together, these examples illustrate how predicate relations evolve over time. VI. D ISCUSSION AND LIMITATIONS 
+
+The cross-dataset results indicate that fixed predicate defi-nitions preserve comparable semantics across the two dataset groundings, although temporally extended relations such as 
+
+overtakes remain more sensitive to trajectory continuity and annotation characteristics. In NuPlanQA, predicate grounding primarily benefits interaction- and reasoning-oriented tasks; benefits are smaller TABLE III: Effect of structured scene grounding on the nine NuPlanQA-Eval subtasks. Bold indicates the best result among conditions with visual input; underlining indicates the best result without visual input. All values are accuracy (%).                                                         
+
+> Road Env. Perception Spatial Relations Recog. Ego-centric Reasoning Method Traffic Light Weather/Lighting Road Type Sur. Obj. Traffic Flow Key Obj. Ego Ctrl. Situ. Asse. Act. Rec.
+> Visual input
+> LLaVA-OV-7B 53.2 89.4 96.4 77.9 77.6 73.2 75.4 76.2 82.9 + GT Metadata 62.8 89.0 96.5 83.0 81.0 77.5 63.4 81.0 84.0 + Predicate KG 71.5 88.8 96.8 82.7 85.8 82.3 83.9 86.1 89.0 No visual input
+> GT Metadata Only 47.6 26.8 71.9 75.1 68.7 65.8 60.8 69.3 66.7 Predicate KG Only 64.2 25.6 79.1 78.8 78.4 74.6 73.1 79.3 76.8
+
+for information directly available from object annotations or absent from the predicate vocabulary. The framework is constrained by the evidence available in each dataset. A common vocabulary does not imply that ev-ery predicate can be instantiated for every source. In the cur-rent implementation, for example, isRelevantSignal 
+
+is evaluated in nuPlan but excluded from the cross-dataset comparison because equivalent traffic-control evidence is not available in the current nuScenes grounding. Predicate reliability also depends on the quality of object tracks, map geometry, temporal coverage, and the assumptions underly-ing the predicate-specific threshold functions. The risk family is therefore grounded in explicit safety-related quantities and thresholds rather than learned or dataset-specific semantic labels. Although the evaluated predicates show high agree-ment in the considered scenarios, rare or weakly represented interactions may require broader validation. Beyond VLM grounding, the Predicate KG can support structured querying and consistency checking against mea-surable scene evidence. Future work will investigate predi-cate extraction directly from sensor observations, connecting the oracle-grounding setting to a perception-driven pipeline. VII. C ODE AVAILABILITY 
+
+The implementation and repository version of the predicate specification are available at: https: //github.com/AImotion-Bavaria/nuPlan_ Predicates_KG.git 
+
+VIII. C ONCLUSION 
+
+This paper introduced a multi-dataset predicate frame-work for grounding driving-scene semantics in measurable geometric, kinematic, temporal, map, and traffic-control evi-dence. A common predicate representation separates dataset-specific grounding from the semantic rules used to derive relations. Validation on nuPlan and nuScenes yielded macro 
+
+F1 scores of 0.94 and 0.93, respectively, demonstrating reproducible derivation of higher-level driving relations from observable scene information (RQ1). Across the two datasets, the shared predicates differed by only 0.02 in F1 on average, with seven of eight predicates differing by no more than 0.03 (RQ2). We further used the Predicate KG to ground a frozen vision–language model on NuPlanQA, achieving the highest accuracy among the evaluated visual-input conditions in seven of nine subtasks, while Predicate KG only input outperformed metadata-only input in eight of nine subtasks (RQ3). These findings show that, under oracle grounding, predicates can provide a consistent and traceable semantic layer between driving data and vision–language reasoning. Future work will extend dataset coverage and investigate predicate extraction directly from sensor observations. APPENDIX 
+
+This appendix provides the implementation-grounded op-erational definitions of the semantic predicates used in this work. The predicates are grouped into the seven Predicate KG families: spatial, motion, temporal, map, interaction, traffic-control, and risk. The appendix covers 83 implemented semantic predicates: 12 spatial, 17 motion, 17 temporal, 25 map, 8 interaction, 3 traffic-control, and 1 risk predicate. Throughout, 
+
+P :⇔ C (11) denotes a definitional equivalence: predicate P is defined to hold exactly when condition C is satisfied. Ordinary equalities are used for stored numerical quantities. Numer-ical thresholds are stated with the corresponding predicate definitions or, for safety-related criteria, in Appendix F. 
+
+A. Common Notation 
+
+Let E denote a spatial entity, S the subject of a directed pair, and O the object. Their planar centers are pS =[xS , y S ]⊤ and pO = [ xO , y O ]⊤, with subject body heading 
+
+θS . The relative position is 
+
+∆pSO = pO − pS = [ dx, dy ]⊤. (12) The subject-forward and subject-left unit vectors are 
+
+eS =
+
+cos θS
+
+sin θS
+
+
+
+, nS =
+
+− sin θS
+
+cos θS
+
+
+
+. (13) The body-frame longitudinal and lateral displacements are 
+
+lSO = e⊤ 
+
+> S
+
+∆pSO , (14) 
+
+rSO = n⊤ 
+
+> S
+
+∆pSO , (15) t1 t2 t3       
+
+> Spatial
+> inFrontOf behind leftOf frontLeftOf
+> Interaction
+> follows merge changesLane
+> Traffic-control
+> isRelevantSignal controls hasSignalState
+
+Fig. 2: Representative predicate relations at three selected time steps for three predicate families shown as illustrative examples: spatial, interaction, and traffic-control. Colours denote predicate semantics, and the black arrow indicates the ego vehicle’s travel direction. so that lSO > 0 means ahead and rSO > 0 means left. The center distance is 
+
+dc(S, O ) = ∥∆pSO ∥2. (16) Let FE be the oriented rectangular footprint of entity E.The free-space clearance and intersection area of a pair are 
+
+df s (S, O ) = dist( FS , F O ), (17) 
+
+A∩(S, O ) = area( FS ∩ FO ). (18) Let vS and vO be their global planar velocity vectors and 
+
+∆vSO = vO − vS = [∆ vx, ∆vy ]⊤. (19) The operator wrap( α) maps an angle to [−π, π ). For tem-poral predicates, k indexes an observation and tk denotes its timestamp. Dataset-specific timestamps are normalised to seconds before predicate evaluation, such that 
+
+∆tk = tk − tk−1 (20) is expressed in seconds. With the default sample interval 
+
+Ts = 0 .5 s and maximum temporal-gap factor 1.5, continuity is preserved only when ∆tk ≤ 0.75 s .
+
+B. Spatial Predicates 
+
+The eight directional predicates are classified in the sub-ject body-heading frame. The defaults are a longitudinal deadband τl = 1 .0 m , lateral deadband τr = 0 .75 m , pure-left/right band τc = 2 .0 m , and front/rear corridor 
+
+w(l) = 2 .5 + 0 .30 |l| [m] . (21) Exactly one primary directional sector is selected when the pair geometry is valid. 
+
+a) inFrontOf :
+
+inFrontOf (S, O ) : ⇔ lSO ≥ 1 ∧
+
+h
+
+(|lSO | ≤ 2 ∧ | rSO | < 0.75) 
+
+∨  |lSO | > 2
+
+∧ | rSO | ≤ w(lSO )i
+
+.
+
+(22) 
+
+b) behind :
+
+behind (S, O ) : ⇔ lSO ≤ − 1 ∧
+
+h
+
+(|lSO | ≤ 2 ∧ | rSO | < 0.75) 
+
+∨  |lSO | > 2
+
+∧ | rSO | ≤ w(lSO )i
+
+.
+
+(23) 
+
+c) leftOf and rightOf :
+
+leftOf (S, O ) : ⇔ | lSO | ≤ 2 ∧ rSO ≥ 0.75 , (24) 
+
+rightOf (S, O ) : ⇔ | lSO | ≤ 2 ∧ rSO ≤ − 0.75 . (25) 
+
+d) frontLeftOf and frontRightOf :
+
+frontLeftOf (S, O ) : ⇔ lSO > 2
+
+∧ rSO > w (lSO ), (26) 
+
+frontRightOf (S, O ) : ⇔ lSO > 2
+
+∧ rSO < −w(lSO ). (27) 
+
+e) rearLeftOf and rearRightOf :
+
+rearLeftOf (S, O ) : ⇔ lSO < −2
+
+∧ rSO > w (lSO ), (28) 
+
+rearRightOf (S, O ) : ⇔ lSO < −2
+
+∧ rSO < −w(lSO ). (29) 
+
+f) overlapping : With εA = 10 −4 m2,
+
+overlapping (S, O ) : ⇔ A∩(S, O ) > ε A. (30) 
+
+g) touching : With geometric distance tolerance 
+
+εd = 10 −3 m,
+
+touching (S, O ) : ⇔ A∩(S, O ) ≤ εA
+
+∧
+
+
+
+FS touches FO
+
+∨ df s ≤ εd
+
+
+
+.
+
+(31) 
+
+h) veryNear and near :
+
+veryNear (S, O ) : ⇔ 0 < d f s (S, O ) ≤ 2 m , (32) 
+
+near (S, O ) : ⇔ 2 < d f s (S, O ) ≤ 5 m . (33) The four distance/contact states are mutually exclusive. 
+
+C. Motion Predicates 
+
+For an entity E, let vE = [vx, v y ]⊤. Tracked-object velocities are interpreted in the common global frame. Ego velocity is converted from the ego-state representation to the global geometric-center velocity used by the predicate framework. 
+
+a) hasVelocity , hasVelocityX ,
+
+hasVelocityY , and hasSpeed : The planar velocity of entity E is 
+
+vE = [ vx, v y ]⊤. (34) The predicate hasVelocity stores this planar velocity, while hasVelocityX and hasVelocityY store its indi-vidual components. The corresponding speed magnitude is 
+
+vE =
+
+q
+
+v2 
+
+> x
+
++ v2 
+
+> y
+
+. (35) 
+
+b) hasAccelerationX , hasAccelerationY ,and hasAcceleration : For ego states exposing native planar acceleration, 
+
+aE =
+
+q
+
+a2 
+
+> x
+
++ a2 
+
+> y
+
+. (36) The component predicates store ax and ay .
+
+c) hasRelativeSpeedTo : The relative-speed mag-nitude is 
+
+vrel SO = ∥∆vSO ∥2. (37) 
+
+d) hasLongitudinalRelativeSpeedTo : The subject-longitudinal relative velocity is 
+
+vrel,long SO = e⊤ 
+
+> S
+
+∆vSO . (38) 
+
+e) hasLateralRelativeSpeedTo : The subject-lateral relative velocity is 
+
+vrel,lat SO = n⊤ 
+
+> S
+
+∆vSO . (39) 
+
+f) hasClosingSpeedTo : The radial closing speed is 
+
+vclose SO = − ∆p⊤
+
+> SO
+
+∆vSO 
+
+∥∆pSO ∥2
+
+, dc(S, O ) > 0. (40) Positive values mean decreasing center separation. 
+
+g) hasVelocityTowardTarget : The component of subject velocity toward the current object center is 
+
+v→OS = v⊤ 
+
+> S
+
+∆pSO 
+
+∥∆pSO ∥2
+
+, dc(S, O ) > 0. (41) 
+
+h) hasSubjectForwardSpeed : The subject for-ward speed in its body-heading frame is 
+
+vf wd S = e⊤ 
+
+> S
+
+vS . (42) 
+
+i) hasVelocityHeading : When vE ≥ 0.75 m /s,the velocity heading is 
+
+θvE = wrap(atan2( vy , v x)) . (43) Below this speed the velocity direction is considered insuf-ficiently stable and the predicate is not emitted. j) hasEffectiveTravelHeading : This predicate stores a conservative travel direction selected from map heading, velocity heading, and displacement heading. Adisplacement heading is considered informative only after at least 0.40 m displacement; a velocity heading requires at least 0.75 m /s. If both motion cues are available, they must agree within 0.45 rad . An accepted motion-derived direction must agree with an available unambiguous map heading within 0.60 rad . The selected angle is denoted θtravel E .
+
+k) hasTravelDirectionSource : Stores the cat-egorical provenance of θtravel E , i.e., which accepted map/motion evidence supplied the selected direction. 
+
+l) hasTravelDirectionDifferenceTo : When both participants have effective travel headings, 
+
+∆θtravel SO = wrap( θtravel O − θtravel S ) . (44) 
+
+D. Temporal Predicates 
+
+The continuity limit is 
+
+Tgap = 0 .5 × 1.5 = 0 .75 s . (45) Temporal derivatives and continuous-streak quantities are not bridged across larger gaps. 
+
+a) precedes : For two instances of the same persis-tent track, 
+
+precedes (Ek−1, E k) : ⇔ sameTrack( Ek−1, E k)
+
+∧ 0 < ∆tk ≤ 0.75 s . (46) 
+
+b) hasDeltaTimeFromPrevious : Stores ∆tk in seconds for a valid preceding observation. 
+
+c) hasDisplacementFromPrevious :
+
+ddisp k = ∥pk − pk−1∥2. (47) 
+
+d) hasHeadingChangeFromPrevious :
+
+∆θk = wrap( θk − θk−1). (48) 
+
+e) hasSpeedChangeFromPrevious :
+
+∆vk = vk − vk−1. (49) 
+
+f) hasEstimatedAcceleration : For ∆tk > 0,
+
+ˆak = ∆vk
+
+∆tk
+
+. (50) 
+
+g) hasDisplacementHeading : When ddisp k ≥
+
+0.40 m ,
+
+θdisp k = atan2( yk − yk−1, x k − xk−1). (51) 
+
+h) hasObservedFrameCount and 
+
+hasObservedDuration : These predicates store the count and elapsed duration of the entity history maintained by the current scenario processing state. The duration is measured from the first available observation in that maintained history to the current timestamp. 
+
+i) hasTotalObservedFrameCount and 
+
+hasTotalObservedSpan : The total count includes all available entity observations in the current processing window, including observations separated by gaps. If tf irst 
+
+is the first observation timestamp, 
+
+T total E = tk − tf irst . (52) 
+
+j) hasContinuousObservedFrameCount and 
+
+hasContinuousObservedDuration : The continuous count increments only while successive observations satisfy the 0.75 s continuity condition. When a gap exceeds that limit the streak restarts at one. If tcont, 0 is the start of the current streak, 
+
+T cont E,k = tk − tcont, 0. (53) 
+
+k) hasPairObservedFrameCount and 
+
+hasPairObservedDuration : The same continuity logic is maintained for each directed pair. If tpair, 0 is the first timestamp of the current uninterrupted co-observation streak, 
+
+T pair SO,k = tk − tpair, 0. (54) 
+
+l) hasCenterDistanceChangeFromPrevious :
+
+∆dc,k = dc,k − dc,k −1. (55) 
+
+m) hasFreeSpaceDistanceChangeFromPrevious :
+
+∆df s,k = df s,k − df s,k −1. (56) 
+
+E. Map Predicates 
+
+Let M denote an HD-map polygon and let 
+
+ρ(E, M ) = area( FE ∩ M )area( FE ) (57) be footprint overlap. Primary-map matching uses exact un-buffered map geometry. A candidate must contain the entity center or provide sufficient footprint overlap. The primary-map configuration uses a minimum overlap ratio 0.20 , an ambiguity margin 0.05 , and a lateral tie-break margin 0.50 m .
+
+a) inLane and inLaneConnector : Center-membership predicates are denoted below by IL and IC ,respectively: 
+
+IL(E, L ) : ⇔ pE ∈ polygon( L), (58) 
+
+IC (E, C ) : ⇔ pE ∈ polygon( C). (59) 
+
+b) intersectsLane and 
+
+intersectsLaneConnector : Writing JL and JC
+
+for the corresponding footprint-intersection predicates, 
+
+JL(E, L ) : ⇔ area( FE ∩ L) > 0, (60) 
+
+JC (E, C ) : ⇔ area( FE ∩ C) > 0. (61) 
+
+c) hasPrimaryLane and 
+
+hasPrimaryLaneConnector : These predicates store the unique conservative primary lane L∗ or lane connector C∗ selected from the exact candidate set. When competing candidates are too similar under the overlap/center/lateral/heading evidence, no forced primary assignment is made. d) hasPrimaryMapOverlapRatio : For the se-lected primary primitive M ∗,
+
+ρ∗ 
+
+> E
+
+= ρ(E, M ∗). (62) 
+
+e) hasAmbiguousMapMatch : A positive Boolean indicator is emitted when candidate evidence is too ambigu-ous for a reliable primary map assignment under the 0.05 
+
+ambiguity margin and associated deterministic tie-breaking logic. 
+
+f) hasBaselineProgress : If p∗ 
+
+> E
+
+is the nearest point on the selected directed baseline and s(·) its arc-length coordinate, 
+
+sE = s(p∗ 
+
+> E
+
+). (63) 
+
+g) hasBaselineLateralOffset : For baseline pose (xb, y b, θ b) at p∗ 
+
+> E
+
+,
+
+rmap E = − sin θb(xE − xb) + cos θb(yE − yb). (64) Positive values lie left of the directed baseline. 
+
+h) hasMapHeading : Stores the local legal travel direction 
+
+θmap E = wrap( θb). (65) 
+
+i) hasBaselineCurvature : Stores the local signed baseline curvature 
+
+κE = κ(sE ). (66) 
+
+j) hasMapSpeedLimit : Stores the speed limit of 
+
+M ∗ in m/s when the map primitive provides a finite valid value. 
+
+k) hasParentRoadblock and 
+
+hasParentRoadblockConnector : These relations expose the parent roadblock of a selected lane and the parent roadblock connector of a selected lane connector, respectively. 
+
+l) inIntersection and 
+
+intersectsIntersection : Writing Iint and Jint for center and footprint intersection, 
+
+Iint (E, I ) : ⇔ pE ∈ polygon( I), (67) 
+
+Jint (E, I ) : ⇔ area( FE ∩ I) > 0. (68) 
+
+m) hasPrimaryMapIntersection : Stores the intersection topologically/geometrically associated with the selected primary lane or connector. 
+
+n) inCrosswalk and intersectsCrosswalk :
+
+Writing Icw and Jcw for center and footprint crosswalk membership, 
+
+Icw (E, CW ) : ⇔ pE ∈ polygon( CW ), (69) 
+
+Jcw (E, CW ) : ⇔ area( FE ∩ CW ) > 0. (70) 
+
+o) hasSpatialMapRelation : For reliable pri-mary map primitives M ∗ 
+
+> S
+
+and M ∗ 
+
+> O
+
+, this categorical predicate stores whether they are the same primitive, left/right adjacent, successor/predecessor, or unrelated according to the directed map topology. 
+
+p) hasMapProgressDifferenceTo : When both entities share the same selected baseline, 
+
+∆sSO = sO − sS . (71) 
+
+q) hasSignedPathDistanceTo : On the same pri-mary primitive, 
+
+dpath SO = sO − sS . (72) If O lies downstream on an accepted direct/connected suc-cessor path, the remaining arc length on the subject primitive and downstream progress are summed. Predecessor paths receive the corresponding negative sign. The search does not force a path through an ambiguous branch. 
+
+r) inSameLaneAs :
+
+inSameLaneAs (S, O ) : ⇔ L∗ 
+
+> S
+
+= L∗
+
+> O
+
+∧ ¬ Amap S ∧ ¬ Amap O , (73) where Amap E is the map-ambiguity flag. Travel-direction agreement is not required by this predicate. 
+
+s) sharesIntersectionWith : Asserted when both entities have independently established geometric or topological association with the same intersection. 
+
+F. Safety-Related Thresholds 
+
+Safety-related thresholds for longitudinal following, colli-sion risk, and lane-change gaps follow the criteria described in UN Regulation No. 157 (UN R157). For M1/N1 vehicles travelling at speed v ≤ 60 km /h, the minimum following distance is 
+
+dmin (v) = v t front (v), (74) where v is expressed in m/s. The minimum time-gap values are 
+
+v [km/h] 7.2 10 20 30 40 50 60 
+
+tfront [s] 1.0 1.1 1.2 1.3 1.4 1.5 1.6 with piecewise-linear interpolation between the specified val-ues. For speeds below 2 m /s, a minimum following distance of 2 m applies. An imminent collision risk is identified when collision avoidance would require a braking demand of at least 5 m /s2.For regular lane changes, the approaching vehicle in the target lane shall not be required to decelerate by more than 
+
+3.0 m /s2 under the corresponding assessment conditions, and the inter-vehicle distance shall not become smaller than the distance travelled by the ALKS vehicle in 1.0 s .
+
+G. Interaction Predicates 
+
+Interaction predicates are deterministic temporal relations that combine geometric, kinematic, map, and history evi-dence. The auxiliary condition symbols below are abbrevia-tions for the explicitly defined condition blocks. 1) follows : For a participant X projected onto a di-rected lane/connector path, let IX = [ srear X , s f ront X ] denote its footprint interval and 
+
+gSO = srear O − sf ront S (75) the forward bumper gap. The complete relation is 
+
+follows (S, O ) : ⇔ F veh ∧ F path ∧ F leader 
+
+∧ (Fmove ∨ F queue ) ∧ F persist . (76) 
+
+Fveh requires compatible motor-vehicle participants. Fpath 
+
+requires one reliable unambiguous directed lane/connector path, at most three topology hops, positive gap, non-overlapping footprints, and no reverse path motion beyond 
+
+0.30 m /s. Fleader requires O to be the unique nearest valid forward leader; candidates within 0.50 m of one another are treated as ambiguous. For moving traffic, 
+
+Fmove :⇔ vpath S > 0.30 m /s
+
+∧ 0 < g SO /v path S ≤ 5.0 s 
+
+∧ gSO ≤ 80 m ,
+
+(77) where vpath S is the subject velocity projected onto the directed path. For stop-and-go traffic, 
+
+Fqueue :⇔ vpath S ≤ 2.0 m /s
+
+∧ vpath O ≤ 4.0 m /s
+
+∧ 0 < g SO ≤ 12 m .
+
+(78) Finally, 
+
+Fpersist :⇔ Tcond ≥ 1.0 s . (79) Thus, queue following is included in follows , while the queue-specific case is additionally represented by the sepa-rate queuesBehind predicate. 
+
+2) queuesBehind : The predicate queuesBehind 
+
+represents the queue-specific case of longitudinal following. It uses the same vehicle, path, leader, and persistence re-quirements as follows , while requiring the stop-and-go condition: 
+
+queuesBehind (S, O ) : ⇔ F veh ∧ F path ∧ F leader 
+
+∧ F queue ∧ F persist . (80) 
+
+3) changesLane : Let Cs and Ct denote the stable decoded source and target logical lane corridors and let Lt
+
+be the emitted target lane. The implemented event can be summarized as 
+
+changesLane (S, L t) : ⇔ L hist ∧ L trans ∧ L motion 
+
+∧ L target ∧ L score . (81) The history gate is 
+
+Lhist :⇔ Nhist ≥ 1 ∧ Thist ≥ 0.5 s . (82) The transition must be lateral rather than an ordinary longi-tudinal lane–connector continuation: 
+
+Ltrans :⇔ Cs̸ = Ct ∧ Adjacent( Cs, C t)
+
+∧ ¬ Continuation( Cs, C t). (83) The principal physical gate is 
+
+Lmotion :⇔ vS ≥ 0.10 m /s
+
+∧ Ttrans ≤ 8.0 s 
+
+∧ | ∆r| ≥ 1.0 m .
+
+(84) The target normally requires two stable frames. Stable-lane evidence uses overlap ratio at least 0.45 . Physical onset uses lateral offset 0.15 m , lateral velocity 0.15 m /s, future target gain 0.40 m , and two onset-support frames within a 
+
+6.0 s search window. Completion uses target overlap at least 
+
+0.60 , source remaining overlap at most 0.40 , and two stable completion frames; the enabled high-confidence single-frame completion requires target overlap at least 0.80 . A single-frame primary-target fallback requires overlap at least 0.70 .Official map adjacency is preferred. The geometric fall-back allows polygon separation at most 1.5 m , centerline distance 2.0–6.5 m , and direction difference at most 0.30 rad ;the local fallback uses centerline distance 1.25 –6.5 m and direction difference at most 0.60 rad . The decoder permits at most three unknown-gap frames and requires 
+
+Lscore :⇔ (sLC ≥ 6.0 ∧ ¬ Ccompletion )
+
+∨ (sLC ≥ 3.25 ∧ Eprobable ), (85) where sLC is the deterministic event score, Ccompletion 
+
+indicates completion censoring, and Eprobable denotes the enabled probable-event mode. 
+
+4) mergesInFrontOf and mergesBehind : Let T
+
+denote the target stream of an already decoded lane change. The shared merge condition is 
+
+Mbase (S, O, T ) : ⇔ changesLane (S, T ) ∧ M pre 
+
+∧ M path ∧ M flow ∧ M stable . (86) 
+
+Mpre requires O to be present in the target stream before entry, using a 2.0 s pre-existence window and at least one supporting frame. Mpath requires target-path overlap at least 
+
+0.20 and at most six topology hops. Mflow requires travel-direction difference at most 0.55 rad . Mstable requires stable order for at least two frames within a 2.0 s confirmation window. Let O∗ 
+
+> rear
+
+and O∗ 
+
+> front
+
+be the nearest valid target-stream neighbors behind and ahead of S. Then 
+
+mergesInFrontOf (S, O ):⇔ M base (S, O, T ) ∧ S ≻T O
+
+∧ O = O∗ 
+
+> rear
+
+∧ 0 < g SO ≤ 40 m 
+
+∧ hrear ≤ 5.0 s ,
+
+(87) and mergesBehind (S, O ):⇔ M base (S, O, T ) ∧ S ≺T O
+
+∧ O = O∗ 
+
+> front
+
+∧ 0 < g SO ≤ 40 m 
+
+∧ hfront ≤ 5.0 s .
+
+(88) Here S ≻T O and S ≺T O denote stable ahead/behind order on the target path, and h is the corresponding post-merge headway when defined. 5) crossesInFrontOf : Let dS and dO be unit vec-tors along the current headings. The two finite forward rays are 
+
+RS (λ) = pS + λdS , 0 ≤ λ ≤ 10 m , (89) 
+
+RO (μ) = pO + μdO , 0 ≤ μ ≤ 10 m . (90) For their unique finite-segment intersection C, the imple-mented relation is 
+
+crossesInFrontOf (S, O ):⇔ X type ∧ X hist ∧ X local 
+
+∧ X angle ∧ X ray ∧ X order 
+
+∧ X map .
+
+(91) 
+
+Xtype requires distinct dynamic road users and rejects parked entities; pedestrian–pedestrian pairs are disabled by default. 
+
+Xhist requires at least three observations, simultaneous ob-servation for at least 1.0 s , and track displacement at least 
+
+0.30 m . Locality requires dc(S, O ) ≤ 30 m , and 
+
+Xangle :⇔ 25 ◦ ≤ ∆θSO ≤ 155 ◦. (92) The finite-ray condition is 
+
+Xray :⇔ C = RS (λC ) = RO (μC ), λC , μ C ∈ [0 , 10] m .
+
+(93) The subject speed must satisfy vS ≥ 0.30 m /s. For a moving object, 
+
+tS (C) = λC /v S , tO (C) = μC /v O , (94) and crossing order requires 
+
+Xorder :⇔ 0.25 s ≤ tO (C) − tS (C) ≤ 6.0 s . (95) For an effectively stopped object, tO (C) is treated as un-bounded after the parking filter. The map/context filter uses a 12 m query radius, maximum road distance 6 m , crosswalk-near distance 5 m , and bicycle road-distance threshold 3 m . Parked-object rejection uses speed at most 0.50 m /s for at least 2.0 s , displacement at most 1.0 m , and lane distance at most 1.5 m . The conflict footprint/side buffer is 0.35 m and the side-search window is 3.0 s .
+
+6) yieldsTo : The object must already be verified to cross in front of the subject. The complete rule is 
+
+yieldsTo (S, O ) : ⇔ crossesInFrontOf (O, S ) ∧ Y type 
+
+∧ Y compete ∧ Y concede 
+
+∧ Y clear ∧ Y outside 
+
+∧ Y proceed ∧ ¬Y red .
+
+(96) The subject is vehicle-like and the object is a dynamic road user. The implementation uses a 4.0 s pre-event window and 
+
+4.0 s post-event verification window. Before concession, both users must approach the conflict with subject speed at least 
+
+0.50 m /s, object speed at least 0.30 m /s, and initial ETA difference 
+
+|τS − τO | ≤ 2.5 s . (97) Let vb be the subject pre-response baseline speed. It must satisfy vb ≥ 1.0 m /s and the required speed drop is 
+
+∆vreq = max(0 .75 , 0.15 vb) [m /s] . (98) The subject must remain within 18 m of the conflict and outside the conflict while O clears it. Clearance uses half the object length plus a 0.25 m buffer. A relevant RED traffic signal invalidates the yield interpretation. After clearance, 
+
+Yproceed :⇔ vpost S ≥ 0.80 m /s
+
+∧ Dpost S ≥ 1.50 m . (99) The implementation also records a slow-state reference threshold of 1.25 m /s when evaluating the concession. 
+
+7) overtakes : Overtaking is a complete, fully ob-served same-direction Case-1 maneuver: 
+
+overtakes (S, O ) : ⇔ O hist ∧ O start ∧ O flow 
+
+∧ O depart ∧ O pass ∧ O reverse 
+
+∧ O return ∧ O duration .
+
+(100) 
+
+Ohist requires at least five common frames, at least 0.5 s pre-departure history, and frame gaps no larger than 1.5 s . The pair search radius is 80 m . Ostart requires the same logical corridor and initial subject-behind gap at least 1.0 m .Same-flow consistency requires 
+
+Oflow :⇔ ∆θtravel SO ≤ 0.55 rad 
+
+∧ fsameFlow ≥ 0.80 . (101) During the passing phase, 
+
+Opass :⇔ vS ≥ 2.0 m /s
+
+∧ vO ≥ 0.50 m /s
+
+∧ vrel,long, + 
+
+> SO
+
+≥ 0.30 m /s
+
+∧ | rSO |side ≥ 1.25 m .
+
+(102) The departure must use an official/validated adjacent passing corridor. Lane search uses radius 8.0 m , minimum overlap ratio 0.10 , ambiguity margin 0.05 , and at most eight topology hops. Order reversal must produce at least 1.0 m full clear-ance, the subject must return stably to the original corridor for two frames, and 
+
+Oduration :⇔ Tovertake ≤ 30 s . (103) The approach, passing, and completion phases each require at least 0.5 s .
+
+H. Traffic-Control Predicates a) controls : Let M(s) denote the controlled lane-connector movements associated with traffic signal s. The relation is defined by 
+
+controls (s, m ) : ⇔ m ∈ M (s). (104) The relation is independent of the current signal color. 
+
+b) hasSignalState : At time t, the predicate stores the latest valid traffic-light state q for signal s:
+
+hasSignalState (s, q ) : ⇔ q = Qs(t). (105) c) isRelevantSignal : At time t, a traffic signal is relevant to agent a only before entry into the controlled movement: 
+
+isRelevantSignal (a, s ):⇔ ∃ m : controls (s, m )
+
+∧ approaches( a, m, t )
+
+∧ ¬ occupies( a, m, t ).
+
+(106) The approach and occupancy terms refer to the imple-mentation’s current lane/connector path context; they do not introduce unreported numerical parameters. The predicate stops being emitted once the agent occupies the controlled connector. 
+
+I. Risk Predicates a) hasConflictRiskWith : The emission condi-tion can be summarized as 
+
+hasConflictRiskWith (S, O ) : ⇔ R dyn ∧ R geom 
+
+∧ R closing ∧ R interact ∧ R broad ∧ R future ∧ R safety .
+
+(107) 
+
+Rdyn requires two dynamic road users. Rgeom requires valid oriented footprints and excludes already-overlapping pairs. 
+
+Rclosing requires radial closing speed at least 0.50 m /s.
+
+Rinteract is satisfied by same/connected lane-path topol-ogy, a VRU pair within 30 m , a tight same-flow corridor (|rtravel SO | ≤ 2.5 m , dc ≤ 45 m , direction difference ≤ 15 ◦), or local cross/opposite motion ( dc ≤ 40 m and direction difference ≥ 25 ◦). Let rS and rO be footprint half-diagonals and dcenter  
+
+> CPA
+
+the minimum center distance under the same constant-velocity model. The broad-phase condition is 
+
+Rbroad :⇔ dcenter  
+
+> CPA
+
+≤ rS + rO + 0 .50 m . (108) If τ ∗ and df s  
+
+> CPA
+
+are the time and oriented-footprint clearance at the predicted minimum, then 
+
+Rfuture :⇔ 0 < τ ∗ ≤ H
+
+∧ df s  
+
+> CPA
+
+≤ 0.50 m 
+
+∧ df s (S, O ) − df s  
+
+> CPA
+
+≥ 1.0 m ,
+
+(109) where H is the configured prediction horizon. The condition Rsafety requires the predicted conflict to satisfy the applicable safety criteria described in Sec. F. An imminent collision condition is identified when the required collision-avoidance braking demand is at least 5 m /s2. For lane-change-related conflicts, Rsafety additionally considers whether the target-lane vehicle would be required to deceler-ate by more than 3.0 m /s2 or whether the inter-vehicle gap would fall below the distance travelled by the ALKS vehicle in 1.0 s .The prediction assumes constant velocity and fixed head-ing. The base predicate implementation uses a 2.0 s horizon; the retained standard launcher passes H = 3 .0 s . The risk computation uses a 0.50 m predicted-clearance threshold, minimum radial closing speed 0.50 m /s, minimum clearance reduction 1.0 m , and 24 bounded optimization iterations. The relation is emitted once per unordered pair and frame and does not use observed future ground truth. ACKNOWLEDGMENT 
+
+This work was supported by the Deutsche Forschungs-gemeinschaft (DFG, German Research Foundation) under Project FIP 135/1, Project Number 549102058. REFERENCES [1] Z. Xu, Y. Zhang, E. Xie, Z. Zhao, Y. Guo, K.-Y. K. Wong, Z. Li, and H. Zhao, “DriveGPT4: Interpretable End-to-End Autonomous Driving Via Large Language Model,” IEEE Robotics and Automation Letters ,vol. 9, no. 10, pp. 8186–8193, 2024. [2] C. Sima, K. Renz, K. Chitta, L. Chen, H. Zhang, C. Xie, J. Beißwenger, P. Luo, A. Geiger, and H. Li, “DriveLM: Driving with Graph Visual Question Answering,” in Proceedings of the European Conference on Computer Vision (ECCV) , ser. Lecture Notes in Com-puter Science. Springer, 2024, pp. 256–274. [3] A.-M. Marcu, L. Chen, J. H¨ unermann, A. Karnsund, B. Hanotte, P. Chidananda, S. Nair, V. Badrinarayanan, A. Kendall, J. Shotton, E. Arani, and O. Sinavski, “LingoQA: Visual Question Answering for Autonomous Driving,” in Proceedings of the European Conference on Computer Vision (ECCV) , ser. Lecture Notes in Computer Science. Springer, 2024, pp. 252–269. [4] M. Buechel, G. Hinz, F. Ruehl, H. Schroth, C. Gyoeri, and A. C. Knoll, “Ontology-based traffic scene modeling, traffic regulations dependent situational awareness and decision-making for automated vehicles,” in 
+
+Proceedings of the IEEE Intelligent Vehicles Symposium (IV) , 2017, pp. 1471–1476. [5] L. Halilaj, I. Dindorkar, J. L¨ uttin, and S. Rothermel, “A knowledge graph-based approach for situation comprehension in driving scenar-ios,” in The Semantic Web: 18th International Conference, ESWC 2021 , ser. Lecture Notes in Computer Science. Springer, 2021, pp. 699–716. [6] L. Mlodzian, Z. Sun, H. Berkemeyer, S. Monka, Z. Wang, S. Dietze, L. Halilaj, and J. Luettin, “nuScenes Knowledge Graph - A Com-prehensive Semantic Representation of Traffic Scenes for Trajectory Prediction,” in Proceedings of the IEEE/CVF International Conference on Computer Vision Workshops (ICCVW) , 2023, pp. 42–52. [7] M. Zipfl, F. Hertlein, A. Rettinger, S. Thoma, L. Halilaj, J. Luettin, S. Schmid, and C. A. Henson, “Relation-based motion prediction using traffic scene graphs,” in Proceedings of the IEEE 25th International Conference on Intelligent Transportation Systems (ITSC) , 2022, pp. 825–831. [8] L. Halilaj, J. Luettin, S. Monka, C. A. Henson, and S. Schmid, “Knowledge graph-based integration of autonomous driving datasets,” 
+
+International Journal of Semantic Computing , vol. 17, no. 2, pp. 249– 271, 2023. [9] T. Qian, J. Chen, L. Zhuo, Y. Jiao, and Y.-G. Jiang, “NuScenes-QA: A Multi-Modal Visual Question Answering Benchmark for Autonomous Driving Scenario,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 38, no. 5, 2024, pp. 4542–4550. [10] T. Choudhary, V. Dewangan, S. Chandhok, S. Priyadarshan, A. Jain, A. K. Singh, S. Srivastava, K. M. Jatavallabhula, and K. M. Kr-ishna, “Talk2BEV: Language-enhanced Bird’s-eye View Maps for Autonomous Driving,” in Proceedings of the IEEE International Conference on Robotics and Automation (ICRA) , 2024, pp. 16 345– 16 352. [11] H. Caesar, J. Kabzan, K. S. Tan, W. K. Fong, E. M. Wolff, A. H. Lang, L. Fletcher, O. Beijbom, and S. Omari, “nuPlan: A closed-loop ML-based planning benchmark for autonomous vehicles,” CoRR , vol. abs/2106.11810, 2021. [12] H. Caesar, V. Bankiti, A. H. Lang, S. Vora, V. E. Liong, Q. Xu, A. Krishnan, Y. Pan, G. Baldan, and O. Beijbom, “nuScenes: A multimodal dataset for autonomous driving,” in CVPR . Computer Vision Foundation / IEEE, 2020, pp. 11 618–11 628. [13] United Nations Economic Commission for Europe, “UN reg-ulation no. 157: Uniform provisions concerning the approval of vehicles with regard to automated lane keeping systems,” United Nations Economic Commission for Europe, Tech. Rep. E/ECE/TRANS/505/Rev.3/Add.156/Rev.1, 2025. [14] S. Park, C. Cui, Y. Ma, A. Moradipari, R. Gupta, K. Han, and Z. Wang, “NuPlanQA: A large-scale dataset and benchmark for multi-view driving scene understanding in multi-modal large language models,” in ICCV . IEEE, 2025, pp. 8066–8076.

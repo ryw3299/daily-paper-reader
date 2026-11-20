@@ -1,0 +1,1081 @@
+{
+  "date": "20260822-20261119",
+  "date_label": "2026-08-22 ～ 2026-11-19",
+  "generated_at": "2026-11-20T12:43:41.913082+00:00",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2609.34145v1",
+      "route": "20260822-20261119/2609.34145v1",
+      "title": "Beyond Retrieval Relevance: Scene-Grounded Risk Entailment for Vision-Language Driving",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 9.0,
+      "evidence": "面向知识图谱检索增强智能体的专题，用DRKG与SWRL推理为驾驶VLM提供场景可适用的风险证据。",
+      "first_seen_at": "2026-11-20T12:43:41.236618+00:00",
+      "updated_at": "2026-11-20T12:43:41.236618+00:00"
+    },
+    {
+      "paper_id": "2609.32645v1",
+      "route": "20260822-20261119/2609.32645v1",
+      "title": "From Scene Graphs to Answers: Selective Neuro-Symbolic Reasoning for Autonomous Driving",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向知识图谱检索增强智能体的查询自适应神经符号推理，与专题在结构化图检索与LLM协同推理上相关。",
+      "first_seen_at": "2026-11-20T12:43:41.252319+00:00",
+      "updated_at": "2026-11-20T12:43:41.252319+00:00"
+    },
+    {
+      "paper_id": "2609.32157v1",
+      "route": "20260822-20261119/2609.32157v1",
+      "title": "CausalDriveBench: Evaluating Causal Reasoning in Vision-Language-Action Models for Autonomous Driving",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "为VLA驾驶模型提供因果推理评测基准，与知识图谱增强智能体专题中因果与结构化知识评测相关。",
+      "first_seen_at": "2026-11-20T12:43:41.247609+00:00",
+      "updated_at": "2026-11-20T12:43:41.247609+00:00"
+    },
+    {
+      "paper_id": "2609.08217v1",
+      "route": "20260822-20261119/2609.08217v1",
+      "title": "Drive by Hindsight and Foresight: Tool-Grounded Synergistic Reasoning over Hierarchical Memory for Autonomous Driving",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向自动驾驶的层次记忆与工具调用协同推理，属知识图谱检索增强智能体专题。",
+      "first_seen_at": "2026-11-20T12:43:41.242416+00:00",
+      "updated_at": "2026-11-20T12:43:41.242416+00:00"
+    },
+    {
+      "paper_id": "2611.15225v2",
+      "route": "20260822-20261119/2611.15225v2",
+      "title": "Can MLLMs Reason over Surround-View Driving Videos? A Multi-View Autonomous Driving QA Benchmark",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.330650+00:00",
+      "updated_at": "2026-11-20T12:43:41.330650+00:00"
+    },
+    {
+      "paper_id": "2611.11532v1",
+      "route": "20260822-20261119/2611.11532v1",
+      "title": "DriveFoundry: Co-Evolving Data and Model for Efficient Closed-Loop Iteration in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.323576+00:00",
+      "updated_at": "2026-11-20T12:43:41.323576+00:00"
+    },
+    {
+      "paper_id": "2610.34689v1",
+      "route": "20260822-20261119/2610.34689v1",
+      "title": "RSKD: Grounding Semantic Consistency in Driving VLMs via Distillation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.316657+00:00",
+      "updated_at": "2026-11-20T12:43:41.316657+00:00"
+    },
+    {
+      "paper_id": "2610.34294v1",
+      "route": "20260822-20261119/2610.34294v1",
+      "title": "Factual Yet One-Sided: Stance Poisoning and Evidence Balancing in Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.309985+00:00",
+      "updated_at": "2026-11-20T12:43:41.309985+00:00"
+    },
+    {
+      "paper_id": "2610.30953v1",
+      "route": "20260822-20261119/2610.30953v1",
+      "title": "Measuring the Reasoning-Action Coupling in Driving Vision-Language-Action Models through Counterfactuals",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.303448+00:00",
+      "updated_at": "2026-11-20T12:43:41.303448+00:00"
+    },
+    {
+      "paper_id": "2610.26528v1",
+      "route": "20260822-20261119/2610.26528v1",
+      "title": "A Semantic Knowledge Graph Construction Pipeline for Vehicle Intention Prediction in nuScenes",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.297058+00:00",
+      "updated_at": "2026-11-20T12:43:41.297058+00:00"
+    },
+    {
+      "paper_id": "2610.21464v1",
+      "route": "20260822-20261119/2610.21464v1",
+      "title": "Poisoning the Neighborhood: A Topology-Aware Topic-Level Attack on Large-Scale HNSW-based RAG Systems",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.290745+00:00",
+      "updated_at": "2026-11-20T12:43:41.290745+00:00"
+    },
+    {
+      "paper_id": "2610.19549v1",
+      "route": "20260822-20261119/2610.19549v1",
+      "title": "GraphRAG-LTM: A Layered Threat Modeling Framework for Attacks on Graph Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向GraphRAG证据路径的分层攻击威胁建模，属KG-RAG智能体安全专题。",
+      "first_seen_at": "2026-11-20T12:43:41.284797+00:00",
+      "updated_at": "2026-11-20T12:43:41.284797+00:00"
+    },
+    {
+      "paper_id": "2610.03948v3",
+      "route": "20260822-20261119/2610.03948v3",
+      "title": "Retrieval-Augmented Large Language Model Decision-Making for Autonomous Driving Guided by Chinese Philosophical Wisdom",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "将中国哲学价值原则经RAG引入自动驾驶决策，属知识图谱增强智能体在决策场景的探索。",
+      "first_seen_at": "2026-11-20T12:43:41.278775+00:00",
+      "updated_at": "2026-11-20T12:43:41.278775+00:00"
+    },
+    {
+      "paper_id": "2609.38641v1",
+      "route": "20260822-20261119/2609.38641v1",
+      "title": "Vision-Language-Action Autonomous Driving Agent with Language-based Memory",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向VLA自动驾驶智能体的语言记忆与强化学习训练，属知识增强智能体相关探索。",
+      "first_seen_at": "2026-11-20T12:43:41.273188+00:00",
+      "updated_at": "2026-11-20T12:43:41.273188+00:00"
+    },
+    {
+      "paper_id": "2609.37468v1",
+      "route": "20260822-20261119/2609.37468v1",
+      "title": "Backdoor in the Loop: Compromising Agentic Search via Malicious Retrievers",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "聚焦智能体式RAG中检索器后门与反馈回路风险，属kg-rag-agent专题的检索安全与智能体检索方向。",
+      "first_seen_at": "2026-11-20T12:43:41.267503+00:00",
+      "updated_at": "2026-11-20T12:43:41.267503+00:00"
+    },
+    {
+      "paper_id": "2609.31636v1",
+      "route": "20260822-20261119/2609.31636v1",
+      "title": "Grounding Vision-Language Models in Driving Semantics: A Multi-Dataset Predicate Framework for Explainable Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向知识图谱与检索增强智能体专题，提供可核验的驾驶场景谓词知识图谱与接地推理评测。",
+      "first_seen_at": "2026-11-20T12:43:41.262211+00:00",
+      "updated_at": "2026-11-20T12:43:41.262211+00:00"
+    },
+    {
+      "paper_id": "2609.15169v1",
+      "route": "20260822-20261119/2609.15169v1",
+      "title": "GRAVA: Grounded Reasoning-to-Action Representation and Learning for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向驾驶VLA中推理与动作脱节问题，以grounded表示和轨迹锚定图连接场景证据与可执行规划，属该专题的邻近工作。",
+      "first_seen_at": "2026-11-20T12:43:41.257155+00:00",
+      "updated_at": "2026-11-20T12:43:41.257155+00:00"
+    },
+    {
+      "paper_id": "2611.24376v1",
+      "route": "20260822-20261119/2611.24376v1",
+      "title": "Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.913082+00:00",
+      "updated_at": "2026-11-20T12:43:41.913082+00:00"
+    },
+    {
+      "paper_id": "2611.22880v1",
+      "route": "20260822-20261119/2611.22880v1",
+      "title": "Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.897240+00:00",
+      "updated_at": "2026-11-20T12:43:41.897240+00:00"
+    },
+    {
+      "paper_id": "2611.19184v1",
+      "route": "20260822-20261119/2611.19184v1",
+      "title": "Do VLMs Really Look at the Road? A Diagnostic Evaluation for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.881515+00:00",
+      "updated_at": "2026-11-20T12:43:41.881515+00:00"
+    },
+    {
+      "paper_id": "2611.16727v1",
+      "route": "20260822-20261119/2611.16727v1",
+      "title": "From Foundation VLM to Versatile Driving VLM: A Triplet Incremental Training Approach",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.866066+00:00",
+      "updated_at": "2026-11-20T12:43:41.866066+00:00"
+    },
+    {
+      "paper_id": "2611.12241v1",
+      "route": "20260822-20261119/2611.12241v1",
+      "title": "SNAPRAG: Cost-Efficient Knowledge Extraction Attack on RAG Systems via Adversarial Perturbations",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.850778+00:00",
+      "updated_at": "2026-11-20T12:43:41.850778+00:00"
+    },
+    {
+      "paper_id": "2611.11305v1",
+      "route": "20260822-20261119/2611.11305v1",
+      "title": "Least-Privilege Auditing of Agent Tool Calls with Intent Graphs and Reasoning-Guided Escalation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.835257+00:00",
+      "updated_at": "2026-11-20T12:43:41.835257+00:00"
+    },
+    {
+      "paper_id": "2611.07640v1",
+      "route": "20260822-20261119/2611.07640v1",
+      "title": "Beyond Instruction Override: Benchmarking Indirect Prompt Injection with Task-Tampering Attacks",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.820328+00:00",
+      "updated_at": "2026-11-20T12:43:41.820328+00:00"
+    },
+    {
+      "paper_id": "2611.05448v1",
+      "route": "20260822-20261119/2611.05448v1",
+      "title": "Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.805218+00:00",
+      "updated_at": "2026-11-20T12:43:41.805218+00:00"
+    },
+    {
+      "paper_id": "2611.02605v1",
+      "route": "20260822-20261119/2611.02605v1",
+      "title": "StateFence: Task-State Protection Against Evidence-Chain Contamination in Blue-Team LLM Agents",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.790574+00:00",
+      "updated_at": "2026-11-20T12:43:41.790574+00:00"
+    },
+    {
+      "paper_id": "2610.40742v1",
+      "route": "20260822-20261119/2610.40742v1",
+      "title": "Prevented is Not Protected: What Attack Success Rate Hides about RAG",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.775838+00:00",
+      "updated_at": "2026-11-20T12:43:41.775838+00:00"
+    },
+    {
+      "paper_id": "2610.35071v1",
+      "route": "20260822-20261119/2610.35071v1",
+      "title": "GuardRAG: A Post-Retrieval Defense against Poisoning Attacks in Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.761696+00:00",
+      "updated_at": "2026-11-20T12:43:41.761696+00:00"
+    },
+    {
+      "paper_id": "2610.34829v2",
+      "route": "20260822-20261119/2610.34829v2",
+      "title": "Logic Hijacking of RAG: Single-Document Poisoning via Local Optimization",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.747377+00:00",
+      "updated_at": "2026-11-20T12:43:41.747377+00:00"
+    },
+    {
+      "paper_id": "2610.33511v1",
+      "route": "20260822-20261119/2610.33511v1",
+      "title": "Towards a Learnable Retriever for Textual Graph Question Answering",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.733375+00:00",
+      "updated_at": "2026-11-20T12:43:41.733375+00:00"
+    },
+    {
+      "paper_id": "2610.33267v2",
+      "route": "20260822-20261119/2610.33267v2",
+      "title": "Scoped Semantic Invariance as a Foundation for LLM Reliability",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.719509+00:00",
+      "updated_at": "2026-11-20T12:43:41.719509+00:00"
+    },
+    {
+      "paper_id": "2610.30728v1",
+      "route": "20260822-20261119/2610.30728v1",
+      "title": "Federated Graph Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.705865+00:00",
+      "updated_at": "2026-11-20T12:43:41.705865+00:00"
+    },
+    {
+      "paper_id": "2610.30193v1",
+      "route": "20260822-20261119/2610.30193v1",
+      "title": "Protection Is Not One Event: A Survey of RAG Protection Research by Measured Endpoint",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.692226+00:00",
+      "updated_at": "2026-11-20T12:43:41.692226+00:00"
+    },
+    {
+      "paper_id": "2610.28364v1",
+      "route": "20260822-20261119/2610.28364v1",
+      "title": "Context-Aware Prompt Injection Detection via Small Language Models in RAG Pipelines: nokast-secureRAG",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.678974+00:00",
+      "updated_at": "2026-11-20T12:43:41.678974+00:00"
+    },
+    {
+      "paper_id": "2610.25937v1",
+      "route": "20260822-20261119/2610.25937v1",
+      "title": "RAGLeak: Supply-Chain Privacy Backdoors in Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.666010+00:00",
+      "updated_at": "2026-11-20T12:43:41.666010+00:00"
+    },
+    {
+      "paper_id": "2610.22017v1",
+      "route": "20260822-20261119/2610.22017v1",
+      "title": "CARA: Causally Guided Retrieval Agent for Question Answering",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.653092+00:00",
+      "updated_at": "2026-11-20T12:43:41.653092+00:00"
+    },
+    {
+      "paper_id": "2610.20609v1",
+      "route": "20260822-20261119/2610.20609v1",
+      "title": "SafeDriveVLA: Navigation-Conditioned World Model Dreaming for Conflict-Aware End-to-End Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.640281+00:00",
+      "updated_at": "2026-11-20T12:43:41.640281+00:00"
+    },
+    {
+      "paper_id": "2610.16985v1",
+      "route": "20260822-20261119/2610.16985v1",
+      "title": "AUGUstus: Autonomous Driving VLA Model with Unified Generation and Understanding",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.627677+00:00",
+      "updated_at": "2026-11-20T12:43:41.627677+00:00"
+    },
+    {
+      "paper_id": "2610.16908v1",
+      "route": "20260822-20261119/2610.16908v1",
+      "title": "ConDenseDrive: Knowledge-Dense, Token-Sparse Visual Encoder for End-to-End Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.614958+00:00",
+      "updated_at": "2026-11-20T12:43:41.614958+00:00"
+    },
+    {
+      "paper_id": "2610.07521v1",
+      "route": "20260822-20261119/2610.07521v1",
+      "title": "Grounding What Shapes the Plan: Rethinking Groundedness for Physical Intelligence in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.602746+00:00",
+      "updated_at": "2026-11-20T12:43:41.602746+00:00"
+    },
+    {
+      "paper_id": "2610.04088v1",
+      "route": "20260822-20261119/2610.04088v1",
+      "title": "Towards Safer Autonomous Driving in an Open World: A Dual-Process Approach",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.590682+00:00",
+      "updated_at": "2026-11-20T12:43:41.590682+00:00"
+    },
+    {
+      "paper_id": "2609.38798v1",
+      "route": "20260822-20261119/2609.38798v1",
+      "title": "GraphCert: Bootstrap Agentic Graph Reasoning with Certified Evidence Rubrics",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.578945+00:00",
+      "updated_at": "2026-11-20T12:43:41.578945+00:00"
+    },
+    {
+      "paper_id": "2609.37871v1",
+      "route": "20260822-20261119/2609.37871v1",
+      "title": "ExceptionDrive: A Planning-Oriented Counterfactual Corner-Case Benchmark for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.567365+00:00",
+      "updated_at": "2026-11-20T12:43:41.567365+00:00"
+    },
+    {
+      "paper_id": "2609.37196v1",
+      "route": "20260822-20261119/2609.37196v1",
+      "title": "ToolFence: Fine-Grained Authorization for Secure Tool-Using LLM Agents",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.555786+00:00",
+      "updated_at": "2026-11-20T12:43:41.555786+00:00"
+    },
+    {
+      "paper_id": "2609.36817v1",
+      "route": "20260822-20261119/2609.36817v1",
+      "title": "pikit: A Composable Toolkit for Indirect Prompt Injection Research and Evaluation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.544519+00:00",
+      "updated_at": "2026-11-20T12:43:41.544519+00:00"
+    },
+    {
+      "paper_id": "2609.36576v1",
+      "route": "20260822-20261119/2609.36576v1",
+      "title": "Divide and Inject: Can Agents Reconstruct an Indirect Prompt Injection from Fragments?",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.533196+00:00",
+      "updated_at": "2026-11-20T12:43:41.533196+00:00"
+    },
+    {
+      "paper_id": "2609.34463v1",
+      "route": "20260822-20261119/2609.34463v1",
+      "title": "CoDeL: Co-Evolutionary Defense against Indirect Prompt Injection in LLM-based Agents",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.522078+00:00",
+      "updated_at": "2026-11-20T12:43:41.522078+00:00"
+    },
+    {
+      "paper_id": "2609.28366v1",
+      "route": "20260822-20261119/2609.28366v1",
+      "title": "AnchorReasoning: A Visual Grounding and Causal Reasoning Dataset in Long-Tail Autonomous Driving Scenarios",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.511085+00:00",
+      "updated_at": "2026-11-20T12:43:41.511085+00:00"
+    },
+    {
+      "paper_id": "2609.25469v1",
+      "route": "20260822-20261119/2609.25469v1",
+      "title": "RAG-NAROK: Retrieval-Aware Knowledge Corpus Poisoning in RAG with Source-specific Refutation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.500604+00:00",
+      "updated_at": "2026-11-20T12:43:41.500604+00:00"
+    },
+    {
+      "paper_id": "2609.21573v1",
+      "route": "20260822-20261119/2609.21573v1",
+      "title": "Micro-Collaborative Poisoning: A Distributed Attack on RAG Systems",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.490151+00:00",
+      "updated_at": "2026-11-20T12:43:41.490151+00:00"
+    },
+    {
+      "paper_id": "2609.17107v1",
+      "route": "20260822-20261119/2609.17107v1",
+      "title": "Symbolic Separation: Grounding Deep Agents in Knowledge Graphs for Trustworthy Operational Data Analytics",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.479927+00:00",
+      "updated_at": "2026-11-20T12:43:41.479927+00:00"
+    },
+    {
+      "paper_id": "2609.16919v1",
+      "route": "20260822-20261119/2609.16919v1",
+      "title": "NeuroSymbEAD: A Large Scale Neuro-Symbolic Caption Dataset for Omni-Directional Embodied Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.469733+00:00",
+      "updated_at": "2026-11-20T12:43:41.469733+00:00"
+    },
+    {
+      "paper_id": "2609.11082v1",
+      "route": "20260822-20261119/2609.11082v1",
+      "title": "ToxicRAG: Compromising Retrieval-Augmented Generation Systems via Single-Shot Knowledge Poisoning Attacks",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.459933+00:00",
+      "updated_at": "2026-11-20T12:43:41.459933+00:00"
+    },
+    {
+      "paper_id": "2609.10892v1",
+      "route": "20260822-20261119/2609.10892v1",
+      "title": "DriftNet: A Dual-Head Trajectory Transformer for Detecting and Localizing Prompt Injection in LLM Agents",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.450039+00:00",
+      "updated_at": "2026-11-20T12:43:41.450039+00:00"
+    },
+    {
+      "paper_id": "2609.09476v2",
+      "route": "20260822-20261119/2609.09476v2",
+      "title": "From Fixed Keys to Readable Schemas: Small Language Models for Vehicle Agent Function Calls",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.440662+00:00",
+      "updated_at": "2026-11-20T12:43:41.440662+00:00"
+    },
+    {
+      "paper_id": "2609.06391v1",
+      "route": "20260822-20261119/2609.06391v1",
+      "title": "Building Trustworthy Graph-Agentic RAG for Social Good: Architectures, Failure Propagation, and Assurance by Construction",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.431264+00:00",
+      "updated_at": "2026-11-20T12:43:41.431264+00:00"
+    },
+    {
+      "paper_id": "2609.03834v1",
+      "route": "20260822-20261119/2609.03834v1",
+      "title": "Semantic Bayesian World Models",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.422056+00:00",
+      "updated_at": "2026-11-20T12:43:41.422056+00:00"
+    },
+    {
+      "paper_id": "2609.00470v1",
+      "route": "20260822-20261119/2609.00470v1",
+      "title": "TRIS: A Tri-Layer Retrieval Integrity Sieve Against Knowledge Poisoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.413081+00:00",
+      "updated_at": "2026-11-20T12:43:41.413081+00:00"
+    },
+    {
+      "paper_id": "2609.00242v1",
+      "route": "20260822-20261119/2609.00242v1",
+      "title": "CoLT-Drive: Counterfactual Long-Tail Benchmarking and Knowledge-Preserving Adaptation for Driving Affordance Prediction",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.403799+00:00",
+      "updated_at": "2026-11-20T12:43:41.403799+00:00"
+    },
+    {
+      "paper_id": "2608.30041v1",
+      "route": "20260822-20261119/2608.30041v1",
+      "title": "Reachability-Based Capability Confinement for LLM Agents under Indirect Prompt Injection",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.395001+00:00",
+      "updated_at": "2026-11-20T12:43:41.395001+00:00"
+    },
+    {
+      "paper_id": "2608.29772v1",
+      "route": "20260822-20261119/2608.29772v1",
+      "title": "Self-Aware Active Learning Enables Continual Improvement in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.386324+00:00",
+      "updated_at": "2026-11-20T12:43:41.386324+00:00"
+    },
+    {
+      "paper_id": "2608.28389v1",
+      "route": "20260822-20261119/2608.28389v1",
+      "title": "CamoDocs: A Poisoning Attack Against Retrieval-Augmented Language Models Using Camouflaged Documents",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.377690+00:00",
+      "updated_at": "2026-11-20T12:43:41.377690+00:00"
+    },
+    {
+      "paper_id": "2608.28279v1",
+      "route": "20260822-20261119/2608.28279v1",
+      "title": "STEGNav: Spatio-Temporal Event Graph Reasoning for Multimodal Lifelong Object Navigation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.369602+00:00",
+      "updated_at": "2026-11-20T12:43:41.369602+00:00"
+    },
+    {
+      "paper_id": "2608.27496v2",
+      "route": "20260822-20261119/2608.27496v2",
+      "title": "ROPE: Routed Origin Policy Enforcement against Indirect Prompt Injection",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.361776+00:00",
+      "updated_at": "2026-11-20T12:43:41.361776+00:00"
+    },
+    {
+      "paper_id": "2608.24977v2",
+      "route": "20260822-20261119/2608.24977v2",
+      "title": "Retrieved But Not Reliable: A Survey on Attacks, and Defenses in Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.353936+00:00",
+      "updated_at": "2026-11-20T12:43:41.353936+00:00"
+    },
+    {
+      "paper_id": "2608.24022v1",
+      "route": "20260822-20261119/2608.24022v1",
+      "title": "What Guides the Agent? Adjudicating Unauthorized Behavior via Localizing Behavior-Guiding Instructions",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.345787+00:00",
+      "updated_at": "2026-11-20T12:43:41.345787+00:00"
+    },
+    {
+      "paper_id": "2608.22248v1",
+      "route": "20260822-20261119/2608.22248v1",
+      "title": "Beyond Over-Refusal: Defending Indirect Prompt Injection via Latent Instruction Manifolds",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-20T12:43:41.338083+00:00",
+      "updated_at": "2026-11-20T12:43:41.338083+00:00"
+    }
+  ]
+}
