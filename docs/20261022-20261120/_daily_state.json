@@ -1,8 +1,233 @@
 {
   "date": "20261022-20261120",
   "date_label": "2026-10-22 ~ 2026-11-20",
-  "generated_at": "2026-11-20 04:38:43 UTC",
+  "generated_at": "2026-11-20 06:38:52 UTC",
   "recommend_exists": true,
-  "run_count": 1,
-  "papers": []
+  "run_count": 2,
+  "papers": [
+    {
+      "paper_id": "2611.09414v1",
+      "route": "20261022-20261120/2611.09414v1-typed-centrality-grounding-for-agentic-graphrag-a-symbolic-approach-for-agentic-reasoning",
+      "title": "Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 9.0,
+      "evidence": "基于类型化中心性符号层的智能体GraphRAG，用知识图谱做确定性推理",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.25229v1",
+      "route": "20261022-20261120/2611.25229v1-lsp-rag-latent-scoring-perspectives-for-knowledge-graph-retrieval-augmented-generation",
+      "title": "LSP-RAG: Latent Scoring Perspectives for Knowledge Graph Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 9.0,
+      "evidence": "面向多跳推理的轻量知识图谱检索增强生成",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2610.30728v1",
+      "route": "20261022-20261120/2610.30728v1-federated-graph-retrieval-augmented-generation",
+      "title": "Federated Graph Retrieval-Augmented Generation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向分布式知识图谱的联邦图检索增强生成",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2610.34777v1",
+      "route": "20261022-20261120/2610.34777v1-scope-gap-injection-exploiting-evaluator-channel-blind-spots-in-the-openclaw-agent-security-competition",
+      "title": "Scope-Gap Injection: Exploiting Evaluator Channel Blind Spots in the OpenClaw Agent Security Competition",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "针对LLM智能体安全流水线的间接提示注入攻击",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2610.34866v1",
+      "route": "20261022-20261120/2610.34866v1-unigfm-rag-unify-graph-foundation-models-and-large-language-models-for-end-to-end-retrieval-and-reasoning",
+      "title": "UniGFM-RAG: Unify Graph Foundation Models and Large Language Models for End-to-End Retrieval and Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "统一图基座模型与大模型的端到端图检索增强推理",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2610.37121v1",
+      "route": "20261022-20261120/2610.37121v1-prospector-learning-a-compact-graph-traversal-policy-for-scientific-reasoning",
+      "title": "Prospector: learning a compact graph traversal policy for scientific reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "以紧凑图遍历策略将大模型推理锚定到外部领域知识图谱",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2610.37405v1",
+      "route": "20261022-20261120/2610.37405v1-clearing-the-fog-training-kg-agents-to-retrieve-the-evidence-behind-their-answers",
+      "title": "Clearing the FoG: Training KG Agents to Retrieve the Evidence Behind Their Answers",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "训练知识图谱智能体检索可追溯的证据三元组",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2610.38366v2",
+      "route": "20261022-20261120/2610.38366v2-tcc-rag-temporal-causal-chain-guided-rag-for-temporal-knowledge-graph-question-answering",
+      "title": "TCC-RAG: Temporal Causal Chain-Guided RAG for Temporal Knowledge Graph Question Answering",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向时序知识图谱的因果链引导检索增强生成与多跳推理",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.01733v1",
+      "route": "20261022-20261120/2611.01733v1-less-but-sufficient-relation-knowledge-selects-compact-knowledge-graph-contexts-and-what-external-checks-can-and-cannot-catch",
+      "title": "Less but Sufficient: Relation Knowledge Selects Compact Knowledge-Graph Contexts, and What External Checks Can and Cannot Catch",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "利用关系知识选择紧凑知识图谱上下文并检查可推导性与一致性",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.02516v1",
+      "route": "20261022-20261120/2611.02516v1-cumulative-and-audited-guardrail-tool-evolution-for-llm-agent-safety",
+      "title": "Cumulative and Audited Guardrail Tool Evolution for LLM Agent Safety",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向LLM智能体安全的自我演化护栏工具防御框架",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.06481v1",
+      "route": "20261022-20261120/2611.06481v1-arcrag-agentic-compositional-retrieval-over-knowledge-graphs",
+      "title": "ArcRAG: Agentic Compositional Retrieval over Knowledge Graphs",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "知识图谱上的智能体组合式多跳检索",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.09658v1",
+      "route": "20261022-20261120/2611.09658v1-differentially-private-graphrag-protecting-relation-connectivity-and-semantics",
+      "title": "Differentially Private GraphRAG: Protecting Relation Connectivity and Semantics",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向GraphRAG知识图谱重构攻击的差分隐私防御",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.10477v1",
+      "route": "20261022-20261120/2611.10477v1-patternbloom-empowering-agentic-rag-with-externalized-rl-distilled-graph-patterns",
+      "title": "PatternBloom: Empowering Agentic RAG with Externalized RL-Distilled Graph Patterns",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "将检索单元从内容转为图逻辑模式的智能体式RAG",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    },
+    {
+      "paper_id": "2611.19441v1",
+      "route": "20261022-20261120/2611.19441v1-grasp-query-adaptive-graph-retrieval-framework-with-cross-attention-scoring-and-path-sufficiency-verification-for-question-answering",
+      "title": "GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向RAG的知识图谱查询自适应图检索与路径充分性验证",
+      "first_seen_at": "2026-11-20 06:38:52 UTC",
+      "updated_at": "2026-11-20 06:38:52 UTC"
+    }
+  ]
 }

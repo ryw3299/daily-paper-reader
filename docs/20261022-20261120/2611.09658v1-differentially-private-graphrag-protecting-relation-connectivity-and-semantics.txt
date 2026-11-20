@@ -1,0 +1,727 @@
+Title: Differentially Private GraphRAG: Protecting Relation Connectivity and Semantics
+
+URL Source: https://arxiv.org/pdf/2611.09658v1
+
+Published Time: Mon, 09 Nov 2026 03:19:55 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Differentially Private GraphRAG: Protecting Relation Connectivity and Semantics 
+
+# Jie Fu 
+
+Stevens Institute of Technology Hoboken, NJ, USA jfu13@stevens.edu 
+
+# Yuan Hong 
+
+University of Connecticut Storrs, CT, USA yuan.hong@uconn.edu 
+
+# Yue Ning 
+
+Stevens Institute of Technology Hoboken, NJ, USA Yue.Ning@stevens.edu 
+
+# Wendy Hui Wang 
+
+Stevens Institute of Technology Hoboken, NJ, USA hwang4@stevens.edu 
+
+## Abstract 
+
+Graph Retrieval-Augmented Generation (GraphRAG) connects in-formation across documents through entity relationships to sup-port relational reasoning. However, black-box access to GraphRAG systems can enable adversaries to reconstruct knowledge graphs and recover both structural connectivity between entities and the semantics of their relationships. Existing defenses lack formal pri-vacy guarantees and provide limited protection against such re-construction attacks. We propose RelGuard , the first differentially private framework for GraphRAG, which provides formal privacy guarantees by mitigating connectivity leakage and protecting re-lations and their semantic meaning through relation removal. We formalize relation differential privacy (relation-DP), which bounds the distinguishability of mechanism outputs according to the se-mantic distance between alternative relations while accounting for relation removal. Building on this definition, we develop a four-step defense mechanism that sanitizes source documents before GraphRAG indexing by perturbing relation predicates or removing their associated connectivity using the exponential mechanism. Experiments across three GraphRAG systems and two targeted re-construction attacks demonstrate that RelGuard provides stronger protection against reconstruction attacks than four existing defense mechanisms while better preserving downstream utility. 
+
+## Keywords 
+
+GraphRAG, Differential Privacy, Relation Privacy Protection 
+
+## 1 Introduction 
+
+Graph Retrieval-Augmented Generation (GraphRAG) integrates knowledge graphs, which represent entities and their relationships, with unstructured text corpora to support knowledge retrieval, domain-specific question answering, and multi-hop reasoning in Web services [9, 14, 25]. By modeling relationships among entities, GraphRAG enables information scattered across documents to be connected and retrieved through graph structures, enhancing the relational reasoning capabilities of large language models (LLMs). However, the relational information that enables these capabil-ities also creates privacy risks. We consider two complementary dimensions of relation privacy: (1) structural connectivity , which reveals whether two entities are connected in the knowledge graph, and (2) relation semantics , which reveals the nature of the rela-tionship between connected entities. An adversary who infers con-nectivity can discover previously unknown associations between entities, while recovering relation semantics can further reveal the specific nature of those associations. Recent studies have demon-strated that adversaries can recover such information by recon-structing knowledge graphs through black-box access to GraphRAG systems [13, 21, 26, 29]. Although existing defense mechanisms at-tempt to mitigate these reconstruction attacks [13, 26, 32], they lack formal privacy guarantees, leaving the extent of information leakage difficult to characterize and control. To address this limitation, we propose RelGuard , the first dif-ferentially private framework for GraphRAG, protecting relation semantics while mitigating connectivity leakage. Our key insight is that relation protection must account for both the existence of a relationship and its meaning when present. Simply suppressing edges can protect connectivity but may unnecessarily impair down-stream reasoning, whereas replacing relation predicates without accounting for edge removal does not provide a unified treatment of both privacy dimensions. First, we formalize relation differential privacy (relation-DP) ,a metric-based privacy definition that calibrates output indis-tinguishability to the semantic distance between alternative relation predicates while also accounting for the possibility of relation removal. This formulation bounds the distinguishability of released relation semantics, while relation removal helps protect connectivity. Second, we develop a four-step defense mechanism that sanitizes private documents before they are indexed by GraphRAG. Specifi-cally, RelGuard : (1) extracts canonical entity–relation triples from the private documents; (2) generates candidate relation predicates for each extracted relation; (3) perturbs each relation by sampling a replacement predicate or a null outcome, which suppresses the corresponding connectivity; and (4) reconstructs sanitized docu-ments by consistently updating relation expressions or removing sentences associated with null outcomes. GraphRAG then builds its index from the sanitized documents and uses the resulting index for query answering. This design integrates formal relation privacy protection into the GraphRAG pipeline while seeking to preserve the information needed for accurate question answering. 
+
+> 1arXiv:2611.09658v1 [cs.CR] 6 Nov 2026
+
+We evaluate RelGuard on three GraphRAG systems and two real-world datasets, comparing it against four existing defense mecha-nisms. RelGuard achieves the lowest relation recovery F1 across all the settings and the lowest connection recovery F1 in most settings. In particular, it reduces relation recovery F1 by 26.98%– 44.35% compared with the strongest baseline. Meanwhile, RelGuard 
+
+achieves the best privacy–utility trade-off, limiting the reduction in question-answering F1 to just 2.98%–8.97%. These results demon-strate that RelGuard provides stronger protection against relation reconstruction while preserving high utility for downstream ques-tion answering. In summary, we make the following contributions: 
+
+• We introduce relation differential privacy (relation-DP) , a metric-based privacy framework for formally protecting relation se-mantics and mitigating connectivity leakage in GraphRAG. 
+
+• We design a relation-DP-based defense mechanism that sanitizes source documents before GraphRAG indexing, jointly protecting relation semantics and connectivity through relation substitu-tion and removal. 
+
+• Our extensive empirical evaluation demonstrates the advantages of RelGuard over existing defenses in terms of both privacy protection and utility preservation. 
+
+## 2 Background 2.1 Graph Retrieval-Augmented Generation 
+
+Graph Retrieval-Augmented Generation (GraphRAG) uses graph-structured knowledge to retrieve connected evidence for LLM gen-eration [9, 14, 25]. Systems either retrieve from existing knowledge graphs or construct graph indexes from documents [25]. We focus on document-based GraphRAG, which extracts entities and rela-tions from source text and retains associated passages as evidence. 
+
+Index construction. Given a private document 𝐷 , the system constructs an index I = Index (𝐷 ) containing a graph 𝐺 = (𝑉 , 𝐸 ).Each triple (𝑠, 𝑟, 𝑜 ) represents a relation 𝑟 from subject entity 𝑠 
+
+to object entity 𝑜 . The index may also store source passages, en-tity and relation descriptions, community summaries, and vector representations [9, 14]. 
+
+Retrieval and generation. For a query 𝑞 , the retriever selects evi-dence 𝐶 𝑞 = Retrieve (𝑞, I) , which the LLM uses to generate an an-swer b𝑦 = Generate (𝑞, 𝐶 𝑞 ). LightRAG uses dual-level retrieval [14], PathRAG retrieves relational paths [4], and HippoRAG 2 uses as-sociative retrieval [16]. Retrieved evidence can include both graph relationships and associated text. 
+
+## 2.2 Differential Privacy 
+
+Differential privacy (DP) bounds how much the output distribution of a randomized mechanism can change when its protected input changes [7, 8]. Definition 1 ( 𝜖 -Differential Privacy). Let 𝑥 ∼ 𝑥 ′ denote neighboring inputs differing in one protected unit. A randomized mechanism M : X → Y satisfies 𝜖 -DP if, for every neighboring pair and every measurable output event S ⊆ Y ,
+
+Pr [M ( 𝑥 ) ∈ S] ≤ 𝑒 𝜖 Pr [M ( 𝑥 ′) ∈ S] . (1) Smaller 𝜖 imposes a tighter bound on distinguishability. Stan-dard DP specifies protected comparisons through binary adjacency. Metric-DP instead uses an input distance to express how the privacy bound varies across possible values [3, 10]. Definition 2 ( 𝜖 -Metric Differential Privacy). For a metric space (X , 𝑑 X ), a randomized mechanism M satisfies 𝜖 -metric-DP if, for every 𝑥, 𝑥 ′ ∈ X and measurable output event S,
+
+Pr [M ( 𝑥 ) ∈ S] ≤ 𝑒 𝜖𝑑 X (𝑥,𝑥 ′ ) Pr [M ( 𝑥 ′) ∈ S] . (2) The input distance 𝑑 X in 𝜖 -metric-DP must satisfy the trian-gle inequality: 𝑑 X (𝑥, 𝑧 ) ≤ 𝑑 X (𝑥, 𝑥 ′) + 𝑑 X (𝑥 ′, 𝑧 ) for all 𝑥, 𝑥 ′, 𝑧 ∈ X .Nearby inputs receive a tighter bound; more distant inputs permit larger differences between output distributions. Metric-DP cap-tures semantic differences through input distances. Text-privacy methods use Euclidean distance between word embeddings [11], Mahalanobis distance in sentence-embedding space [2], and Earth Mover’s distance between bags of word embeddings [10]. The met-ric and its scale must be specified together with 𝜖 .A common approach to achieving 𝜖 -metric-DP is the exponential mechanism , which selects from a finite candidate set according to a utility score [3, 22]. Let 𝑥 ∈ X be the private input, Y a fixed finite output set, and 𝑢 : X × Y → R a utility function satisfying 
+
+|𝑢 (𝑥, 𝑦 ) − 𝑢 (𝑥 ′, 𝑦 )| ≤ 𝑑 X (𝑥, 𝑥 ′)
+
+for all 𝑥, 𝑥 ′ ∈ X and 𝑦 ∈ Y . Sampling according to Pr [M EM (𝑥 ) = 𝑦 ] = exp (𝜖𝑢 (𝑥, 𝑦 )/ 2)
+
+Í𝑧 ∈ Y exp (𝜖𝑢 (𝑥, 𝑧 )/ 2) (3) satisfies 𝜖 -metric-DP. Higher-utility candidates are more likely, with 
+
+𝜖 controlling concentration. 
+
+## 3 Related Work 
+
+Privacy inference in GraphRAG. RAG systems are vulnerable to text extraction [6, 19] and membership inference [20]. GraphRAG attacks further recover entity connections and relation semantics from generated answers. Untargeted attacks seek broad graph recov-ery: AGEA uses graph memory and novelty-guided exploration [29], while GraphSteal expands entity neighborhoods through breadth-wise traversal [13]. Targeted attacks recover relations around a spec-ified entity. GraphSteal uses depth-wise search, whereas GRASP frames extraction as structured relation processing with record identifiers and adaptive queries [26]. We evaluate both connection and semantic relation recovery under targeted attacks. 
+
+Privacy defenses for GraphRAG. Existing defenses modify gener-ation instructions or retrieved contexts. Protective Prompt restricts disclosure of retrieved content [13], while Abstractive requires query-relevant paraphrasing [21, 26]. GRASP’s ID Alignment col-lapses record identifiers, and Decoy adds misleading endpoint fields to disrupt structured extraction [26]. These defenses aim to reduce extraction but provide no formal privacy guarantees. In contrast, our framework provides relation-DP guarantees through document sanitization before indexing. 
+
+Metric-DP on text. Prior work applies metric-DP to word embed-dings [11], sentence representations [2], and LLM-generated sub-stitutes [1]. Pr 𝜖𝜖 mpt combines metric-DP with format-preserving encryption for sensitive prompt values [5], while TDP substitutes sensitive entities in LLM contexts [31]. These methods protect tex-tual units rather than explicitly addressing both the semantics and existence of relationships between entities. Our framework targets 
+
+> 2
+
+relation-level privacy, combining semantic replacement and rela-tion deletion to protect relation meaning and mitigate connectivity leakage. 
+
+## 4 Problem Setup 4.1 Semantic Distance between Relations 
+
+We define an embedding-based semantic distance between relation predicates for the privacy guarantee in Section 4.2. We also describe the extension used to represent connectivity perturbation. 
+
+Distance between predicates. Let R denote the domain of rela-tions, and let Emb : R → R𝑝 be a fixed encoder that maps each relation to a finite, nonzero embedding vector [12, 27]. For each 
+
+𝑟 ∈ R , we define its normalized embedding as 
+
+𝑧 (𝑟 ) = Emb (𝑟 )∥ Emb (𝑟 )∥ 2
+
+. (4) The semantic distance between two predicates 𝑟, 𝑟 ′ ∈ R is defined as 
+
+𝑑 R (𝑟, 𝑟 ′) = 12 ∥𝑧 (𝑟 ) − 𝑧 (𝑟 ′)∥ 2. (5) Since the embeddings are unit-normalized, this distance depends only on their directions and is independent of their magnitudes. Fur-thermore, 𝑑 R (𝑟, 𝑟 ′) ∈ [ 0, 1], with smaller values indicating greater embedding-based semantic similarity and larger values indicating greater semantic dissimilarity. The scaled Euclidean distance sat-isfies the triangle inequality, as shown in Appendix A.1. It is a metric when 𝑟 ↦ → 𝑧 (𝑟 ) is injective and otherwise a pseudometric; the privacy proof covers both cases. 
+
+Extended distance between triples under connectivity pertur-bation. In addition to perturbing relation semantics, our defense may remove edges from the relation graph to protect connectivity privacy. To capture such structural perturbation, we introduce a special marker null to represent the absence of an edge between the subject 𝑠 and object 𝑜 . Specifically, for a triple 𝑡 = (𝑠, 𝑟, 𝑜 ) and its edge-removed counterpart 𝑡 ′ = (𝑠, null , 𝑜 ), we define their distance as 
+
+𝑑 T (𝑡, 𝑡 ′) = 𝜆, 𝜆 > 0, (6) where 𝜆 is a predefined positive constant that quantifies the distance associated with connectivity perturbation. We assign a constant distance 𝜆 because it separates the cost of structural changes from semantic differences and provides a uniform measure of the privacy cost associated with removing any edge. The value of 𝜆 controls the relative distance assigned to edge removal compared with relation substitution and is fixed across all relations to ensure a consistent distance definition. 
+
+## 4.2 Relation Differential Privacy 
+
+While conventional DP [7, 8] provides a rigorous framework for limiting the information revealed about private data, its standard formulation typically assigns the same privacy bound to all neigh-boring inputs. This uniform treatment does not distinguish between relation substitutions that preserve similar semantics and those that substantially change the meaning of a knowledge graph fact. On the other hand, metric-DP generalizes conventional DP by incorporat-ing a distance function over inputs, allowing the privacy guarantee to vary with the distance between them. Motivated by this flexibility, we introduce relation differential privacy (relation-DP) , which in-stantiates the metric-DP principle for relations by defining privacy in terms of semantic distances between relations. Let R denote the domain of relation predicates, and let O =
+
+R ∪ { null } be the output space, where null is a special marker indicating the absence of an edge. We define 𝜖 -Relation Differential Privacy as follows. Definition 3 ( 𝜖 -Relation Differential Privacy). A random-ized mechanism M : R → O satisfies 𝜖 -relation-DP if, for every pair of input relations 𝑟, 𝑟 ′ ∈ R and every output event S ⊆ O ,
+
+Pr [M ( 𝑟 ) ∈ S] ≤ 𝑒 𝜖𝑑 R (𝑟,𝑟 ′ ) Pr [M ( 𝑟 ′) ∈ S] , (7) 
+
+where 𝑑 R is the relation distance defined in Eq. (5) .
+
+Relation-DP bounds the distinguishability of both released pred-icates and retention or deletion outcomes under alternative predi-cates on a fixed entity pair. The guarantee provides tighter indis-tinguishability bounds for semantically closer input relations and correspondingly weaker bounds for more distant relations. 
+
+Document-level extension. We extend 𝜖 -relation-DP from in-dividual relations to the collection of relations extracted from a document. Let 𝐷 and 𝐷 ′ be two private documents, and let F ( 𝐷 ) =
+
+(𝑡 𝑖 )𝑚 𝑖 =1 and F ( 𝐷 ′) = (𝑡 ′ 
+
+> 𝑖
+
+)𝑚 𝑖 =1 denote their ordered canonical triples, where 𝑡 𝑖 = (𝑠 𝑖 , 𝑟 𝑖 , 𝑜 𝑖 ) and 𝑡 ′ 
+
+> 𝑖
+
+= (𝑠 𝑖 , 𝑟 ′ 
+
+> 𝑖
+
+, 𝑜 𝑖 ) for all 𝑖 ∈ { 1, . . . , 𝑚 }. We compare documents that differ only in the protected relation expres-sions, with all remaining text and occurrence mappings unchanged. We define the distance between the two collections of triples as the sum of the distances between their corresponding relations: 
+
+𝑑 F (F ( 𝐷 ), F ( 𝐷 ′)) =
+
+> 𝑚
+
+∑︁ 
+
+> 𝑖 =1
+
+𝑑 R (𝑟 𝑖 , 𝑟 ′ 
+
+> 𝑖
+
+). (8) Suppose a randomized mechanism independently perturbs each relation using an 𝜖 -relation-DP mechanism and reconstructs the perturbed triples while preserving their subject and object entities. Then, for every such pair 𝐷, 𝐷 ′ and every joint output event S, the resulting mechanism M satisfies Pr [M ( 𝐷 ) ∈ S] ≤ 𝑒 𝜖𝑑 F ( F ( 𝐷 ),F ( 𝐷 ′ ) ) Pr [M ( 𝐷 ′) ∈ S] . (9) Thus, the document-level privacy guarantee follows from the in-dividual relation-DP guarantees through composition, with the overall privacy bound determined by the sum of the distances be-tween corresponding relations. The composition proof is provided in Appendix A.2. 
+
+## 4.3 Threat Model and Defense Goal 
+
+Attack goal. Given a private document 𝐷 and a target entity 𝑠 target 
+
+appearing in it, the adversary aims to infer sensitive information associated with 𝑠 target from GraphRAG answers. Specifically, the attack targets two types of information: 
+
+• Connectivity leakage : The adversary aims to identify which object entities in 𝐷 are directly connected to 𝑠 target .
+
+• Relation semantics leakage : The adversary aims to infer the se-mantic meaning of the relationship between 𝑠 target and each directly connected object entity. An inference is considered successful if the inferred relation is semantically equivalent to the true relation, even if its exact representation differs. 
+
+> 3
+
+Figure 1: Threat model. Adversary capabilities. We consider a strong, knowledge-rich adversary who knows the identities of all object entities appearing in the private document 𝐷 , but has no prior knowledge of the relationships among them. This assumption reflects scenarios in which entity identities are publicly available or already known to the adversary. It also establishes a conservative threat model in which privacy protection does not rely on concealing the entity set, but instead focuses on protecting sensitive relationships among known entities. Although the adversary is strong in terms of prior knowledge, we assume that it interacts with GraphRAG as an external user and therefore has only black-box access to the service. This setting reflects practical deployments in which the underlying document, graph index, retrieved context, and model parameters are not ex-posed to users. The adversary can submit natural-language queries, observe generated answers, and adapt subsequent queries based on information accumulated from previous responses. However, it can-not directly inspect the private document or the system’s internal components, nor can it modify the document or index. Document poisoning and system compromise are outside our threat model. Figure 1 illustrates the threat model. Suppose a private docu-ment states that Alice works for Company B, where Alice is the target entity 𝑠 target . The adversary knows the identities of Alice and Company B, as well as all other object entities appearing in the private document, but has no prior knowledge of the relationships among them. Through black-box queries to the GraphRAG system, the adversary may infer whether Alice is connected to Company B and, if so, the semantic meaning of their relationship. For example, an answer describing Alice as an employee of Company B reveals both the Alice–Company B connection and its employment seman-tics, even without explicitly reproducing the predicate works_for .By issuing adaptive follow-up queries, the adversary may attempt to identify all object entities directly connected to Alice and infer the semantic meaning of each corresponding relationship, thereby reconstructing Alice’s entire one-hop neighborhood. 
+
+Defense objective. We aim to design a defense mechanism that mitigates the disclosure of sensitive relations involving 𝑠 target along two complementary dimensions: structural privacy , which limits the ability to infer whether 𝑠 target is connected to other entities, and 
+
+semantic privacy , which limits the ability to infer the meanings of these relations. At the same time, the defense should preserve the utility of the protected document for downstream question answer-ing (QA). To achieve these objectives, we develop a relation-level perturbation mechanism guided by the relation-DP guarantee (Defi-nition 3), with the goal of protecting sensitive relational information while retaining sufficient semantic and structural information for accurate QA. 
+
+## 5 Methodology 
+
+Given a private document 𝐷 and privacy budget 𝜖 , RelGuard gen-erates a sanitized document e𝐷 for GraphRAG indexing and query answering. Figure 2 shows four steps: (1) extract canonical entity– relation triples and record their occurrences; (2) generate type-conditioned candidate relations; (3) perturb relations using these candidates and null ; and (4) reconstruct e𝐷 from the perturbed triples. We describe each step below. 
+
+## 5.1 Relation Extraction 
+
+The first step of RelGuard is to extract subject–relation–object triples from the private document 𝐷 . We use a large language model (LLM) for this task [18, 23]. The LLM extracts only rela-tions supported by the document, excluding unsupported, negated, or hypothetical relations. The extraction prompt is provided in Appendix B. To ensure consistent representation, entity aliases and unam-biguous coreferential mentions are mapped to the same entity iden-tity, and semantically equivalent relation expressions are normal-ized into snake_case predicates while preserving subject–object direction. For example, both Alice works at Company B and Al-ice is employed by Company B are normalized to the same triple, 
+
+(‘Alice ′, works_for , ‘Company B ′).
+
+## 5.2 Relation Candidate Generation 
+
+Next, RelGuard generates candidate relations for perturbing each extracted triple. The key idea is to construct candidate pools based on the types of the subject and object entities, rather than the orig-inal relation. Specifically, RelGuard follows two steps to generate the candidates: (1) Entity typing : it assigns each entity a type from a fixed inventory; (2) Candidate generation : it generates a pool of candidate predicates for each observed relation based on the types of its subject and object entities. All triples with the same subject and object entities use the same candidate pool. This design makes generated relation candidates independent of the extracted ones and avoids generating a separate pool for every triple. Next, we explain the details of the two steps. 
+
+Entity typing. Given the set of canonical entities 𝑉 appearing in the extracted triples, we define a type assignment function 𝜏 : 𝑉 →U that assigns each entity a type from a fixed inventory. Specifically, we adopt an entity-type inventory based on OntoNotes [28]: 
+
+U = {Person , Norp , Fac , Org , Gpe , Loc , Product , Event ,
+
+Work_Of_Art , Law , Language }. (10) Each entity is assigned a type based on its canonical identity and the fixed inventory, without using source sentences or extracted relation predicates. Given a subject entity 𝑠 and an object entity 𝑜 ,we define their ordered type pair as 
+
+𝑔 (𝑠, 𝑜 ) = (𝜏 (𝑠 ), 𝜏 (𝑜 )) ,
+
+> 4
+
+Figure 2: Overview of RelGuard .
+
+where the subject type always comes first and the object type sec-ond. This ordering is essential because relation predicates are direc-tional: reversing the subject and object types can change the set of type-compatible predicates. For example, works_for describes a re-lation from a person to an organization, whereas employs describes the corresponding relation in the reverse direction. Accordingly, these two directions are treated as distinct type pairs for candi-date generation. In our running example, Alice is assigned type Person and Company B type Org, yielding 𝑔 (Alice , Company B ) =
+
+(Person , Org ).
+
+Candidate generation. For each extracted triple (𝑠, 𝑟, 𝑜 ), we prompt an LLM to generate a pool of 𝐾 distinct candidate relations for 𝑟 , denoted by C𝑟 = {𝑟 1, . . . , 𝑟 𝐾 }, where 𝐾 ≥ 1 is a user-specified parameter. The candidate relations must satisfy the following three requirements. (1) Type compatibility : Each 𝑟 𝑖 ∈ C 𝑟 must represent a plausible relation between entity types 𝜏 (𝑠 ) and 𝜏 (𝑜 ). For example, for the type pair (Person , Org ), plausible relations include works_for ,
+
+founded , and invests_in , whereas headquartered_in is in-compatible. (2) Semantic distinctness : The candidate relations must be se-mantically distinct. Relations that are semantically equivalent, such as synonyms or paraphrases, are merged into a single canonical relation. For example, works_for and employed_by 
+
+are treated as equivalent, whereas works_for and founded rep-resent distinct relations. (3) Non-subsumption : No candidate relation may subsume an-other relation in the same pool. If one relation logically implies another, the broader relation is removed in favor of the more spe-cific one. For example, spouse_of implies family_member_of ;therefore, the broader family_member_of relation is removed, while the more specific spouse_of relation is retained. The prompt used for generating candidate relations is provided in Appendix B. Given the generated candidate relations, for each extracted triple 𝑡 = (𝑠, 𝑟, 𝑜 ), we construct its candidate pool (denoted as C𝑡 ) as 
+
+C𝑡 = {( 𝑠, 𝑟 𝑖 , 𝑜 ) | 𝑟 𝑖 ∈ 𝐶 𝑟 }.
+
+Thus, all triples sharing the same subject and object entities use the same candidate pool. 
+
+## 5.3 Relation Perturbation 
+
+At this stage, RelGuard protects both relation semantics and con-nectivity by randomly replacing each relation with a candidate from the pool or deleting it. An exponential mechanism governs these choices by balancing semantic preservation against privacy protec-tion through two parameters: 𝜖 , which controls the randomness of the perturbation, and 𝜆 , which controls the propensity for deletion. Algorithm 1 summarizes the relation perturbation procedure. We explain the details below. For each triple 𝑡 (𝑠, 𝑟, 𝑜 ) retrieved from the private document 𝐷 ,let C𝑟 be its candidate pool (Section 5.2). To perturb both relation meaning and released connectivity, we augment this pool with 
+
+null : O𝑟 = C𝑟 ∪ { null }. Selecting a real candidate replaces the original relation, whereas selecting null removes the relation from the released representation. We assign each candidate outcome a utility score based on its semantic distance from the original relation. Specifically, for an original relation 𝑟 and a candidate outcome 𝑟 ′ ∈ C 𝑟 , we define the utility function 𝑢 (𝑟, 𝑟 ′) for replacing 𝑟 with 𝑟 ′ as follows: 
+
+𝑢 (𝑟, 𝑟 ′) =
+
+(
+
+−𝑑 R (𝑟, 𝑟 ′), 𝑟 ′ ∈ C 𝑟 ,
+
+−𝜆, 𝑟 ′ = null . (11) where 𝑑 R is defined in Eq. (5) and 𝜆 is defined in Eq. (6). For a real candidate, the utility is the negative semantic distance, so candidates that preserve more of the original relation’s meaning receive higher scores. In contrast, null represents deletion and has no predicate semantics; we therefore assign it the constant utility 
+
+−𝜆 , independent of the input relation. The removal distance 𝜆 is fixed across compared inputs but re-mains a configurable parameter. For a fixed 𝜖 > 0 and candidate pool, decreasing 𝜆 increases the probability of selecting null , allow-ing more relations to be removed. This parameter therefore controls the trade-off between privacy protection and question-answering (QA) utility, which we investigate in Section 6.4. For each relation 𝑟 , we independently sample a perturbed out-come e𝑟 ∈ O 𝑖 using the exponential mechanism: Pr [e𝑟 = 𝑟 ′ | 𝑟 ] = exp (𝜖𝑢 (𝑟, 𝑟 ′)/ 2)
+
+Í𝑧 ∈ O 𝑖 exp (𝜖𝑢 (𝑟, 𝑧 )/ 2) . (12) 
+
+> 5
+
+Algorithm 1: Relation Perturbation 
+
+Input: Ordered triples F ( 𝐷 ); fixed pools {C 𝑖 } with 
+
+|C 𝑖 | = 𝐾 ≥ 1; distance 𝑑 R ; 𝜆 ≥ 0; 𝜖 ≥ 0
+
+Output: Perturbed triples eF ( 𝐷 ) in input order 
+
+eF ( 𝐷 ) ← [ ] ;
+
+for 𝑖 = 1, . . . , 𝑚 do 
+
+O𝑖 ← C 𝑖 ∪ { null };
+
+foreach 𝑐 ∈ C 𝑖 do 
+
+𝑤 𝑖 (𝑐 ) ← exp (− 𝜖𝑑 R (𝑟 𝑖 , 𝑐 )/ 2);
+
+𝑤 𝑖 (null ) ← exp (− 𝜖𝜆 /2);Sample e𝑟 𝑖 ∈ O 𝑖 with probability 𝑤 𝑖 (e𝑟 𝑖 )/ Í𝑦 ∈ O 𝑖 𝑤 𝑖 (𝑦 );Append (𝑠 𝑖 ,e𝑟 𝑖 , 𝑜 𝑖 ) to eF ( 𝐷 );
+
+return eF ( 𝐷 );The denominator normalizes the scores over all possible out-comes, including both relation replacements and deletion. Con-sequently, both types of perturbation are governed by the same probability distribution, with their relative probabilities determined by their respective utility scores. Furthermore, a smaller 𝜖 produces a flatter sampling distribution, increasing randomness, whereas a larger 𝜖 places more probability on outcomes with higher utility. We have the following theorem: Theorem 4. Algorithm 1 satisfies 𝜖 -relation-DP (Definition 3). 
+
+The proof of Theorem 4 can be found in Appendix A.1. 
+
+## 5.4 Document Reconstruction 
+
+Next, we incorporate the perturbed relations into the source docu-ment before indexing. Since a subject–relation–object triple may appear multiple times with different wording, we record all occur-rences of each triple 𝑡 𝑖 in the input document to ensure that its perturbed relation is applied consistently across all mentions: 
+
+P𝑖 = {( 𝑝 𝑖 𝑗 , ℓ 𝑖 𝑗 )} 𝑘 𝑖 
+
+> 𝑗 =1
+
+,
+
+where 𝑘 𝑖 is the number of occurrences of 𝑡 𝑖 , 𝑝 𝑖 𝑗 identifies the sen-tence containing occurrence 𝑗 , and ℓ𝑖 𝑗 records the exact text span ex-pressing the relation. These records are collected during extraction (Section 5.1). Each canonical triple receives one sampled outcome, shared across all its occurrences. To reconstruct the sanitized document, we first replace each recorded relation expression in 𝐷 with an indexed placeholder, producing a masked document 𝐴 (𝐷 ). For example, Alice works at Company B becomes Alice [REL_i] Company B , where [REL_i] 
+
+corresponds to triple 𝑖 . The occurrence records P𝑖 locate these place-holders and their sentences for subsequent replacement or deletion. All other text remains unchanged. The compared documents in Section 4.2 differ only in the protected relation expressions and therefore yield the same masked document, denoted by 𝐴 .If a triple receives null , we delete every sentence containing a recorded occurrence of that triple. A sentence containing multiple triples is deleted if any of them receives null . In the remaining sentences, we fill each placeholder with a verbalization of its sam-pled relation e𝑟 𝑖 , using the masked document without consulting the original relation expression. For example, replacing works_for 
+
+with founded changes Alice works at Company B to Alice founded Company B . All surviving mentions of the same triple use the same sampled relation. Other text and sentence order remain unchanged. The resulting sanitized document e𝐷 is indexed once for subsequent queries without modifying GraphRAG’s retrieval or generation procedures. Theorem 5. The reconstructed document satisfies the document-level relation-DP guarantee (Eq. (9) ). 
+
+The result follows the composition and postprocessing property of DP [8]; the detailed proof is provided in Appendix A.2. 
+
+## 6 Experiments 
+
+We organize our evaluation around three research questions: 
+
+• RQ1: How does RelGuard compare with existing defenses in protecting GraphRAG against reconstruction attacks on connec-tivity and relation semantics? 
+
+• RQ2: What trade-off does RelGuard achieve between privacy protection and downstream question-answering (QA) utility? 
+
+• RQ3: How do different parameter settings affect the privacy protection and QA utility of RelGuard ?
+
+## 6.1 Experimental Setup 
+
+We run experiments on a server with an NVIDIA A100 GPU with 40 GB of GPU memory. We implement the algorithms in Python using PyTorch and report the mean over three trials. 
+
+Data, models, and GraphRAG systems. We evaluate privacy pro-tection and utility on HotpotQA [30] and 2WikiMultiHopQA [17]. Their source documents form the protected corpus, while valida-tion questions and reference answers are used for QA evaluation. We evaluate three mainstream GraphRAG systems: LightRAG [14], PathRAG [4], and HippoRAG 2 [16]. The victim generators are two closed-source models, GPT-4o-mini [24] and Gemini-2.5-Flash. Results for Gemini-2.5-Flash appear in Appendix C. We use GPT-5-mini to perform relation extraction and candidate generation in the DP-protected document reconstruction pipeline. We encode relation predicates using nli-roberta-base-v2 . Unless otherwise specified, we use 𝐾 = 10 and 𝜆 = 1.0. 
+
+Recovery Attacks. We employ two state-of-the-art black-box re-construction attacks against GraphRAG systems: GRASP [26] and 
+
+GraphSteal [13]. Both attacks recover both entity connections and relation semantics within the target entity’s one-hop subgraph. Appendix D provides the attack settings. 
+
+Privacy metrics. We measure Connection Recovery (Conn.) and 
+
+Relation Recovery (Rel.) , following the distinction between endpoint and relation matching [26]. Conn. checks whether the attacker iden-tifies the correct directed entity pair, regardless of the predicted predicate. Entity aliases are mapped to canonical names before comparison. Rel. additionally uses GPT-4o-mini to judge whether the predicted predicate captures the true relation’s meaning. Ap-pendix E defines the matching rules and precision, recall, and F1 calculations. 
+
+Utility metrics. Following prior graph-based RAG evaluations [15, 16], we measure QA utility using token-level F1, the harmonic mean of token precision and recall. We follow each benchmark’s 
+
+> 6
+
+Table 1: Performance of RelGuard and defense baselines ( 𝜖 = 5, GPT-4o-mini). We use GRASP and targeted GraphSteal to measure the privacy leakage of connectivity and relation. Bold values mark the lowest recovery F1 for each system, dataset, attack, and metric, and the highest QA F1 for each system and dataset.                                                                                                                                                                                                                
+
+> Victim Defense 2WikiMultiHopQA HotpotQA
+> GRASP GraphSteal QA F1 ↑GRASP GraphSteal QA F1 ↑
+> Conn. F1 ↓Rel. F1 ↓Conn. F1 ↓Rel. F1 ↓Conn. F1 ↓Rel. F1 ↓Conn. F1 ↓Rel. F1 ↓
+> LightRAG no-defense 89.63 84.26 89.14 85.54 49.48 83.78 75.97 90.31 80.98 61.47 Abstractive 88.76 83.33 89.72 85.13 46.37 82.81 75.80 89.51 80.65 60.41 ID Alignment 87.28 83.36 89.33 85.88 46.53 83.40 75.32 90.70 80.04 60.24 Decoy 85.57 80.06 82.57 77.87 49.09 80.56 74.07 78.99 73.26 61.23 Protective Prompt 86.93 83.61 88.89 84.69 48.17 82.73 75.60 89.09 80.82 61.86
+> RelGuard (ours) 83.30 40.94 84.47 44.31 44.85 71.24 37.64 73.51 34.86 58.49 PathRAG no-defense 79.31 72.71 82.49 77.20 55.39 74.38 67.84 82.66 72.02 64.47
+> Abstractive 79.25 72.37 81.85 76.79 51.30 72.57 63.19 82.13 71.43 61.65 ID Alignment 76.58 71.05 79.84 74.67 52.06 73.92 63.42 82.41 72.07 63.20 Decoy 78.33 72.23 79.11 69.70 52.99 73.71 67.19 78.79 68.09 61.91 Protective Prompt 79.27 71.42 81.81 77.00 50.47 73.10 66.38 82.10 70.64 64.45
+> RelGuard (ours) 75.93 37.93 78.86 42.42 52.40 68.51 36.21 74.04 40.65 60.85 HippoRAG 2 no-defense 76.99 68.51 75.71 69.93 70.50 70.92 62.48 78.37 67.21 71.91 Abstractive 73.34 65.05 69.94 53.30 70.27 70.62 62.60 68.71 54.06 71.98 ID Alignment 71.27 67.61 75.34 66.49 69.33 70.68 62.13 74.95 65.51 72.03
+> Decoy 70.19 63.96 74.92 67.99 68.86 54.75 48.00 71.29 59.60 71.19 Protective Prompt 76.25 67.01 75.15 66.67 68.94 68.81 58.88 77.24 64.84 71.14
+> RelGuard (ours) 69.75 19.61 69.60 25.81 61.53 45.03 13.63 63.42 23.47 67.25
+
+answer and alias handling, average scores over questions, and report percentages. Higher scores indicate better utility. 
+
+Defense baselines. We compare RelGuard with four existing GraphRAG defenses: Abstractive [21], ID Alignment , Decoy [26], and Protective Prompt [13]. Abstractive restricts responses to para-phrased query-relevant evidence. ID Alignment collapses retrieved record identifiers, while Decoy introduces misleading endpoint fields. Protective Prompt adds a system-level instruction against disclosing retrieved knowledge-base content. Appendix F provides details of these methods. 
+
+## 6.2 RQ1: Comparison with Existing Defenses 
+
+Table 1 compares RelGuard at 𝜖 = 5 with four existing defenses and no-defense on two datasets across three GraphRAG systems, all using GPT-4o-mini as the generator. We measure privacy leakage through connection and relation recovery F1 under GRASP and targeted GraphSteal, and evaluate QA utility using QA F1. 
+
+Relation recovery. RelGuard achieves the lowest Rel. F1 and the largest reduction from no-defense in all 12 system–dataset– attack combinations. Its Rel. F1 is 26.98–44.35 percentage points below even the strongest baseline in each setting, compared with reductions of 31.37–48.90 points from no-defense. For LightRAG on 2WikiMultiHopQA, RelGuard reduces GRASP Rel. F1 to 40.94, whereas the four baselines yield 80.06–83.61. Under GraphSteal, the corresponding scores are 44.31 and 77.87–85.88. 
+
+Connection recovery. RelGuard also achieves the lowest Conn. F1 and the largest reduction from no-defense in 11 of the 12 combina-tions, outperforming the strongest baseline by 0.25–9.72 percentage points in these settings. The sole exception is LightRAG on 2Wiki-MultiHopQA under GraphSteal, where Decoy yields 82.57 Conn. F1 versus 84.47 for RelGuard . Even there, RelGuard provides sub-stantially lower Rel. F1 (44.31 versus 77.87). 
+
+QA utility. Although RelGuard generally yields lower QA F1 than existing defenses, the additional utility loss is modest in most set-tings. In five of the six system–dataset combinations, its gap from the baseline with the highest QA F1 is 0.59–4.78 percentage points. For PathRAG on 2WikiMultiHopQA, RelGuard retains 52.40 F1, only 0.59 points below the best baseline’s 52.99. For LightRAG on HotpotQA, its QA F1 is 58.49, a gap of 3.37 points. The larger gap of 8.74 points occurs for HippoRAG 2 on 2WikiMultiHopQA. Sec-tion 6.3 varies the privacy budget to examine this trade-off beyond the fixed 𝜖 = 5 comparison. 
+
+## 6.3 RQ2: Privacy–Utility Trade-off 
+
+Table 2 examines the privacy–utility trade-off for 𝜖 ∈ { 10 , 5, 1, 0.1}
+
+across both datasets and all three GraphRAG systems, using GPT-4o-mini as the victim generator. No-DP uses the original document; the other rows use documents sanitized by RelGuard at the indi-cated budget. All scores are percentages. Overall, smaller 𝜖 reduces connection and relation recovery, strengthening privacy protection at the cost of QA utility; larger 𝜖 retains more utility but permits more recovery. For LightRAG on 2WikiMultiHopQA, decreasing 𝜖 from 10 to 1 and then to 0.1 reduces GRASP Conn. F1 from 88.79 to 65.45 and 59.01, and Rel. F1 from 47.26 to 28.71 and 25.41. GraphSteal shows the same trend: Conn. F1 decreases from 89.09 to 65.57 and 63.78, while Rel. F1 decreases from 46.32 to 31.42 and 27.59. QA F1 cor-respondingly declines from 46.73 to 45.17 and 45.06. The trade-off is also evident for PathRAG on HotpotQA: reducing 𝜖 from 10 to 0.1 lowers GRASP Conn. F1 from 71.45 to 57.97 and Rel. F1 from 40.25 to 30.97, while QA F1 falls from 62.58 to 58.95. The utility cost 
+
+> 7
+
+Table 2: Relation privacy leakage and QA utility of RelGuard under different privacy budgets (GPT-4o-mini). 
+
+Victim Config 2WikiMultiHopQA HotpotQA 
+
+GRASP GraphSteal QA F1 ↑ GRASP GraphSteal QA F1 ↑
+
+Conn. F1 ↓ Rel. F1 ↓ Conn. F1 ↓ Rel. F1 ↓ Conn. F1 ↓ Rel. F1 ↓ Conn. F1 ↓ Rel. F1 ↓
+
+HippoRAG 2 no-DP 76.99 68.51 75.71 69.93 70.50 70.92 62.48 78.37 67.21 71.91 
+
+𝜖 = 10 76.39 20.14 74.47 29.70 62.99 55.35 19.31 71.77 30.99 67.45 
+
+𝜖 = 5 69.75 19.61 69.60 25.81 61.53 45.03 13.63 63.42 23.47 67.25 
+
+𝜖 = 1 59.39 18.12 54.08 21.79 53.40 44.82 11.37 62.67 21.71 64.90 
+
+𝜖 = 0.1 49.73 11.01 52.22 14.87 52.75 43.92 10.09 59.76 20.58 63.30 LightRAG no-DP 89.63 84.26 89.14 85.54 49.48 83.78 75.97 90.31 80.98 61.47 
+
+𝜖 = 10 88.79 47.26 89.09 46.32 46.73 83.07 50.60 87.97 47.63 58.56 
+
+𝜖 = 5 83.30 40.94 84.47 44.31 44.85 71.24 37.64 73.51 34.86 58.49 
+
+𝜖 = 1 65.45 28.71 65.57 31.42 45.17 68.09 35.59 70.96 34.27 57.24 
+
+𝜖 = 0.1 59.01 25.41 63.78 27.59 45.06 66.23 35.01 68.65 33.78 57.23 PathRAG no-DP 79.31 72.71 82.49 77.20 55.39 74.38 67.84 82.66 72.02 64.47 
+
+𝜖 = 10 78.77 42.65 81.48 43.84 54.24 71.45 40.25 81.05 45.49 62.58 
+
+𝜖 = 5 75.93 37.93 78.86 42.42 52.40 68.51 36.21 74.04 40.65 60.85 
+
+𝜖 = 1 56.59 23.16 64.84 32.50 47.54 62.69 35.88 69.17 40.44 60.49 
+
+𝜖 = 0.1 58.29 21.30 62.68 30.92 46.90 57.97 30.97 66.26 39.92 58.95 
+
+Table 3: Null-candidate ablation on 2WikiMultiHopQA with LightRAG under GRASP.                              
+
+> 𝜖 Conn. F1 ↓Rel. F1 ↓QA F1 ↑
+> w/o null w/ null w/o null w/ null w/o null w/ null
+> 189.84 65.45 48.39 28.71 46.97 45.17 586.56 83.30 45.39 40.94 47.52 44.85
+
+varies across systems; for HippoRAG 2 on 2WikiMultiHopQA, the same budget reduction lowers QA F1 from 62.99 to 52.75. These re-sults demonstrate that adjusting 𝜖 provides control over the balance between relation privacy and answer quality. 
+
+## 6.4 RQ3: Sensitivity Analysis 
+
+Effect of null candidate. Table 3 compares RelGuard with a vari-ant that excludes null from the output domain and renormalizes the replacement probabilities. We use LightRAG on 2WikiMulti-HopQA under GRASP at 𝜖 ∈ { 1, 5}. At 𝜖 = 1, including null reduces Conn. F1 by 24.39 percentage points and Rel. F1 by 19.68 points, with an additional QA F1 loss of 1.80 points. At 𝜖 = 5, the corre-sponding reductions are 3.26 and 4.45 points, with a QA F1 loss of 2.67 points. Thus, enabling deletion reduces both connection and relation recovery, with larger recovery reductions at 𝜖 = 1 but an additional utility cost at both budgets. 
+
+Number of relation candidates. Figure 3(a) varies 𝐾 ∈{5, 10 , 15 , 20 } with LightRAG on 2WikiMultiHopQA under GRASP at 𝜖 = 5 and 𝜆 = 1. Increasing 𝐾 from 5 to 20 raises QA F1 from 43.48 to 47.74, Conn. F1 from 72.00 to 85.87, and Rel. F1 from 37.24 to 43.59. QA and relation recovery increase across the tested candidate counts, whereas connection recovery peaks at 86.34 for 
+
+𝐾 = 15 before decreasing slightly at 𝐾 = 20. Larger pools improve QA utility overall in these runs but also allow greater relation             
+
+> QA F1 Conn. F1 Rel. F1 30 40 50 60 70 80 90 510 15 20
+> KF1 (%)
+> (a) # of relation candidates 𝐾 10 20 30 40 50 60 70 80 90 0.01 0.1 0.5 12
+> λF1 (%) (b) Removal distance 𝜆
+
+Figure 3: Sensitivity analysis. 
+
+recovery. Changing 𝐾 affects both the available replacements and null’s probability through the normalizer in Eq. (12). 
+
+Edge-removal distance 𝜆 . At fixed 𝜖 > 0 and candidate pool, a smaller 𝜆 increases the null weight exp (− 𝜖𝜆 /2) and hence the prob-ability of relation deletion. Figure 3(b) varies 𝜆 ∈ { 0.01 , 0.1, 0.5, 1, 2}
+
+in the same LightRAG setting, holding 𝜖 = 5 and the default 𝐾 = 10 candidate pool fixed. The horizontal axis is logarithmic. Increasing 
+
+𝜆 from 0.01 to 2 raises Conn. F1 from 51.87 to 87.79 and Rel. F1 from 20.12 to 44.15. QA F1 first increases from 46.35 to 48.93 at 𝜆 = 0.1, then decreases to 44.07 at 𝜆 = 2. Increasing 𝜆 therefore retains more perturbed relations, raising attack recovery across the tested values, while QA utility peaks at 𝜆 = 0.1. This pattern suggests that deleting a relation can be preferable to retaining an incorrect replacement, which may mislead answer generation. However, an excessively small 𝜆 may remove too many relations and reduce the evidence available for QA, also harming utility. At 𝐾 = 10 and 
+
+𝜆 = 1, both sweeps share QA, Conn., and Rel. F1 scores of 44.85, 83.30, and 40.94, respectively. 
+
+> 8
+
+## 7 Conclusion 
+
+We proposed RelGuard to mitigate connectivity and relation se-mantics leakage through GraphRAG answers. RelGuard replaces sensitive relations based on semantic distance or deletes them, then consistently updates documents before indexing for use with GraphRAG systems. RelGuard provides relation-DP guarantees over relation values, and mitigates connectivity leakage through deletion. Experiments on two datasets across three GraphRAG sys-tems show that, compared with four existing defenses, RelGuard 
+
+substantially reduces relation recovery with limited QA utility loss in most settings, while also reducing connection recovery. 
+
+> 9
+
+## References 
+
+[1] Ahmed Musa Awon, Yun Lu, Shera Potka, and Alex Thomo. 2025. CluSanT: Differentially private and semantically coherent text sanitization. In Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers) . 3676–3693. [2] Danushka Bollegala, Shuichi Otake, Tomoya Machide, and Ken-ichi Kawarabayashi. 2025. A metric differential privacy mechanism for sen-tence embeddings. ACM Transactions on Privacy and Security 28, 2 (2025), 1–34. [3] Konstantinos Chatzikokolakis, Miguel E Andrés, Nicolás Emilio Bordenabe, and Catuscia Palamidessi. 2013. Broadening the scope of differential privacy using metrics. In international symposium on privacy enhancing technologies symposium .Springer, 82–102. [4] Boyu Chen, Zirui Guo, Zidan Yang, Yuluo Chen, Junze Chen, Zhenghao Liu, Chuan Shi, and Cheng Yang. 2026. Pathrag: Pruning graph-based retrieval augmented generation with relational paths. In Proceedings of the AAAI conference on artificial intelligence , Vol. 40. 30183–30191. [5] Amrita Roy Chowdhury, David Glukhov, Divyam Anshumaan, Prasad Chalasani, Nicolas Papernot, Somesh Jha, and Mihir Bellare. 2025. Pr 𝜖𝜖 mpt: Sanitizing Sensitive Prompts for LLMs. arXiv preprint arXiv:2504.05147 (2025). [6] Stav Cohen, Ron Bitton, and Ben Nassi. 2024. Unleashing worms and extracting data: Escalating the outcome of attacks against rag-based inference in scale and severity using jailbreaking. arXiv preprint arXiv:2409.08045 (2024). [7] Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith. 2006. Cali-brating noise to sensitivity in private data analysis. In Theory of cryptography conference . Springer, 265–284. [8] Cynthia Dwork and Aaron Roth. 2014. The algorithmic foundations of differential privacy. Foundations and trends® in theoretical computer science 9, 3-4 (2014), 211–487. [9] Darren Edge, Ha Trinh, Newman Cheng, Joshua Bradley, Alex Chao, Apurva Mody, Steven Truitt, Dasha Metropolitansky, Robert Osazuwa Ness, and Jonathan Larson. 2024. From local to global: A graph rag approach to query-focused summarization. arXiv preprint arXiv:2404.16130 (2024). [10] Natasha Fernandes, Mark Dras, and Annabelle McIver. 2019. Generalised dif-ferential privacy for text document processing. In International Conference on Principles of Security and Trust . Springer International Publishing Cham, 123–148. [11] Oluwaseyi Feyisetan, Borja Balle, Thomas Drake, and Tom Diethe. 2020. Privacy-and utility-preserving textual analysis via calibrated multivariate perturbations. In Proceedings of the 13th international conference on web search and data mining .178–186. [12] Kata Gábor, Haïfa Zargayouna, Isabelle Tellier, Davide Buscaldi, and Thierry Charnois. 2017. Exploring vector spaces for semantic relations. In Proceedings of the 2017 Conference on Empirical Methods in Natural Language Processing .1814–1823. [13] Jinze Gu, Qinghua Mao, Xi Lin, and Jun Wu. 2026. GraphSteal: Structural Knowl-edge Stealing from Graph RAG via Traversal Reconstruction. arXiv preprint arXiv:2605.28645 (2026). [14] Zirui Guo, Lianghao Xia, Yanhua Yu, Tu Ao, and Chao Huang. 2025. LightRAG: Simple and Fast Retrieval-Augmented Generation. In Findings of the Association for Computational Linguistics: EMNLP 2025 . 10746–10761. [15] Bernal J Gutiérrez, Yiheng Shu, Yu Gu, Michihiro Yasunaga, and Yu Su. 2024. HippoRAG: Neurobiologically inspired long-term memory for large language models. Advances in neural information processing systems 37 (2024), 59532– 59569. [16] Bernal Jiménez Gutiérrez, Yiheng Shu, Weijian Qi, Sizhe Zhou, and Yu Su. 2025. From rag to memory: Non-parametric continual learning for large language models. arXiv preprint arXiv:2502.14802 (2025). [17] Xanh Ho, Anh-Khoa Duong Nguyen, Saku Sugawara, and Akiko Aizawa. 2020. Constructing a multi-hop qa dataset for comprehensive evaluation of reason-ing steps. In Proceedings of the 28th International Conference on Computational Linguistics . 6609–6625. [18] Pere-Lluís Huguet Cabot and Roberto Navigli. 2021. REBEL: Relation Extraction By End-to-end Language generation. In Findings of the Association for Com-putational Linguistics: EMNLP 2021 . Association for Computational Linguistics, 2370–2381. doi:10.18653/v1/2021.findings-emnlp.204 [19] Changyue Jiang, Xudong Pan, Geng Hong, Chenfu Bao, and Min Yang. 2024. Rag-thief: Scalable extraction of private data from retrieval-augmented generation applications with agent-based attacks. arXiv preprint arXiv:2411.14110 4 (2024). [20] Hao Li, Jiajun He, Guangshuo Wang, Dengguo Feng, Zheng Li, and Min Zhang. 2025. BudgetLeak: Membership Inference Attacks on RAG Systems via the Generation Budget Side Channel. arXiv preprint arXiv:2511.12043 (2025). doi:10. 48550/arXiv.2511.12043 [21] Jiale Liu, Jiahao Zhang, and Suhang Wang. 2026. Exposing privacy risks in graph retrieval-augmented generation. In Findings of the Association for Computational Linguistics: ACL 2026 . 18073–18093. [22] Frank McSherry and Kunal Talwar. 2007. Mechanism design via differential privacy. In 48th Annual IEEE Symposium on Foundations of Computer Science (FOCS’07) . IEEE, 94–103. [23] Belinda Mo, Kyssen Yu, Joshua Kazdan, Joan Cabezas, Proud Mpala, Lisa Yu, Chris Cundy, Charilaos Kanatsoulis, and Sanmi Koyejo. 2025. KGGen: Extract-ing Knowledge Graphs from Plain Text with Language Models. arXiv preprint arXiv:2502.09956 (2025). https://arxiv.org/abs/2502.09956 [24] OpenAI. 2024. GPT-4o mini: Advancing Cost-Efficient Intelligence. https:// openai.com/index/gpt-4o-mini-advancing-cost-efficient-intelligence/. [25] Boci Peng, Yun Zhu, Yongchao Liu, Xiaohe Bo, Haizhou Shi, Chuntao Hong, Yan Zhang, and Siliang Tang. 2025. Graph retrieval-augmented generation: A survey. 
+
+ACM Transactions on Information Systems 44, 2 (2025), 1–52. [26] Minkyoo Song, Jaehan Kim, Myungchul Kang, Hanna Kim, Seungwon Shin, and Sooel Son. 2026. Graphs Don’t Stay Secret: Practical Subgraph Reconstruction Attacks on Defended Graph RAG. arXiv preprint arXiv:2602.06495 (2026). [27] Asahi Ushio, Jose Camacho-Collados, and Steven Schockaert. 2021. Distilling relation embeddings from pretrained language models. In Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing . 9044–9062. [28] Ralph Weischedel, Martha Palmer, Mitchell Marcus, Eduard Hovy, Sameer Pradhan, Lance Ramshaw, Nianwen Xue, Ann Taylor, Jeff Kaufman, Michelle Franchini, et al. 2013. OntoNotes Release 5.0. Linguistic Data Consortium, LDC2013T19. doi:10.35111/xmhb-2b84 [29] Shuhua Yang, Jiahao Zhang, Yilong Wang, Dongwon Lee, and Suhang Wang. 2026. Query-efficient agentic graph extraction attacks on graphrag systems. In Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) . 16017–16041. [30] Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Bengio, William Cohen, Ruslan Salakhutdinov, and Christopher D Manning. 2018. HotpotQA: A dataset for diverse, explainable multi-hop question answering. In Proceedings of the 2018 conference on empirical methods in natural language processing . 2369–2380. [31] Junwei Yu, Yepeng Ding, Jieyu Zhou, Jiani Dai, Lingfeng Zhang, and Hiroyuki Sato. 2026. Protecting User Privacy in LLM Reasoning: A Textual Differential Privacy Framework for Context-Aware Applications. Electronics 15, 13 (2026), 2880. [32] Shenglai Zeng, Jiankun Zhang, Pengfei He, Yue Xing, Yiding Liu, Han Xu, Jie Ren, Shuaiqiang Wang, Dawei Yin, Yi Chang, and Jiliang Tang. 2024. The Good and The Bad: Exploring Privacy Issues in Retrieval-Augmented Generation (RAG). In 
+
+Findings of the Association for Computational Linguistics: ACL 2024 . Association for Computational Linguistics, 4505–4524. doi:10.18653/v1/2024.findings-acl.267 
+
+## Appendix A Differential Privacy Proof A.1 Privacy of Relation Perturbation 
+
+Proof of Theorem 4. Fix finite 𝜖 ≥ 0 and 𝜆 ≥ 0. For each pair of compared inputs, use the same entity types, encoder, extended removal distance, and candidate pools with exactly 𝐾 real predicates, where 𝐾 ≥ 1 is fixed across compared inputs. In particular, each 
+
+C𝑖 is independent of the private predicates and gives the common support O𝑖 = C𝑖 ∪ { null }.
+
+Utility sensitivity. For any two input relations 𝑟 𝑖 , 𝑟 ′
+
+𝑖 ∈ R compared under the same candidate pool C𝑖 , define 
+
+𝛿 𝑖 := 𝑑 R (𝑟 𝑖 , 𝑟 ′
+
+𝑖 ) = 12 ∥𝑧 (𝑟 𝑖 ) − 𝑧 (𝑟 ′
+
+𝑖 )∥ 2.
+
+We show that changing the input from 𝑟 𝑖 to 𝑟 ′
+
+𝑖 changes the utility of any fixed output by at most 𝛿 𝑖 . For a real candidate 𝑐 ∈ C 𝑖 , the Euclidean triangle inequality gives 
+
+𝑑 R (𝑟 𝑖 , 𝑐 ) = 12 (𝑧 (𝑟 𝑖 ) − 𝑧 (𝑟 ′
+
+𝑖 )) + ( 𝑧 (𝑟 ′
+
+𝑖 ) − 𝑧 (𝑐 )) 2
+
+≤ 12 ∥𝑧 (𝑟 𝑖 ) − 𝑧 (𝑟 ′
+
+𝑖 )∥ 2 + 12 ∥𝑧 (𝑟 ′
+
+𝑖 ) − 𝑧 (𝑐 )∥ 2
+
+= 𝛿 𝑖 + 𝑑 R (𝑟 ′
+
+𝑖 , 𝑐 ).
+
+This step involves only real predicates. Interchanging 𝑟 𝑖 and 𝑟 ′
+
+𝑖 
+
+yields the reverse bound, so 
+
+|𝑢 (𝑟 𝑖 , 𝑐 ) − 𝑢 (𝑟 ′
+
+𝑖 , 𝑐 )| = |𝑑 R (𝑟 𝑖 , 𝑐 ) − 𝑑 R (𝑟 ′
+
+𝑖 , 𝑐 )| ≤ 𝛿 𝑖 . (13) 
+
+> 10
+
+For the deletion output, Eq. (11) assigns the same utility −𝜆 under both inputs. Hence 
+
+|𝑢 (𝑟 𝑖 , null ) − 𝑢 (𝑟 ′ 
+
+> 𝑖
+
+, null )| = | − 𝜆 − (− 𝜆 )| = 0 ≤ 𝛿 𝑖 .
+
+Consequently, 
+
+|𝑢 (𝑟 𝑖 , 𝑦 ) − 𝑢 (𝑟 ′ 
+
+> 𝑖
+
+, 𝑦 )| ≤ 𝛿 𝑖 , 𝑦 ∈ O 𝑖 . (14) 
+
+Relation privacy. Let 𝜋 𝑖 (𝑦 | 𝑟 ) denote the probability in Eq. (12), and write 
+
+𝑤 𝑖 (𝑟, 𝑦 ) = 𝑒 𝜖𝑢 (𝑟,𝑦 )/ 2, 𝑍 𝑖 (𝑟 ) =∑︁  
+
+> 𝑦 ∈ O 𝑖
+
+𝑤 𝑖 (𝑟, 𝑦 ).
+
+All weights are positive and finite, so 0 < 𝑍 𝑖 (𝑟 ) < ∞. By Eq. (14), 
+
+𝑒 −𝜖𝛿 𝑖 /2𝑤 𝑖 (𝑟 ′ 
+
+> 𝑖
+
+, 𝑦 ) ≤ 𝑤 𝑖 (𝑟 𝑖 , 𝑦 ) ≤ 𝑒 𝜖𝛿 𝑖 /2𝑤 𝑖 (𝑟 ′ 
+
+> 𝑖
+
+, 𝑦 ). (15) Summing the lower bound over the common output support gives 
+
+𝑍 𝑖 (𝑟 𝑖 ) ≥ 𝑒 −𝜖𝛿 𝑖 /2𝑍 𝑖 (𝑟 ′ 
+
+> 𝑖
+
+), 𝑍 𝑖 (𝑟 ′ 
+
+> 𝑖
+
+)
+
+𝑍 𝑖 (𝑟 𝑖 ) ≤ 𝑒 𝜖𝛿 𝑖 /2. (16) Combining the weight and normalizer bounds, for every 𝑦 ∈ O 𝑖 we obtain 𝜋 𝑖 (𝑦 | 𝑟 𝑖 )
+
+𝜋 𝑖 (𝑦 | 𝑟 ′ 
+
+> 𝑖
+
+) = 𝑤 𝑖 (𝑟 𝑖 , 𝑦 )
+
+𝑤 𝑖 (𝑟 ′ 
+
+> 𝑖
+
+, 𝑦 )
+
+𝑍 𝑖 (𝑟 ′ 
+
+> 𝑖
+
+)
+
+𝑍 𝑖 (𝑟 𝑖 )≤ 𝑒 𝜖𝛿 𝑖 /2𝑒 𝜖𝛿 𝑖 /2 = 𝑒 𝜖𝛿 𝑖 .
+
+(17) Summing this inequality over any relation-output event S ⊆ O 𝑖 
+
+establishes Definition 3 for the mechanism sampling e𝑟 𝑖 . □
+
+## A.2 Privacy of Document Reconstruction 
+
+Proof of Theorem 5. We first compose the single-relation guarantees, then apply the postprocessing property to document reconstruction. 
+
+Composition across relations. Fix 𝐷, 𝐷 ′ with aligned canon-ical triples F = F ( 𝐷 ) = (( 𝑠 𝑖 , 𝑟 𝑖 , 𝑜 𝑖 )) 𝑚 𝑖 =1 and F ′ = F ( 𝐷 ′) =
+
+(( 𝑠 𝑖 , 𝑟 ′ 
+
+> 𝑖
+
+, 𝑜 𝑖 )) 𝑚 𝑖 =1. The endpoints and slot order are fixed, as in the document-level extension in Section 4.2. Let 𝛿 𝑖 = 𝑑 R (𝑟 𝑖 , 𝑟 ′ 
+
+> 𝑖
+
+). For 
+
+y ∈ Î𝑖 O𝑖 , write Fy = (( 𝑠 𝑖 , 𝑦 𝑖 , 𝑜 𝑖 )) 𝑚 𝑖 =1. Placing sampled relations into triples retains the fixed endpoints and slot order. Since the algorithm samples relations independently, Pr [M ( 𝐷 ) = Fy]
+
+Pr [M ( 𝐷 ′) = Fy] =
+
+> 𝑚
+
+Ö
+
+> 𝑖 =1
+
+𝜋 𝑖 (𝑦 𝑖 | 𝑟 𝑖 )
+
+𝜋 𝑖 (𝑦 𝑖 | 𝑟 ′ 
+
+> 𝑖
+
+)≤ 𝑒 𝜖 Í𝑖 𝛿 𝑖 = 𝑒 𝜖𝑑 F ( F ,F′ ) .
+
+(18) Summing over every Fy in an arbitrary event S proves Eq. (9). Repeated mentions reuse one canonical triple’s sampled outcome and therefore introduce no additional independent releases. 
+
+Released connectivity. Keeping the endpoint pair of each non-null output triple is postprocessing, so the released connectivity view inherits the same relation-DP bound [8]. This guarantee compares relation assignments on fixed, aligned entity pairs, rather than inputs with different original edge sets. 
+
+Text reconstruction. Document reconstruction preserves the joint guarantee by postprocessing [8]. Let Mtext (𝐷 ) =
+
+Reconstruct (M ( 𝐷 ), 𝐴 ). For the document comparisons in Sec-tion 4.2, let 𝐴 = 𝐴 (𝐷 ) = 𝐴 (𝐷 ′) be the shared masked document. Write F = F ( 𝐷 ) and F ′ = F ( 𝐷 ′), and consider a text-output event S. Define 𝐾 𝐴 (S | 𝑧 ) = Pr [Reconstruct (𝑧, 𝐴 ) ∈ S] . The reconstruction procedure uses the sampled predicates and placeholders in 𝐴 , without reading original relation values. Its kernel is therefore identical for the two inputs. The joint bound in Eq. (9) gives Pr [M text (𝐷 ) ∈ S] =∑︁ 
+
+> 𝑧
+
+𝐾 𝐴 (S | 𝑧 ) Pr [M ( 𝐷 ) = 𝑧 ]≤ 𝑒 𝜖𝑑 F ( F ,F′ )∑︁ 
+
+> 𝑧
+
+𝐾 𝐴 (S | 𝑧 ) Pr [M ( 𝐷 ′) = 𝑧 ]
+
+= 𝑒 𝜖𝑑 F ( F ,F′ ) Pr [M text (𝐷 ′) ∈ S] .
+
+This proves relation-DP for the reconstructed text under the speci-fied document comparisons. □
+
+## B Prompt 
+
+Figure 4 gives the prompt for canonical relation extraction. Figure 5 generates relation candidates from an ordered entity-type pair. 
+
+## C Additional Victim Model: Gemini-2.5-Flash 
+
+Table 4 examines the privacy–utility trade-off for 𝜖 ∈ { 10 , 5, 1, 0.1}
+
+across both datasets and all three GraphRAG systems, using Gemini-2.5-Flash as the victim generator. No-DP uses the original document; the other rows use documents sanitized by RelGuard at the indi-cated budget. All scores are percentages. Overall, smaller 𝜖 reduces connection and relation recovery at the cost of QA utility, while larger 𝜖 retains more utility but permits more recovery. For LightRAG on 2WikiMultiHopQA, decreasing 𝜖 from 10 to 1 and then to 0.1 reduces GRASP Conn. F1 from 61.49 to 47.19 and 41.18, and Rel. F1 from 17.67 to 12.19 and 10.09. GraphSteal shows the same trend: Conn. F1 decreases from 76.11 to 70.12 and 63.55, while Rel. F1 decreases from 33.04 to 22.35 and 20.44. QA F1 correspondingly declines from 61.43 to 58.22 and 58.11. For PathRAG on HotpotQA, reducing 𝜖 from 10 to 0.1 lowers GRASP Conn. F1 from 72.01 to 54.12 and Rel. F1 from 28.25 to 20.06, while QA F1 falls from 66.92 to 65.27. The utility cost varies across systems and datasets: on 2WikiMultiHopQA, the same budget reduction lowers PathRAG’s QA F1 from 64.34 to 51.30. Although individual scores are not uniformly monotone, the overall trend is consistent with Section 6.3: smaller privacy budgets provide stronger privacy protection with lower QA utility, and larger budgets exhibit the reverse trade-off. 
+
+## D Attack Details 
+
+We use GRASP and targeted GraphSteal to evaluate the two attack objectives in Section 4.3: connectivity inference, which identifies entities directly connected to the target, and relation semantics recovery, which identifies how these entities are related to the target. 
+
+GRASP. GRASP [26] anchors retrieval on the target entity and frames extraction as a structured relation-processing task, request-ing records with an instance identifier, source entity, relation predi-cate, and destination entity. The endpoints support inference of the target’s one-hop connections, while the predicates support recov-ery of relation semantics. Instance identifiers associate fields within each record to reduce cross-record mixing. We preserve relation direction and restrict predictions to target-incident relations. New predictions are identified against the accumulated triples; instance identifiers are excluded from scoring. 
+
+> 11
+
+You are a knowledge graph extraction assistant. Extract entities and explicitly stated relations from the document, with one numbered sentence per line, and locate every relation occurrence. 1. Entities - Include only entities belonging to this inventory: PERSON, NORP, FAC, ORG, GPE, LOC, PRODUCT, EVENT, WORK_OF_ART, LAW, LANGUAGE. - Assign one canonical name per entity; resolve clear pronouns, aliases, and abbreviations. Exclude dates, quantities, titles, professions, abstract concepts, and biological taxa. - Return canonical names only, without type labels. Entity types are assigned separately from canonical names and the fixed inventory, without source sentences or extracted predicates. 2. Relations - Extract directed (subject, relation, object) triples only when both endpoints are listed entities. - Use specific lower-case snake_case predicates, such as works_for or founded. Merge equivalent expressions and output each distinct triple once; retain different relations for the same entity pair. - Do not infer relations from external knowledge, commonsense, negation, hypotheticals, or speculation. 3. Occurrences - For every occurrence, return the printed sentence number and the shortest exact substring expressing the relation, usually a verb phrase. Each numbered line contains exactly one sentence. - Copy the substring character for character. Exclude entity names, dates, and unrelated modifiers; do not return a bare preposition or copula. Skip occurrences without an explicit relation-bearing span. - Report all occurrences of each triple. Do not report character offsets. Return only JSON. Triple endpoints must match canonical entity names. {"entities": [{"name": "<entity_name>"}], "triples": [{"subject": "<subject_entity>", "relation": "<canonical_relation>", "object": "<object_entity>", "occurrences": [{"sentence": <sentence_number>, "predicate": "<exact substring>"}]}]} Document: {ruled} 
+
+Figure 4: Prompt for entity and relation extraction. 
+
+You are a semantic relation calibration assistant. Given only an ordered entity-type pair and a candidate count K, generate relations from the subject type to the object type. Use no documents, entity identities, or private relation values. Each candidate must satisfy all three conditions: 1. Type compatibility: The relation must be meaningful for both types in the specified direction. For (ORG, PERSON), employs is valid; works_for has the wrong direction. 2. Non-containment: No candidate may imply another in the pool. For example, do not include both spouse_of and family_member_of; retain the more specific predicate. Check every candidate pair. 3. Semantic diversity: Cover distinct kinds of relationships. Merge synonyms and expressions differing only in tense, voice, or wording. Prefer candidates that convey different information and, where appropriate, are mutually exclusive. Use concise lower-case snake_case predicates. Avoid vague predicates such as related_to, associated_with, connected_to, involves, part_of, and is_a. Do not name specific entities. Return exactly {K} distinct candidates satisfying all three conditions. Input: Subject Type: {subject_type} Object Type: {object_type} Candidate Count: {K} Return only JSON: {"relation_pool": ["<relation_1>", "<relation_2>", "..."]} 
+
+Figure 5: Prompt for type-conditioned candidate generation. 
+
+Targeted GraphSteal. Targeted GraphSteal [13] starts with a known target entity and uses entities and relations discovered in previous answers to guide subsequent queries, progressively recovering the target’s local relations. Its outputs include both neighboring entities and relation descriptions: the former support connectivity inference, while the latter support recovery of relation 
+
+> 12
+
+Table 4: Privacy–utility trade-off of RelGuard with Gemini-2.5-Flash. 
+
+Victim Config 2WikiMultiHopQA HotpotQA 
+
+GRASP GraphSteal QA F1 ↑ GRASP GraphSteal QA F1 ↑
+
+Conn. F1 ↓ Rel. F1 ↓ Conn. F1 ↓ Rel. F1 ↓ Conn. F1 ↓ Rel. F1 ↓ Conn. F1 ↓ Rel. F1 ↓
+
+HippoRAG 2 no-DP 76.83 71.50 85.43 77.71 65.10 75.95 68.51 72.72 61.95 75.62 
+
+𝜖 = 10 76.61 18.52 75.89 19.73 57.53 70.71 23.47 71.23 28.11 70.03 
+
+𝜖 = 5 74.59 13.21 73.80 16.74 55.31 66.13 16.95 63.19 19.68 64.06 
+
+𝜖 = 1 55.43 11.53 56.50 14.98 53.62 61.34 16.71 61.54 18.87 66.63 
+
+𝜖 = 0.1 55.14 10.14 55.66 14.31 53.01 56.40 13.69 60.69 17.18 66.27 LightRAG no-DP 66.18 59.19 79.13 74.23 62.48 75.19 69.55 80.11 66.81 70.19 
+
+𝜖 = 10 61.49 17.67 76.11 33.04 61.43 64.00 26.22 77.53 44.50 68.83 
+
+𝜖 = 5 57.11 13.55 74.99 28.83 58.89 62.77 26.05 77.37 41.47 65.60 
+
+𝜖 = 1 47.19 12.19 70.12 22.35 58.22 61.92 22.27 75.99 35.74 65.48 
+
+𝜖 = 0.1 41.18 10.09 63.55 20.44 58.11 60.56 21.04 74.16 30.74 64.96 PathRAG no-DP 73.50 67.44 71.41 58.77 67.03 74.50 64.48 69.97 54.59 68.87 
+
+𝜖 = 10 72.89 19.16 71.93 36.91 64.34 72.01 28.25 68.64 36.47 66.92 
+
+𝜖 = 5 68.79 12.80 63.97 32.53 61.57 67.48 26.46 65.46 36.12 66.01 
+
+𝜖 = 1 52.51 12.14 54.81 28.03 54.23 61.99 20.66 57.39 32.76 65.36 
+
+𝜖 = 0.1 52.17 7.10 50.84 22.30 51.30 54.12 20.06 50.63 32.08 65.27 
+
+semantics. We parse answers into directed subject–predicate–object triples, retain target-incident predictions, and merge repeated re-sults across turns before computing Conn. and Rel. scores. 
+
+## E Privacy Metric Details 
+
+Connection Recovery (Conn.) checks whether the attacker identifies the correct directed entity pair, regardless of the predicted predicate. Entity aliases are mapped to canonical names before comparison. 
+
+Relation Recovery (Rel.) additionally checks whether the predicted predicate captures the true relation’s meaning. GPT-4o-mini accepts semantically matching predicates or broader predictions entailed by the true relation. For example, if Alice is Bob’s spouse, predicting that Alice is Bob’s family member counts as relation recovery; predicting a spouse relation from a true family-member relation does not. Predictions without predicates are evaluated only for connection recovery. Precision measures the fraction of predictions that are correct; recall measures the fraction of true items recovered. For target 
+
+𝑠 target , let 𝐸 𝑠 target and b𝐸 𝑠 target denote the true and predicted triple sets. For relation recovery, we use these triples directly: 𝐸 Rel  
+
+> 𝑠 target
+
+= 𝐸 𝑠 target .For connection recovery, we discard predicates and keep distinct directed pairs: 𝐸 Conn  
+
+> 𝑠 target
+
+= {( 𝑢, 𝑣 ) : (𝑢, 𝑟, 𝑣 ) ∈ 𝐸 𝑠 target }. Predictions are transformed in the same way. For 𝑎 ∈ { Conn , Rel }, let ℎ𝑎 𝑠 target be the number of correct matches under the corresponding rule. We compute 
+
+𝑝 𝑎 𝑠 target = ℎ𝑎 𝑠 target 
+
+max (1, |b𝐸 𝑎 𝑠 target |) , 𝑟 𝑎 𝑠 target = ℎ𝑎 𝑠 target 
+
+|𝐸 𝑎 𝑠 target | . (19) All evaluated targets have nonempty true sets. Empty predictions receive zero precision and recall. We average target-level precision and recall over the target set 
+
+𝑇 . For connection recovery, 
+
+𝑃 Conn =
+
+Í𝑠 target ∈𝑇 𝑝 Conn 
+
+> 𝑠 target
+
+|𝑇 | , 𝑅 Conn =
+
+Í𝑠 target ∈𝑇 𝑟 Conn 
+
+> 𝑠 target
+
+|𝑇 | . (20) For relation recovery, 
+
+𝑃 Rel =
+
+Í𝑠 target ∈𝑇 𝑝 Rel 
+
+> 𝑠 target
+
+|𝑇 | , 𝑅 Rel =
+
+Í𝑠 target ∈𝑇 𝑟 Rel 
+
+> 𝑠 target
+
+|𝑇 | . (21) Conn. F1 and Rel. F1 are the harmonic means of their respective averaged precision and recall, computed as 𝐹 1𝑎 = 2𝑃 𝑎 𝑅 𝑎 /( 𝑃 𝑎 + 𝑅 𝑎 )
+
+for 𝑎 ∈ { Conn , Rel }.
+
+## F Defense Baseline Details 
+
+Abstractive. Abstractive [21] instructs the generator to select query-relevant evidence and express it concisely in its own words. We use the system-prompt implementation evaluated by Song et al. [26]. The instruction supplements the base prompt and returns 
+
+NO_RELEVANT_CONTENT when the context is irrelevant. 
+
+ID Alignment. ID Alignment [26] assigns the same displayed identifier (e.g., 1) to every retrieved relation record before passing the context to the generator. Endpoints, relation descriptions, and row order are preserved. Collapsing identifiers removes the record-level distinction used by structured extraction and can induce cross-record mixing. The transformation applies during context serialization, leaving the stored graph unchanged. 
+
+Decoy. Decoy [26] adds misleading src_entity and dst_entity 
+
+columns to retrieved relation records while retaining the true src 
+
+and dst fields. The added values differ from the true endpoints. A system instruction identifies the added fields as internal metadata to ignore in answers. This presentation can steer extraction toward incorrect endpoint assignments while preserving the true evidence for QA. Decoy is evaluated separately from ID Alignment. 
+
+Protective Prompt. Protective Prompt implements the Protective System Prompt mitigation in GraphSteal [13]. It prepends a protective instruction to the generator’s system prompt, directing the LLM not to disclose content retrieved from the knowledge base. The source corpus, stored graph, and retrieved evidence remain unchanged. The instruction applies when answering both benign and attack queries; attack predictions are extracted from the resulting answers.
