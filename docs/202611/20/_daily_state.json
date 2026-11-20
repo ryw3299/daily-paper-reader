@@ -1,0 +1,137 @@
+{
+  "date": "20261120",
+  "date_label": "",
+  "generated_at": "2026-11-20 06:48:25 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.24294v1",
+      "route": "202611/20/2611.24294v1-knowledgeclaw-towards-agentic-knowledge-engineering-via-omnimodal-hypergraphs",
+      "title": "KnowledgeClaw: Towards Agentic Knowledge Engineering via Omnimodal Hypergraphs",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "构建全模态类型化超图知识库并结合图检索增强生成的智能体化知识工程",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.15467v1",
+      "route": "202611/20/2611.15467v1-autoontic-automatic-ontology-induction-from-text-for-knowledge-graph-construction",
+      "title": "AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "通过本体归纳提升GraphRAG的知识图谱质量",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.16267v1",
+      "route": "202611/20/2611.16267v1-causals-an-open-knowledge-graph-for-research-on-causal-reasoning",
+      "title": "Causals: An Open Knowledge Graph for Research on Causal Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "支持因果与多跳推理的开放知识图谱表示",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.19871v1",
+      "route": "202611/20/2611.19871v1-interactive-structured-environment-scaling-for-large-language-model-agentic-reasoning",
+      "title": "Interactive Structured Environment Scaling for Large Language Model Agentic Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向大模型智能体推理的结构化与检索环境及子图检索",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.24552v1",
+      "route": "202611/20/2611.24552v1-navigate-noise-aware-dual-view-generation-for-multimodal-knowledge-graph-reasoning",
+      "title": "NaviGATE: Noise-Aware Dual-View Generation for Multimodal Knowledge Graph Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "对噪声检索鲁棒的多模态知识图谱推理",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.24887v1",
+      "route": "202611/20/2611.24887v1-ground-iterate-trace-decomposing-ai-research-ideation",
+      "title": "Ground, Iterate, Trace: Decomposing AI Research Ideation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "智能体构建语义知识图谱并使用图检索工具",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.25705v1",
+      "route": "202611/20/2611.25705v1-stark-moving-towards-personalized-agents-that-truly-learn-and-remember",
+      "title": "STARK: Moving towards Personalized Agents That Truly Learn and Remember",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向个性化智能体的双图记忆架构，存储情景与洞察知识",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    },
+    {
+      "paper_id": "2611.26062v1",
+      "route": "202611/20/2611.26062v1-gensparql-a-generative-extension-of-sparql-for-incomplete-knowledge-graphs",
+      "title": "GenSPARQL: A Generative Extension of SPARQL for Incomplete Knowledge Graphs",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向知识图谱的LLM增强SPARQL查询与推理",
+      "first_seen_at": "2026-11-20 06:48:25 UTC",
+      "updated_at": "2026-11-20 06:48:25 UTC"
+    }
+  ]
+}

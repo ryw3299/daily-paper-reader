@@ -1,0 +1,533 @@
+Title: NaviGATE: Noise-Aware Dual-View Generation for Multimodal Knowledge Graph Reasoning
+
+URL Source: https://arxiv.org/pdf/2611.24552v1
+
+Published Time: Thu, 19 Nov 2026 03:14:30 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# NaviGATE: Noise-Aware Dual-View Generation for Multimodal Knowledge Graph Reasoning 
+
+Jie Peng, Yongxue Shan, Yongfu Zha, Cui Miao, Xiaodong Wang 
+
+College of Computer Science and Technology National University of Defense Technology Changsha 410073, China {pengjie, shanyongxue001, zhayongfu, miaocui1024, xdwang}@nudt.edu.cn 
+
+Abstract 
+
+Multimodal knowledge graph reasoning (MKGR) aims to infer missing facts by jointly exploiting relational structures, tex-tual descriptions, and visual evidence. Existing embedding-based methods effectively capture graph topology, but their fixed multimodal representations are less effective for query-specific fine-grained semantic reasoning, while generation-based methods are vulnerable to noisy retrieval and may pro-duce invalid entities. To address these challenges, we propose NaviGATE, a noise-aware generative framework for MKGR. NaviGATE first aligns graph-derived structural representa-tions with textual semantics, then performs structure-aware internal knowledge activation by fine-tuning the multimodal language model with multimodal entity summaries and in-jected structural tokens. In the noise-aware dual-view instruc-tion tuning stage, NaviGATE jointly optimizes retrieval-free and retrieval-aware views: reliable retrieved candidates are reinforced through contrastive logit sharpening, while mis-leading candidates are suppressed through parametric consis-tency distillation. In inference, structure-constrained decod-ing restricts generation to valid entities in the target knowl-edge graph. Experiments on standard benchmarks show that NaviGATE consistently outperforms strong unimodal, mul-timodal, and generation-based baselines, and remains robust under noisy retrieval scenarios. 
+
+Introduction 
+
+Multimodal knowledge graphs (MMKGs) integrate struc-tured relational facts with multimodal information, such as textual descriptions and visual images, and have become important knowledge resources for artificial intelligence ap-plications, including recommendation systems (Xian et al. 2019; Kim et al. 2024), question answering (Li, Wang, and Zhu 2020), and information retrieval (Li, Ao, and He 2024; Kim et al. 2025). However, real-world knowledge graphs are often incomplete, with many valid facts missing from the observed graph. Multimodal knowledge graph reasoning (MKGR) aims to predict missing entities by jointly exploit-ing graph structure and entity-associated multimodal context, and has attracted increasing attention in recent years. Existing MKGR methods can be broadly categorized into embedding-based and generation-based approaches. Embedding-based methods encode entities, relations, and multimodal attributes into continuous representation spaces, and predict missing facts by scoring candidate triples. With graph neural networks (Li et al. 2023; Peng et al. 2025), translation-based constraints (Jian et al. 2025; Li et al. 2026), or multimodal fusion modules (Zhang et al. 2024a, 2025, 2024c), these methods effectively preserve structural topol-ogy and enrich entity representations with textual and visual evidence. However, their dependence on fixed multimodal representations and predefined scoring functions limits their ability to perform query-specific fine-grained semantic rea-soning. As a result, when multiple candidates are seman-tically similar, embedding-based models may narrow down the search space but remain insufficient to distinguish the exact target entity. Generation-based methods (Yang et al. 2025; Zhang et al. 2024b) offer a promising alternative by formulating MKGR as a text generation problem. Leveraging the semantic under-standing and parametric knowledge of multimodal large lan-guage models (MLLMs), these methods can generate miss-ing entities from textualized queries and multimodal con-texts. Compared with embedding-based models, they pro-vide greater flexibility in contextual reasoning and can better exploit relation semantics, entity descriptions, and visual in-formation. Nevertheless, direct generation may produce an-swers that are not valid entities in the target knowledge graph or are inconsistent with the graph schema, which limits their completion performance. Recent retrieval-augmented frame-works (Liu et al. 2025b; Wei et al. 2023; Liu et al. 2025a) mitigate this issue by using an embedding-based retriever to obtain a top-K candidate set, which is then provided to the MLLM for reranking or generation. By combining structural recall with semantic reasoning, these methods have achieved notable performance improvements. However, this pipeline is fundamentally constrained by retriever recall: if the ground-truth entity is absent from the top-K candidate set, MLLMs may fail to reliably generate the correct answer; meanwhile, feeding the entire entity set into the model is impractical due to their limited context windows and attention budgets. In realistic MKGR scenarios, retrieved candidates are not always reliable, since the ground-truth entity may be absent from the candidate set, making the retrieved candidate set noisy. Over-reliance on retrieval may force the generator to select an incorrect entity from the candidate set. This raises a key challenge: how can a generative MKGR model rely on retrieved evidence when it is reliable, while falling back on the LLM’s internal knowledge when the retrieved arXiv:2611.24552v1 [cs.AI] 18 Nov 2026 candidate set is noisy? 
+
+To address this challenge, we propose NaviGATE, a progressively optimized generative framework for MKGR. First, structure-semantic collaborative alignment coordinates structural entity representations with textual semantics in a shared space, enabling graph-derived knowledge to be integrated into the MLLM. Second, structure-aware inter-nal knowledge activation trains the model with multimodal entity summaries and structural cues under a retrieval-free view, preserving its basic completion ability when retrieval is noisy. Third, noise-aware dual-view instruction tuning jointly optimizes retrieval-free and retrieval-aware predic-tions: reliable candidates are strengthened through con-trastive logit sharpening, while misleading candidates are suppressed through parametric consistency distillation. Dur-ing inference, structure-constrained decoding restricts out-puts to valid KG entities. The main contributions of this work are summarized as follows: 
+
+• We propose structure-semantic collaborative alignment and internal knowledge activation to inject graph-derived knowledge into the MLLM, building retrieval-free com-pletion ability as a reliable fallback under noisy retrieval. 
+
+• We introduce noise-aware dual-view instruction tuning, which strengthens reliable candidates via contrastive logit sharpening and suppresses misleading ones via paramet-ric consistency distillation. Structure-constrained decod-ing further ensures valid entity generation. 
+
+• Experiments on MKG-W and DB15K show that Navi-GATE achieves the best MRR and Hits@1 among fifteen baselines and remains robust under noisy retrieval. 
+
+Related Work 
+
+Embedding-based knowledge graph reasoning 
+
+Embedding-based knowledge graph reasoning (KGR) learns entity and relation representations and predicts missing facts by scoring candidate triples. Classical models, such as TransE (Bordes et al. 2013a), DistMult (Yang et al. 2015), ComplEx (Trouillon et al. 2016), RotatE (Sun et al. 2019), and TuckER (Balazevic et al. 2019), mainly exploit struc-tural triples to model relational patterns. MKGR methods further incorporate images and textual descriptions into en-tity representation learning, including IKRL (Xie et al. 2017), RSME (Wang et al. 2021), OTKGE (Cao et al. 2022), IMF (Li et al. 2023), QEB (Wang et al. 2023), VISTA (Lee et al. 2023), NativE (Zhang et al. 2024a), MyGO (Zhang et al. 2025), and APKGR (Jian et al. 2025). These methods im-prove structural retrieval through modality fusion, interac-tion, adaptive learning, or noise modeling, but still rely on fixed representations and predefined scoring functions. As fine-grained multimodal clues are compressed before infer-ence, their query-specific reasoning ability remains limited when candidates are semantically similar. 
+
+Generation-based knowledge graph reasoning 
+
+Generation-based KGR formulates link prediction as a text generation task, where a generative language model produces the missing entity from a textualized query. Early meth-ods, such as GenKGR (Xie et al. 2022) and KG-S2S (Yang et al. 2025), convert triples into natural language sequences and apply sequence-to-sequence models for entity gener-ation. With the emergence of large language models, re-cent studies further explore instruction tuning, in-context learning, and retrieval-augmented generation for KGR. For instance, KG-LLM (Shu et al. 2025) and KoPA (Zhang et al. 2024b) finetunes LLMs on KG completion instructions, while KICGPT (Wei et al. 2023), SAT (Liu et al. 2025a), and DIFT (Liu et al. 2025b) combine embedding-based retrieval with LLM-based reranking or finetuning. These methods demonstrate the potential of language models in leveraging semantic priors for KGR. Nevertheless, they often remain sensitive to retrieval quality. When retrieved candidates are noisy or the ground-truth entity is absent, generation models can be misled by irrelevant evidence. Moreover, directly gen-erated answers may not always correspond to valid entities in the KG. In contrast, our framework targets multimodal KGR by combining noise-aware dual-view instruction tuning with structure-constrained inference, achieving robust and valid entity generation under noisy multimodal retrieval. 
+
+Methodology 
+
+As shown in Figure 1, NaviGATE progressively performs structure-semantic collaborative alignment, retrieval-free in-ternal knowledge activation, and noise-aware dual-view in-struction tuning to exploit reliable candidates while mitigat-ing misleading ones. Fin ally, structure-constrained decoding ensures valid entity generation. 
+
+Problem Formulation 
+
+We denote a multimodal knowledge graph as 
+
+G = ( E, R, T , D, I) , (1) where E and R denote the entity set and relation set, re-spectively. T = {(h, r, t ) | h, t ∈ E , r ∈ R} is the set of observed triples. Each entity e ∈ E may be associated with a textual description de ∈ D and a visual image ie ∈ I . Given a query triple with one missing entity, MKGR aims to infer the missing entity from the entity set. Depending on whether the missing entity occurs in the tail or head position, the completion query can be formulated as (h, r, ∗) or (∗, r, t ),respectively, where ∗ denotes the unknown entity. Unlike conventional embedding-based MKGR methods that score candidate triples with fixed representation func-tions, NaviGATE formulates MKGR as a constrained gener-ation problem. Given the query context Cq , the model directly generates the surface name of the missing entity: 
+
+Pθ (y | Cq ) =  
+
+> |Yy|
+
+Y
+
+> ℓ=1
+
+Pθ (Yy,ℓ | Yy,<ℓ , C q ) , (2) where Yy = ( Yy, 1, . . . , Y y, |Yy |) denotes the token sequence of entity y under the tokenizer vocabulary W. During in-ference, the generation space is constrained to valid entity names in E.
+
+Structure-Semantic Collaborative Alignment 
+
+A central difficulty in generative MKGR is that graph topol-ogy and language semantics are represented in fundamentally Graph Topology Entity Textual Description 
+
+> Text Backbone Encoder
+
+`       
+
+> Stage 0: Structure-Semantic Collaborative Alignment
+> Shared Hypersphere
+> GAT Backbone Encoder
+> Structure-aware representation Textual representation
+> 𝒉 𝒔
+> 𝒉 𝒕
+> 𝒉 𝒔 + 𝒓 ≈ 𝒕 𝒔
+> Translational constraint Structural loss
+> 𝓛 #$%&'$
+> Aligned Structural Embedding for LLM Perception Graph-Text Alignment Loss
+> 𝓛 ()*+,
+> Stage 1: Structure-Aware Internal Knowledge Activation
+> Entity
+> ℎ
+> Pre-trained GAT Encoder 𝒉 𝒔 MLP
+> Process 2 of injection Entity Token [ENTITY]
+> 𝜙(*)
+> Process 1 of compression
+> MLLM Summary Synthesis
+> Frozen Multimodal-LLM
+> 𝑺 𝒆
+> LLM
+> Entity Summary KGE Task Formulation Autoagg-ressive Loss
+> 𝓛 ./
+> Stage 2: Noise-Aware Dual-View Instruction Tuning
+> Training Instance Candidate Set 𝑲
+> Contextual View 1
+
+`𝑪 0%11 
+
+`
+
+> Contextual View 2
+
+`𝑪 (2(%1 
+
+> LLM
+
+`
+
+> ………
+
+`
+
+> ………
+> Ground Truth
+> 𝒚 ∈ 𝑲?
+
+`   
+
+> Positive Retrieval Noisy Generation Yes No
+> Contrastive Logit Sharpening Parametric Consistency Distillation
+> 𝒛 0%11
+> 𝒛 (2(%1
+> Teacher Softmax 𝒛 !"##
+> Student Softmax 𝒛 $%$"#
+> (gradients detached) KL Divergence Loss
+> 𝑷 0%11
+> 𝑷 (2(%1
+> 𝒛 0%11
+> 𝒛 (2(%1
+
+⨁ `     
+
+> ………
+> 𝓛 45#
+> 4𝒛 = 𝟏 + 𝜺 𝒛 (2(%1 − 𝜺𝒛 0%11
+> 4𝒛
+> Cross-Entropy Loss Joint Loss Adaptive Joint Loss 𝓛 #𝟐
+> Structure-Constrained Inference
+> LLM
+> Query Prefix Trie
+
+𝜏    
+
+> Prefix Trie Lookup
+> 𝒚 7𝒕 Generated Prefix 𝒚 7𝒕
+
++ New Token 𝒘       
+
+> Valid Continuation Tokens 𝛀(𝒚 7𝒕 )00−∞
+> 00−∞
+> Structural Mask softmax Valid Entity Prediction
+
+Figure 1: Overview of NaviGATE. The framework consists of three progressive training stages: structure-semantic collaborative alignment, structure-aware internal knowledge activation, and noise-aware dual-view instruction tuning. At inference time, structure-constrained decoding ensures valid entity generation. different spaces. To bridge this gap, NaviGATE first learns structure-aware entity representations and aligns them with textual semantic representations. 
+
+Structure-aware entity encoding. We use a graph en-coder fg (·) to encode each entity into a structure-aware rep-resentation. For entity ei, its representation is obtained by aggregating information from its local neighborhood Ni:
+
+si = σ  X
+
+j∈N i∪{ i}
+
+αij Wg xj
+
+, (3) where xj is the initial feature of entity ej , Wg is a learnable transformation matrix, αij is the attention weight between ei
+
+and ej , and σ(·) is a activation function. To preserve relational geometry, we further impose a translation-based structural objective (Bordes et al. 2013b). For each positive triple (h, r, t ) ∈ T , we construct a cor-rupted negative triple (¯h, r, ¯t) by replacing either the head or the tail entity. The structural loss is defined as 
+
+Lkg = X
+
+(h,r,t )∈T 
+
+[γ + d(sh + r, st) − d(s¯h + r, s¯t)] + . (4) where r denotes the relation embedding, d(·, ·) is imple-mented as the L1 distance, γ is the margin, and [x]+ =max(0 , x ). This objective encourages valid triples to have lower energy than corrupted triples, thereby preserving graph topology in the structural embedding space. 
+
+Contrastive structure–text alignment. Although si cap-tures graph topology, it resides in a geometry-driven space that is misaligned with the semantic space of language mod-els. To bridge this gap, we ground the structural representa-tion of each entity in its textual semantics. Concretely, we encode the entity description di with a frozen language en-coder to obtain the textual representation ui, and map both representations into a shared space: 
+
+¯si = Norm ( gs(si)) , ¯ui = Norm ( gt(ui)) , (5) where gs(·) and gt(·) are learnable projection heads, and 
+
+Norm( ·) denotes L2 normalization. We adopt a symmetric contrastive objective to align matched graph-text pairs while separating mismatched pairs within the same mini-batch. Let B denote a mini-batch, and define the InfoNCE loss as 
+
+ℓNCE (ai, bi) = − log exp (sim( ai, bi)/τ )
+
+P
+
+j∈B exp (sim( ai, bj )/τ ) , (6) where sim( ·, ·) denotes cosine similarity and τ is a tempera-ture parameter. The symmetric graph-text contrastive loss is written in expectation form as 
+
+Lcon = 12 Ei∼B [ℓNCE (¯ si, ¯ui) + ℓNCE (¯ ui, ¯si)] . (7) The overall alignment objective is 
+
+Lalign = Lkg + λcon Lcon , (8) where λcon balances the contributions of the structural and contrastive objectives. Structure-Aware Internal Knowledge Activation 
+
+Retrieval-augmented methods depend heavily on the quality of the retrieved candidate set. However, in realistic MKGR scenarios, the ground-truth entity may be absent due to lim-ited retriever recall. To reduce such over-dependence on re-trieval, NaviGATE first activates the model’s retrieval-free completion ability before exposing it to retrieved candidates. 
+
+Query-aware multimodal entity summarization. Raw entity descriptions, images, and neighboring triples can be lengthy, redundant, and noisy. Directly concatenating them into the prompt may cause context dilution and make it dif-ficult for the MLLM to identify query-relevant evidence. Therefore, for each entity e involved in query q, we construct a compact query-aware multimodal summary: 
+
+Sqe = Summarize ( q, d e, i e, Ne) , (9) where de is the textual description, ie is the associated image, and Ne denotes the local structural neighborhood of e. The summary Se converts heterogeneous evidence into a concise textual form, highlighting entity attributes, visual cues, and graph-neighborhood semantics relevant to query. 
+
+Structural token injection. To explicitly provide the MLLM with graph structural information, we project the aligned structural representation into the input embedding space of the MLLM. Specifically, for each entity e, we com-pute 
+
+pe = ϕ(se), (10) where ϕ(·) is a lightweight multilayer perceptron that matches the dimension of se to that of the MLLM token embeddings. The projected vector pe is treated as a soft structural token and inserted into the input embedding se-quence. For a tail prediction query q = ( h, r, ∗) as an example, the retrieval-free context is constructed as 
+
+Cfree  
+
+> q
+
+= Prompt ( q, S qh, ph) , (11) where Sqh provides query-aware multimodal evidence for the observed entity, while ph encodes its structural context. The context excludes retrieved candidate entities, encouraging the model to predict the missing entity based on its inter-nal parametric knowledge and the provided multimodal and structural evidence. 
+
+Retrieval-free warm-up objective. The model is opti-mized to generate the ground-truth entity name from the retrieval-free context: 
+
+Lact = − 
+
+> |Yy|
+
+X
+
+> ℓ=1
+
+log Pθ
+
+ Yy,ℓ | Yy,<ℓ , C free 
+
+> q
+
+ . (12) This stage equips the model with retrieval-independent com-pletion ability by learning to predict the missing entity from its parametric knowledge and the provided multimodal-structural evidence. It also establishes a retrieval-free pre-diction distribution that later serves as a stable reference for suppressing misleading candidate evidence. 
+
+Noise-Aware Dual-View Instruction Tuning 
+
+Building on the retrieval-free completion ability established during internal knowledge activation, NaviGATE is further optimized with retrieved candidates. Let Kq = k1, . . . , k K
+
+denote the top-K candidate entities retrieved for query q by an embedding-based retriever. These candidates may provide useful non-parametric evidence, but the ground-truth entity may be absent and the remaining candidates may be mislead-ing. Therefore, the model should learn to exploit retrieved evidence when it is reliable, while preserving its internal parametric knowledge when retrieval is noisy. To this end, we construct two complementary views for each training query: 
+
+Cfree  
+
+> q
+
+= Prompt( q, S h, ph),Caware  
+
+> q
+
+= Prompt( q, S h, ph, Kq ). (13) The retrieval-free view captures the model’s internal belief without external candidates, while the retrieval-aware view incorporates retrieved entity evidence. Let Yy = ( Yy, 1, . . . , Y y, |Yy |) denote the token sequence of the ground-truth entity. At each decoding position ℓ, un-der teacher forcing with prefix Yy,<ℓ , the model produces vocabulary logits for each view: 
+
+zvθ,ℓ = LMHead  hvθ,ℓ 
+
+ ∈ R|V| , v ∈ { free , aware },
+
+(14) where hvθ,ℓ is the hidden state conditioned on context Cvq and prefix Yy,<ℓ , and V denotes the vocabulary. 
+
+Sharpened generative supervision for reliable retrieval. 
+
+When the ground-truth entity is included in the retrieved set, i.e., y ∈ K q , the retrieved candidates provide useful external evidence. In this case, the retrieval-aware logits should be encouraged to amplify the preference gain induced by the retrieved context. Specifically, for each decoding position ℓ, we first compute the retrieval-induced logit shift: 
+
+∆zθ,ℓ = zaware  
+
+> θ,ℓ
+
+− sg zfree 
+
+> θ,ℓ
+
+ , (15) where sg[ ·] denotes the stop-gradient operation. We then construct sharpened retrieval-aware logits: 
+
+ezθ,ℓ = zaware  
+
+> θ,ℓ
+
++ ϵ∆zθ,ℓ , (16) where ϵ ≥ 0 controls the sharpening strength. Equivalently, 
+
+ezθ,ℓ = (1 + ϵ)zaware  
+
+> θ,ℓ
+
+− ϵ sg zfree 
+
+> θ,ℓ
+
+ . (17) This operation amplifies the logit-level preference shift from the retrieval-free view to the retrieval-aware view, thereby strengthening the useful signal introduced by reliable re-trieval. The reliable-retrieval loss is computed as the token-level negative log-likelihood under the sharpened logits: 
+
+Lrel = − 1
+
+|Yy | 
+
+> |Yy|
+
+X
+
+> ℓ=1
+
+log exp  ezθ,ℓ,Y y,ℓ 
+
+P 
+
+> w∈V
+
+exp ( ezθ,ℓ,w ) . (18) This objective encourages the model to enlarge the relative advantage of the ground-truth entity under the retrieval-aware view, while suppressing candidate preferences that mainly originate from the retrieval-free prior. Parametric consistency distillation for noisy retrieval. 
+
+When the ground-truth entity is absent from the retrieved set, i.e., y / ∈ K q , applying logit sharpening to the retrieval-aware prediction may bias the model toward plausible but incorrect candidates. Therefore, we use the retrieval-free branch as a parametric anchor and constrain the retrieval-aware branch at each decoding position. For each output position ℓ, we minimize the KL divergence between the retrieval-free token distribution and the retrieval-aware token distribution: 
+
+Lpcd = 1
+
+|Yy | 
+
+> |Yy|
+
+X
+
+> ℓ=1
+
+DKL 
+
+ sg pfree 
+
+> θ,ℓ
+
+ paware 
+
+> θ,ℓ
+
+
+
+= 1
+
+|Yy | 
+
+> |Yy|
+
+X
+
+> ℓ=1
+
+X
+
+> w∈V
+
+sg pfree 
+
+> θ,ℓ,w
+
+ log sg 
+
+h
+
+pfree 
+
+> θ,ℓ,w
+
+i
+
+paware 
+
+> θ,ℓ,w
+
+,
+
+(19) where 
+
+pvθ,ℓ = softmax  zvθ,ℓ 
+
+ , v ∈ { free , aware }. (20) The stop-gradient operation prevents the consistency objec-tive from updating the retrieval-free branch, while encourag-ing the retrieval-aware branch to resist misleading retrieval evidence and remain consistent with the model’s internal parametric knowledge. Finally, the dual-view tuning objec-tive is 
+
+Ldual = I [y ∈ K q ] Lrel + λkl I [y / ∈ K q ] Lpcd , (21) where λkl balances the parametric consistency objective. 
+
+Structure-Constrained Inference 
+
+Unconstrained generation may produce entity names that do not exist in the target knowledge graph. Since MKGR re-quires each prediction to correspond to a valid entity in E,we introduce a structure-constrained decoding strategy to ensure entity validity. We first construct a prefix trie P from the tokenized names of all entities in E, with an end-of-sequence token appended to each entity name. At decoding step t, given the generated prefix Y<t , the set of valid next tokens is defined as 
+
+Ω( Y<t ) = {w ∈ V | Y<t ◦ w is a valid prefix in P} , (22) where ◦ denotes token concatenation. We then define the vocabulary constraint mask as 
+
+Mt(w) = 
+
+0, w ∈ Ω( Y<t ),
+
+−∞ , w / ∈ Ω( Y<t ). (23) During inference, NaviGATE computes the retrieval-free and retrieval-aware token logits, denoted by zfree  
+
+> θ,t
+
+and zaware  
+
+> θ,t
+
+,respectively. Both predictions are conditioned on the gener-ated prefix Y<t . We define the retrieval-induced logit shift as 
+
+∆zθ,t = zaware  
+
+> θ,t
+
+− zfree  
+
+> θ,t
+
+. (24) Following the logit-level adjustment used during training, the inference logits are computed as 
+
+ezθ,t = zaware  
+
+> θ,t
+
++ η∆zθ,t , (25) where η ≥ 0 controls the adjustment strength. The final decoding distribution is defined as 
+
+Pθ (Yt = w | Y<t , q ) = exp ( ezθ,t,w + Mt(w)) 
+
+X
+
+> v∈V
+
+exp ( ezθ,t,v + Mt(v)) . (26) The prefix constraint ensures that each completed output corresponds to a valid entity name in the target KG. When retrieved candidates provide useful evidence, the logit ad-justment strengthens the retrieval-induced preference. Under noisy retrieval, parametric consistency distillation reduces the discrepancy between the retrieval-free and retrieval-aware predictions, thereby limiting the influence of mislead-ing candidates. 
+
+Experiments 
+
+Experimental Setup 
+
+Datasets. We evaluate NaviGATE on two widely used mul-timodal knowledge graph reasoning benchmarks, namely DB15K and MKG-W. DB15K contains 12,842 entities, 279 relations, 79,222 training triples, 9,902 validation triples, and 9,904 test triples. MKG-W contains 15,000 entities, 169 relations, 34,196 training triples, 4,276 validation triples, and 4,274 test triples. Both datasets provide structural triples together with multimodal entity information, making them suitable for evaluating the ability of MKGR models. 
+
+Baselines. We compare NaviGATE with three categories of baseline methods. First, we include representative uni-modal knowledge graph embedding models that rely only on structural triples, including TransE (Bordes et al. 2013a), DistMult (Yang et al. 2015), ComplEx (Trouillon et al. 2016), RotatE (Sun et al. 2019), and TuckER (Balazevic et al. 2019). Second, we compare with discriminative MKGR methods that incorporate visual or textual information into entity rep-resentation learning, including OTKGE (Cao et al. 2022), IMF (Li et al. 2023), QEB (Wang et al. 2023), AdaMF (Zhang et al. 2024d), SnAg (Chen et al. 2025), NativE (Zhang et al. 2024a), MyGO (Zhang et al. 2025), and APKGR (Jian et al. 2025). Third, we include generation-based KGR methods, in-cluding DIFT (Liu et al. 2025b) and SAT (Liu et al. 2025a), to evaluate whether NaviGATE can leverage generative reason-ing while maintaining robustness to noisy retrieval results. 
+
+Implementation Details. We conduct all experiments on an Intel Xeon Gold CPU with 4 NVIDIA 4090 GPUs, each with 24 GB memory, under Ubuntu 18.04 LTS. We select TuckER and RotatE as representative embedding-based re-trievers. Each retriever is first pretrained on the training set, and the top-20 predicted entities are then retrieved for each query as candidate entities. For the multimodal generative backbone, we use Qwen3-VL 8B as the base model and adopt LoRA (Hu et al. 2022) for parameter-efficient finetuning. The LoRA rank, scaling factor, and dropout rate are set to 64, 16, and 0.1, respectively. We train the model for 2 epochs in the internal knowledge activation stage and 4 epochs in the dual-view instruction tuning stage. During inference, we use prefix-trie constrained decoding to generate a valid entity, place it at the top of the retriever’s original ranking, remove Table 1: Overall results on MKG-W and DB15K. The best results are shown in bold , and the second-best results are underlined. We reproduce the results of RotatE, TuckER, DIFT, and SAT using their released code. Results for the remaining baselines are taken from their respective original papers. 
+
+Models MKG-W DB15K MRR Hits@1 Hits@3 Hits@10 MRR Hits@1 Hits@3 Hits@10 Unimodal KGR Methods 
+
+TransE (Bordes et al. 2013a) 0.292 0.211 0.332 0.442 0.249 0.128 0.315 0.471 DistMult (Yang et al. 2015) 0.210 0.159 0.223 0.309 0.230 0.148 0.263 0.396 ComplEx (Trouillon et al. 2016) 0.249 0.191 0.267 0.367 0.275 0.184 0.316 0.454 RotatE (Sun et al. 2019) 0.334 0.270 0.362 0.451 0.291 0.184 0.355 0.479 TuckER (Balazevic et al. 2019) 0.301 0.243 0.323 0.408 0.340 0.258 0.374 0.501 
+
+Discriminative MKGR methods & Generative Models 
+
+OTKGE (Cao et al. 2022) 0.344 0.289 0.363 0.449 0.239 0.185 0.259 0.342 IMF (Li et al. 2023) 0.345 0.288 0.366 0.454 0.323 0.242 0.360 0.482 QEB (Wang et al. 2023) 0.324 0.255 0.351 0.453 0.282 0.148 0.367 0.516 AdaMF (Zhang et al. 2024d) 0.343 0.272 0.379 0.472 0.325 0.213 0.397 0.517 NativE (Zhang et al. 2024a) 0.366 0.296 0.395 0.494 0.362 0.273 0.411 0.529 
+
+SnAg (Chen et al. 2025) 0.359 0.284 0.394 0.492 0.342 0.250 0.391 0.515 MyGO (Zhang et al. 2025) 0.361 0.300 0.383 0.469 0.372 0.296 0.413 0.520 APKGR (Jian et al. 2025) 0.374 0.306 0.404 0.501 0.364 0.282 0.413 0.527 DHNS (Niu and Zhang 2026) 0.346 0.268 0.392 0.512 0.364 0.297 0.398 0.492 DIFT+TuckER (Liu et al. 2025b) 0.361 0.317 0.390 0.442 0.367 0.304 0.402 0.505 DIFT+RotatE (Liu et al. 2025b) 0.390 0.351 0.416 0.468 0.332 0.267 0.366 0.482 SAT+TuckER (Liu et al. 2025a) 0.363 0.320 0.388 0.441 0.369 0.305 0.401 0.503 SAT+RotatE (Liu et al. 2025a) 0.389 0.347 0.415 0.471 0.336 0.271 0.369 0.485 
+
+NaviGATE+TuckER 0.378 0.330 0.403 0.453 0.383 0.313 0.415 0.516 
+
+NaviGATE+RotatE 0.408 0.361 0.430 0.487 0.348 0.279 0.379 0.491 
+
+any duplicate occurrence, and preserve the relative order of all remaining entities. We then report standard filtered MRR and Hits@1/3/10. 
+
+Main Results. Table 1 reports the overall results. Com-pared with unimodal KGR methods, NaviGATE consistently achieves better performance on both datasets, demonstrating the effectiveness of integrating multimodal information with generative reasoning for MKGR. Compared with discriminative MKGR baselines, Navi-GATE achieves stronger and more consistent performance on the key top-ranking metrics across both datasets. On MKG-W, NaviGATE+RotatE improves the best MRR and Hits@1 from 0.374 and 0.306 to 0.408 and 0.361, respec-tively, demonstrating a clear advantage in ranking the correct entity at the top. On DB15K, NaviGATE+TuckER reaches an MRR of 0.383 and a Hits@1 of 0.313, also surpassing the strongest discriminative baselines. Compared with LLM-based methods such as DIFT and SAT, NaviGATE achieves further improvements under both retrievers. On MKG-W, NaviGATE+RotatE improves MRR by 1.8 percentage points over DIFT+RotatE, while Navi-GATE+TuckER outperforms SAT+TuckER by 1.5 percent-age points. On DB15K, NaviGATE+TuckER further im-proves MRR by 1.4 percentage points over SAT+TuckER. These results show that noise-aware tuning effectively ex-ploits reliable candidates while mitigating noisy retrieval. 10 20 30 40       
+
+> Number of Candidates
+> 0.32 0.34 0.36 0.38 0.40 0.42
+> Performance Metrics
+> 0.347 0.361 0.361 0.357 0.391 0.408 0.406 0.401
+> Performance & Training Time vs. Number of Candidates
+> H@1 MRR Training Time
+> 05000 10000 15000 20000 25000
+> Training Time (s)
+
+Figure 2: Impact of the number of candidates in prompt inputs on model performance and training time on the MKG-W dataset. 
+
+Ablation Study. Table 2 presents the ablation results on MKG-W. Removing stage-1 pretraining or the structural contrastive loss decreases MRR from 0.408 to 0.401 and 0.405, respectively, confirming that structure-semantic align-ment provides a useful foundation for subsequent gener-ative reasoning. In the dual-view tuning stage, removing stage-2 finetuning causes a substantial drop in both MRR and Hits@1, while removing the retrieval-aware branch re-sults in the lowest Hits@1 of 0.248. These results indi-cate that retrieved evidence remains essential when properly incorporated through noise-aware optimization. The mul-timodal summary, structure-constrained decoding, KL loss, Table 2: Ablation results on MKG-W across training stages, dual-view tuning components, and modality configurations. “w/o” denotes removing the corresponding component from the full model. Best results are shown in bold. 
+
+Variants MRR H@1 H@3 H@10 
+
+Stage-1 Structural Design 
+
+w/o stage1 pretrain 0.401 0.357 0.421 0.478 w/o structural contrastive loss 0.405 0.357 0.430 0.486 
+
+Stage-2 Reranking Design 
+
+w/o stage2 finetune 0.338 0.256 0.390 0.468 w/o multimodal text summary 0.387 0.334 0.411 0.478 w/o structure-const. inference 0.395 0.348 0.415 0.481 w/o KL loss 0.397 0.352 0.416 0.477 w/o retrieval-free 0.398 0.352 0.416 0.480 w/o retrieval-aware 0.338 0.248 0.398 0.478 
+
+Modality Ablation 
+
+w/o visual modality 0.399 0.350 0.423 0.481 w/o textual modality 0.364 0.307 0.389 0.466 w/o structural modality 0.401 0.350 0.427 0.485 
+
+Noisy-Retrieval Subset (y / ∈ Kq )w/o parametric consistency 0.396 0.350 0.423 0.482 
+
+Full Model 0.408 0.361 0.430 0.487 0.01 0.1 0.5 1.0         
+
+> Weight of KL Divergence λkl
+> 0.28 0.31 0.34 0.37 0.40 0.43
+> Metric Score
+> (a) Sensitivity of λkl
+> MRR H@1
+> 0.1 0.2 0.5 1.0 2.0
+> Exploration Rate ε
+> 0.28 0.31 0.34 0.37 0.40 0.43
+> Metric Score
+> (b) Sensitivity of ε
+> MRR H@1
+
+Figure 3: Hyperparameter sensitivity analysis on the MKG-W dataset: (a) Impact of the KL divergence weight λkl under noisy retrieval conditions, and (b) Impact of the exploration rate ε in contrastive logit sharpening. and retrieval-free branch also yield consistent improvements, demonstrating their complementary roles in semantic en-richment, valid entity generation, and robustness to noisy candidates. Among the three modalities, removing textual information leads to the largest degradation, whereas visual and structural information provide smaller but stable gains. To directly evaluate robustness under retrieval failure, we further report results on the subset where the ground-truth entity is absent from the candidate set. As shown in Table 2, NaviGATE improves Hits@1 by 1.1 percentage points over the variant without parametric consistency, confirming its ability to suppress misleading retrieval evidence. 
+
+Impact of the Number of Retrieved Candidates. Fig-ure 2 analyzes the effect of candidate number on MKG-W. Increasing candidates from 10 to 20 improves MRR from 0.391 to 0.408 and Hits@1 from 0.347 to 0.361, showing that a moderate candidate set provides more useful retrieval evidence. However, further increasing the number to 30 or Ground Truth in the Candidate List (Use External Knowledge):          
+
+> Predict Query Maanthrikam
+> ?
+> film editor (Ground Truth: A. Sreekar Prasad) Candidate List No.1: William M. Anderson
+> No.18: A. Sreekar Prasad
+> No.20: Frank Sullivan
+> Answer
+> A. Sreekar Prasad
+> Predict Query Now, Voyager composer (Ground Truth: Max Steiner) Candidate List No.1: Dimitri Tiomkin
+> No.3: Max Steiner
+> No.20: David Buttolph
+> Answer
+> Franz Waxman
+> Ground Truth not in the Candidate List (Use LLM Internal Knowledge):
+> Predict Query Amir Johnson member of sports team (Ground Truth: Toronto Raptors) Candidate List No.1: Washington Wizards
+> No.2: Los Angeles Lakers
+> No.20: Film director
+> Answer
+> Toronto Raptors
+> Predict Query Shocking Pinks (album) record label (Ground Truth: DFA Records) Candidate List No.1: Film Director
+> No.2: Pianist
+> No.20: Eagle Squadron
+> Answer
+> The Cure
+> … … … … … … … …
+> ???
+
+Figure 4: Case study of NaviGATE under different re-trieval conditions. The upper part shows examples where the ground-truth entity is included in the candidate list, while the lower part shows examples where it is absent. 40 brings no additional gain and slightly degrades perfor-mance, likely due to more noisy distractors in the prompt. Since training time also increases steadily with more candi-dates, we use 20 candidates as the default setting for better accuracy-efficiency trade-off. 
+
+Hyperparameter Sensitivity. Figure 3 shows the sensitiv-ity of NaviGATE to λkl and ε on MKG-W. For λkl , the model performs stably when it ranges from 0.01 to 0.5, while a larger value of 1.0 slightly degrades both MRR and Hits@1. This suggests that moderate parametric consistency helps suppress noisy retrieval, whereas overly strong regulariza-tion may limit the benefit of retrieval-aware evidence. For 
+
+ε, the best performance is achieved around 0.2–0.5. A small 
+
+ε provides insufficient logit sharpening, while a large value over-amplifies retrieval-induced shifts and introduces noise. Therefore, we set λkl = 0 .1 and ε = 0 .2 by default. 
+
+Case Study. Figure 4 shows representative cases under different retrieval conditions. When the ground-truth entity appears in the candidate list, NaviGATE exploits retrieval evidence to generate the correct answer. More importantly, even when the ground-truth entity is absent from the candi-dates, NaviGATE can still recover it using activated internal knowledge. The failure cases further show that distinguish-ing highly confusable entities under ambiguous multimodal cues remains challenging, highlighting the inherent difficulty of noise-aware reasoning in MKGR. 
+
+Conclusion 
+
+In this paper, we propose NaviGATE, a noise-aware gen-erative framework for multimodal knowledge graph reason-ing. NaviGATE aligns structural representations with tex-tual semantics, activates retrieval-free completion through multimodal summaries and structural token injection, and employs dual-view instruction tuning to exploit reliable can-didates while suppressing misleading ones via parametric consistency. Structure-constrained decoding further ensures valid entity generation. Experiments demonstrate its effec-tiveness and robustness. In future work, we will extend Navi-GATE to incorporate more modality information beyond text and images, and explore robust designs for missing-modality scenarios to improve real-world MKGR reliability. References 
+
+Balazevic, I.; Allen, C.; Hospedales, T.; and abc. 2019. TuckER: Tensor Factorization for Knowledge Graph Com-pletion. In Inui, K.; Jiang, J.; Ng, V.; and Wan, X., eds., 
+
+Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP) , 5185–5194. Hong Kong, China: Association for Computational Linguistics. Bordes, A.; Usunier, N.; Garcia-Durán, A.; Weston, J.; and Yakhnenko, O. 2013a. Translating embeddings for model-ing multi-relational data. In Proceedings of the 27th In-ternational Conference on Neural Information Processing Systems - Volume 2 , NIPS’13, 2787–2795. Red Hook, NY, USA: Curran Associates Inc. Bordes, A.; Usunier, N.; Garcia-Durán, A.; Weston, J.; and Yakhnenko, O. 2013b. Translating embeddings for mod-eling multi-relational data. In Proceedings of the 27th In-ternational Conference on Neural Information Processing Systems - Volume 2 , NIPS’13, 2787–2795. Red Hook, NY, USA: Curran Associates Inc. Cao, Z.; Xu, Q.; Yang, Z.; He, Y.; Cao, X.; and Huang, Q. 2022. OTKGE: Multi-modal Knowledge Graph Embeddings via Optimal Transport. In Advances in Neural Information Processing Systems , volume 35, 39090–39102. Chen, Z.; Fang, Y.; Zhang, Y.; Guo, L.; Chen, J.; Pan, J. Z.; Chen, H.; and Zhang, W. 2025. Noise-powered Multi-modal Knowledge Graph Representation Framework. In Rambow, O.; Wanner, L.; Apidianaki, M.; Al-Khalifa, H.; Eugenio, B. D.; and Schockaert, S., eds., Proceedings of the 31st In-ternational Conference on Computational Linguistics , 141– 155. Abu Dhabi, UAE: Association for Computational Lin-guistics. Hu, E. J.; Shen, Y.; Wallis, P.; Allen-Zhu, Z.; Li, Y.; Wang, S.; Wang, L.; and Chen, W. 2022. LoRA: Low-Rank Adaptation of Large Language Models. In ICLR 2022 .Jian, Y.; Luo, X.; Li, Z.; Zhang, M.; Zhang, Y.; Xiao, K.; and Hou, X. 2025. APKGC: Noise-enhanced Multi-Modal Knowledge Graph Completion with Attention Penalty. In Walsh, T.; Shah, J.; and Kolter, Z., eds., Thirty-Ninth AAAI Conference on Artificial Intelligence, Thirty-Seventh Con-ference on Innovative Applications of Artificial Intelligence, Fifteenth Symposium on Educational Advances in Artificial Intelligence, AAAI 2025, Philadelphia, PA, USA, February 25 - March 4, 2025 , 15005–15013. AAAI Press. Kim, J.; Lee, G.; Kim, T.; and Shin, K. 2025. KGMEL: Knowledge Graph-Enhanced Multimodal Entity Linking. In 
+
+Proceedings of the 48th International ACM SIGIR Confer-ence on Research and Development in Information Retrieval ,SIGIR ’25, 3015–3019. New York, NY, USA: Association for Computing Machinery. ISBN 9798400715921. Kim, Y.; Rome, S.; Foley, K.; Nankani, M.; Melamed, R.; Morales, J.; Yadav, A.; Peifer, M.; Hamidian, S.; and Huang, H. H. 2024. Improving Content Recommendation: Knowl-edge Graph-Based Semantic Contrastive Learning for Di-versity and Cold-Start Users. In Proceedings of the 2024 Joint International Conference on Computational Linguis-tics, Language Resources and Evaluation , 8743–8755. Lee, J.; Chung, C.; Lee, H.; Jo, S.; and Whang, J. J. 2023. VISTA: Visual-Textual Knowledge Graph Representation Learning. In Findings of the Association for Computational Linguistics: EMNLP 2023 , 7314–7328. Singapore: Associa-tion for Computational Linguistics. Li, G.; Wang, X.; and Zhu, W. 2020. Boosting visual question answering with context-aware knowledge aggregation. In 
+
+Proceedings of the 28th ACM International Conference on Multimedia , 1227–1235. Li, L.; Jin, Z.; Zhang, Y.; Jin, D.; Dou, C.; He, Y.; Zhang, X.; and Zhao, H. 2026. Towards Structure-Aware Model for Multi-Modal Knowledge Graph Completion. IEEE Transac-tions on Multimedia , 28: 1404–1416. Li, X.; Zhao, X.; Xu, J.; Zhang, Y.; and Xing, C. 2023. IMF: Interactive Multimodal Fusion Model for Link Prediction. In 
+
+Proceedings of the ACM Web Conference 2023 , WWW ’23, 2572–2580. New York, NY, USA: Association for Comput-ing Machinery. ISBN 9781450394161. Li, Z.; Ao, Y.; and He, J. 2024. SpherE: Expressive and In-terpretable Knowledge Graph Embedding for Set Retrieval. In Proceedings of the 47th International ACM SIGIR Confer-ence on Research and Development in Information Retrieval ,2629–2634. Liu, Y.; Cao, Y.; Lin, X.; Shang, Y.; Wang, S.; and Pan, S. 2025a. Enhancing Large Language Model for Knowledge Graph Completion via Structure-Aware Alignment-Tuning. In Christodoulopoulos, C.; Chakraborty, T.; Rose, C.; and Peng, V., eds., Proceedings of the 2025 Conference on Em-pirical Methods in Natural Language Processing , 20970– 20984. Suzhou, China: Association for Computational Lin-guistics. ISBN 979-8-89176-332-6. Liu, Y.; Tian, X.; Sun, Z.; and Hu, W. 2025b. Finetuning Generative Large Language Models with Discrimination In-structions for Knowledge Graph Completion. In Demartini, G.; Hose, K.; Acosta, M.; Palmonari, M.; Cheng, G.; Skaf-Molli, H.; Ferranti, N.; Hernández, D.; and Hogan, A., eds., 
+
+The Semantic Web – ISWC 2024 , 199–217. Cham: Springer Nature Switzerland. ISBN 978-3-031-77844-5. Niu, G.; and Zhang, X. 2026. Diffusion-Based Hierarchical Negative Sampling for Multimodal Knowledge Graph Com-pletion. In Zhu, F.; Yu, P. S.; Nadamoto, A.; Lim, E.-P.; Shim, K.; Ding, W.; and Zhang, B., eds., Database Systems for Advanced Applications , 479–495. Singapore: Springer Nature Singapore. ISBN 978-981-95-3906-2. Peng, J.; Shan, Y.; Zha, Y.; and Wang, X. 2025. Adaptive multimodal graph learning for knowledge graph completion. 
+
+Data Min. Knowl. Discov. , 39(6): 70. Shu, D.; Chen, T.; Jin, M.; Zhang, C.; Du, M.; and Zhang, Y. 2025. Knowledge Graph Large Language Model (KG-LLM) for Link Prediction. In Nguyen, V.; and Lin, H.-T., eds., Proceedings of the 16th Asian Conference on Machine Learning , volume 260 of Proceedings of Machine Learning Research , 143–158. PMLR. Sun, Z.; Deng, Z.-H.; Nie, J.-Y.; and Tang, J. 2019. Ro-tatE: Knowledge Graph Embedding by Relational Rotation in Complex Space. In International Conference on Learning Representations .Trouillon, T.; Welbl, J.; Riedel, S.; Gaussier, E.; and Bouchard, G. 2016. Complex Embeddings for Simple Link Prediction. In Proceedings of the 33rd International Con-ference on Machine Learning , volume 48 of Proceedings of Machine Learning Research , 2071–2080. PMLR. Wang, M.; Wang, S.; Yang, H.; Zhang, Z.; Chen, X.; and Qi, G. 2021. Is Visual Context Really Helpful for Knowledge Graph? A Representation Learning Perspective. In Proceed-ings of the 29th ACM International Conference on Multime-dia , 2735–2743. Association for Computing Machinery. Wang, X.; Meng, B.; Chen, H.; Meng, Y.; Lv, K.; and Zhu, W. 2023. TIVA-KG: A Multimodal Knowledge Graph with Text, Image, Video and Audio. In Proceedings of the 31st ACM International Conference on Multimedia , 2391–2399. Association for Computing Machinery. Wei, Y.; Huang, Q.; Zhang, Y.; and Kwok, J. 2023. KICGPT: Large Language Model with Knowledge in Context for Knowledge Graph Completion. In Bouamor, H.; Pino, J.; and Bali, K., eds., Findings of the Association for Compu-tational Linguistics: EMNLP 2023 , 8667–8683. Singapore: Association for Computational Linguistics. Xian, Y.; Fu, Z.; Muthukrishnan, S.; de Melo, G.; and Zhang, Y. 2019. Reinforcement Knowledge Graph Reasoning for Explainable Recommendation. In Proceedings of the 42nd International ACM SIGIR Conference on Research and De-velopment in Information Retrieval , 285–294. Xie, R.; Liu, Z.; Luan, H.; and Sun, M. 2017. Image-embodied Knowledge Representation Learning. In Proceed-ings of the Twenty-Sixth International Joint Conference on Artificial Intelligence , 3140–3146. Xie, X.; Zhang, N.; Li, Z.; Deng, S.; Chen, H.; Xiong, F.; Chen, M.; and Chen, H. 2022. From Discrimination to Gener-ation: Knowledge Graph Completion with Generative Trans-former. In Companion Proceedings of the Web Conference 2022 , WWW ’22, 162–165. New York, NY, USA: Associa-tion for Computing Machinery. ISBN 9781450391306. Yang, B.; Yih, W.-t.; He, X.; Gao, J.; and Deng, L. 2015. Em-bedding Entities and Relations for Learning and Inference in Knowledge Bases. In International Conference on Learning Representations .Yang, R.; Zhu, J.; Man, J.; Liu, H.; Fang, L.; and Zhou, Y. 2025. GS-KGC: A generative subgraph-based framework for knowledge graph completion with large language models. 
+
+Information Fusion , 117: 102868. Zhang, Y.; Chen, Z.; Guo, L.; Xu, Y.; Hu, B.; Liu, Z.; Zhang, W.; and Chen, H. 2024a. NativE: Multi-modal Knowledge Graph Completion in the Wild. In SIGIR , 91–101. ACM. Zhang, Y.; Chen, Z.; Guo, L.; Xu, Y.; Hu, B.; Liu, Z.; Zhang, W.; and Chen, H. 2025. Tokenization, Fusion, and Augmen-tation: Towards Fine-grained Multi-modal Entity Represen-tation. In AAAI , 13322–13330. AAAI Press. Zhang, Y.; Chen, Z.; Guo, L.; Xu, Y.; Zhang, W.; and Chen, H. 2024b. Making Large Language Models Perform Bet-ter in Knowledge Graph Completion. In Proceedings of the 32nd ACM International Conference on Multimedia , MM ’24, 233–242. New York, NY, USA: Association for Com-puting Machinery. ISBN 9798400706868. Zhang, Y.; Chen, Z.; Liang, L.; Chen, H.; and Zhang, W. 2024c. Unleashing the Power of Imbalanced Modality In-formation for Multi-modal Knowledge Graph Completion. In Calzolari, N.; Kan, M.-Y.; Hoste, V.; Lenci, A.; Sakti, S.; and Xue, N., eds., Proceedings of the 2024 Joint Interna-tional Conference on Computational Linguistics, Language Resources and Evaluation (LREC-COLING 2024) , 17120– 17130. Torino, Italia: ELRA and ICCL. Zhang, Y.; Chen, Z.; Liang, L.; Chen, H.; and Zhang, W. 2024d. Unleashing the Power of Imbalanced Modality In-formation for Multi-modal Knowledge Graph Completion. In Calzolari, N.; Kan, M.-Y.; Hoste, V.; Lenci, A.; Sakti, S.; and Xue, N., eds., Proceedings of the 2024 Joint Interna-tional Conference on Computational Linguistics, Language Resources and Evaluation (LREC-COLING 2024) , 17120– 17130. Torino, Italia: ELRA and ICCL.

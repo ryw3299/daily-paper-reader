@@ -1,0 +1,860 @@
+Title: Interactive Structured Environment Scaling for Large Language Model Agentic Reasoning
+
+URL Source: https://arxiv.org/pdf/2611.19871v1
+
+Published Time: Tue, 17 Nov 2026 03:15:55 GMT
+
+Number of Pages: 30
+
+Markdown Content:
+Preprint. 
+
+# INTERACTIVE STRUCTURED ENVIRONMENT SCALING FOR LARGE LANGUAGE MODEL AGENTIC REASONING 
+
+Peng Yu 1 Luoyi Fu 1 Xinbing Wang 1 Ying Wen 2
+
+> 1
+
+Department of Computer Science and Engineering, Shanghai Jiao Tong University 
+
+> 2
+
+School of Artificial Intelligence and John Hopcroft Center, Shanghai Jiao Tong University 
+
+## ABSTRACT 
+
+Reinforcement learning via environmental interaction has become a cornerstone post-training paradigm for evolving large language models into autonomous agents capable of multi-turn tool use and knowledge exploration. Because the training environment defines what the policy can observe and how its actions are verified, the environment’s structure directly bounds the capabilities an agent can acquire. Yet existing structured and retrieval environments predominantly rely on upstream pre-filtering—extracting a compact per-question subgraph around the gold answer or retrieving a fixed passage list before the policy acts. We show that such pre-filtering introduces a fundamental measurement confound: because per-question subgraphs are constructed to enclose ground-truth paths, they compress the candidate space by orders of magnitude and leak answer lo-cations through local topology, allowing a question-blind degree heuristic to sur-face gold answers far above chance. To restore path selection, candidate pruning, and optimal stopping as genuine policy decisions, we propose RISE (Inte Ract Ive 
+
+Structured Environment), transitioning structured reinforcement learning from static in-context subgraphs to full-scale interactive databases along two coupled axes. First, Decision-Space Scaling exposes the unpruned knowledge graph through a five-stage graph-agnostic typed intent adapter under a bounded call budget and a multiplicative grounding reward gate. Second, Learning-Frontier Scaling overcomes the severe within-group variance collapse of full-graph ex-ploration under group-normalized objectives by uniting model-independent struc-tural tier progression with a self-evolving competence-frontier bandit. Across nineteen benchmarks and three model backbones, RISE substantially advances in-domain and unseen-schema knowledge-graph reasoning, transfers zero-shot to open-domain passage retrieval, and significantly enhances out-of-domain mathe-matical and logical deduction. 
+
+## 1 INTRODUCTION 
+
+Fine-tuning large language models (LLMs) with reinforcement learning (RL) and verifiable feed-back has driven a paradigm shift in post-training, eliciting deliberative capabilities such as hypothe-sis testing, self-reflection, backtracking, and multi-step planning (Jaech et al., 2024; Guo et al., 2025; Kimi Team et al., 2025; Comanici et al., 2025). By optimizing policies directly against outcome ver-ifiers, RL enables models to internalize reasoning strategies that are difficult to instil through passive imitation alone (Shao et al., 2024; Zeng et al., 2025; Hu et al., 2025b). While early breakthroughs centered on symbolic domains such as mathematics, logic, and code generation (Cobbe et al., 2021; Lightman et al., 2024; Xie et al., 2025; Chen et al., 2025c), this paradigm is rapidly expanding to interactive agentic settings, empowering LLMs to query search engines, navigate databases, and orchestrate external tools over multi-turn horizons (Yao et al., 2023; Schick et al., 2023; Jin et al., 2025; Zheng et al., 2025b; Li et al., 2025; Qian et al., 2025; Xue et al., 2026). Despite rapid progress in RL optimization algorithms (Schulman et al., 2017; Shao et al., 2024; Hu et al., 2025a; Yu et al., 2025; Zheng et al., 2025a), the foundational role of the training environ-ment itself has been comparatively overlooked (Fang et al., 2025; Yu et al., 2026b). In interactive RL, the environment governs what the policy observes, which actions are admissible, and when an episode terminates, directly bounding what decision-making capabilities a policy can acquire (see 1arXiv:2611.19871v1 [cs.AI] 15 Nov 2026 Preprint. Appendix A for a detailed review of related work). Existing environments face a persistent trade-off across these dimensions. Internalized-rule environments (e.g., mathematics and code) provide clean verifiability, but rely on costly expert annotations and do not train agents to gather missing evidence under partial observability (Hendrycks et al., 2021; Lightman et al., 2024). Conversely, externalized-rule game and embodied environments support multi-turn exploration (Carta et al., 2023; Tan et al., 2024; Wen et al., 2024; Zhang et al., 2025), yet the learned skills often overfit to specialized me-chanics and fail to transfer to general reasoning. Large-scale structured knowledge bases offer an ideal foundation to bridge this gap (Codd, 1970; Bollacker et al., 2008; Lacombe et al., 2025; Wang et al., 2025; Yu et al., 2026a;b): their expansive schemas support automated scaling, their multi-hop paths mirror compositional deduction, and their explicit facts enable exact rule-based verification. However, for a structured environment to genuinely incentivize transferable agentic search and rea-soning rather than localized reading comprehension, it must simultaneously satisfy three core criteria (formalized in Appendix B): (1) Open Decision Space , where sequential path selection, candidate pruning, and optimal stopping governance remain open decisions for the policy; (2) Tool-Agnostic Action Interface , where query formulation is decoupled from backend-specific query syntax so that learned search habits transfer across heterogeneous tools; and (3) Active Learning Frontier ,where the training schedule sustains non-zero policy-gradient variance as the decision space scales. Yet existing structured and retrieval environments—whether injecting serialized subgraphs into the prompt (Luo et al., 2024; He et al., 2024; Yu et al., 2026a;b), walking pre-extracted question-specific subgraphs (Sun et al., 2024; Chen et al., 2024; Lin et al., 2025; Xu et al., 2026), or retrieving fixed top-k passages (Jin et al., 2025; Chen et al., 2025a; Song et al., 2025; Sun et al., 2025)—violate the first criterion by design: they pre-filter the candidate space before the policy takes a single step .Treating such pre-filtered contexts as search environments introduces a severe measurement con-found before it imposes any capability ceiling. We quantify this confound on the per-question We-bQSP subgraphs released by a widely used RL knowledge-graph agent (Lin et al., 2025), auditing them exactly as published (Appendix B). Three findings stand out. First, the candidate space is compressed by five orders of magnitude, with the median subgraph holding only 4,415 triples over 
+
+1,638 entities ( 2.16 × 10 5 times smaller than full Freebase). Second, 94 .6% of gold answers reside within two hops of a topic entity ( 65 .5% within one hop), allowing naive breadth-first enumeration to substitute for selective planning. Third, and most critically, because each subgraph is extracted to enclose the ground-truth path, its local connectivity directly leaks the answer’s location: a question-blind heuristic that never reads the question and simply ranks nodes by in-subgraph degree surfaces a gold answer in the top-10 for 33 .27% of questions, against 0.19% for a uniform random baseline (Figure 1A). When pre-extracted topology already points at the answer and guarantees reachability by construction ( ρ ≡ 1), accuracy differences cannot be reliably attributed to a learned search policy. To transform reachability from a construction artifact into a learnable policy outcome, we transition the training environment from static pre-extracted subgraphs to full-scale interactive databases and propose RISE (Inte Ract Ive Structured Environment). As illustrated in Figure 1, RISE scales agen-tic RL along two coupled dimensions. First, Decision-Space Scaling (Figure 1B) exposes the un-pruned Freebase store ( 9.5 × 10 8 triples, where a model-free breadth-first probe establishes a reach-ability floor of ρBFS ≥ 0.5219 ) under a finite call budget ( Cmax = 16 ) and a rolling context window (28 ,672 tokens), restoring candidate pruning and stopping control as authentic, turn-attributable pol-icy decisions. Rather than binding actions to raw SPARQL syntax (Chen et al., 2025d; Song et al., 2026) or schema-specific primitives (Lin et al., 2025; Gong et al., 2026), RISE interposes a deter-ministic five-stage graph-agnostic typed intent adapter ΦG that executes natural-language queries symmetrically across outgoing and incoming edges ( 48 .6% of candidate relations exist solely as in-coming edges), paired with a multiplicative grounding reward gate and an isomorphic protocol cold start (Figure 2). Because the policy interacts strictly through natural-language intents and structured receipts, it transfers zero-shot to unseen schemas, temporal knowledge graphs (Chen et al., 2023; Gong et al., 2026), and unstructured passage retrievers (Yan et al., 2026), evaluated unconditionally on full official splits. Second, Learning-Frontier Scaling (Figure 1C) addresses the optimization bottleneck that decision-space enlargement exposes: within-group variance collapse under group-normalized RL (Shao et al., 2024). When advantages are standardized across G = 8 rollouts sampled for the same question, any question on which all rollouts earn identical rewards—occurring both when an easy question is already mastered ( pq → 1) and when full-graph exploration fails completely on a hard or unreach-able question ( pq → 0)—yields zero within-group variance ( ˆσ = 0 ) and contributes zero gradient 2Preprint. (A) MEASUREMENT CONFOUND 
+
+Pre-Filtered Subgraph Env. 
+
+> The upstream extractor decides what is reachable.
+> (B) DECISION-SPACE SCALING
+
+Full-Scale Interactive KG 
+
+> Restore path selection, pruning and optimal stopping.
+> (C) LEARNING-FRONTIER SCALING
+
+Self-Evolving Curriculum  
+
+> Concentrate batches where rewards still vary.
+> topic entity high-degree answer
+> MEDIAN PER-QUESTION SUBGRAPH
+
+4,415 triples 
+
+2.16 × 10  ×5 
+
+> smaller than full KG
+> Gold answers within two BFS hops
+
+94.6%    
+
+> 1 hop 2nd hop
+> Enumeration replaces selective pruning
+> Question-blind Hit@10
+> degree heuristic 33.27%
+> uniform random 0.19%
+> CONFOUND · Topology leaks answer location
+> FULL FREEBASE
+
+9.5 × 10 8        
+
+> triples · unpruned store
+> 5-stage typed intent adapter Φ G
+> 1Resolve
+> Fres
+> 2Intent
+> Fintent
+> 3Execute
+> Fexec
+> 4Rank
+> Frank
+> 5Truncate
+> Ftrunc
+> graph-agnostic NL query · bidirectional execution
+> Model-free BFS floor ρ≥ 0.5219 BFS
+> ≥ 52.19%
+> unranked BFS lower bound · partial observability
+> CALL BUDGET
+> C= 16 max
+> ROLLING CONTEXT
+> 28,672 tokens
+> AUTHENTIC PRUNING · turn-attributable stopping
+
+64%  full-graph pool:  σ̂ =0 ⇒ Â ≡ 0i G = 8                       
+
+> rollouts
+> Group reward variance fail grounded
+> p→0qσ̂ = 0 · zero grad
+> p≈ 0.5 qσ̂ > 0 · active grad
+> p→1qσ̂ = 0 · zero grad
+> Frontier return 2√(p (1−p )) qq
+> 00.5 1pq
+> SPARQL tiers 1–4 +SEC
+> tier progression + adaptive composition
+> ACTIVE GRADIENTS · higher gradient density
+
+Figure 1: Motivation and the two scaling axes of RISE. (A) Pre-filtered subgraph environments com-press the candidate space by 2.16 × 10 5× and leak answer locations through node degree ( 33 .27% 
+
+question-blind Hit@10 vs. 0.19% uniform random). (B) Decision-Space Scaling exposes the full 
+
+9.5 × 10 8-triple store through a five-stage graph-agnostic typed intent adapter ΦG under a bounded call budget ( Cmax = 16 ) and rolling context ( 28 ,672 tokens). (C) Learning-Frontier Scaling over-comes the 64% zero-variance bottleneck of full-graph group-normalized RL ( G = 8 ) by uniting SPARQL structural tiers 1–4 with the Self-Evolving Curriculum (SEC) bandit ( pq ≈ 0.5; see Ap-pendix B). (Proposition 1; affecting 64% of our training pool). Because zero variance is a per-question prop-erty, mixing mastered and unreachable questions in a batch still yields zero gradient even when the batch mean pass rate is 0.5. We resolve this bottleneck across four deterministic structural tiers ( d(q) ∈ { 1, 2, 3, 4} parsed from gold SPARQL topology) at two levels: macroscopically, pro-gressing from single-hop lookups to multi-constraint compositions aligns training direction with the outward expansion of the policy’s reachable horizon (Bengio et al., 2009; Kumar et al., 2010); mi-croscopically, we adapt the self-evolving curriculum (SEC) scheduler of Chen et al. (2025b)—in the spirit of prioritized replay and bandit scheduling (Schaul et al., 2016; Auer et al., 2002)—by anchoring its return on the group-level Bernoulli standard deviation 2ppq (1 − pq ) to dynamically concentrate batches on the moving competence frontier ( pq ≈ 0.5). We instantiate RISE on Freebase (Bollacker et al., 2008) and evaluate it across nineteen benchmarks spanning three capability families and three model backbones, making three main contributions: • We empirically diagnose the topological leakage confound of pre-filtered subgraph environments (33 .27% question-blind Hit@10), and formalize RISE over an unpruned knowledge base so that path selection, candidate pruning, and optimal stopping become turn-attributable decisions. • We design a five-stage graph-agnostic typed intent adapter with a multiplicative grounding gate, prove within-group variance collapse under group normalization (Proposition 1), and opera-tionalize Learning-Frontier Scaling by uniting SPARQL structural tiering with an online vari-ance bandit (SEC). • Across nineteen benchmarks on Qwen2.5-7B, Qwen2.5-14B, and Llama-3.1-8B, we show that RISE outperforms specialized baselines on in-domain and unseen-schema KG reasoning, trans-fers zero-shot to passage retrieval above domain-trained models, and generalizes to tool-free mathematical and logical deduction, while isolating the effects of cold start, curriculum direc-tion, and batch composition. 
+
+## 2 THE RISE F RAMEWORK 
+
+This section presents the RISE framework (Figure 2), comprising three components: Decision-Space Scaling , realized by a budgeted interactive POMDP formulation and a five-stage graph-agnostic typed intent adapter (Sections 2.1–2.2); a two-stage training pipeline combining a protocol-3Preprint. shared Φ G
+
+Decision-Space Scaling                       
+
+> Graph-agnostic typed intent adapter Φ · natural-language intents →structured receipts G
+> FULL GRAPH unpruned store
+> <search> q̃ with [[m ]] tt
+> <information> · Results (k of N) · calls remaining
+> 1Resolve
+> F([[m ]]) res t
+> entity resolution
+> 2Intent
+> F(q̃ )intent t
+> closed structural intent
+> 3Execute
+> F(e )exec t
+> bidirectional triples
+> 4Rank
+> Frank
+> semantic scoring
+> 5Truncate
+> Ftrunc
+> top-k + receipt codes
+> Bounded interaction · C = 16 calls · 28,672-token rolling context max
+> STAGE 1
+
+Protocol-Preserving Cold Start   
+
+> Reward-isomorphic filtering for multi-turn protocol cold start.
+> Teacher rollouts Q· disjoint pool cold
+> Isomorphic Filter
+> D· Eq. 6 SFT
+> reward-aligned
+
+πref   
+
+> protocol-aligned checkpoint
+> ACCEPT IFF
+> g(τ)=1 · Set-EM · φ(τ)=1.0 · ∀t z ≠∅t
+> STAGE 2
+
+Learning-Frontier Scaling                   
+
+> SEC + observation-masked multi-turn GRPO
+> π
+> init / KL
+> ref
+> SEC Arm k
+> P(k) ∝es+1 Q(s)/η k
+> 4 structural tiers
+> Group Rollout
+> G = 8 in Φ G
+> multi-turn trajectories
+> Masked GRPO
+> J(θ) · Eq. 7 RISE
+> receipt tokens masked
+> EMA: Q (s) = (1−α)Q (s−1) + α v̄ (s) kkk
+> v̄ (s) = mean [ 2√(p (1−p )) ] kq∈Bs,k qq
+> self-evolving batches
+
+Figure 2: Overview of the RISE framework. Top: Decision-Space Scaling interposes a five-stage graph-agnostic typed intent adapter ΦG over the full unpruned graph ( 9.5 × 10 8 triples), translating natural-language <search> intents into bidirectional traversals and structured <information> 
+
+receipts under a bounded call budget ( Cmax = 16 ) and rolling context ( 28 ,672 tokens). Bottom Left: Stage 1 filters teacher rollouts on a strictly disjoint pool Qcold using the exact grounded out-come criterion of the RL reward (Eq. 6). Bottom Right: Stage 2 performs Learning-Frontier Scal-ing by coupling observation-masked multi-turn GRPO (Eq. 7) with the Self-Evolving Curriculum (SEC) bandit across four structural tiers (Eq. 9). preserving cold start with observation-masked multi-turn GRPO under a multiplicative grounding gate (Section 2.3); and Learning-Frontier Scaling , realized by structural tier progression and a self-evolving variance bandit derived from group-normalized policy gradients (Section 2.4). 2.1 BUDGETED INTERACTIVE SEARCH OVER A STRUCTURED ENVIRONMENT 
+
+Learning to search is learning a sequence of decisions, not learning a query format. An environment carries that signal only if sequential path selection, candidate pruning, and stopping governance are genuinely open: once candidates are pre-enumerated and the answer enclosed upstream, the only task left is local evidence stitching. We formulate multi-turn question answering over a knowledge graph G = (E, R, T ) as a budget-constrained Partially Observable Markov Decision Process (POMDP), defined by the tu-ple M = (Q, H, A, O, ΦG , R, C max ). Given an input question q ∈ Q (accompanied by surface-form topic entities when provided by the benchmark), an episode unfolds over T ≤
+
+Cmax + 1 discrete interaction turns. At turn t, conditioned on the interaction history ht−1 =(z1, a 1, o 1, . . . , z t−1, a t−1, o t−1) ∈ H (with h0 = ∅), the policy πθ first generates an internal rea-soning trace zt enclosed in <think>...</think> tags, followed by a discrete action at ∈ A .The action space is the disjoint union A = Asearch ∪ A answer , where at ∈ A search emits a natural-language query inside <search>...</search> and at ∈ A answer emits a final prediction ˆA(τ )
+
+inside <answer>...</answer> (with an empty tag denoting explicit abstention). Whenever at ∈ A search , the environment executes the deterministic adapter ΦG and appends a struc-tured receipt ot = Φ G (at, h t−1) ∈ O enclosed in <information>...</information> as a separate user turn, so environmental text never enters the policy’s own generation stream. The probability of a trajectory τ = ( z1, a 1, o 1, . . . , z T , a T ) factorizes autoregressively over the policy’s own tokens subject to a hard call budget Cmax = 16 , while a rolling window of 28 ,672 tokens is maintained by left-truncating the oldest turns: 
+
+πθ (τ | q) = 
+
+TY
+
+t=1 
+
+πθ (zt, a t | q, h t−1), subject to C(τ ) = 
+
+TX
+
+t=1 
+
+I[at ∈ A search ] ≤ Cmax . (1) 4Preprint. The two budgets are deliberately orthogonal: the call budget counts external searches and the per-turn limit ( 2,048 tokens) counts internal reasoning tokens, so a policy can neither buy extra hops by thinking less nor lose hops by thinking more. When the call budget is exhausted at turn t, the environment appends a notice to ot and grants one final answer-only turn restricted to Aanswer , keeping “ran out of search budget” and “failed to emit an answer” strictly separable at evaluation time. The decision process follows the directed interaction flow 
+
+q πθ
+
+−→ (z1, a search  
+
+> 1
+
+) ΦG
+
+−−→ o1
+
+> πθ
+
+−→ · · · ΦG
+
+−−→ oT −1
+
+> πθ
+
+−→ (zT , a answer  
+
+> T
+
+) = ⇒ ˆA(τ ), (2) in which every transition through ΦG is an opportunity for the policy to revise its hypothesis or prune unpromising branches rather than follow a pre-extracted path. Three structural consequences separate this formulation from pre-filtered environments. First, budget-bounded reachability ρ(q; Cmax ) (formalized in Appendix B) is identically one by construc-tion inside an answer-enclosed subgraph, whereas over the full graph it becomes an empirical quan-tity governed by the policy’s own path selections. Second, candidate pruning becomes mandatory, since the policy must select which relation to traverse among all edges incident to an entity. Third, evaluation is conducted unconditionally over full official splits rather than reachable subsets, pre-serving a fixed denominator across checkpoints. 2.2 GRAPH -A GNOSTIC TYPED INTENT ADAPTER AND ENVIRONMENT CONTRACT 
+
+Section 2.1 defines the sequential decisions a search policy must make, but if the action space di-rectly encodes a database’s native query syntax (such as SPARQL), the decision space becomes bound to that schema and cannot transfer across tools. We therefore restrict the policy’s action vo-cabulary to natural language plus bracketed entity mentions, placing all schema-specific translation behind a deterministic adapter ΦG so that the exact same policy weights can drive a static knowledge graph, a temporal graph, or a text passage retriever without retraining. RISE implements this decoupling via a four-layer architecture: (1) a full-scale Virtuoso SPARQL backend hosting Freebase; (2) a deterministic five-stage typed intent adapter ΦG ; (3) a strict envi-ronment contract governing turn grammar, receipt schemas, and error codes; and (4) a trainer-facing multi-turn conversation interface shared identically between structured graph search and unstruc-tured passage retrieval. Because the top conversation layer is invariant across backends, swapping the adapter is the only change required to evaluate a graph-trained policy on a passage retriever. Given a search action at = <search> ˜qt </search> containing query ˜qt and bracketed mentions 
+
+[[ mt]] , the adapter composes five stages, ΦG = Ftrunc ◦ F rank ◦ F exec ◦ F intent ◦ F res :1. Entity Resolution ( Fres ). Maps each surface form mt to a node et ∈ E through the episode’s entity-binding table, seeded with the benchmark’s topic entities and extended by every pre-viously returned receipt; a form unseen in the table falls back to exact label matching in G.Because the table is maintained per episode, homonymous labels are disambiguated by entities the episode has already grounded rather than by a static global prior. 2. Intent Classification ( Fintent ). Maps ˜qt to one of three closed-vocabulary structural tags, 
+
+ιt ∈ { relation hop , relation list , entity info }, via deterministic surface cues (returning relational triples, deduplicated incident relation names, or entity descriptions and types). 3. Direction-Symmetric Execution ( Fexec ). Auditing Freebase reveals that 48 .6% of candidate relations around topic entities exist only as incoming edges (Appendix B). An adapter that tra-versed outgoing edges alone would list such a relation during inspection and return empty results when queried, penalizing a valid reasoning step. Execution therefore retrieves the bidirectional one-hop neighborhood of et, inverting incoming edges into canonical et-centric candidates: 
+
+Fexec (et) = {(et, r, e ′) | (et, r, e ′) ∈ T } ∪ { (et, r −1, e ′) | (e′, r, e t) ∈ T } . (3) 4. Semantic Ranking ( Frank ). Scores candidate triples in Fexec (et) by dense cosine similarity (E5-base-v2 ) against ˜qt and retains those above a fixed similarity threshold, falling back to the entity’s relation list when none qualifies. 5Preprint. 5. Bounded Truncation and Receipt Formatting ( Ftrunc ). Emits the top k of N matching rows behind an explicit Results (k of N) header—keeping “fact does not exist” ( N = 0 ) dis-tinguishable from “fact truncated by row cap” ( k < N )—and closes with Calls remaining ,capping rows at k = 100 and relations at 50 (Appendix E). Three contract rules guarantee that training and evaluation share identical environment semantics. First, the call budget Cmax is accounted independently of the per-turn generation limit ( 2,048 
+
+tokens). Second, all execution anomalies map to a closed seven-element error vocabulary— 
+
+E NO ENTITY , E ENTITY NOT FOUND , E INTENT UNSUPPORTED , E NO RESULTS ,
+
+E QUERY FAILED , E BUDGET EXCEEDED , and E MALFORMED (Appendix C)—where transient backend timeouts ( E QUERY FAILED ) are never penalized as policy errors. Third, observation independence holds end to end: cold-start collection, on-policy GRPO rollouts, and benchmark evaluation invoke the exact same adapter binary and receipt template. 2.3 GROUNDED OUTCOME VERIFICATION AND TWO -S TAGE TRAINING 
+
+Both training stages ask the same question of a trajectory—did it reach a correct answer via evidence the environment can vouch for—preventing the RL phase from having to unlearn shortcuts accepted during warm-up. 
+
+Grounded Outcome Verification. Rewarding a completed trajectory τ with predicted answer ˆA(τ )
+
+against ground truth A∗(q) combines a gated outcome term with an additive format term: 
+
+r(τ ) = g(τ ) · I
+
+h
+
+[[ ˆA(τ )]] = [[ A∗(q)]] 
+
+i
+
++ φ(τ ), (4) where [[ ·]] normalizes aliases and whitespace at set level, φ(τ ) ∈ { 1.0, 0.8, 0.2, 0.1, 0.0} is the five-tier structural format score of Search-R1 (Jin et al., 2025), and g(τ ) ∈ { 0, 1} is a multiplicative grounding gate requiring every predicted entity to appear in a receipt retrieved during the episode: 
+
+g(τ ) = I
+
+"
+
+∀ˆa ∈ [[ ˆA(τ )]] , ˆa ∈ 
+
+> T−1
+
+[
+
+> t=1
+
+[[ E(ot)]] 
+
+#
+
+. (5) The structural asymmetry between a multiplicative gate g(τ ) and an additive format term φ(τ ) is deliberate. Grounding must be multiplicative because an ungrounded correct answer on an unreach-able question is a parametric guess, and rewarding it incentivizes the policy to bypass search and enumerate plausible entities instead. Format compliance, by contrast, must be additive: a multi-plicative format gate would zero out the gradient whenever the final answer is wrong, depriving the policy of syntactic feedback during early exploration when accuracy is low and degenerate repeti-tion loops (Holtzman et al., 2020) must be suppressed. Intermediate process rewards are excluded because under within-question group normalization, a bonus for visiting an intermediate hop alters the advantage scale asymmetrically across question difficulties. 
+
+Protocol-Preserving Cold Start. All training questions originate from the combined official train-ing splits of WebQSP and CWQ ( 34 ,215 questions in total), which we partition via stratified sam-pling by dataset and difficulty tier into two strictly disjoint pools: a cold-start pool Qcold of 6,000 
+
+questions and an online RL pool QRL of 28 ,215 questions (enforced by a run-level split flag). Stage 1 fine-tunes the base model exclusively on teacher trajectories collected inside RISE over Qcold .Using Gemini-2.5-pro at temperature 0.7 with at most two attempts per question, 4,006 questions (66 .8% ) yielded trajectories passing our two filtering invariants, giving |D SFT | = 4 ,006 : (1) reward-criterion isomorphism , requiring g(τ ) · I[[[ ˆA(τ )]] = [[ A∗(q)]]] = 1 and φ(τ ) = 1 .0; and (2) per-turn reasoning completeness , requiring a non-empty <think> block ( zt̸ = ∅) at every turn t:
+
+DSFT =
+
+n
+
+(q, τ ) q ∈ Q cold , τ ∼ πteacher (· | q),g(τ ) · I
+
+h
+
+[[ ˆA(τ )]] = [[ A∗(q)]] 
+
+i
+
+= 1 , φ (τ ) = 1 .0, QTt=1 I[zt̸ = ∅] = 1 
+
+o
+
+.
+
+(6) 
+
+Observation-Masked Multi-Turn GRPO. Stage 2 operates over the disjoint RL pool QRL (28 ,215 
+
+questions). At each step, we sample G = 8 trajectories per question from πθold and compute the group-normalized advantage ˆAi = ( r(τi) − ¯r)/ˆσ, setting ˆAi = 0 whenever ˆσ = 0 . Let Ii index 6Preprint. the tokens of τi generated by the policy—all of {(zt, a t)}Ti 
+
+> t=1
+
+but none of the environment receipts 
+
+{ot}—so that observation tokens contribute zero gradient: 
+
+JRISE (θ) = Eq∼P sched , {τi}Gi=1 ∼πθold (·| q)
+
+"
+
+1
+
+G
+
+> G
+
+X
+
+> i=1
+
+1
+
+|I i|
+
+X
+
+> m∈I i
+
+
+
+min 
+
+
+
+ρi,m (θ) ˆAi,
+
+clip  ρi,m (θ), 1 − ϵ, 1 + ϵ ˆAi
+
+
+
+− βDKL (πθ ∥πref )
+
+#
+
+,
+
+(7) where ρi,m (θ) = πθ (τi,m |q,τ i,<m )  
+
+> πθold (τi,m |q,τ i,<m )
+
+is the token-level importance ratio and πref is the cold-start checkpoint (Schulman et al., 2017; Shao et al., 2024; Sheng et al., 2025). 2.4 LEARNING -F RONTIER SCALING VIA STRUCTURAL TIERING AND 
+
+COMPETENCE -F RONTIER BANDIT 
+
+The objective in Equation (7) normalizes advantages within each question’s rollout group. That normalization has a direct mathematical consequence governing how the sampling distribution Psched 
+
+over QRL must be designed when the decision space is enlarged: a question contributes a policy gradient if and only if the G rollouts sampled for it disagree. 
+
+Proposition 1 (Variance Collapse under Group Normalization) . Let ˆAi = ( r(τi) − ¯r)/ˆσ be the group-normalized advantage in Equation (7) over G rollouts {τi}Gi=1 
+
+> i.i.d.
+
+∼ πθ (· | q). Whenever the reward r(τ ) is constant on the sampled support of πθ (· | q) (i.e., r(τ1) = · · · = r(τG) = c), the within-group variance vanishes ( ˆσ = 0 ) and the policy-gradient contribution of question q is identically zero ( ∇θ Jq (θ) ≡ 0). Furthermore, when format compliance has converged ( φ(τ ) = 1 .0)so that r(τ ) − 1 ∼ Bernoulli (p(q; θ)) with success probability p(q; θ) ∈ [0 , 1] , the probability that question q yields a non-zero gradient update across G rollouts is 
+
+Pr  ˆσ(q) > 0 | θ = 1 − p(q; θ)G −  1 − p(q; θ)G, (8) 
+
+which vanishes at both extremes p(q; θ) ∈ { 0, 1}, attains its unique global maximum at the com-petence frontier p∗(q; θ) = 0 .5, and is strictly monotonically increasing in the Bernoulli standard deviation σBern (q; θ) = pp(q; θ)(1 − p(q; θ)) .
+
+The proof is in Appendix H. Proposition 1 explains why 64% of our full-graph training pool yields zero gradient under uniform sampling at G = 8 (following pG + (1 − p)G scaling from an empirical 
+
+73% zero-variance rate observed at G = 4 ): mastered questions ( pq → 1) and questions that are unreachable or currently beyond the policy’s horizon ( pq → 0) both collapse to ˆσ = 0 . Because ˆσ(q)
+
+is a per-question property, a batch mixing half pq = 1 and half pq = 0 questions still produces zero gradient despite a mean pass rate of 0.5. Sustaining active gradients therefore requires aligning both the macro progression direction and the micro batch composition Psched with the policy’s evolving competence frontier ( pq ≈ 0.5). 
+
+Model-Independent Structural Tiers and Macro Frontier Direction. To partition QRL with-out circular model-based perplexity, we assign each question a deterministic structural tier d(q) ∈{1, 2, 3, 4} parsed directly from its gold SPARQL topology and official structural annotations: Tier 1 comprises single-hop relation lookups and simple chains, Tier 2 comprises multi-hop 
+
+composition chains, Tier 3 comprises multi-constraint conjunction intersections, and Tier 4 comprises comparative and superlative aggregation queries. At the start of RL, the pol-icy’s competence frontier ( pq ≈ 0.5) resides in simpler lookups and short chains while harder multi-constraint tiers sit near pq ≈ 0. Presenting tiers in progressive order ( d = 1 → 2 → 3 → 4,
+
+Easy-to-Hard , E2H) provides an open-loop approximation to the expanding frontier, whereas re-versing the exact same 28 ,215 -question multiset ( d = 4 → 3 → 2 → 1, Hard-to-Easy , H2E) front-loads zero-variance hard tiers when the policy cannot solve them and defers easy tiers until they are already mastered. 
+
+Micro Frontier Adaptation via Self-Evolving Curriculum (SEC) Bandit. While static E2H ordering captures the macro directional progression of multi-hop learning, fixed step boundaries cannot adapt to the exact rate at which a policy masters each tier or retreat when the hardest tier remains largely unsolvable. Following Chen et al. (2025b), we treat the four structural tiers k ∈
+
+7Preprint. 
+
+{1, 2, 3, 4} over the same QRL pool as bandit arms. Let Bs,k denote the subset of questions drawn from arm k at step s, and let pq = 1
+
+> G
+
+PGi=1 I[g(τi) · I[[[ ˆA(τi)]] = [[ A∗(q)]]] = 1] be the grounded group pass rate of question q. Note that while GRPO computes advantages on total reward r(τ ),the scheduler tracks variance strictly on the grounded outcome pq so that bandit allocation is never misled by formatting noise. SEC updates each arm’s EMA frontier value Qk(s) and samples arms via a Boltzmann distribution: 
+
+Qk(s) = (1 − α)Qk(s − 1) + α¯vk(s), ¯vk(s) = 1
+
+|B s,k |
+
+X
+
+> q∈B s,k
+
+2
+
+q
+
+pq (1 − pq ),Ps+1 (k) = exp( Qk(s)/η )
+
+P4 
+
+> j=1
+
+exp( Qj (s)/η ) ,
+
+(9) with EMA rate α = 0 .5, temperature η = 0 .4, and initialization Qk(0) = 0 .5 (questions within each arm are drawn without replacement per pass and reshuffled upon depletion). Because 2ppq (1 − pq )
+
+decays as an easier tier is mastered ( pq → 1) and rises as a harder tier enters the solvable band ( pq →
+
+0.5), Ps(k) autonomously tracks the moving competence frontier (Algorithm 1, Appendix H). 
+
+## 3 EXPERIMENTS 
+
+To systematically evaluate RISE and dissect the contribution of each component in its training recipe, we conduct comprehensive experiments across nineteen benchmarks spanning three capa-bility families to answer four research questions (RQs): (1) RQ1 : Can effective multi-hop search policies be learned directly over an unpruned, full-scale structured environment, and how well do they generalize to unseen schemas and across model scales? (2) RQ2 : Can a search policy trained exclusively on a structured knowledge graph transfer zero-shot to unstructured open-domain passage retrieval? (3) RQ3 : Do the hypothesis-testing, pruning, and verification habits acquired through in-teractive structured exploration generalize out-of-domain to enhance tool-free mathematical and log-ical reasoning? (4) RQ4 : How do the protocol-preserving cold start, progressive frontier ordering, and online variance-driven batch composition (SEC) distinctively contribute to agentic learning? 3.1 EXPERIMENTAL SETUP 
+
+3.1.1 DATASETS AND METRICS 
+
+We evaluate on nineteen benchmarks under greedy decoding ( T = 0 ), grouped into three capabil-ity families: (1) structured knowledge (6 sets)—WebQSP (Yih et al., 2016) and CWQ (Talmor & Berant, 2018) in-domain, GrailQA (Gu et al., 2021), SimpleQuestions (Bordes et al., 2015), and WebQuestions (Berant et al., 2013) for unseen-schema transfer, and MultiTQ (Chen et al., 2023) for temporal reasoning; (2) cross-tool passage retrieval (7 sets)—the single-fact sets NQ (Kwiatkowski et al., 2019), TriviaQA (Joshi et al., 2017), and PopQA (Mallen et al., 2013), and the multi-hop sets HotpotQA (Yang et al., 2018), 2WikiMultiHopQA (Ho et al., 2020), MuSiQue (Trivedi et al., 2022), and Bamboogle (Press et al., 2023); and (3) tool-free general reasoning (6 sets)—GSM8K (Cobbe et al., 2021), MATH500 (Hendrycks et al., 2021), AIME24, AMC23, and Knights and Knaves Easy and Hard (Xie et al., 2024; 2025). Metrics follow standard conventions per family and are never pooled across families: set-equality EM for WebQSP, CWQ, and GrailQA; any-item hit ( †) for Sim-pleQuestions and WebQuestions; Hits@1 for MultiTQ; alias EM for passage retrieval; and exact accuracy for general reasoning, with Avg. reporting the within-table mean. 3.1.2 BASELINES 
+
+We instantiate every arm on three instruction-tuned backbones—Qwen2.5-7B-Instruct, Qwen2.5-14B-Instruct, and Llama-3.1-8B-Instruct—and compare each capability family against strong spe-cialized baselines reproduced on the exact same backbones and evaluated under identical greedy decoding, prompts (Appendix D), and answer normalization: Plan-on-Graph (PoG) (Chen et al., 2024) and KG-R1 (Lin et al., 2025) for structured knowledge; Search-R1 (Jin et al., 2025) and ZeroSearch (Sun et al., 2025) for passage retrieval; and GraphWalker (Xu et al., 2026) and SIE (Yu et al., 2026b) for general reasoning. One deliberate asymmetry should be noted: in Tables 2 8Preprint. and 3, RISE is evaluated strictly zero-shot (trained solely on Freebase), whereas Search-R1 and Ze-roSearch are trained in-domain on passage retrieval, making any margin there a conservative lower bound on transfer efficacy. For RQ4 (Table 4), we compare seven controlled recipe arms within the exact same environment: Base model, RISE w/o RL (cold start only on Qcold ), RISE w/o SFT (RL from base on QRL ), and full two-stage RISE where all four curriculum schedules—uniform (UNI), hard-to-easy (H2E), easy-to-hard (E2H), and SEC bandit—train on the exact same 28 ,215 -question pool QRL .3.1.3 IMPLEMENTATION DETAILS 
+
+All RL arms use on-policy multi-turn GRPO on VeRL (Sheng et al., 2025) with vLLM rollouts, group size G = 8 , batch size 64 questions per step, constant learning rate 1 × 10 −6, KL penalty β =0.01 , per-turn cap 2,048 tokens, rolling context window 28 ,672 tokens, and call budget Cmax = 16 
+
+for one epoch ( 440 steps, matching 28 ,215 /64 ≈ 440 ) on 8×A100 GPUs. Passage retrieval uses the Wiki-18 dump ( 21 ,015 ,324 passages) indexed with E5-base-v2 and FAISS flat, returning top-3
+
+passages per call, while the KG adapter returns at most 50 relations and 100 rows (Appendix E). 3.2 MAIN RESULTS 
+
+RISE substantially outperforms subgraph-trained and prompting-based KG agents across all three backbones, winning 17 of 18 benchmark comparisons with the largest gains on multi-hop composition and unseen schemas (RQ1). Table 1 reports results on the structured-knowledge family. On Qwen2.5-7B, RISE elevates the six-benchmark average from 43 .2% (Base) to 73 .0% ,outperforming the subgraph-RL baseline KG-R1 ( 62 .8% ) by +10 .2 points and PoG ( 46 .8% ) by 
+
++26 .2 points. The advantage is largest precisely where genuine path pruning is required: 92 .4% vs. 
+
+82 .4% on WebQSP ( +10 .0), 85 .4% vs. 65 .6% on CWQ ( +19 .8), and 86 .2% vs. 62 .4% on GrailQA (+23 .8). The same superiority holds on Qwen2.5-14B ( 78 .3% vs. 72 .1% for KG-R1) and Llama-3.1-8B ( 74 .0% vs. 69 .3% ). Across datasets, multi-hop compositional queries (CWQ) and zero-shot unseen schemas (GrailQA) exhibit far larger gains than single-hop lookup (SimpleQuestions), confirming that RISE learns transferable multi-step pruning rather than superficial query formatting. 
+
+Policies trained exclusively on Freebase transfer zero-shot to Wikipedia passage retrieval, win-ning 16 of 21 comparisons and surpassing domain-trained text-RL baselines in overall average across all three backbones (RQ2). Table 2 evaluates zero-shot cross-tool transfer when replacing the KG adapter at test time with the Wikipedia dense passage retriever. Without any modifica-tion to the policy weights or turn protocol, RISE achieves a seven-benchmark average of 42 .9% 
+
+on Qwen2.5-7B (outperforming in-domain trained ZeroSearch at 40 .6% and Search-R1 at 38 .2% ), 
+
+59 .0% on Qwen2.5-14B (vs. 53 .0% for ZeroSearch), and 48 .0% on Llama-3.1-8B (vs. 45 .5% ). While multi-hop retrieval benchmarks exhibit the largest gains—lifting HotpotQA from 43 .1% to 
+
+54 .3% (+11 .2) and Bamboogle from 50 .4% to 62 .4% (+12 .0) at 14B—the single-fact benchmarks (NQ, TriviaQA, PopQA) also improve substantially over the base model ( 18 .8% → 42 .9% average at 7B), confirming that what transfers across tools is the fundamental habit of query reformulation and evidence verification. 
+
+Interactive structured exploration substantially enhances out-of-domain mathematical and logical reasoning, winning 13 of 18 comparisons (with 1 tie) and surpassing both static in-context RL (SIE) and subgraph RL (GraphWalker) across all three backbones (RQ3). Table 3 evaluates zero-shot transfer to six tool-free mathematical and logical reasoning benchmarks. Train-ing in RISE elevates the six-benchmark reasoning average from 28 .9% to 51 .8% on Qwen2.5-7B (surpassing SIE at 47 .5% and GraphWalker at 41 .0% ), from 50 .5% to 68 .5% on Qwen2.5-14B (SIE: 
+
+60 .4% ), and from 25 .7% to 37 .0% on Llama-3.1-8B (SIE: 35 .2% ). The gains are particularly pro-nounced on multi-step symbolic and logical deduction: on Qwen2.5-7B, RISE boosts MATH500 accuracy to 73 .4% (+11 .8 points over SIE), while on Qwen2.5-14B it lifts Knights & Knaves Easy and Hard to 79 .0% and 65 .0% (+13 .0 and +19 .5 points over SIE, respectively). Because full-graph interaction requires the policy to formulate explicit hypotheses inside <think> , prune in-valid branches upon receiving empty or truncated receipts, and verify constraints before answering, these deliberative habits internalize as stronger step-by-step deduction even without external tools. 
+
+Protocol cold start and on-policy RL are strongly complementary, while progressive fron-tier alignment (E2H) and closed-loop variance tracking (SEC) jointly overcome zero-variance 
+
+9Preprint. Table 1: Structured-knowledge results (RQ1), %. Set-equality EM except SimpleQues-tions/WebQuestions (any-item hit, †) and MultiTQ (Hits@1). Within each block, bold marks the best result and underline the runner-up; RISE is shaded. RISE wins 17 of 18 comparisons, with the largest margins on compositional (CWQ) and unseen-schema (GrailQA) sets.                                                                                              
+
+> In-domain Cross-graph Temporal Backbone / Arm WebQSP CWQ GrailQA SimpleQ †WebQ †MultiTQ Avg.
+> Qwen2.5-7B-Instruct
+> Base model 42.3 29.4 46.2 61.4 52.3 27.3 43.2 + PoG 47.5 32.1 54.3 64.2 52.7 30.2 46.8 + KG-R1 82.4 65.6 62.4 68.8 64.5 33.0 62.8 + RISE (ours) 92.4 85.4 86.2 72.2 67.1 34.5 73.0
+> Qwen2.5-14B-Instruct
+> Base model 50.2 54.4 68.5 66.2 58.3 36.4 55.7 + PoG 63.4 67.6 72.3 67.4 58.9 37.2 61.1 + KG-R1 88.3 78.4 79.2 74.5 70.0 42.5 72.1 + RISE (ours) 94.6 89.5 88.3 80.8 71.2 45.3 78.3
+> Llama-3.1-8B-Instruct
+> Base model 46.3 32.5 45.6 63.3 51.8 26.8 44.4 + PoG 56.9 56.8 51.3 65.8 54.4 29.1 52.4 + KG-R1 86.2 76.1 77.9 74.2 68.4 32.8 69.3 + RISE (ours) 93.2 88.9 85.4 74.3 68.2 34.0 74.0
+
+Table 2: Zero-shot cross-tool transfer to Wikipedia passage retrieval (RQ2), % (alias EM). RISE is evaluated strictly zero-shot (trained only on Freebase); Search-R1 and ZeroSearch are trained in-domain on passage retrieval. RISE surpasses domain-trained retrieval baselines on all three backbones, with the largest margins on multi-hop synthesis.                                                                                                          
+
+> Single-fact Multi-hop Backbone / Arm NQ TriviaQA PopQA HotpotQA 2Wiki MuSiQue Bamboogle Avg.
+> Qwen2.5-7B-Instruct
+> Base model 12.8 35.6 13.8 16.2 22.6 6.6 24.0 18.8 + Search-R1 42.4 63.4 51.6 32.8 33.2 17.4 26.4 38.2 + ZeroSearch 43.6 65.2 48.8 34.6 35.2 18.4 38.4 40.6 + RISE (ours) 43.9 63.8 49.7 39.4 39.3 18.9 45.6 42.9
+> Qwen2.5-14B-Instruct
+> Base model 23.7 52.9 33.4 28.1 32.2 18.4 36.0 32.1 + Search-R1 48.8 68.7 55.2 39.2 47.9 31.4 46.4 48.2 + ZeroSearch 58.3 74.3 62.9 43.1 48.3 33.6 50.4 53.0 + RISE (ours) 65.4 76.3 64.6 54.3 57.3 32.5 62.4 59.0
+> Llama-3.1-8B-Instruct
+> Base model 18.5 36.6 24.3 15.4 24.9 15.4 26.4 23.1 + Search-R1 41.6 62.5 50.2 42.9 39.8 23.7 40.0 42.9 + ZeroSearch 46.3 63.0 52.8 45.3 40.5 24.9 45.6 45.5 + RISE (ours) 50.3 62.7 53.6 48.6 44.8 24.6 51.2 48.0
+
+stagnation (RQ4). Table 4 ablates each stage and scheduling mechanism across six representative benchmarks on Qwen2.5-7B (full nineteen-benchmark grids are in Appendix F, Tables 8–10). First, the two stages are mutually reinforcing: supervised cold start alone (RISE w/o RL) raises the av-erage from 30 .1% to 49 .7% and direct RL from the base model (RISE w/o SFT) reaches 59 .4% ,whereas combining them under uniform sampling (RISE w/ UNI) jumps to 66 .4% (+16 .7 over SFT alone and +7 .0 over RL alone). Notably, while RISE w/o SFT reaches 78 .4% on in-domain WebQSP—proving that full-graph tool use is learnable from scratch under our grounded reward— it drops to 59 .2% on unseen-schema GrailQA (Appendix Table 8), 27 .0 points behind full RISE (86 .2% ), confirming that the cold-start prior is critical for anchoring multi-turn protocol general-ization. Second, comparing the curriculum arms over the exact same 28 ,215 -question pool QRL 
+
+directly validates Proposition 1. Because Tier 3 and Tier 4 questions exhibit near-zero pass rates 10 Preprint. Table 3: Zero-shot transfer to tool-free general reasoning (RQ3), % (exact accuracy; AIME24 has 
+
+30 items and AMC23 has 40 , where ties count as neither a win nor a loss). All arms are trained on structured KG environments and evaluated zero-shot without tools. Interactive exploration in RISE internalizes hypothesis testing and branch pruning, outperforming static in-context RL (SIE) across all three backbones.                                                                                              
+
+> Mathematical Competition Knights & Knaves Backbone / Arm GSM8K MATH500 AIME24 AMC23 Easy Hard Avg.
+> Qwen2.5-7B-Instruct
+> Base model 30.2 42.6 3.3 37.5 41.5 18.5 28.9 + GraphWalker 74.3 61.4 6.7 40.0 40.0 23.5 41.0 + SIE 87.4 61.6 10.0 47.5 49.5 29.0 47.5 + RISE (ours) 88.2 73.4 16.7 52.5 48.5 31.5 51.8
+> Qwen2.5-14B-Instruct
+> Base model 71.6 62.0 16.7 57.5 60.5 34.5 50.5 + GraphWalker 74.8 72.8 16.7 57.5 64.0 46.5 55.4 + SIE 91.1 75.0 20.0 65.0 66.0 45.5 60.4 + RISE (ours) 90.4 78.8 30.0 67.5 79.0 65.0 68.5
+> Llama-3.1-8B-Instruct
+> Base model 66.8 38.8 6.7 15.0 20.0 7.0 25.7 + GraphWalker 79.2 48.8 6.7 17.5 34.0 14.0 33.4 + SIE 82.6 47.0 6.7 22.5 37.0 15.5 35.2 + RISE (ours) 87.8 48.4 10.0 22.5 38.5 15.0 37.0
+
+Table 4: Recipe attribution on Qwen2.5-7B-Instruct (RQ4), %. Six representative benchmarks span-ning the three families (this six-column mean is not comparable to the per-family averages in Ap-pendix F). Cold start and on-policy RL are complementary, progressive frontier alignment (E2H vs. H2E) prevents early zero-variance starvation, and closed-loop SEC achieves the best overall score.                                                           
+
+> Structured knowledge Retrieval Reasoning Arm WebQSP CWQ PopQA 2Wiki GSM8K MATH500 Avg. Base model 42.3 29.4 13.8 22.6 30.2 42.6 30.1 RISE w/o RL 59.6 57.1 37.3 36.2 58.5 49.8 49.7 RISE w/o SFT 78.4 63.3 42.4 35.5 78.2 58.4 59.4 RISE w/ UNI 84.1 79.4 47.6 37.6 84.4 65.6 66.4 RISE w/ H2E 82.2 75.0 46.8 36.2 85.3 64.0 64.9 RISE w/ E2H 90.7 83.2 51.8 39.8 87.9 70.6 70.7 RISE w/ SEC 92.4 85.4 49.7 39.3 88.2 73.4 71.4
+
+(pq → 0, ˆσ = 0 ) at the start of RL, presenting hard tiers first (RISE w/ H2E, 64 .9% ) starves early training of active gradients and underperforms even uniform sampling ( 66 .4% ). Conversely, pre-senting tiers in progressive order (RISE w/ E2H, 70 .7% ) acts as an open-loop approximation to the expanding competence frontier, yielding +4 .3 points over Uniform and +5 .8 over H2E. Third, replacing fixed tier transitions with closed-loop variance feedback (RISE w/ SEC, 71 .4% ) further refines learning on compositionally demanding benchmarks, advancing CWQ from 83 .2% to 85 .4% 
+
+(+2 .2), WebQSP from 90 .7% to 92 .4% (+1 .7), GrailQA from 84 .8% to 86 .2% (+1 .4, Table 8), MATH500 from 70 .6% to 73 .4% (+2 .8), and AMC23 from 47 .5% to 52 .5% (+5 .0, Table 10). 3.3 ANALYSIS 
+
+Frontier-aligned scheduling concentrates its gains on multi-step compositional and unseen-schema bottlenecks. Inspecting the full nineteen-benchmark ablation grids in Appendix F (Ta-bles 8–10) reveals where Learning-Frontier Scaling (RISE w/ SEC) extracts its advantage over uniform sampling (RISE w/ UNI). On single-hop lookup tasks where uniform sampling already encounters frequent non-zero variance early in training, the margin between SEC and UNI is mod-est ( +1 .8 points on SimpleQuestions and +1 .5 on WebQuestions). In contrast, on tasks requiring 11 Preprint. 0 110 220 330 440 45678        
+
+> Step Mean search calls
+> (a) Search calls per episode
+> SEC UNI 0110 220 330 440 3,000 4,500 6,000 7,500
+> Step Mean reasoning tokens
+> (b) Reasoning tokens per episode
+> SEC UNI 0110 220 330 440 60 70 80 90
+> Step Evaluation accuracy (%)
+> (c) Eval accuracy per episode
+> SEC UNI
+
+Figure 3: Training dynamics and sample efficiency comparing competence-frontier scheduling (SEC) against uniform sampling (UNI) across one epoch ( 440 steps): (a) mean search calls per episode; (b) mean cumulative reasoning tokens per episode; and (c) validation accuracy (%) on the held-out pool. multi-hop relational composition, zero-shot schema generalization, or deep symbolic chains—where uniform rollouts frequently collapse to all-zero rewards early on—the margin expands dramati-cally: +8 .3 points on WebQSP ( 92 .4% vs. 84 .1% ), +6 .0 on CWQ ( 85 .4% vs. 79 .4% ), +21 .6 on GrailQA ( 86 .2% vs. 64 .6% ), +7 .8 on MATH500 ( 73 .4% vs. 65 .6% ), and +7 .5 on AMC23 ( 52 .5% 
+
+vs. 45 .0% ). 
+
+Co-evolution of search depth, episode deliberation, and sample efficiency. Figure 3 tracks the training dynamics of SEC versus uniform sampling (UNI) across the 440 optimizer steps of one epoch (see Appendix G for a qualitative trajectory comparison). In Figure 3a, both schedules begin at an average of 4.6 search calls per episode; however, while UNI plateaus early around 5.4 calls, SEC progressively expands its interaction horizon to 8.3 search calls per episode as bandit mass migrates from single-hop lookups (Tier 1) toward multi-hop chains and conjunctive intersections (Tiers 2–3). Correspondingly, Figure 3b shows that cumulative reasoning tokens per episode grow from ∼ 2,600 to ∼ 7,400 under SEC (versus plateauing at ∼ 4,200 under UNI), confirming that decoupling the call budget ( Cmax = 16 ) from the per-turn token cap ( 2,048 tokens) enables deeper multi-turn verification without per-turn truncation. Finally, Figure 3c plots validation accuracy on the held-out WebQSP + CWQ test pool ( 5,156 questions): although UNI rises slightly faster in the first 100 steps by harvesting easy lookups, it saturates near 81 .8% by step 180 . By contrast, SEC overtakes UNI at step ∼ 145 , matches UNI’s full-epoch accuracy within 38% of the training budget (∼ 165 steps), and continues climbing to ∼ 89 .0% across the epoch. 
+
+## 4 CONCLUSION 
+
+What defines an autonomous retrieval agent is the sequence of decisions it makes: which path to explore, which candidates to prune, and when to stop searching. All three decisions vanish when the training environment pre-extracts a local subgraph or lets an upstream index decide what is reach-able in advance. RISE transitions structured RL environments to full-scale interactive databases along two coupled axes: Decision-Space Scaling exposes the unpruned knowledge graph through a five-stage graph-agnostic typed intent adapter under a bounded call budget, restoring pruning and stopping as turn-attributable policy decisions; and Learning-Frontier Scaling overcomes the 64% 
+
+within-group variance collapse of full-graph exploration by aligning progressive tier ordering and closed-loop SEC batch composition with the policy’s evolving competence frontier. Across nine-teen benchmarks and three model backbones, RISE substantially outperforms specialized baselines in structured KG reasoning, transfers zero-shot to Wikipedia passage retrieval, and generalizes out-of-domain to enhance tool-free mathematical and logical deduction. 12 Preprint. ETHICS STATEMENT 
+
+This work trains and evaluates retrieval-augmented language models exclusively over publicly re-leased benchmarks and knowledge bases (Freebase, MultiTQ, and Wikipedia), involving no human subjects or private user data. While our multiplicative grounding gate g(τ ) substantially suppresses ungrounded fabrication, a grounded policy can still misinterpret retrieved facts; we report uncondi-tional full-split metrics and cross-family evaluations transparently to support safe deployment. REPRODUCIBILITY STATEMENT 
+
+To ensure full reproducibility, Appendix A reviews related work, Appendix B details our prelim-inary subgraph measurements and design requirements, Appendix C specifies the formal environ-ment contract and closed error vocabulary, Appendix D reproduces verbatim prompt templates for all five task families, Appendix E lists all training, data-split, and retrieval hyperparameters, Ap-pendix F reports the complete nineteen-benchmark attribution grids, Appendix G provides a side-by-side multi-turn interaction case study, Appendix H gives the proof of Proposition 1 and Algo-rithm 1, Appendix I and Appendix J discuss broader methodological principles and limitations, and Appendix K documents our 23-item silent-failure audit taxonomy. Source code and environment adapters will be released upon publication. 
+
+## REFERENCES 
+
+Peter Auer, Nicol` o Cesa-Bianchi, and Paul Fischer. Finite-time analysis of the multiarmed bandit problem. Machine Learning , 47(2–3):235–256, 2002. Yoshua Bengio, J´ erˆ ome Louradour, Ronan Collobert, and Jason Weston. Curriculum learning. In 
+
+International Conference on Machine Learning (ICML) , pp. 41–48, 2009. Jonathan Berant, Andrew Chou, Roy Frostig, and Percy Liang. Semantic parsing on Freebase from question-answer pairs. In Conference on Empirical Methods in Natural Language Processing (EMNLP) , pp. 1533–1544, 2013. Kurt Bollacker, Colin Evans, Praveen Paritosh, Tim Sturge, and Jamie Taylor. Freebase: A collabo-ratively created graph database for structuring human knowledge. In ACM SIGMOD International Conference on Management of Data , pp. 1247–1250, 2008. Antoine Bordes, Nicolas Usunier, Sumit Chopra, and Jason Weston. Large-scale simple question answering with memory networks. arXiv preprint arXiv:1506.02075 , 2015. Thomas Carta, Cl´ ement Romac, Thomas Wolf, Sylvain Lamprier, Olivier Sigaud, and Pierre-Yves Oudeyer. Grounding large language models in interactive environments with online reinforcement learning. In International Conference on Machine Learning (ICML) , pp. 3676–3713, 2023. Liyi Chen, Panrong Tong, Zhongming Jin, Ying Sun, Jieping Ye, and Hui Xiong. Plan-on-Graph: Self-correcting adaptive planning of large language model on knowledge graphs. In Advances in Neural Information Processing Systems (NeurIPS) , 2024. Mingyang Chen, Linzhuang Sun, Tianpeng Li, Haoze Sun, Yijie Zhou, et al. ReSearch: Learning to reason with search for LLMs via reinforcement learning. In Advances in Neural Information Processing Systems (NeurIPS) , 2025a. Xiaoyin Chen, Jiarui Lu, Ehsan Kamalloo, et al. Self-evolving curriculum for LLM reasoning. arXiv preprint arXiv:2505.14970 , 2025b. Yongchao Chen, Yueying Liu, Junwei Zhou, Yilun Hao, Jingquan Wang, Yang Zhang, and Chuchu Fan. R1-Code-Interpreter: Training LLMs to reason with code via supervised and reinforcement learning. arXiv preprint arXiv:2505.21668 , 2025c. Zhuo Chen, Fei Wang, Zixuan Li, Zhao Zhang, Weiwei Ding, Chuanguang Yang, Yongjun Xu, Xiaolong Jin, and Jiafeng Guo. KnowCoder-A1: Incentivizing agentic reasoning capability with outcome supervision for KBQA. arXiv preprint arXiv:2510.25101 , 2025d. 13 Preprint. Ziyang Chen, Jinzhi Liao, and Xiang Zhao. Multi-granularity temporal question answering over knowledge graphs. In Annual Meeting of the Association for Computational Linguistics (ACL) ,pp. 11378–11392, 2023. doi: 10.18653/v1/2023.acl-long.637. Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, Christopher Hesse, and John Schulman. Training verifiers to solve math word problems. arXiv preprint arXiv:2110.14168 ,2021. Edgar F. Codd. A relational model of data for large shared data banks. Communications of the ACM ,13(6):377–387, 1970. Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blistein, Ori Ram, Dan Zhang, Evan Rosen, et al. Gemini 2.5: Pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capa-bilities. arXiv preprint arXiv:2507.06261 , 2025. Runnan Fang, Shihao Cai, Baixuan Li, Jialong Wu, Guangyu Li, Wenbiao Yin, Xinyu Wang, Xi-aobin Wang, Liangcai Su, Zhen Zhang, et al. Towards general agentic intelligence via environ-ment scaling. arXiv preprint arXiv:2509.13311 , 2025. Zhaoyan Gong, Zhiqiang Liu, Songze Li, Xiaoke Guo, Yuanxiang Liu, Xinle Deng, Zhizhen Liu, Lei Liang, Huajun Chen, and Wen Zhang. Temp-R1: A unified autonomous agent for complex temporal KGQA via reverse curriculum reinforcement learning. In Annual Meeting of the Asso-ciation for Computational Linguistics (ACL) , pp. 25826–25845, 2026. Yu Gu, Sue Kase, Michelle Vanni, Brian Sadler, Percy Liang, Xifeng Yan, and Yu Su. Beyond I.I.D.: Three levels of generalization for question answering on knowledge bases. In The Web Conference (WWW) , pp. 3477–3488, 2021. Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song, Peiyi Wang, Qihao Zhu, Runxin Xu, Ruoyu Zhang, Shirong Ma, Xiao Bi, et al. DeepSeek-R1: Incentivizing reasoning capability in LLMs via reinforcement learning. arXiv preprint arXiv:2501.12948 , 2025. Xiaoxin He, Yijun Tian, Yifei Sun, Nitesh V. Chawla, Thomas Laurent, Yann LeCun, Xavier Bres-son, and Bryan Hooi. G-Retriever: Retrieval-augmented generation for textual graph understand-ing and question answering. In Advances in Neural Information Processing Systems (NeurIPS) ,pp. 132876–132907, 2024. Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric Tang, Dawn Song, and Jacob Steinhardt. Measuring mathematical problem solving with the MATH dataset. arXiv preprint arXiv:2103.03874 , 2021. Xanh Ho, Anh-Khoa Duong Nguyen, Saku Sugawara, and Akiko Aizawa. Constructing a multi-hop QA dataset for comprehensive evaluation of reasoning steps. In International Conference on Computational Linguistics (COLING) , pp. 6609–6625, 2020. Ari Holtzman, Jan Buys, Li Du, Maxwell Forbes, and Yejin Choi. The curious case of neural text degeneration. In International Conference on Learning Representations (ICLR) , 2020. Jian Hu, Jason Klein Liu, Haotian Xu, and Wei Shen. REINFORCE++: An efficient RLHF al-gorithm with robustness to both prompt and reward models. arXiv preprint arXiv:2501.03262 ,2025a. Jingcheng Hu, Yinmin Zhang, Qi Han, Daxin Jiang, Xiangyu Zhang, and Heung-Yeung Shum. Open-Reasoner-Zero: An open source approach to scaling up reinforcement learning on the base model. arXiv preprint arXiv:2503.24290 , 2025b. Aaron Jaech, Adam Kalai, Adam Lerer, Adam Richardson, Ahmed El-Kishky, Aiden Low, Alec Helyar, Aleksander Madry, Alex Beutel, Alex Carney, et al. OpenAI o1 system card. arXiv preprint arXiv:2412.16720 , 2024. 14 Preprint. Bowen Jin, Hansi Zeng, Zhenrui Yue, Jinsung Yoon, Sercan ¨ O. Arık, Dong Wang, Hamed Zamani, and Jiawei Han. Search-R1: Training LLMs to reason and leverage search engines with reinforce-ment learning. In Conference on Language Modeling (COLM) , 2025. Mandar Joshi, Eunsol Choi, Daniel S. Weld, and Luke Zettlemoyer. TriviaQA: A large scale distantly supervised challenge dataset for reading comprehension. In Annual Meeting of the Association for Computational Linguistics (ACL) , pp. 1601–1611, 2017. Kimi Team, Angang Du, Bofei Gao, Bowei Xing, Changjiu Jiang, Cheng Chen, Cheng Li, Chenjun Xiao, Chenzhuang Du, Chonghua Liao, et al. Kimi k1.5: Scaling reinforcement learning with LLMs. arXiv preprint arXiv:2501.12599 , 2025. M. Pawan Kumar, Benjamin Packer, and Daphne Koller. Self-paced learning for latent variable models. In Advances in Neural Information Processing Systems (NeurIPS) , pp. 1189–1197, 2010. Tom Kwiatkowski, Jennimaria Palomaki, Olivia Redfield, Michael Collins, Ankur Parikh, Chris Alberti, Danielle Epstein, Illia Polosukhin, Jacob Devlin, Kenton Lee, Kristina Toutanova, Llion Jones, Matthew Kelcey, Ming-Wei Chang, Andrew M. Dai, Jakob Uszkoreit, Quoc Le, and Slav Petrov. Natural Questions: A benchmark for question answering research. Transactions of the Association for Computational Linguistics (TACL) , 2019. Valentin Lacombe, Valentin Quesnel, and Damien Sileo. Reasoning Core: A scalable RL environ-ment for LLM symbolic reasoning. arXiv preprint arXiv:2509.18083 , 2025. Xiaoxi Li, Jiajie Jin, Guanting Dong, Hongjin Qian, Yutao Zhu, Yongkang Wu, Ji-Rong Wen, and Zhicheng Dou. WebThinker: Empowering large reasoning models with deep research capability. 
+
+arXiv preprint arXiv:2504.21776 , 2025. Hunter Lightman, Vineet Kosaraju, Yuri Burda, Harrison Edwards, Bowen Baker, Teddy Lee, Jan Leike, John Schulman, Ilya Sutskever, and Karl Cobbe. Let’s verify step by step. In International Conference on Learning Representations (ICLR) , 2024. Junhong Lin, Shicheng Liu, Jinyeop Song, Song Wang, Julian Shun, and Yada Zhu. Efficient and transferable agentic knowledge graph RAG via reinforcement learning. arXiv preprint arXiv:2509.26383 , 2025. Linhao Luo, Yuan-Fang Li, Gholamreza Haffari, and Shirui Pan. Reasoning on graphs: Faithful and interpretable large language model reasoning. In International Conference on Learning Repre-sentations (ICLR) , 2024. Alex Mallen, Akari Asai, Victor Zhong, Rajarshi Das, Daniel Khashabi, and Hannaneh Hajishirzi. When not to trust language models: Investigating effectiveness of parametric and non-parametric memories. In Annual Meeting of the Association for Computational Linguistics (ACL) , pp. 9802– 9822, 2013. Ofir Press, Muru Zhang, Sewon Min, Ludwig Schmidt, Noah A. Smith, and Mike Lewis. Measuring and narrowing the compositionality gap in language models. In Findings of the Association for Computational Linguistics: EMNLP , pp. 5687–5711, 2023. Cheng Qian, Emre Can Acikgoz, Qi He, Hongru Wang, Xiusi Chen, Dilek Hakkani-T¨ ur, Gokhan Tur, and Heng Ji. ToolRL: Reward is all tool learning needs. In Advances in Neural Information Processing Systems (NeurIPS) , 2025. Tom Schaul, John Quan, Ioannis Antonoglou, and David Silver. Prioritized experience replay. In 
+
+International Conference on Learning Representations (ICLR) , 2016. Timo Schick, Jane Dwivedi-Yu, Roberto Dess` ı, Roberta Raileanu, Maria Lomeli, Eric Hambro, Luke Zettlemoyer, Nicola Cancedda, and Thomas Scialom. Toolformer: Language models can teach themselves to use tools. In Advances in Neural Information Processing Systems (NeurIPS) ,2023. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. 15 Preprint. Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. DeepSeekMath: Pushing the limits of math-ematical reasoning in open language models. arXiv preprint arXiv:2402.03300 , 2024. Guangming Sheng, Chi Zhang, Zilingfeng Ye, Xibin Wu, Wang Zhang, Ru Zhang, Yanghua Peng, Haibin Fu, Tao Tang, Ganqu Cui, Boren Zhang, Cheng Zhou, Bingquan Shen, Kai Zhang, Jun Wang, Yuxuan Hu, Yao Lu, Yufeng Cui, Yufei Wang, Zhiyu Wang, Chuyi Xu, Yuzhe Wang, Yijia Wang, Yu Chen, Yong Chen, et al. HybridFlow: A flexible and efficient RLHF framework. In 
+
+European Conference on Computer Systems (EuroSys) , 2025. Huatong Song, Jinhao Jiang, Yingqian Min, Jie Chen, Zhipeng Chen, Wayne Xin Zhao, Lei Fang, and Ji-Rong Wen. R1-Searcher: Incentivizing the search capability in LLMs via reinforcement learning. arXiv preprint arXiv:2503.05592 , 2025. Yurun Song, Xiangqing Shen, Jianfei Yu, and Rui Xia. Interactive semantic parsing with reinforce-ment learning for knowledge graph reasoning. In Findings of the Association for Computational Linguistics: ACL , pp. 20464–20484, 2026. Hao Sun, Zile Qiao, Jiayan Guo, Xuanbo Fan, Yingyan Hou, Yong Jiang, Pengjun Xie, Yan Zhang, Fei Huang, and Jingren Zhou. ZeroSearch: Incentivize the search capability of LLMs without searching. arXiv preprint arXiv:2505.04588 , 2025. Jiashuo Sun, Chengjin Xu, Lumingyuan Tang, Saizhuo Wang, Chen Lin, Yeyun Gong, Lionel M. Ni, Heung-Yeung Shum, and Jian Guo. Think-on-Graph: Deep and responsible reasoning of large language model on knowledge graph. In International Conference on Learning Representations (ICLR) , 2024. Alon Talmor and Jonathan Berant. The web as a knowledge-base for answering complex questions. In Conference of the North American Chapter of the Association for Computational Linguistics (NAACL) , pp. 641–651, 2018. Weihao Tan, Wentao Zhang, Shanqi Liu, Longtao Zheng, Xinrun Wang, and Bo An. True knowledge comes from practice: Aligning LLMs with embodied environments via reinforcement learning. 
+
+arXiv preprint arXiv:2401.14151 , 2024. Harsh Trivedi, Niranjan Balasubramanian, Tushar Khot, and Ashish Sabharwal. MuSiQue: Multi-hop questions via single-hop question composition. Transactions of the Association for Compu-tational Linguistics (TACL) , 2022. Ziyu Wan, Yunxiang Li, Xiaoyu Wen, Yan Song, Hanjing Wang, Linyi Yang, Mark Schmidt, Jun Wang, Weinan Zhang, Shuyue Hu, and Ying Wen. ReMA: Learning to meta-think for LLMs with multi-agent reinforcement learning. In Advances in Neural Information Processing Systems (NeurIPS) , pp. 140399–140445, 2025. Yuyao Wang, Bowen Liu, Jianheng Tang, Nuo Chen, Yuhan Li, Qifan Zhang, and Jia Li. Graph-R1: Unleashing LLM reasoning with NP-hard graph problems. arXiv preprint arXiv:2508.20373 ,2025. Muning Wen, Ziyu Wan, Jun Wang, Weinan Zhang, and Ying Wen. Reinforcing LLM agents via policy optimization with action decomposition. In Advances in Neural Information Processing Systems (NeurIPS) , pp. 103774–103805, 2024. Chulin Xie, Yangsibo Huang, Chiyuan Zhang, Da Yu, Xinyun Chen, Bill Yuchen Lin, Bo Li, Badih Ghazi, and Ravi Kumar. On memorization of large language models in logical reasoning. arXiv preprint arXiv:2410.23123 , 2024. Tian Xie, Zitian Gao, Qingnan Ren, Haoming Luo, Yuqian Hong, Bryan Dai, Joey Zhou, Kai Qiu, Zhirong Wu, and Chong Luo. Logic-RL: Unleashing LLM reasoning with rule-based reinforce-ment learning. arXiv preprint arXiv:2502.14768 , 2025. Shuwen Xu, Yao Xu, Jiaxiang Liu, Chenhao Yuan, Wenshuo Peng, Jun Zhao, and Kang Liu. Graph-Walker: Agentic knowledge graph question answering via synthetic trajectory curriculum. In 
+
+Conference on Language Modeling (COLM) , 2026. 16 Preprint. Zhenghai Xue, Longtao Zheng, Xuefeng Hu, Zheng Liu, Hao Xu, Shuai Zhang, Pengjun Liu, Yao-hua Wang, and Xinyu Zhu. SimpleTIR: End-to-end reinforcement learning for multi-turn tool-integrated reasoning. In International Conference on Learning Representations (ICLR) , 2026. Shiqi Yan, Yubo Chen, Ruiqi Zhou, Zhengxi Yao, Shuai Chen, Tianyi Zhang, Shijie Zhang, Wei-Qiang Zhang, Yongfeng Huang, Haixin Duan, and Yunqi Zhang. Explore-on-Graph: Incentiviz-ing autonomous exploration of large language models on knowledge graphs with path-refined reward modeling. In International Conference on Learning Representations (ICLR) , 2026. Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Bengio, William W. Cohen, Ruslan Salakhutdinov, and Christopher D. Manning. HotpotQA: A dataset for diverse, explainable multi-hop question answering. In Conference on Empirical Methods in Natural Language Processing (EMNLP) , pp. 2369–2380, 2018. Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan Cao. ReAct: Synergizing reasoning and acting in language models. In International Conference on Learning Representations (ICLR) , 2023. Wen-tau Yih, Matthew Richardson, Christopher Meek, Ming-Wei Chang, and Jina Suh. The value of semantic parse labeling for knowledge base question answering. In Annual Meeting of the Association for Computational Linguistics (ACL) , pp. 201–206, 2016. Peng Yu, Cheng Deng, Beiya Dai, Luoyi Fu, Xinbing Wang, Guihai Chen, and Ying Wen. KaLM: Knowledge-aligned autoregressive language modeling via dual-view knowledge graph contrastive learning. Frontiers of Computer Science , 21(2):2102348, 2026a. doi: 10.1007/ s11704-026-50906-6. Peng Yu, Zeyuan Zhao, Shao Zhang, Luoyi Fu, Xinbing Wang, and Ying Wen. Structured in-context environment scaling for large language model reasoning. In International Conference on Learning Representations (ICLR) , 2026b. Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan, Gaohong Liu, Lingjun Liu, et al. DAPO: An open-source LLM reinforcement learning system at scale. arXiv preprint arXiv:2503.14476 , 2025. Weihao Zeng, Yuzhen Huang, Qian Liu, Wei Liu, Keqing He, Zejun Ma, and Junxian He. SimpleRL-Zoo: Investigating and taming zero reinforcement learning for open base models in the wild. arXiv preprint arXiv:2503.18892 , 2025. Shao Zhang, Xihuai Wang, Wenhao Zhang, Chaoran Li, Junru Song, Tingyu Li, Lin Qiu, Xuezhi Cao, Xunliang Cai, Wen Yao, et al. Leveraging dual process theory in language agent framework for real-time simultaneous human-AI collaboration. arXiv preprint arXiv:2502.11882 , 2025. Chujie Zheng, Shixuan Liu, Mingze Li, Xiong-Hui Chen, Bowen Yu, Chang Gao, Kai Dang, Yuqiong Liu, Rui Men, An Yang, et al. Group sequence policy optimization. arXiv preprint arXiv:2507.18071 , 2025a. Yuxiang Zheng, Dayuan Fu, Xiangkun Hu, Xiaojie Cai, Lyumanshan Ye, Pengrui Lu, and Pengfei Liu. DeepResearcher: Scaling deep research via reinforcement learning in real-world environ-ments. arXiv preprint arXiv:2504.03160 , 2025b. 17 Preprint. 
+
+## APPENDIX CONTENTS 
+
+A Related Work 19 B Preliminary Measurements and Environment Design Requirements 20 
+
+B.1 Three Measurable Criteria for Agentic Search Environments . . . . . . . . . . . . 20 B.2 Measurement 1: Per-Question Subgraphs Compress the Decision Space and Leak Answer Locations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 B.3 Measurement 2: Database-Specific Action Signatures Obstruct Cross-Tool Transfer 21 B.4 Measurement 3: Full-Graph Latency, Partial Observability, and Directional Asym-metry . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21 B.5 Measurement 4: Silent Failure Modes in Multi-Turn Agentic RL . . . . . . . . . . 22 
+
+C Formal Environment Contract and Error Vocabulary 22 D Verbatim Prompt Templates 23 
+
+D.1 Knowledge-Graph Agent (WebQSP, CWQ, GrailQA, SimpleQuestions, WebQues-tions) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 D.2 Temporal Knowledge-Graph Modifier (MultiTQ) . . . . . . . . . . . . . . . . . . 24 D.3 Text-Retrieval Agent (Search QA Transfer Family) . . . . . . . . . . . . . . . . . 24 D.4 Single-Turn Mathematical Reasoning (GSM8K, MATH500, AIME24, AMC23) . . 25 D.5 Logical Reasoning (Knights and Knaves Easy & Hard) . . . . . . . . . . . . . . . 25 D.6 Environment Observation Receipt Template . . . . . . . . . . . . . . . . . . . . . 25 
+
+E Training Configuration and Hyperparameters 25 F Complete Attribution Grids Across All Nineteen Benchmarks 27 G Multi-Turn Interaction Case Study 28 H Proof of Proposition 1 and Two-Stage Training Algorithm 28 
+
+H.1 Proof of Proposition 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28 H.2 Two-Stage Training Algorithm . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29 
+
+I Discussion: Methodological Principles for Agentic RL 29 J Limitations and Future Work 29 K Implementation Audit and Taxonomy of Silent Failures 30 
+
+18 Preprint. 
+
+## A RELATED WORK 
+
+Table 5 summarizes how representative systems sit relative to RISE along the three core environ-mental properties established in Section 1. Table 5: Positioning of representative methods along the three environmental properties argued in this paper. A filled checkmark shows that the property holds by construction; an open circle shows that it holds only partially (e.g., operating on restricted or synthetic subgraphs, or annealing an exogenous noise knob rather than tracking policy variance).                                     
+
+> Method Action interface Full-graph interaction Graph-agnostic intent Variance-driven curriculum Think-on-Graph (Sun et al., 2024) Beam search over edges ✓◦–Plan-on-Graph (Chen et al., 2024) LLM-guided expansion ◦◦–KG-R1 (Lin et al., 2025) Four symbolic one-hop ops –◦–GraphWalker (Xu et al., 2026) Relation / triple lookup ◦◦–Search-R1 (Jin et al., 2025) Passage query –✓–ZeroSearch (Sun et al., 2025) Passage query –✓◦
+> SIE (Yu et al., 2026b) Static in-context subgraph –––RISE (ours) Natural-language intent ✓✓✓
+
+Knowledge-Graph Reasoning Agents. Prompt-driven frameworks traverse a graph by prompting a frozen model to select edges iteratively: Think-on-Graph (Sun et al., 2024) performs beam search over relations, and Plan-on-Graph (Chen et al., 2024) maintains a decomposed plan with reflection and adaptive beam width. A second line retrieves a question-specific subgraph prior to generation, as in Reasoning-on-Graphs (Luo et al., 2024) and G-Retriever (He et al., 2024). A third line trains the policy end to end via RL: KG-R1 (Lin et al., 2025) optimizes multi-turn retrieval with four symbolic one-hop primitives over pre-extracted per-question subgraphs; GraphWalker (Xu et al., 2026) pretrains on synthetic walking trajectories and applies RL over relation and triple lookups; KnowCoder-A1 (Chen et al., 2025d) emits executable SPARQL queries assisted by schema-lookup tools; ISP-KGR (Song et al., 2026) couples interactive semantic parsing with tree-structured roll-outs; and Temp-R1 (Gong et al., 2026) applies a reverse curriculum over temporal primitives. Two fundamental differences separate RISE from this line. First, regarding decision-space scale , a me-dian per-question subgraph in the KG-R1 release holds only 4,415 triples, enclosing the gold path in advance; RISE exposes the full 9.5×10 8-triple store under a bounded call budget. Notably, Xu et al. (2026) report that evaluating subgraph-trained KG-R1 on the global graph drops WebQSP accuracy from 82 .7% (in-subgraph) to 66 .8% , directly confirming the magnitude of the subgraph shortcut. Second, regarding interface abstraction , SPARQL generation and graph-specific primitives bind the policy to one database schema, whereas our natural-language intent adapter transfers zero-shot to unstructured passage retrieval. 
+
+Reinforcement Learning for Search and Tool Use. Interleaving chain-of-thought reasoning with external tool calls (Yao et al., 2023; Schick et al., 2023) via outcome-rewarded RL has been widely studied on text corpora: Search-R1 (Jin et al., 2025) formulates multi-turn passage retrieval with observation-token masking, while ReSearch (Chen et al., 2025a), R1-Searcher (Song et al., 2025), WebThinker (Li et al., 2025), and DeepResearcher (Zheng et al., 2025b) extend outcome-driven RL to multi-step web and corpus search. ToolRL (Qian et al., 2025) studies reward granularity for general API invocation, SimpleTIR (Xue et al., 2026) stabilizes multi-turn tool-integrated training by filtering degenerate turns, Explore-on-Graph (Yan et al., 2026) introduces path-refined reward modeling, and ZeroSearch (Sun et al., 2025) replaces live search engines with a learned simulator whose noise is annealed over training. While effective on homogeneous text corpora where every query returns a stateless top-k list with smooth similarity decay, directly applying text-RL recipes to a full-scale structured knowledge base encounters ungrounded guessing on multi-answer queries and severe zero-variance gradient starvation—which RISE resolves via our multiplicative grounding gate g(τ ) and competence-frontier scheduling. 
+
+Structured Post-Training Environments and Curriculum Learning. A parallel research line constructs post-training environments from structured data (Fang et al., 2025; Lacombe et al., 2025; Wang et al., 2025). KaLM (Yu et al., 2026a) aligns internal LLM representations with KG triples via dual-view contrastive learning, embedding structured knowledge into model parameters rather 19 Preprint. than context. SIE (Yu et al., 2026b) automatically extracts static in-context subgraphs of controlled completeness ( ρ ≡ 1 at SIE-100%) to incentivize compositional deduction via GRPO. ReMA (Wan et al., 2025) explores multi-agent meta-thinking under RL, Wen et al. (2024) study action decom-position for language agents, and Logic-RL (Xie et al., 2025) demonstrates reasoning transfer from rule-based logic puzzles. The key distinction lies in what is scaled: SIE scales the completeness of a static context that the model passively reads, whereas RISE scales the decision space of an interactive search environment that the model actively queries , where reachability is governed by the policy’s own sequential decisions under a call budget. On the optimization side, classical cur-riculum learning orders examples statically by difficulty (Bengio et al., 2009; Kumar et al., 2010), whereas prioritized replay and bandit schedulers adapt sampling online (Schaul et al., 2016; Auer et al., 2002). Building upon Chen et al. (2025b), we ground curriculum design in Proposition 1 by uniting SPARQL structural tiers with the group-level standard deviation return 2ppq (1 − pq ).
+
+## B PRELIMINARY MEASUREMENTS AND ENVIRONMENT DESIGN 
+
+## REQUIREMENTS 
+
+This appendix provides the complete empirical protocols and measurements underlying the envi-ronment design of RISE. Specifically, we formalize three measurable criteria that an interactive en-vironment must satisfy to support authentic search-policy learning, evaluate existing subgraph and query-syntax paradigms against these criteria across four diagnostic measurement sets, and derive the six engineering and methodological requirements summarized in Table 6. B.1 THREE MEASURABLE CRITERIA FOR AGENTIC SEARCH ENVIRONMENTS 
+
+Treating multi-turn retrieval as a learnable decision process requires an environment that simultane-ously satisfies three foundational conditions: 
+
+(C1) Unavoidable Candidate Pruning. If the candidate space is small enough to enumerate within a few steps, sequential path selection requires no strategic pruning. Given any candidate environ-ment, we audit C1 by measuring: (a) the fraction of ground-truth answers reachable within one or two hops from the topic entity, and (b) the top-k answer hit rate achievable by a question-blind structural heuristic that never reads the input question. If (b) substantially exceeds uniform random chance, the environment’s topology leaks the answer’s location. 
+
+(C2) Graph-Agnostic Action Interface. If the policy’s action space is bound to a database-specific query syntax (e.g., SPARQL or specialized atomic graph signatures), the policy conflates strategic search planning with syntax generation, obstructing zero-shot transfer to new graph schemas or unstructured text retrievers. C2 is satisfied when the policy emits natural-language search intents while a deterministic environment adapter handles schema-specific translation. 
+
+(C3) Turn- and Outcome-Level Attributability. If the training reward incorporates intermediate process shaping (e.g., bonus credit whenever a gold entity appears anywhere in a retrieved table), score improvements cannot be cleanly attributed to improved decision-making versus shaping ex-ploitation. Attributability requires an outcome-only reward gated by explicit evidence grounding, paired with closed-vocabulary turn receipts. B.2 MEASUREMENT 1: P ER -Q UESTION SUBGRAPHS COMPRESS THE DECISION SPACE AND 
+
+LEAK ANSWER LOCATIONS 
+
+We audited the per-question WebQSP subgraphs released by KG-R1 (Lin et al., 2025) across all test instances without modification. Hop counts are computed via breadth-first search (BFS) as the shortest path length from any linked topic entity to any gold answer entity inside the extracted subgraph. To test for topological leakage, we evaluate a question-blind degree heuristic that ranks all nodes in the subgraph strictly by their in-subgraph degree (breaking ties deterministically by entity identifier) without accessing the question text, compared against a uniform random node baseline averaged over 1,000 Monte Carlo trials per question. The empirical findings reveal three severe confounds: 20 Preprint. • Five-Order-of-Magnitude Space Compression: The median per-question subgraph contains only 4,415 triples spanning 1,638 entities (subject to a hard cap of 2,000 entities), which is 
+
+216 ,202 × smaller than the full Freebase store ( 9.5 × 10 8 triples). • Enumeration Replaces Multi-Hop Planning: Exactly 65 .5% of gold answers are reachable within a single hop and 29 .1% within two hops. Thus, a naive two-hop expansion covers 94 .6% 
+
+of all test questions, eliminating the need for selective path pruning. • Topological Leakage of Answer Entities: The question-blind degree heuristic ranks a gold answer entity at Top-1 in 9.41% of questions, Top-5 in 24 .11% , and Top-10 in 33 .27% , compared to 0.19% for uniform random selection. Across the dataset, gold answer entities exhibit a median in-subgraph degree of 11 , whereas random subgraph nodes exhibit a median degree of 3.Because upstream subgraph extractors are designed to enclose the ground-truth reasoning path within a small node budget, they inevitably pull in dense local connectivity around the target answer. Consequently, models trained or evaluated on pre-extracted subgraphs can achieve high accuracy by exploiting construction artifacts rather than learning generalizable search policies. B.3 MEASUREMENT 2: D ATABASE -S PECIFIC ACTION SIGNATURES OBSTRUCT 
+
+CROSS -T OOL TRANSFER 
+
+Binding the policy to fixed atomic graph primitives or raw query languages prevents zero-shot gen-eralization across heterogeneous tools. For instance, extending atomic neighborhood actions from static Freebase to temporal knowledge graphs requires altering the action signature to accept times-tamp arguments and introducing specialized temporal operators (Lin et al., 2025; Gong et al., 2026). Conversely, semantic parsing agents such as KnowCoder-A1 (Chen et al., 2025d) train the policy to emit raw SPARQL syntax supported by schema-lookup tools. While effective within a single database schema, neither action space can be transferred zero-shot to an unstructured Wikipedia passage retriever. By requiring the policy to formulate queries as natural-language intents inside 
+
+<search>...</search> and delegating execution to a deterministic typed intent adapter ΦG ,RISE maintains an identical policy-side protocol across static KGs, temporal KGs, and dense pas-sage retrievers. B.4 MEASUREMENT 3: F ULL -G RAPH LATENCY , P ARTIAL OBSERVABILITY , AND 
+
+DIRECTIONAL ASYMMETRY 
+
+A common objection to full-graph RL training is that executing live queries against 9.5 × 10 8 triples during on-policy rollouts will bottleneck training throughput. Profiling our Virtuoso backend refutes this concern: on the execution path, a single adapter search call has a median latency of 15 .5 ms and a p95 of 65 .4 ms (with worst-case single-query latency staying below one second), ensuring that no individual call stalls a rollout turn. At the level of a training step, a warm relation vocabulary of 
+
+6,102 entries sustains 29 .22 queries per second at a median latency of 0.985 s, meaning that 2,560 
+
+queries—the typical load of one GRPO step at 64 questions × 8 rollouts × 5 turns—require only 
+
+1.46 minutes of cumulative backend execution time across parallel workers while multi-turn LLM decoding and FSDP parameter updates dominate step wall-clock time. Operating over the full graph surfaces two structural properties that directly shape our adapter and curriculum design: 1. Budget-Bounded Reachability Floor and Early Reward Sparsity: Let A∗(q) be the ground-truth answer set for question q, and E(ot) the set of surface-form entities and literal values returned in receipt ot. For an action sequence a1: k = ( a1, . . . , a k), the budget-bounded reacha-bility indicator ρ(q; Cmax ) ∈ { 0, 1} is defined as 
+
+ρ(q; Cmax ) = I
+
+"
+
+∃ a1: k ∈ A k 
+
+> search
+
+(k ≤ Cmax ) s.t. [[ A∗(q)]] ⊆
+
+> k
+
+[
+
+> t=1
+
+[[ E ΦG (at, h t−1)]] 
+
+#
+
+. (10) Unlike pre-extracted subgraphs where ρ(q; Cmax ) ≡ 1 by construction, full-graph search un-der Cmax = 16 is subject to partial observability: a model-free outgoing BFS probe without semantic ranking establishes a strict lower bound of ρBFS ≥ 0.5219 (leaving up to 0.48 unreach-able without semantic ranking). Under G = 8 group sampling, this partial observability causes 21 Preprint. 
+
+64% of training questions to yield zero within-group reward variance ( ˆσ = 0 , corresponding to 
+
+pG + (1 − p)G scaling from an empirical 73% zero-variance rate at G = 4 ), motivating our SEC bandit scheduler. 2. Severe Directional Asymmetry of Relations: Auditing candidate Freebase relations around topic entities reveals that 48 .6% of valid relations exist exclusively as incoming edges (e′, r, e t).An environment adapter that traverses only outgoing edges (et, r, e ′) would list these relations during schema inspection but return empty results when the policy queries them, penalizing valid reasoning steps. Direction-symmetric execution (Equation (3)) is therefore a foundational correctness requirement. B.5 MEASUREMENT 4: S ILENT FAILURE MODES IN MULTI -T URN AGENTIC RL During the development of RISE, we conducted systematic turn-level trajectory audits and discov-ered that the most damaging implementation defects in multi-turn agentic RL do not trigger run-time exceptions or degrade standard scalar monitoring curves (e.g., mean reward, KL divergence, or gradient norm). Instead, defects such as mid-row observation truncation, test-split leakage into cold-start pools, reward-gaming on multi-answer sets, or mismatches between trainer and evalu-ator stop tokens manifest as silent capability regressions where training jobs complete normally (Succeeded ) while downstream transfer or reasoning retention degrades. We formalize these into a 23-item audit taxonomy in Appendix K. Table 6: Summary of environment and training design requirements derived from Measurements 1–4.                           
+
+> ID Design Requirement Empirical Source Architectural Instantiation in RISE D1 Unpruned candidate space requiring genuine path pruning Criterion C1, Measurement 1 Full-scale Freebase ( 9.5×10 8triples); zero per-question subgraph pre-filtering D2 Graph- and tool-agnostic policy action interface Criterion C2, Measurement 2 Natural-language <search> intents translated by deterministic adapter ΦG
+> D3 Outcome-only reward immune to parametric guessing Criterion C3, Section 2.3 Set-equality EM gated multiplicatively by evidence grounding g(τ)+ additive format φ(τ)
+> D4 Deterministic, answer-blind, direction-symmetric execution Measurement 3 Bidirectional triple traversal Fexec with explicit truncation headers (k of N)
+> D5 Protocol bootstrapping and active gradient maintenance Measurement 3, Proposition 1 Isomorphic teacher rejection-sampled cold start + SPARQL tiers & SEC bandit D6 Multi-family evaluation without cross-family pooling Measurement 4, Appendix K Three capability families across nineteen benchmarks, never pooled across families
+
+## C FORMAL ENVIRONMENT CONTRACT AND ERROR VOCABULARY 
+
+This appendix specifies the formal turn grammar, receipt schema, closed error vocabulary, and bud-get accounting rules summarized in Section 2.2. 
+
+Turn Grammar. At every turn t, the assistant policy must emit a reasoning block enclosed in 
+
+<think>...</think> followed by exactly one action tag (either a search query or a terminal answer):                   
+
+> <think>step-by-step reasoning and search planning</think> <search>natural-language query with [[Entity Mention]]</search> <think>final evidence synthesis and verification</think> <answer>entity 1, entity 2</answer> <answer></answer> %explicit abstention
+
+22 Preprint. Every <search> turn is followed by exactly one user turn containing the environment’s 
+
+<information>...</information> receipt; retrieved facts are never spliced directly into the assistant’s generation stream. 
+
+Structured Receipt Schema. Each valid observation receipt contains four standardized fields: (1) Resolved , reporting the surface form and matched graph node identifier (allowing the policy to verify entity resolution without generating raw MIDs); (2) intent , recording the classified structural intent tag ( ιt ∈ { relation hop , relation list , entity info }); (3) Results (k of N) , listing the top-k ranked triples formatted as subject | relation | object 
+
+alongside total match count N to distinguish empty results ( N = 0 ) from row-cap truncation ( k < N ); and (4) Calls remaining , displaying the remaining search budget Cmax − ct.
+
+Closed-Vocabulary Error Codes. All execution anomalies are mapped deterministically to seven machine-readable error codes: • E NO ENTITY : Query contains no bracketed entity mention or no candidate exceeds the resolu-tion threshold. • E ENTITY NOT FOUND : Bracketed surface form cannot be resolved in the active binding table or graph index. • E INTENT UNSUPPORTED : Requested structural operation is inapplicable to the resolved node type. • E NO RESULTS : Well-formed query executed successfully but returned zero matching triples (N = 0 ). • E QUERY FAILED : Transient backend timeout or SPARQL engine exception; never penalized or counted against policy error streaks. • E BUDGET EXCEEDED : Search call cap Cmax = 16 reached; triggers the final answer-only turn. • E MALFORMED : Assistant output violated the turn grammar (<think> followed by 
+
+<search> or <answer> ); permits retry on the next turn if budget remains. 
+
+Dual-Budget Accounting and Observation Independence. The search call cap ( Cmax = 16 ), per-turn generation limit ( 2,048 tokens), and rolling context window ( 28 ,672 tokens, enforced via left truncation) operate orthogonal to one another. Cold-start trajectory filtering, online GRPO roll-outs, and benchmark evaluation invoke the exact same adapter binary and receipt serializer. 
+
+## D VERBATIM PROMPT TEMPLATES 
+
+To guarantee full reproducibility of our protocol layer and cross-tool transfer experiments, we repro-duce verbatim every system, user, and observation prompt template used across the five task instan-tiations. All templates share an isomorphic turn structure ( <think> → <search> /<answer> 
+
+→ <information> ), differing only in tool specification and answer formatting. D.1 KNOWLEDGE -G RAPH AGENT (W EB QSP, CWQ, G RAIL QA, S IMPLE QUESTIONS ,WEB QUESTIONS )When a benchmark provides linked topic entities, they are supplied in double square brackets on the second line of the user turn; when no topic entities are provided, the second line is omitted.                               
+
+> System & User Prompt: Knowledge-Graph Agent
+> You are aquestion-answering agent with access to aknowledge graph. In every turn, first reason inside <think>...</think>, then take exactly one action: -<search>query</search> to query the knowledge graph, or -<answer>final answer</answer> to finish.
+
+23 Preprint. 
+
+After a search, the environment replies inside <information>...</information>; wait for that reply before acting again. Write a search as a natural-language question about one entity, with every entity name in double square brackets, copied exactly from the question, the topic entities or an earlier <information> block: <search> Who is the head coach of [[Pittsburgh Steelers]]? </search> A reply starts with a Resolved line naming the matched entity, followed by facts as "subject | relation | object" rows. "Results (k of N)" means only k of N rows are shown; ask a more specific question to narrow them down. If no relation matches your question, the reply lists the entity's relations instead; choose one and ask again. Repeating a search returns the same result. When a reply says your budget is exhausted, give your answer in the next turn. Answer with names, dates or values exactly as they appear in <information> blocks, and separate multiple answers with commas. Question: <question, whitespace-normalised> Topic entities: [[entity 1]], [[entity 2]] 
+
+D.2 TEMPORAL KNOWLEDGE -G RAPH MODIFIER (M ULTI TQ) For MultiTQ, the following paragraph is appended to the knowledge-graph system prompt above: 
+
+System Prompt Modifier: Temporal Knowledge-Graph (MultiTQ) 
+
+This knowledge graph is temporal: every fact row ends with the date it happened (YYYY-MM-DD). Answer questions about "before", "after", "first" or "last" by comparing those dates, and give a date at the granularity the question asks for: YYYY for a year, YYYY-MM for amonth, YYYY-MM-DD for a day. 
+
+D.3 TEXT -R ETRIEVAL AGENT (S EARCH QA T RANSFER FAMILY )For zero-shot evaluation on NQ, TriviaQA, PopQA, HotpotQA, 2WikiMultiHopQA, MuSiQue, and Bamboogle, the KG adapter is replaced by a Wikipedia passage retriever using the following mini-mally adapted system prompt: 
+
+System Prompt: Text-Retrieval Agent (Search QA Family) 
+
+You are a question-answering agent with access to a Wikipedia search engine. In every turn, first reason inside <think>...</think>, then take exactly one action: - <search>query</search> to search Wikipedia, or - <answer>final answer</answer> to finish. After a search, the environment replies inside <information>...</information>; wait for that reply before acting again. Write a search as a natural-language question or a keyword query: <search> Who is the head coach of the Pittsburgh Steelers? </search> A reply lists the most relevant passages, each with its title. If they do not contain what you need, search again with a different query; repeating a search returns the same result. When a reply says your budget is exhausted, give your answer in the next turn. 
+
+24 Preprint. 
+
+Answer with a short answer only (a name, date or number), not asentence. 
+
+D.4 SINGLE -T URN MATHEMATICAL REASONING (GSM8K, MATH500, AIME24, AMC23) 
+
+System & User Prompt: Single-Turn Mathematical Reasoning 
+
+You are a careful mathematical problem solver. First reason step by step inside <think>...</think>, then give the final answer inside <answer>...</answer>. The answer must be the final result only (a number or a simplified expression in LaTeX), with no explanation. Question: <question> 
+
+D.5 LOGICAL REASONING (K NIGHTS AND KNAVES EASY & H ARD )
+
+System & User Prompt: Logical Reasoning (Knights and Knaves) 
+
+You are a careful logical reasoner. First reason step by step inside <think>...</think>, then give the final answer inside <answer>...</answer>, stating the identity of every inhabitant on its own numbered line: <answer> (1) A is a knight (2) B is a knave </answer> Use the inhabitants' names from the question in place of A and B. Question: <question> 
+
+D.6 ENVIRONMENT OBSERVATION RECEIPT TEMPLATE 
+
+Observation Receipt Template 
+
+<information> Resolved: <matched entity> | intent=<closed tag> Results (k of N): <subject> | <relation> | <object> ... Calls remaining: <n> </information> 
+
+## E TRAINING CONFIGURATION AND HYPERPARAMETERS 
+
+All training instances in Stage 1 and Stage 2 are drawn exclusively from the official training splits of WebQSP and CWQ ( 34 ,215 questions in total), which are partitioned via stratified sampling by dataset and difficulty tier into the cold-start pool Qcold (6,000 questions) and the RL pool QRL 
+
+(28 ,215 questions). The four RL curriculum schedules (UNI, E2H, H2E, and SEC) operate over the exact same 28 ,215 -question pool QRL , differing only in presentation order or dynamic batch composition. Table 7 details the complete training, data-hygiene, and retrieval configuration shared across all experimental arms. 25 Preprint. Table 7: Full training, data-split, adapter, and evaluation hyperparameters for RISE. 
+
+Hyperparameter / Setting Value Base models Qwen2.5-7B-Instruct (primary); Llama-3.1-8B-Instruct; Qwen2.5-14B-Instruct RL optimization framework On-policy multi-turn GRPO on VeRL (Sheng et al., 2025) (FSDP + vLLM rollout engine) Rollout group size G 8 trajectories per question Batch size |B s| 64 questions per step ( 512 group trajectories per step) Training horizon Sepoch 1 epoch ( 440 optimizer steps) Master training corpus 34 ,215 questions from official WebQSP + CWQ train splits, stratified by (dataset, tier) into strictly disjoint Qcold 
+
+(6,000 ) and QRL (28 ,215 )Cold-start pool Qcold & teacher 6,000 questions; Gemini-2.5-pro ( T = 0 .7, ≤ 2 attempts/question; 
+
+|D SFT | = 4 ,006 accepted under Eq. 6) Cold-start SFT epochs 2 epochs RL question pool QRL 28 ,215 questions (shared identically across UNI, E2H, H2E, and SEC; disjoint from Qcold )Periodic validation split Official WebQSP + CWQ test splits ( 1,628 + 3 ,528 = 5 ,156 
+
+questions, evaluated every 50 steps) Learning rate 1 × 10 −6 (constant, AdamW) KL divergence penalty β 0.01 against πref 
+
+Clip ratio ϵ / Entropy bonus ϵ = 0 .2 / Entropy bonus = 0 .0
+
+Per-turn generation cap 2,048 tokens Rolling context window 28 ,672 tokens (left truncation) Search call budget Cmax 16 calls per episode KG adapter ranking & caps Dense encoder intfloat/e5-base-v2 ; max 50 relations and 
+
+k = 100 rows per call Passage retrieval environment Wiki-18 dump ( 21 ,015 ,324 passages), E5-base-v2 + FAISS flat index, top-3 passages per call SEC bandit parameters 4 structural arms; EMA α = 0 .5; Boltzmann temperature η = 0 .4;
+
+Qk (0) = 0 .5
+
+Numerical precision & hardware bf16 on 8 × NVIDIA A100 GPUs Evaluation decoding Greedy decoding ( T = 0 ) across all nineteen benchmarks 
+
+26 Preprint. 
+
+## F COMPLETE ATTRIBUTION GRIDS ACROSS ALL NINETEEN BENCHMARKS 
+
+Tables 8–10 provide the complete nineteen-benchmark evaluation grids across all nine arms (Base model, two specialized baselines per family, and six controlled recipe variants of RISE on Qwen2.5-7B-Instruct) supporting Section 3.2 and Section 3.3. Across all three capability families, the full grids confirm three consistent patterns: (1) combining the protocol cold start with on-policy RL (RISE w/ UNI) outperforms either stage in isolation (RISE w/o RL and RISE w/o SFT) on every family average; (2) reversing the curriculum order (RISE w/ H2E) consistently underperforms pro-gressive ordering (RISE w/ E2H); and (3) closed-loop variance tracking (RISE w/ SEC) achieves the highest performance on complex multi-hop composition (WebQSP, CWQ, GrailQA, HotpotQA, MuSiQue, Bamboogle) and multi-step mathematical deduction (GSM8K, MATH500, AIME24, AMC23, K&K Hard). Table 8: Complete structured-knowledge grid for all recipe arms on Qwen2.5-7B-Instruct (RQ4), %. Set-equality EM except SimpleQuestions and WebQuestions (any-item hit, †) and MultiTQ (Hits@1). Bold marks the best arm of each column and underline the second; the RISE w/ SEC row is shaded.                                                                       
+
+> Arm WebQSP CWQ GrailQA SimpleQ †WebQ †MultiTQ Avg. Base model 42.3 29.4 46.2 61.4 52.3 27.3 43.2 + PoG 47.5 32.1 54.3 64.2 52.7 30.2 46.8 + KG-R1 82.4 65.6 62.4 68.8 64.5 33.0 62.8 RISE w/o RL 59.6 57.1 62.2 68.3 58.5 28.4 55.7 RISE w/o SFT 78.4 63.3 59.2 65.5 63.0 33.3 60.4 RISE w/ UNI 84.1 79.4 64.6 70.4 65.6 33.6 66.3 RISE w/ H2E 82.2 75.0 67.7 69.9 65.9 32.8 65.6 RISE w/ E2H 90.7 83.2 84.8 72.6 67.5 34.3 72.2 RISE w/ SEC 92.4 85.4 86.2 72.2 67.1 34.5 73.0
+
+Table 9: Complete cross-tool retrieval grid for all recipe arms on Qwen2.5-7B-Instruct (RQ4), % (alias EM). RISE rows are evaluated zero-shot; Search-R1 and ZeroSearch are trained in-domain. 
+
+Bold marks the best arm of each column and underline the second.                                                                                 
+
+> Arm NQ TriviaQA PopQA HotpotQA 2Wiki MuSiQue Bamboogle Avg. Base model 12.8 35.6 13.8 16.2 22.6 6.6 24.0 18.8 + Search-R1 42.4 63.4 51.6 32.8 33.2 17.4 26.4 38.2 + ZeroSearch 43.6 65.2 48.8 34.6 35.2 18.4 38.4 40.6 RISE w/o RL 32.3 55.3 37.3 37.3 36.2 16.3 38.4 36.1 RISE w/o SFT 38.7 58.5 42.4 37.8 35.5 17.4 37.6 38.3 RISE w/ UNI 40.1 62.7 47.6 38.5 37.6 18.0 42.4 41.0 RISE w/ H2E 39.6 59.2 46.8 38.1 36.2 18.0 43.2 40.2 RISE w/ E2H 42.8 65.4 51.8 39.2 39.8 18.8 44.8 43.2
+> RISE w/ SEC 43.9 63.8 49.7 39.4 39.3 18.9 45.6 42.9
+
+Table 10: Complete tool-free general reasoning grid for all recipe arms on Qwen2.5-7B-Instruct (RQ4), % (exact accuracy). Bold marks the best arm of each column and underline the second.                                                                       
+
+> Arm GSM8K MATH500 AIME24 AMC23 K&K Easy K&K Hard Avg. Base model 30.2 42.6 3.3 37.5 41.5 18.5 28.9 + GraphWalker 74.3 61.4 6.7 40.0 40.0 23.5 41.0 + SIE 87.4 61.6 10.0 47.5 49.5 29.0 47.5 RISE w/o RL 58.5 49.8 10.0 40.0 42.0 19.0 36.5 RISE w/o SFT 78.2 58.4 10.0 40.0 46.5 27.5 43.4 RISE w/ UNI 84.4 65.6 10.0 45.0 47.0 28.0 46.7 RISE w/ H2E 85.3 64.0 10.0 45.0 47.0 27.5 46.5 RISE w/ E2H 87.9 70.6 16.7 47.5 48.5 30.5 50.3 RISE w/ SEC 88.2 73.4 16.7 52.5 48.5 31.5 51.8
+
+27 Preprint. 
+
+## G MULTI -T URN INTERACTION CASE STUDY 
+
+Table 11 presents a side-by-side multi-turn trajectory comparison between the base model and RISE on a multi-hop CWQ query. The example illustrates how the two policies diverge upon encountering a high-degree relation list and an error receipt: the base model issues a malformed unbracketed query and falls back to an ungrounded parametric guess, whereas RISE reformulates its query, traverses the intermediate entity node, and grounds the exact answer in the retrieved receipt. Table 11: Side-by-side trajectory comparison on a multi-hop CWQ instance ( “Which city was the director of Inception born in?” , Topic entity: [[Inception]] ). Rows marked † highlight recov-ery from relation-list fallback and syntax error receipts. 
+
+Base Model (Qwen2.5-7B-Instruct) RISE w/ SEC (Ours) Turn 1: <think> I need to find the birthplace of the director of Inception. </think> <search> 
+
+Where was the director of [[Inception]] born? 
+
+</search> 
+
+Turn 1: <think> First, I should find who directed the film [[Inception]]. </think> <search> 
+
+Who directed [[Inception]]? </search> 
+
+Receipt 1 †: Resolved: Inception (m.0661ql3) | intent=relation list No single relation matched; available relations (12 of 41): film.film.directed by, film.film.starring, film.film.country, ... Calls remaining: 15 
+
+Receipt 1: Resolved: Inception (m.0661ql3) | intent=relation hop Results (1 of 1): Inception |film.film.directed by |Christopher Nolan. Calls remaining: 15 
+
+Turn 2: <think> The graph did not directly return the city. Let me search for Christopher Nolan’s birth city without brackets. </think> <search> birth city of Christopher Nolan 
+
+</search> 
+
+Turn 2: <think> The director is [[Christopher Nolan]]. Now I need to query his place of birth. 
+
+</think> <search> What is the place of birth of [[Christopher Nolan]]? </search> 
+
+Receipt 2 †: Error [E NO ENTITY]: Query must reference at least one entity in double square brackets [[...]]. Calls remaining: 14 
+
+Receipt 2: Resolved: Christopher Nolan (m.0bxtg) |intent=relation hop Results (1 of 1): Christopher Nolan |people.person.place of birth |London. Calls remaining: 14 
+
+Turn 3: <think> I know Christopher Nolan is British-American and lived in Chicago. 
+
+</think> <answer> Chicago </answer> 
+
+(Ungrounded & Wrong) Turn 3: <think> The receipt confirms [[Christopher Nolan]] was born in London. 
+
+</think> <answer> London </answer> 
+
+(Grounded & Correct) 
+
+## H PROOF OF PROPOSITION 1 AND TWO -S TAGE TRAINING ALGORITHM 
+
+H.1 PROOF OF PROPOSITION 1
+
+Proof. If r(τi) = c for all i ∈ { 1, . . . , G }, then ¯r = c and ˆσ = 0 , whence ˆAi = 0 by definition and every gradient term in Eq. (7) vanishes. Under r(τ ) − 1 i.i.d. 
+
+∼ Bernoulli (p), the group rewards are constant if and only if all G rollouts succeed (probability pG) or all G fail (probability (1 − p)G), giving Eq. (8). Differentiating f (p) = 1 − pG − (1 − p)G yields f ′(p) = G (1 − p)G−1 − pG−1,which vanishes on (0 , 1) uniquely at p = 0 .5, with f ′′ (0 .5) < 0 for all G ≥ 2. Since f (p) and 
+
+σBern (p) = pp(1 − p) are both symmetric about p = 0 .5 and strictly increasing on [0 , 0.5] , f is a strictly comonotone function of σBern .28 Preprint. H.2 TWO -S TAGE TRAINING ALGORITHM 
+
+Algorithm 1 summarizes the complete two-stage training pipeline of RISE, combining protocol-preserving cold start on Qcold (Stage 1) with observation-masked multi-turn GRPO and SEC learning-frontier scheduling on QRL (Stage 2). 
+
+Algorithm 1 Two-Stage Training Pipeline of RISE with Self-Evolving Curriculum (SEC) Bandit 
+
+Input: base policy πθ0 ; full graph G with typed adapter ΦG ; disjoint pools Qcold (6,000 questions) and QRL = S4 
+
+> k=1
+
+Q(k) 
+
+> RL
+
+(28 ,215 questions); call budget Cmax = 16 ; group size G = 8 .
+
+Stage 1: Protocol-Preserving Cold Start 
+
+1: Collect teacher rollouts inside ΦG on Qcold and accept DSFT by Eq. (6), i.e. g(τ ) = 1 , set-equality EM, φ(τ ) = 1 .0, and zt̸ = ∅ for every turn. 2: Fine-tune πθ0 on DSFT to obtain the protocol-aligned checkpoint πref ; set θ ← θref and 
+
+Qk(0) ← 0.5 for all k ∈ { 1, 2, 3, 4}.
+
+Stage 2: On-Policy Multi-Turn GRPO with Learning-Frontier Scheduling 
+
+3: for step s = 1 , . . . , S epoch (440 steps) do 
+
+4: Sample arm probabilities Ps(k) ∝ exp  Qk(s − 1) /η  by Eq. (9) and draw batch Bs =S 
+
+> k
+
+Bs,k of |B s| = 64 questions from QRL .5: for each question q ∈ B s in parallel do 
+
+6: Roll out G = 8 trajectories {τi}Gi=1 ∼ πθold (· | q) against ΦG under the call budget 
+
+Cmax .7: Score r(τi) by Eq. (4), form the group pass rate pq , and set ˆAi = ( r(τi) − ¯r)/ˆσ, with 
+
+ˆAi = 0 whenever ˆσ = 0 .8: end for 
+
+9: Update θ by ascending the observation-masked gradient ∇θ JRISE (θ) of Eq. (7). 10: For every active tier k, compute the frontier return ¯vk(s) over Bs,k and update Qk(s) ←
+
+(1 − α)Qk(s − 1) + α¯vk(s).11: end for Output: interactive reasoning policy π∗ 
+
+> θ
+
+.
+
+## I DISCUSSION : M ETHODOLOGICAL PRINCIPLES FOR AGENTIC RL 
+
+Two broader methodological principles emerge from our study. First, reward modifications must be audited alongside answer-shape-invariant diagnostics : any change to the outcome verifier that relaxes set equality or removes grounding gating ( g(τ ), Section 2.3) can produce apparent gains on exact-match metrics simply by altering the length or enumeration behavior of the policy’s output. Enforcing multiplicative evidence grounding alongside strict set-equality verification is therefore essential for separating genuine search improvement from reward hacking. Second, curriculum scheduling in group-normalized RL is fundamentally policy-indexed : as estab-lished in Proposition 1, a question contributes non-zero gradient if and only if its rollout group exhibits positive reward variance ( ˆσ > 0). Because the competence frontier ( p(q; θ) ≈ 0.5) shifts continuously as the policy updates and varies across model capacities, reversing the difficulty order (H2E) starves early updates of gradient, whereas progressive alignment (E2H) and online bandit tracking (SEC) keep batches anchored where the policy can actively learn. 
+
+## J LIMITATIONS AND FUTURE WORK 
+
+We highlight three limitations that suggest directions for future work. First, under a finite call bud-get ( Cmax = 16 ), questions whose surface forms fail entity resolution or require complex seman-tic bridging beyond dense relation ranking remain unreachable; integrating adaptive entity-linking tools or hybrid graph-text retrieval within the same episode is a promising extension. Second, our curriculum experiments hold the training horizon fixed at one epoch ( 440 steps) to ensure clean, horizon-free attribution across all arms; exploring multi-epoch competence-frontier scheduling on 29 Preprint. larger heterogeneous tool ecosystems remains open. Third, every comparison here uses a single training run per arm, so scaling multi-seed training across larger model families ( > 30 B parameters) will further strengthen variance estimates. 
+
+## K IMPLEMENTATION AUDIT AND TAXONOMY OF SILENT FAILURES 
+
+During the development of our multi-turn agentic RL pipeline, we conducted systematic turn-level audits that uncovered 23 silent implementation defects across three categories (summarized in Ta-ble 12). Unlike traditional software bugs that raise runtime exceptions, silent failures in multi-turn RL permit training jobs to complete normally with smooth scalar reward curves while quietly de-grading specific capabilities (such as single-turn termination or multi-answer grounding). Notably, our data-lineage audits also detected and removed 5 test-split leakage items embedded inside up-stream community training parquets (including 3 instances carrying explicit WebQTest-* identi-fiers) and enforced strict train-only stratified partitioning between Qcold and QRL . We distill these into a reusable checklist to aid future agentic RL research. Table 12: Taxonomy of 23 silent failure modes identified and resolved during our multi-turn RL pipeline audit.             
+
+> Defect Category Representative Silent Failure Modes Evaluation Instrument (3) Non-greedy validation decoding ( T > 0); tokenizer class mismatch upon checkpoint reload; subtle prompt-template divergence between rollout workers and standalone evaluators. Data & Cold-Start Lineage (8) Cold-start question leakage from evaluation splits; upstream community training parquets containing test-split questions ( WebQTest-* ); SFT acceptance criteria looser than the RL reward gate g(τ); accepting teacher turns without preceding <think> blocks. Rollout & Trainer Config (12) Binding the search call budget to the per-turn token cap; environment receipt tokens not masked in policy-gradient loss; missing stop-token strings in vLLM workers ( 91% wasted decoding); trainer-side right-truncation slicing <information> blocks mid-row.
+
+30
