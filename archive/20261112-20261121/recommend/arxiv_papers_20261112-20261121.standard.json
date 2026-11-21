@@ -1,123 +1,101 @@
 {
   "mode": "standard",
-  "generated_at": "2026-11-21T04:42:49.176684+00:00",
+  "generated_at": "2026-11-21T14:52:49.993083+00:00",
   "stats": {
     "mode": "standard",
     "tag_count": 1,
     "deep_divecandidates": 0,
     "deep_cap": 6,
     "deep_selected": 0,
-    "quick_candidates": 4,
+    "quick_candidates": 3,
     "quick_skim_target": 11,
-    "quick_selected": 4
+    "quick_selected": 3
   },
   "deep_dive": [],
   "quick_skim": [
     {
-      "id": "2611.19184v1",
+      "id": "2611.17788v1",
       "source": "arxiv",
-      "title": "Do VLMs Really Look at the Road? A Diagnostic Evaluation for Autonomous Driving",
-      "abstract": "Vision-language models (VLMs) are increasingly being evaluated for autonomous driving through question-answering benchmarks, yet high benchmark accuracy does not necessarily reflect visually grounded reasoning. We present a diagnostic evaluation framework that systematically probes whether VLMs base safety-critical driving decisions on visual evidence or instead rely on language priors, answer biases, and dataset regularities. Our benchmark comprises two task categories, Adverse Weather and Junctions \\& Intersections, with a nuScenes spatial reasoning extension, and evaluates open-source (general, driving, and spatial-reasoning) VLMs along four diagnostic protocols: image versus no-image evaluation, counterfactual weather sensitivity, linguistic robustness under paraphrasing and negation, and spatial reasoning. All ground-truth labels are derived programmatically from BDD100K and DriveLM annotations, enabling reproducible evaluation without manual labeling. Across all models, we find that competitive overall accuracy conceals systematic failure modes, including strong affirmation bias, limited sensitivity to counterfactual scene changes, near-chance performance on negated questions despite high paraphrase consistency, and confident driving decisions even without visual input. These results demonstrate that current open-source VLMs remain insufficiently grounded for safety-critical autonomous driving and underscore the need for diagnostic evaluation beyond aggregate accuracy.",
+      "title": "RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG",
+      "abstract": "In retrieval-augmented generation (RAG), query rewriting serves as a core interface that aligns user intent with external knowledge bases, and its effectiveness directly determines overall system performance. However, generative retrieval faces three critical challenges in real-world deployment: noisy retrieval feedback, the difficulty of jointly optimizing discrete prompt templates and continuous decoding-control parameters, and the limited generalization of static rewriting strategies under semantically complex scenarios. To address these issues, we propose RAG-FGO, a dynamic optimization framework for generative retrieval strategies. RAG-FGO formulates query rewriting as a non-differentiable black-box optimization problem in a mixed discrete-continuous space, and represents prompt templates and decoding parameters as adaptively optimizable query-rewriting agents. The framework performs global search to enable semantic jumps and structural reorganization that escape local optima, while applying local perturbations for fine-grained alignment and precise refinement. In addition, RAG-FGO introduces an elite-preserving memory pool that accumulates high-quality strategies across iterations, thereby mitigating the impact of stochasticity and noisy feedback on optimization stability. Experimental results on a diverse suite of benchmarks demonstrate the effectiveness and robustness of the proposed method, supporting its applicability to complex semantic retrieval tasks.",
       "authors": [
-        "Shankar Gangisetty",
-        "Muskan Singh",
-        "C V Jawahar"
+        "Qigan Sun",
+        "Xudong Wang",
+        "Chaoning Zhang",
+        "Chenghao Li",
+        "Jiaquan Zhang",
+        "Jiehui Xie",
+        "Sungyoung Lee",
+        "Jie Zou",
+        "Ning Xie",
+        "Peng Wang",
+        "Yang Yang",
+        "Heng Tao Shen"
       ],
-      "primary_category": "cs.CV",
+      "primary_category": "cs.CL",
       "categories": [
-        "cs.CV"
+        "cs.CL"
       ],
-      "published": "2026-11-14T06:07:18+00:00",
-      "link": "https://arxiv.org/pdf/2611.19184v1",
+      "published": "2026-11-13T06:01:09+00:00",
+      "link": "https://arxiv.org/pdf/2611.17788v1",
       "tags": [
         "keyword:kg-rag-agent",
         "query:kg-rag-agent"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "diagnostic evaluation of vision-language driving decisions with counterfactual robustness probes",
-      "llm_evidence_cn": "面向驾驶决策的视觉语言模型诊断评测与反事实鲁棒性检验",
-      "llm_evidence": "面向驾驶决策的视觉语言模型诊断评测与反事实鲁棒性检验",
-      "canonical_evidence": "面向驾驶决策的视觉语言模型诊断评测与反事实鲁棒性检验",
-      "llm_tldr_en": "This paper probes whether vision-language models base safety-critical driving decisions on visual evidence or on language priors, using image versus no-image, counterfactual weather and linguistic bias protocols across adverse weather and junction tasks.",
-      "llm_tldr_cn": "视觉语言模型在自动驾驶问答基准上得分高，却未必真正依据视觉证据做出安全关键决策。作者构建诊断评测框架，覆盖恶劣天气与交叉路口两类任务并扩展nuScenes空间推理，设计有图与无图对比、反事实天气敏感性与语言先验等四种诊断协议。结果显示多个开源模型的准确率部分来自答案偏置与数据规律而非视觉 grounding。该工作为车载视觉语言智能体的可靠性评测提供了可复用的反事实鲁棒性方法。",
-      "llm_tldr": "视觉语言模型在自动驾驶问答基准上得分高，却未必真正依据视觉证据做出安全关键决策。作者构建诊断评测框架，覆盖恶劣天气与交叉路口两类任务并扩展nuScenes空间推理，设计有图与无图对比、反事实天气敏感性与语言先验等四种诊断协议。结果显示多个开源模型的准确率部分来自答案偏置与数据规律而非视觉 grounding。该工作为车载视觉语言智能体的可靠性评测提供了可复用的反事实鲁棒性方法。",
+      "llm_evidence_en": "dynamic optimization of query-rewriting agents for retrieval-augmented generation",
+      "llm_evidence_cn": "面向检索增强生成的查询改写智能体动态优化",
+      "llm_evidence": "面向检索增强生成的查询改写智能体动态优化",
+      "canonical_evidence": "面向检索增强生成的查询改写智能体动态优化",
+      "llm_tldr_en": "RAG-FGO treats query rewriting as black-box optimization over mixed discrete-continuous prompt and decoding parameters, making retrieval agents robust to noisy feedback and complex queries.",
+      "llm_tldr_cn": "针对生成式检索中检索反馈噪声大、离散提示模板与连续解码参数难以联合优化、静态改写策略在复杂语义场景下泛化不足的问题，本文提出RAG-FGO。该方法把查询改写建模为混合离散-连续空间中的非可微黑盒优化问题，动态优化查询改写智能体的提示模板与解码控制参数。实验表明其能提升检索增强生成在复杂场景下的效果，为知识增强智能体的检索接口提供了可迁移的鲁棒优化方法。",
+      "llm_tldr": "针对生成式检索中检索反馈噪声大、离散提示模板与连续解码参数难以联合优化、静态改写策略在复杂语义场景下泛化不足的问题，本文提出RAG-FGO。该方法把查询改写建模为混合离散-连续空间中的非可微黑盒优化问题，动态优化查询改写智能体的提示模板与解码控制参数。实验表明其能提升检索增强生成在复杂场景下的效果，为知识增强智能体的检索接口提供了可迁移的鲁棒优化方法。",
       "llm_tags": [
         "query:kg-rag-agent"
       ],
       "matched_query_tag": "query:kg-rag-agent",
-      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
-      "matched_requirement_id": "req-1",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-3",
       "selection_source": "fresh_fetch",
       "quick_tier": "6"
     },
     {
-      "id": "2611.20398v1",
+      "id": "2611.22179v1",
       "source": "arxiv",
-      "title": "Deploying a Control-Logic LLM Assistant in Air-Gapped Power Plants: Lessons in Source Authority and Bounded Retrieval",
-      "abstract": "Deploying Large Language Model (LLM) assistants in industrial operational technology environments poses constraints largely absent from cloud applications: site policies restrict engineering and operational data from leaving the plant, on-premises compute is limited, and incorrect causal attribution can mislead incident response. We report lessons from deploying a control-logic evidence layer that underpins a broader on-premises operator assistance system at two gas power plants. Two prototypes revealed where generative models added avoidable uncertainty and cost. The first used a Vision Language Model (VLM) to reconstruct control topology from PDF printouts routinely exchanged by engineers. Across the full 6,979-page document, extraction reached 0.51 connection precision and required 3.1 hours on 4xH200 GPUs; consultation with controls engineers then revealed a native structured export from the authoring system. The second used an LLM tool-calling agent to plan repeatedly over eight predefined graph operations. In a controlled benchmark of 40 template-generated questions, replacing this agent with explicit execution plans reduced mean token use by 20x and median latency by 3x, with identical retrieved node sets across repeated runs. The deployed design ingests the authoritative export into a versioned knowledge graph, executes bounded graph operations in fixed software, and confines the local LLM to fallback intent classification and evidence-grounded explanation. At one site, the graph contains 221K nodes across seven controllers. Our experience suggests a practical division of labor for high-consequence AI: LLMs interpret natural-language requests and explain results, while deterministic software constructs and retrieves technical evidence grounded in authoritative sources. Abstention, entity disambiguation, graph versioning, and read-only integration provide additional safeguards.",
+      "title": "RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn't",
+      "abstract": "Agentic memory research has accumulated extraction, supersession, reflection, and graph synthesis on top of retrieval-augmented generation. However, we found that almost none of those primitives earn their cost in our tested memory benchmarks: we show this with BRIDGE, a deliberately minimal RAG memory with chained observation notes, hybrid BM25 with cosine retrieval, and chronological rendering, which reaches parity within bootstrap CI with the prior SOTA on LongMemEval-S and BEAM, and beats the best memory baseline on EverMemBench by 5.7-6.3 points at matched reader. It runs at ~5-7K reader-prompt tokens per query, using a single LLM call for each ingestion or query. We argue that this parity is itself the result: standard benchmarks score what memory retrieves, not what memory enables when the agent acts. To test the latter, we introduce five adversarial probes (Rule Application +-, Pattern Induction Style / Procedural, Dynamic Multiturn) judged at generation time by a cross vendor verification chain, where each query can only be solved by applying a remembered rule or pattern it never mentions. Across 5 probes x 20 scenarios, no architecture wins universally: atomic fact extractors (LangMem) win rule application, while BRIDGE's block-summary memory wins pattern induction. This result holds across four domains, three graders, and three reader families. Each design fails where the other wins, for reasons a recall benchmark cannot see: atomic-fact extractors discard the form a demonstrated pattern takes, while block-summary memory retrieves the rule but the reader does not act on it, a gap that presenting the rule more prominently largely closes. What separates memory designs is not what they retrieve but what they enable an agent to do, and that is what agentic memory should be evaluated on.",
       "authors": [
-        "Yiwei Fu",
-        "Nicholas Gabriel"
+        "Jingyu Liu",
+        "Zongze Li",
+        "Zach Xu",
+        "Zhanhui Zhou",
+        "Tahseen Rabbani",
+        "Dawn Song",
+        "Ce Zhang"
       ],
       "primary_category": "cs.AI",
       "categories": [
         "cs.AI"
       ],
-      "published": "2026-11-16T01:54:11+00:00",
-      "link": "https://arxiv.org/pdf/2611.20398v1",
+      "published": "2026-11-17T04:16:34+00:00",
+      "link": "https://arxiv.org/pdf/2611.22179v1",
       "tags": [
-        "keyword:kg-rag-agent",
         "query:kg-rag-agent"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "knowledge-enhanced LLM operator assistant with bounded retrieval and source authority",
-      "llm_evidence_cn": "具备受限检索与来源权威的知识增强大模型操作助手",
-      "llm_evidence": "具备受限检索与来源权威的知识增强大模型操作助手",
-      "canonical_evidence": "具备受限检索与来源权威的知识增强大模型操作助手",
-      "llm_tldr_en": "Reports deploying a control-logic LLM assistant in air-gapped power plants, showing bounded retrieval and source authority prevent incorrect causal attribution in operator support.",
-      "llm_tldr_cn": "在工业操作技术环境中部署大模型助手面临数据不出厂、算力受限和错误因果归因误导处置等约束。论文报告了两座燃气电厂控制逻辑证据层的部署经验，比较视觉语言模型重建拓扑与受限检索两类原型，发现生成模型会引入可避免的不确定性与成本。研究强调来源权威与有界检索对可靠决策支持的关键作用。该经验可迁移到车载等安全攸关领域的知识增强智能体设计。",
-      "llm_tldr": "在工业操作技术环境中部署大模型助手面临数据不出厂、算力受限和错误因果归因误导处置等约束。论文报告了两座燃气电厂控制逻辑证据层的部署经验，比较视觉语言模型重建拓扑与受限检索两类原型，发现生成模型会引入可避免的不确定性与成本。研究强调来源权威与有界检索对可靠决策支持的关键作用。该经验可迁移到车载等安全攸关领域的知识增强智能体设计。",
+      "llm_evidence_en": "minimal RAG memory versus graph synthesis primitives for agentic systems",
+      "llm_evidence_cn": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
+      "llm_evidence": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
+      "canonical_evidence": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
+      "llm_tldr_en": "BRIDGE shows a minimal RAG memory with chained notes and hybrid BM25-cosine retrieval matches prior SOTA agentic memory and beats the best baseline on EverMemBench by 5.7-6.3 points.",
+      "llm_tldr_cn": "针对智能体记忆研究不断叠加抽取、更新、反思与图合成等复杂组件的问题，本文提出极简记忆方案BRIDGE，仅使用链式观察笔记、BM25与余弦混合检索以及按时间顺序渲染。在LongMemEval-S与BEAM上其表现与先前最优方法在置信区间内持平，并在EverMemBench上领先最佳记忆基线5.7至6.3分。结果表明许多记忆原语并未带来实际收益，提示知识增强智能体应审慎评估检索与图结构的真实增益。",
+      "llm_tldr": "针对智能体记忆研究不断叠加抽取、更新、反思与图合成等复杂组件的问题，本文提出极简记忆方案BRIDGE，仅使用链式观察笔记、BM25与余弦混合检索以及按时间顺序渲染。在LongMemEval-S与BEAM上其表现与先前最优方法在置信区间内持平，并在EverMemBench上领先最佳记忆基线5.7至6.3分。结果表明许多记忆原语并未带来实际收益，提示知识增强智能体应审慎评估检索与图结构的真实增益。",
       "llm_tags": [
         "query:kg-rag-agent"
       ],
       "matched_query_tag": "query:kg-rag-agent",
-      "matched_query_text": "knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning",
-      "matched_requirement_id": "req-2",
-      "selection_source": "fresh_fetch",
-      "quick_tier": "6"
-    },
-    {
-      "id": "2611.23346v1",
-      "source": "arxiv",
-      "title": "Securing and Auditing Long-Horizon LLM Agents: State-Transfer Auditing and Controls in the Agent Harness",
-      "abstract": "Long-horizon LLM agents across codebases, web browsers, and enterprise infrastructure rely on an execution harness to move state between the working context, session history, persistent memory, and external environment. While conventional execution traces log model prompts and tool calls, critical security and reliability failures occur during state transfers: a transfer can admit unchecked content (indirect prompt injections, unverified memory writes), rewrite state lossily (context compaction dropping user constraints, memory consolidation stripping source authority), or restore state incompletely (workspace rollbacks leaving aborted KV state active on the inference server). Because current traces omit what crosses these boundaries, failure attribution and runtime monitors fail on multi-step trajectories. We present a state-transfer audit architecture for the agent harness. At each transfer boundary, we define an audit point specifying the minimal hash-chained record the harness emits, separating low-overhead deterministic checks from model-based semantic checks and binding internal context, memory, and inference-server cache state to external actions. We show that the same transfer records required for causal failure attribution supply the durable state needed by runtime security controls, including least-privilege capabilities, replay-resistant authorization outside the prompt, information flow control, obligation monitors, and transactional recovery across multi-agent and infrastructure pipelines. Finally, we analyze multimodal GUI adaptations and implement and evaluate a reference harness middleware across 240 multi-step fault-injection trajectories, showing that transfer records localize root causes and catch cross-transfer violations missed by lifecycle and tool-only logs at microsecond deterministic overhead.",
-      "authors": [
-        "Deep Shah",
-        "Nehal Kathrotia"
-      ],
-      "primary_category": "cs.CR",
-      "categories": [
-        "cs.CR"
-      ],
-      "published": "2026-11-17T10:36:04+00:00",
-      "link": "https://arxiv.org/pdf/2611.23346v1",
-      "tags": [
-        "keyword:kg-rag-agent"
-      ],
-      "llm_score": 6.0,
-      "llm_evidence_en": "auditing and controlling indirect prompt injection and memory poisoning in LLM agent state transfers",
-      "llm_evidence_cn": "LLM智能体状态迁移中的间接提示注入与记忆投毒审计与管控",
-      "llm_evidence": "LLM智能体状态迁移中的间接提示注入与记忆投毒审计与管控",
-      "canonical_evidence": "LLM智能体状态迁移中的间接提示注入与记忆投毒审计与管控",
-      "llm_tldr_en": "This paper identifies security and reliability failures occurring at state transfers in long-horizon LLM agent harnesses, such as indirect prompt injection and unverified memory writes, and proposes state-transfer auditing and controls.",
-      "llm_tldr_cn": "长时程大模型智能体依赖执行框架在工作上下文、会话历史、持久记忆与环境间迁移状态，而现有执行轨迹只记录提示与工具调用。作者指出关键安全与可靠性故障发生在状态迁移环节，包括间接提示注入、未经验证的记忆写入、上下文压缩丢失约束与回滚不完整。为此提出状态迁移审计与控制机制，显式追踪跨越边界的内容。该工作为知识增强智能体的错误传播与提示注入防护提供了可复用的安全框架。",
-      "llm_tldr": "长时程大模型智能体依赖执行框架在工作上下文、会话历史、持久记忆与环境间迁移状态，而现有执行轨迹只记录提示与工具调用。作者指出关键安全与可靠性故障发生在状态迁移环节，包括间接提示注入、未经验证的记忆写入、上下文压缩丢失约束与回滚不完整。为此提出状态迁移审计与控制机制，显式追踪跨越边界的内容。该工作为知识增强智能体的错误传播与提示注入防护提供了可复用的安全框架。",
-      "llm_tags": [
-        "query:kg-rag-agent:composite"
-      ],
-      "matched_query_tag": "query:kg-rag-agent:composite",
-      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; graph structured reasoning for safe and reliable knowledge-enhanced automotive agents; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
-      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-3",
       "selection_source": "fresh_fetch",
       "quick_tier": "6"
     },
@@ -145,19 +123,19 @@
         "query:kg-rag-agent"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "agentic framework with semantic knowledge graph and graph-retrieval tools",
-      "llm_evidence_cn": "基于语义知识图谱与图检索工具的智能体框架",
-      "llm_evidence": "基于语义知识图谱与图检索工具的智能体框架",
-      "canonical_evidence": "基于语义知识图谱与图检索工具的智能体框架",
-      "llm_tldr_en": "This paper presents CAR, an agentic ideation framework that builds a semantic knowledge graph from retrieved literature and equips an agent with graph-retrieval tools and explicit conceptual operators, tracing each transformation back to literature sources.",
-      "llm_tldr_cn": "大模型虽能生成看似合理的研究想法，但其有效性来源与创新如何从既有文献中产生仍不清楚。作者提出创意AI研究者CAR框架，从检索文献构建语义知识图谱，并为构思智能体配备图检索工具与四种概念算子，每次算子调用都需通过结构条件检查并记录来源。实验在两个语言模型后端上验证了该框架的构思质量与可追溯性。该工作展示了知识图谱增强的图检索智能体在复杂推理任务中的可复用范式。",
-      "llm_tldr": "大模型虽能生成看似合理的研究想法，但其有效性来源与创新如何从既有文献中产生仍不清楚。作者提出创意AI研究者CAR框架，从检索文献构建语义知识图谱，并为构思智能体配备图检索工具与四种概念算子，每次算子调用都需通过结构条件检查并记录来源。实验在两个语言模型后端上验证了该框架的构思质量与可追溯性。该工作展示了知识图谱增强的图检索智能体在复杂推理任务中的可复用范式。",
+      "llm_evidence_en": "semantic knowledge graph with graph-retrieval tools for an agentic reasoning pipeline",
+      "llm_evidence_cn": "为智能体配备图检索工具的语义知识图谱",
+      "llm_evidence": "为智能体配备图检索工具的语义知识图谱",
+      "canonical_evidence": "为智能体配备图检索工具的语义知识图谱",
+      "llm_tldr_en": "CAR is an agentic ideation framework that builds a semantic knowledge graph from retrieved literature and equips an agent with graph-retrieval tools and four conceptual operators, recording traced transformations.",
+      "llm_tldr_cn": "大模型生成研究想法时缺乏对文献依据的追溯，难以说明新颖性从何而来。作者提出创意AI研究者框架CAR，从检索文献构建语义知识图谱，并为智能体配备图检索工具与类比、探索等四类概念算子。每次算子调用都经过结构化接受条件检验并记录，形成可追溯的推理轨迹。该工作展示了知识图谱与图检索增强对智能体推理过程的可控化价值。",
+      "llm_tldr": "大模型生成研究想法时缺乏对文献依据的追溯，难以说明新颖性从何而来。作者提出创意AI研究者框架CAR，从检索文献构建语义知识图谱，并为智能体配备图检索工具与类比、探索等四类概念算子。每次算子调用都经过结构化接受条件检验并记录，形成可追溯的推理轨迹。该工作展示了知识图谱与图检索增强对智能体推理过程的可控化价值。",
       "llm_tags": [
         "query:kg-rag-agent"
       ],
       "matched_query_tag": "query:kg-rag-agent",
       "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
-      "matched_requirement_id": "req-4",
+      "matched_requirement_id": "req-3",
       "selection_source": "fresh_fetch",
       "quick_tier": "6"
     }

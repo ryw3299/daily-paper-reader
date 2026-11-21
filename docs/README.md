@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-23 ~ 2026-11-21</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-12 ~ 2026-11-21</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 04:50:01 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 14:53:14 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>本期共筛出4篇速读、0篇精读，其中三篇重点论文均获8.0分，聚焦语言世界模型驱动的自动驾驶、面向具身场景的RAG++，以及智能体GraphRAG的类型化中心性 grounding。</p>
-<p>最值得看的是两条主线：用语言世界模型提升语言引导自动驾驶的安全性，以及把RAG从“能检索”推进到“在具身场景中真正好用”。</p>
-<p>建议普通读者先挑与自身场景最贴近的一篇通读摘要和实验部分，再判断是否需要回溯精读。</p>
+<p>本期速读 6 篇、精读 0 篇，重点集中在 RAG 优化与 AI 研究构思分解两条线上。</p>
+<p>最值得看的是两篇同为 6.0 分的 RAG 工作：《RAG-FGO》讨论查询改写智能体的动态优化，《RAG in a Trenchcoat》则回答了“最小记忆何时够用、何时不够”这一实用边界问题。</p>
+<p>普通读者可先读这两篇的结论部分，判断自己的场景是否真需要复杂记忆或改写模块，再决定是否深入《Ground, Iterate, Trace》的研究构思拆解思路。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model">Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="Embodied RAG++: Retrieval-Augmented Generation From What Exists to What Works in Embodied Scenes">Embodied RAG++: Retrieval-Augmented Generation From What Exists to What Works in Embodied Scenes</span></li><li><span class="dpr-home-dashboard-paper-title" title="Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning">Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG">RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG</span></li><li><span class="dpr-home-dashboard-paper-title" title="RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn&#x27;t">RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn&#x27;t</span></li><li><span class="dpr-home-dashboard-paper-title" title="Ground, Iterate, Trace: Decomposing AI Research Ideation">Ground, Iterate, Trace: Decomposing AI Research Ideation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>6</strong></span></div>
 </section>
 </div>
 

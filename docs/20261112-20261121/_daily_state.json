@@ -1,10 +1,58 @@
 {
   "date": "20261112-20261121",
   "date_label": "2026-11-12 ~ 2026-11-21",
-  "generated_at": "2026-11-21 04:43:11 UTC",
+  "generated_at": "2026-11-21 14:53:14 UTC",
   "recommend_exists": true,
-  "run_count": 1,
+  "run_count": 2,
   "papers": [
+    {
+      "paper_id": "2611.17788v1",
+      "route": "20261112-20261121/2611.17788v1-rag-fgo-dynamic-optimization-of-query-rewriting-agents-for-generative-rag",
+      "title": "RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向检索增强生成的查询改写智能体动态优化",
+      "first_seen_at": "2026-11-21 14:53:14 UTC",
+      "updated_at": "2026-11-21 14:53:14 UTC"
+    },
+    {
+      "paper_id": "2611.22179v1",
+      "route": "20261112-20261121/2611.22179v1-rag-in-a-trenchcoat-when-minimal-memory-is-enough-for-agentic-systems-and-when-it-isnt",
+      "title": "RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn't",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
+      "first_seen_at": "2026-11-21 14:53:14 UTC",
+      "updated_at": "2026-11-21 14:53:14 UTC"
+    },
+    {
+      "paper_id": "2611.24887v1",
+      "route": "20261112-20261121/2611.24887v1-ground-iterate-trace-decomposing-ai-research-ideation",
+      "title": "Ground, Iterate, Trace: Decomposing AI Research Ideation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "基于语义知识图谱与图检索工具的智能体框架",
+      "first_seen_at": "2026-11-21 04:43:11 UTC",
+      "updated_at": "2026-11-21 14:53:14 UTC"
+    },
     {
       "paper_id": "2611.19184v1",
       "route": "20261112-20261121/2611.19184v1-do-vlms-really-look-at-the-road-a-diagnostic-evaluation-for-autonomous-driving",
@@ -50,22 +98,6 @@
       ],
       "score": 6.0,
       "evidence": "LLM智能体状态迁移中的间接提示注入与记忆投毒审计与管控",
-      "first_seen_at": "2026-11-21 04:43:11 UTC",
-      "updated_at": "2026-11-21 04:43:11 UTC"
-    },
-    {
-      "paper_id": "2611.24887v1",
-      "route": "20261112-20261121/2611.24887v1-ground-iterate-trace-decomposing-ai-research-ideation",
-      "title": "Ground, Iterate, Trace: Decomposing AI Research Ideation",
-      "section": "quick",
-      "tags": [
-        {
-          "kind": "query",
-          "label": "kg-rag-agent"
-        }
-      ],
-      "score": 6.0,
-      "evidence": "基于语义知识图谱与图检索工具的智能体框架",
       "first_seen_at": "2026-11-21 04:43:11 UTC",
       "updated_at": "2026-11-21 04:43:11 UTC"
     }
