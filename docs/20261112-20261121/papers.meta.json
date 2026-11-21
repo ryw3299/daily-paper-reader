@@ -1,0 +1,69 @@
+{
+  "label": "2026-11-12 ~ 2026-11-21",
+  "date": "2026-11-12 ~ 2026-11-21",
+  "generated_at": "2026-11-21T04:43:14",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "20261112-20261121/2611.19184v1-do-vlms-really-look-at-the-road-a-diagnostic-evaluation-for-autonomous-driving",
+      "section": "quick",
+      "title_en": "Do VLMs Really Look at the Road? A Diagnostic Evaluation for Autonomous Driving",
+      "authors": "Shankar Gangisetty, Muskan Singh, C V Jawahar",
+      "date": "2026-11-14",
+      "pdf": "https://arxiv.org/pdf/2611.19184v1",
+      "score": "6.0",
+      "evidence": "面向驾驶决策的视觉语言模型诊断评测与反事实鲁棒性检验",
+      "tldr": "视觉语言模型在自动驾驶问答基准上得分高，却未必真正依据图像做安全决策。作者构建诊断评测，覆盖恶劣天气、路口交叉口与nuScenes空间推理，并用无图对比、反事实天气、复述与否定、空间推理四类协议检验开源模型。结果显示总体准确率掩盖了肯定偏差、反事实不敏感、否定题接近随机以及无图仍自信决策等系统性问题。该工作表明现有开源VLM视觉 grounding 不足，需超越聚合准确率的诊断评测。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Vision-language models (VLMs) are increasingly being evaluated for autonomous driving through question-answering benchmarks, yet high benchmark accuracy does not necessarily reflect visually grounded reasoning. We present a diagnostic evaluation framework that systematically probes whether VLMs base safety-critical driving decisions on visual evidence or instead rely on language priors, answer biases, and dataset regularities. Our benchmark comprises two task categories, Adverse Weather and Junctions \\& Intersections, with a nuScenes spatial reasoning extension, and evaluates open-source (general, driving, and spatial-reasoning) VLMs along four diagnostic protocols: image versus no-image evaluation, counterfactual weather sensitivity, linguistic robustness under paraphrasing and negation, and spatial reasoning. All ground-truth labels are derived programmatically from BDD100K and DriveLM annotations, enabling reproducible evaluation without manual labeling. Across all models, we find that competitive overall accuracy conceals systematic failure modes, including strong affirmation bias, limited sensitivity to counterfactual scene changes, near-chance performance on negated questions despite high paraphrase consistency, and confident driving decisions even without visual input. These results demonstrate that current open-source VLMs remain insufficiently grounded for safety-critical autonomous driving and underscore the need for diagnostic evaluation beyond aggregate accuracy.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20261112-20261121/2611.20398v1-deploying-a-control-logic-llm-assistant-in-air-gapped-power-plants-lessons-in-source-authority-and-bounded-retrieval",
+      "section": "quick",
+      "title_en": "Deploying a Control-Logic LLM Assistant in Air-Gapped Power Plants: Lessons in Source Authority and Bounded Retrieval",
+      "authors": "Yiwei Fu, Nicholas Gabriel",
+      "date": "2026-11-16",
+      "pdf": "https://arxiv.org/pdf/2611.20398v1",
+      "score": "6.0",
+      "evidence": "具备受限检索与来源权威的知识增强大模型操作助手",
+      "tldr": "在气隙电厂部署LLM助手受数据不出厂、算力受限与错误因果归因风险约束。作者以两个原型发现VLM从PDF重建拓扑精度仅0.51且耗时，而LLM工具调用代理可被显式图执行计划替代，令牌降20倍、延迟降3倍。最终采用权威结构化导出构建版本化知识图谱，由固定软件执行有界检索，LLM仅负责回退意图分类与证据解释。该分工为高后果工业AI提供可落地范式。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Deploying Large Language Model (LLM) assistants in industrial operational technology environments poses constraints largely absent from cloud applications: site policies restrict engineering and operational data from leaving the plant, on-premises compute is limited, and incorrect causal attribution can mislead incident response. We report lessons from deploying a control-logic evidence layer that underpins a broader on-premises operator assistance system at two gas power plants. Two prototypes revealed where generative models added avoidable uncertainty and cost. The first used a Vision Language Model (VLM) to reconstruct control topology from PDF printouts routinely exchanged by engineers. Across the full 6,979-page document, extraction reached 0.51 connection precision and required 3.1 hours on 4xH200 GPUs; consultation with controls engineers then revealed a native structured export from the authoring system. The second used an LLM tool-calling agent to plan repeatedly over eight predefined graph operations. In a controlled benchmark of 40 template-generated questions, replacing this agent with explicit execution plans reduced mean token use by 20x and median latency by 3x, with identical retrieved node sets across repeated runs. The deployed design ingests the authoritative export into a versioned knowledge graph, executes bounded graph operations in fixed software, and confines the local LLM to fallback intent classification and evidence-grounded explanation. At one site, the graph contains 221K nodes across seven controllers. Our experience suggests a practical division of labor for high-consequence AI: LLMs interpret natural-language requests and explain results, while deterministic software constructs and retrieves technical evidence grounded in authoritative sources. Abstention, entity disambiguation, graph versioning, and read-only integration provide additional safeguards.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20261112-20261121/2611.23346v1-securing-and-auditing-long-horizon-llm-agents-state-transfer-auditing-and-controls-in-the-agent-harness",
+      "section": "quick",
+      "title_en": "Securing and Auditing Long-Horizon LLM Agents: State-Transfer Auditing and Controls in the Agent Harness",
+      "authors": "Deep Shah, Nehal Kathrotia",
+      "date": "2026-11-17",
+      "pdf": "https://arxiv.org/pdf/2611.23346v1",
+      "score": "6.0",
+      "evidence": "LLM智能体状态迁移中的间接提示注入与记忆投毒审计与管控",
+      "tldr": "长时程LLM智能体依赖执行harness在上下文、记忆、推理缓存与外部环境间转移状态，传统轨迹却只记录提示和工具调用，遗漏边界上的注入、约束丢失与恢复不完整等故障。本文提出状态转移审计架构，在每个边界生成最小哈希链记录，分离确定性检查与模型语义检查，并绑定内部状态与外部动作。在240条多步故障注入轨迹中，参考中间件可定位根因并捕获跨转移违规，优于生命周期与仅工具日志，确定性开销仅微秒级。该工作让审计记录同时支撑失败归因与运行时安全控制，为长时程智能体提供可复用的安全审计基础。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Long-horizon LLM agents across codebases, web browsers, and enterprise infrastructure rely on an execution harness to move state between the working context, session history, persistent memory, and external environment. While conventional execution traces log model prompts and tool calls, critical security and reliability failures occur during state transfers: a transfer can admit unchecked content (indirect prompt injections, unverified memory writes), rewrite state lossily (context compaction dropping user constraints, memory consolidation stripping source authority), or restore state incompletely (workspace rollbacks leaving aborted KV state active on the inference server). Because current traces omit what crosses these boundaries, failure attribution and runtime monitors fail on multi-step trajectories. We present a state-transfer audit architecture for the agent harness. At each transfer boundary, we define an audit point specifying the minimal hash-chained record the harness emits, separating low-overhead deterministic checks from model-based semantic checks and binding internal context, memory, and inference-server cache state to external actions. We show that the same transfer records required for causal failure attribution supply the durable state needed by runtime security controls, including least-privilege capabilities, replay-resistant authorization outside the prompt, information flow control, obligation monitors, and transactional recovery across multi-agent and infrastructure pipelines. Finally, we analyze multimodal GUI adaptations and implement and evaluate a reference harness middleware across 240 multi-step fault-injection trajectories, showing that transfer records localize root causes and catch cross-transfer violations missed by lifecycle and tool-only logs at microsecond deterministic overhead.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20261112-20261121/2611.24887v1-ground-iterate-trace-decomposing-ai-research-ideation",
+      "section": "quick",
+      "title_en": "Ground, Iterate, Trace: Decomposing AI Research Ideation",
+      "authors": "Samson Yu, Qiran Zou, Jing Yu Lim, Rushi Shah, Anirudh Goyal, Dianbo Liu",
+      "date": "2026-11-18",
+      "pdf": "https://arxiv.org/pdf/2611.24887v1",
+      "score": "6.0",
+      "evidence": "基于语义知识图谱与图检索工具的智能体框架",
+      "tldr": "大模型可生成看似合理的科研想法，但其有效性来源与新颖性如何从已有文献产生仍不清楚。CAR以文献语义知识图谱为基座，结合迭代开发与四种概念算子，并记录每次操作及文献来源形成可检查轨迹。评测中CAR的方法新颖性显著高于单次提示和The AI Scientist，可行性优于Research Ideation Agent，并在两个执行基准取得最高成对胜率。消融显示显式算子未稳定带来质量增益，但流程可追溯性成为独立贡献。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Large language models have been widely used to generate plausible research ideas, yet it remains unclear what makes automated ideation effective and how generated novel proposals arise from prior scientific work. We introduce the Creative AI Researcher (CAR), an agentic framework combining literature grounding, iterative development and explicit conceptual operators. CAR constructs a semantic knowledge graph from retrieved literature and equips an ideation agent with graph-retrieval tools and four operators: bisociation, analogy, exploration and elaboration. Each operator call is checked against structural acceptance conditions and recorded, producing a trace of intermediate transformations and declared literature sources. We evaluate CAR with two language-model backbones across 40 LiveIdeaBench research topics and two execution benchmarks. CAR achieves significantly higher methodological novelty (MN) than single-shot prompting and The AI Scientist. Its methodological novelty does not differ significantly from the Research Ideation Agent, while its feasibility scores are higher on both backbones. With a shared experiment executor, CAR achieves the highest pairwise win rate among the evaluated AI methods on FML-bench-Lite and BioXArena. In a ten-condition ablation study, MN point estimates favor CAR over one-step proposal on both backbones, but no MN contrast survives correction for multiple comparisons. The results do not establish a consistent quality benefit from explicit operators beyond free-form iteration. CAR makes the sequence of operations and declared literature sources inspectable, separating judged idea quality from procedural traceability.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
