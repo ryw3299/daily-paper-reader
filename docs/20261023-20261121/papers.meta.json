@@ -1,0 +1,69 @@
+{
+  "label": "2026-10-23 ~ 2026-11-21",
+  "date": "2026-10-23 ~ 2026-11-21",
+  "generated_at": "2026-11-21T04:50:04",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "20261023-20261121/2611.05448v1-jev-with-foresight-safe-language-guided-autonomous-driving-via-a-language-world-model",
+      "section": "quick",
+      "title_en": "Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model",
+      "authors": "Yansong Qu, Jiancong Chen, Samuel Labi",
+      "date": "2026-11-03",
+      "pdf": "https://arxiv.org/pdf/2611.05448v1",
+      "score": "8.0",
+      "evidence": "面向语言引导自动驾驶的大模型决策",
+      "tldr": "大型语言模型能理解乘客指令，但作为驾驶智能体时需逐秒生成文本并隐式推断动作后果。Jev-AD将类型化决策模型Jev与语言世界模型结合，由世界模型预测每个候选动作下邻近车辆未来两秒运动，再用代码转化为可比较的预见后果。高速合流500车次仿真中，同一决策模型碰撞率由26.0%降至2.4%，自由指令试验93%达成乘客意图；500段NGSIM真实回放中碰撞率由48.2%降至2.8%。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Large language models understand passengers' driving commands, but as driving agents they reason in generated text for seconds and must infer each action's consequences implicitly from the scene. We present Jev-AD, which pairs Jev, a typed decision model that answers predefined questions with probabilities, not generated text, with a language world model that predicts for every candidate action how nearby vehicles move over the next two seconds. Code turns these predictions into foreseen consequences, which Jev compares instead of inferring them from coordinates. In simulated highway merging (500 car-episodes), this foresight lowers the same decision model's collision rate from 26.0% to 2.4% at 0.25 seconds per decision, and Jev-AD achieves the passenger's intent in 93% of free-form command trials. In 500 replayed real-world NGSIM episodes, foresight lowers the collision rate from 48.2% to 2.8%, and the world model, learned from this traffic, foresees 93% of dangerous actions. Project page: https://ys-qu.github.io/jev-ad-website.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20261023-20261121/2611.07517v1-embodied-rag-retrieval-augmented-generation-from-what-exists-to-what-works-in-embodied-scenes",
+      "section": "quick",
+      "title_en": "Embodied RAG++: Retrieval-Augmented Generation From What Exists to What Works in Embodied Scenes",
+      "authors": "Fan Yang, Tatsuya Kikuzuki, Jun Liang, Jun Liu, Wenkai Li, Ryosuke Kawamura, Ananya Hazarika, Prajit KrisshnaKumar, Shaunak Mehta, Yuushi Toyoda",
+      "date": "2026-11-05",
+      "pdf": "https://arxiv.org/pdf/2611.07517v1",
+      "score": "8.0",
+      "evidence": "结合场景图与检索增强生成的具身推理",
+      "tldr": "机器人需按功能需求找到可用物体并匹配可到达的机器人，但场景图缺少产品手册中的能力信息。E2W-Bench将动态混合场景图与真实手册结合，评估可用性、移动性、垂直可达和连接约束下的能力分配。Embodied RAG++把检索限定到候选物体关联手册，缓存产品能力并用确定性空间推理判断机器人—物体可行性。实验中配对准确率在Qwen2.5-32B达0.90、Llama3.3-70B达1.00，显著超过基线。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "To serve a request in a human environment, a robot system must find an object that satisfies a functional requirement and a robot that can feasibly reach it. Scene graphs record which objects exist and where, but they often omit capabilities documented only in product manuals. Retrieval-augmented generation methods can read such manuals, yet they rarely reason jointly over object capabilities, physical instances, robot states, and dynamic connectivity. We introduce E2W-Bench, the Exists-to-Works Benchmark, which links dynamic hybrid scene graphs with real product manuals to evaluate capability-grounded robot--object assignment under availability, mobility, vertical-reach, and connector constraints. We also present Embodied RAG++, a spatially grounded retrieval framework that scopes retrieval to the manuals linked to candidate objects, caches extracted capabilities per product model, and resolves robot--object feasibility through deterministic spatial reasoning. On E2W-Bench, Embodied RAG++ reaches a pair accuracy of 0.90 with Qwen2.5-32B and 1.00 with Llama3.3-70B, compared with at most 0.30 and 0.55 for the baselines, while requiring the shortest preprocessing time among the retrieval-based methods and tying for the lowest total token count.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20261023-20261121/2611.09414v1-typed-centrality-grounding-for-agentic-graphrag-a-symbolic-approach-for-agentic-reasoning",
+      "section": "quick",
+      "title_en": "Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning",
+      "authors": "Rosario Napoli, Antonio Celesti, Massimo Villari, Maria Fazio",
+      "date": "2026-11-06",
+      "pdf": "https://arxiv.org/pdf/2611.09414v1",
+      "score": "8.0",
+      "evidence": "基于类型化中心性符号接地的智能体GraphRAG确定性推理",
+      "tldr": "现有GraphRAG将知识图谱视为同质图并依赖文本相似度，难以提供确定性知识。本文提出面向智能体GraphRAG的类型化中心性接地方法，按KG类别分别计算中心性并构建符号层，与文本相似度协同供LLM推理。在真实POLE数据集上对比有无符号层，结果显示生成更贴合上下文、输出质量提升。该工作为GraphRAG引入可验证的符号推理提供了新路径。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Knowledge Graphs (KGs) and Large Language Models (LLMs) represent two approaches for knowledge representation and reasoning over heterogeneous data. Recent research has explored their integration through Graph Retrieval-Augmented Generation (GraphRAG) systems, which use KGs to provide structured context to LLMs. However, existing GraphRAG approaches treat KGs as homogeneous graphs and rely on textual similarity between the input prompt and the context, rather than using it as a source of deterministic knowledge.   This work proposes an agent-based GraphRAG system that introduces a symbolic layer to integrate deterministic reasoning alongside text similarities. This approach is based on the definition of typed centralities for KGs, where centrality measures are computed separately for each specific KG's class. This information is used to construct a symbolic representation that is provided to the LLM as a deterministic source. The proposed system was mathematically validated and evaluated on a real-world POLE (Person, Object, Location, Event) dataset, comparing reasoning and information retrieval with and without the symbolic layer. The results indicate that the our approach leads to responses that are more consistent with the context, improving the generated outputs.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20261023-20261121/2611.24376v1-teaching-vlms-what-to-say-not-how-to-reason-rethinking-counterfactual-reasoning-in-autonomous-driving",
+      "section": "quick",
+      "title_en": "Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving",
+      "authors": "Hayeon Oh, Donghwan Lee",
+      "date": "2026-11-18",
+      "pdf": "https://arxiv.org/pdf/2611.24376v1",
+      "score": "8.0",
+      "evidence": "自动驾驶视觉语言模型中的反事实因果推理鲁棒性",
+      "tldr": "端到端自动驾驶易受捷径学习和因果混淆影响，VLM语言推理能否带来真正因果理解仍存疑。本文系统检验反事实推理在VLM驾驶决策中的作用，结合动作分布、不确定性、视觉注意力与因果干预实验分析其效应。结果显示反事实推理主要使动作更保守并提高不确定性，却不改变视觉 grounding，屏蔽因果与非因果因素引发相近决策变化。研究表明其更像语言捷径而非因果推理，揭示语言推理与因果理解之间的差距。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "End-to-end autonomous driving systems have been shown to suffer from shortcut learning and causal confusion, limiting their ability to generalize robustly under distribution shift. To mitigate these limitations, recent works based on Vision-Language Models (VLMs) have explored incorporating linguistic reasoning capabilities into driving decision-making, reporting improvements in driving performance. In particular, counterfactual (CF) reasoning has been proposed to enable self-reflective, high-level causal understanding. However, it remains unclear whether the language-based reasoning mitigates shortcut learning or merely shifts it from visual representations to linguistic patterns, creating an illusion of causal understanding. Moreover, existing approaches often conflate intervention-based reasoning with CF reasoning, leaving the effects of genuine CF reasoning unexplored. In this work, we examine what CF reasoning actually induces in VLM-based autonomous driving and observe that it shifts the action distribution toward more conservative behaviors while increasing uncertainty in reasoning and decision-making. This effect persists under reinforcement fine-tuning, suggesting that it is not merely a transient artifact. Furthermore, visual attention analysis shows that CF reasoning does not alter visual grounding, while causal intervention experiments reveal that masking causally relevant and non-causal factors in accident scenarios results in comparable decision change rates. Overall, these results suggest that CF reasoning does not induce genuine causal reasoning grounded in visual evidence. Instead, it acts as a linguistic shortcut that reshapes the action distribution, teaching models what to say but not how to reason, highlighting a gap between language-based reasoning and causal understanding in autonomous driving.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

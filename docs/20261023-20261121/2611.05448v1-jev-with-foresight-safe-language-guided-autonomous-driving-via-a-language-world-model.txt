@@ -1,0 +1,307 @@
+Title: Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model
+
+URL Source: https://arxiv.org/pdf/2611.05448v1
+
+Published Time: Thu, 05 Nov 2026 01:04:03 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+> 1
+
+# Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model 
+
+Yansong Qu, Jiancong Chen, and Samuel Labi 
+
+Abstract —Large language models understand passengers’ driving commands, but as driving agents they reason in generated text for seconds and must infer each action’s consequences implicitly from the scene. We present Jev-AD, which pairs Jev, a typed decision model that answers predefined questions with probabilities, not generated text, with a language world model that predicts for every candidate action how nearby vehicles move over the next two seconds. Code turns these predictions into foreseen consequences, which Jev compares instead of inferring them from coordinates. In simulated highway merging (500 car-episodes), this foresight lowers the same decision model’s collision rate from 26.0% to 2.4% at 0.25 seconds per decision, and Jev-AD achieves the passenger’s intent in 93% of free-form command trials. In 500 replayed real-world NGSIM episodes, foresight lowers the collision rate from 48.2% to 2.8%, and the world model, learned from this traffic, foresees 93% of dangerous actions. Project page: https://ys-qu.github.io/jev-ad-website. 
+
+Index Terms —Autonomous driving, Jev, large language mod-els, world models, natural-language commands, human–vehicle interaction, trajectory prediction. 
+
+I. I NTRODUCTION 
+
+As autonomous vehicles (AVs) move from test tracks to public roads [1], passengers will expect to tell them how to drive in their own words rather than through a menu of driving modes [2], [3]: “ I’m late for a meeting, please get me there quickly ”, “ Please drive gently, I get carsick easily ”, or “ Let the car on the ramp merge in front of us ”. Such an interface has to understand free-form commands, turn them into measurably different driving, refuse requests that would endanger anyone, and respond within the decision period of the vehicle. Large language models (LLMs) have made this kind of interaction plausible. Beyond understanding language, they bring commonsense knowledge about traffic, and a growing line of work uses them as driving agents that describe the scene in text, reason about it, and decide how to drive [4]–[7]. Two problems stand in the way of using them for every decision. First, an LLM agent typically writes a chain of thought before it answers, which is slow and costly when a decision is due every fraction of a second. Second, the agent decides from what it has observed so far and must anticipate implicitly, from positions and speeds in text, what each action will lead to; in dense interactions such as merging, this can fail. For the first problem, dual-process designs keep the large model out of the fast loop: DriveVLM runs a vision-language model alongside a conventional planner [8], and LeapAD transfers the experience of its slow analytic process to a         
+
+> The authors are with the Lyles School of Civil and Construction En-gineering, Purdue University, West Lafayette, IN 47907 USA (e-mail: qu120@purdue.edu; chen5281@purdue.edu; labi@purdue.edu).
+
+small fast model [9]. Typed decision models instead make the decision itself fast: they read the state as text and return probabilities over predefined answers, computed in parallel rather than generated one token (word piece) at a time [10], and have served as fast decision layers that call a strong LLM only when unsure [11] or control an agent’s memory [12]. They are called typed because each question fixes the type of its answer (a choice among named options, a score on a scale, or yes/no), and the model returns a probability for every possible answer. Jev, released by TypeSafe AI in limited early access in September 2026, is one such model: it answers typed questions (choices, scores, and yes/no questions) with probabilities and confidence scores [10]. Its developer calls this class System One models, and several other such models now exist [13]; we use the descriptive name typed decision models. For the second problem, world models predict how the environment evolves under an action [14], [15], and agents can learn their behavior by imagining the future with them [14], [16]. An LLM can act as a world model that simulates the outcome of each reasoning step [17], and driving world mod-els evaluate candidate trajectories by generating their future views [18], condition actions on imagined future scenes [19], or predict the future scene together with the ego motion [20]. Foreseeing consequences helps to decide safely, but most of these models generate images or long token sequences, which is costly to repeat for every candidate action at every decision. In this paper, we explore a lightweight way to address both problems in language-guided driving, which combines the two paradigms (Fig. 1). We pair Jev [10], a typed decision model that answers in about 0.13 s, with a small language world model that predicts, for each candidate action, how the nearby vehicles move over the next 2 s. Code turns these predictions into short foreseen consequences, and Jev chooses the action that is foreseen as safe and best matches the passenger’s request (Fig. 2). By foresight we mean these consequences: for each candidate action, whether and when the AV would collide, the minimum time to collision, and its final lane and speed, stated in words. We call the resulting agent Jev-AD (Jev for autonomous driving). We address five research questions (RQs): RQ1 How accurately does Jev ground free-form commands, including unsafe ones (Sec. IV-B)? RQ2 How well does the language world model foresee dan-gerous actions (Sec. IV-C)? RQ3 How much does foresight reduce collisions, and at what cost in time (Sec. IV-D)? arXiv:2611.05448v1 [cs.RO] 3 Nov 2026 2“Move to the left lane.”               
+
+> Real case from NGSIM (I-80)
+> The AV (blue) drives at 8 m/s in dense traffic; in the left lane, a car (orange) approaches from behind at 18 m/s.
+> 18 m/s → AV, 8 m/s
+> command + scene (text) LLM Turn-left
+> listens to the command, reasons, and plans at once
+> turns left at once → collision after 0.95 s
+> ✓Follows free-form commands
+> ✓Common-sense reasoning
+> ✗No look-ahead: cannot see the danger
+> state
+> World model
+> future states
+> Policy / planner Keep
+> predicts future states; plans or learns a policy in imagination
+> keeps its lane: safe, but the request is ignored
+> ✓Foresees how traffic evolves
+> ✓Learns from data (imagination)
+> ✗No language: cannot take commands
+> command Jev Language
+> world model
+> “Turn-left?” “COLLISION within 1.5 s”
+> the LLM asks what each action leads to; the answer is in words
+> waits 1.5 s, then moves left → safe, as asked
+> ✓Follows free-form commands
+> ✓Foresees each action’s outcome, incl. others’ reactions
+> ✓Foresight in words: read by the LLM and by people
+
+(a) LLM-based autonomous driving (b) World-model-based autonomous driving (c) Ours: LLM + language world model 
+
+Fig. 1. Three ways to act on a passenger’s request in a replayed NGSIM case (I-80): the passenger asks to move to the left lane while a car approaches in that lane at 18 m/s. (a) An LLM-based agent [4], [5], here Jev with KoMA’s scene text, turns left at once and collides 0.95 s later. (b) A world-model-based agent [14]–[16], [18] stays safe but cannot take the request. (c) Jev-AD’s world model answers “COLLISION within 1.5 s” for turning left, so Jev-AD waits 1.5 s and then moves left. Scenes: replayed traffic at the collision (a) or 3 s after the request (b, c); faded: the AV and the approaching car at the request. 
+
+RQ4 How often does Jev-AD achieve the passenger’s intent (Sec. IV-E)? RQ5 How accurate is the foresight, and how much does it reduce collisions, with altered simulated drivers and in replayed real-world traffic (Secs. IV-F and IV-G)? Our contributions are: 1) Typed decisions for language-guided driving. To the best of our knowledge, this is the first evaluated language-guided driving architecture that uses a typed decision model, as defined in this paper, for recurring closed-loop action selection: Jev grounds each free-form command once and makes every driving decision with one typed call, which is fast and cheap and leaves nothing to parse. A concurrent benchmark runs such models in simulated driving, without commands or fore-sight [13]. 2) Foresight for safer decisions. The decision model sees, for every candidate action, its foreseen consequences instead of coordinates, and we show that this foresight, more than the way it is predicted, is what lowers its collision rate: even with constant-velocity prediction, the rate of the same decision model falls from 26.0% to 2.8%. Our language world model, which reads the recent history as text and predicts how the nearby vehicles move over the next 2 s, including how they react to the AV, makes the foresight more accurate and lets the car also stop promptly when asked. 3) Closed-loop evaluation. On KoMA’s merge scenario [5] in highway-env [21], foresight lowers the collision rate of the same decision model from 26.0% to 2.4%, Jev-AD achieves the passenger’s intent in 93% of trials with 24 scored free-form commands, including negated requests and requests in Chinese, and a decision takes about 0.25 s; on real traffic replayed from NGSIM, foresight lowers the collision rate from 48.2% to 2.8%. II. R ELATED WORK 
+
+LLM-based driving agents. In this line of work, the language model is the driver: it reads a description of the scene and decides how to drive. DiLu [4] realizes the reasoning, interpretation, and memorization abilities called for in [7] with reasoning, reflection, and memory modules in highway-env [21], and KoMA [5], whose scenarios we use, lets several such agents interact, share a memory, and plan over multiple steps. Other work lets a language or vision-language model output a planned trajectory as text [6], answer linked per-ception, prediction, and planning questions [22], or guide the training of a reinforcement-learning driver [23]. These studies establish that language models can reason about traffic; we ask how such decisions can be made fast enough for every step and safe in interactive scenes. 
+
+Language-guided driving. Here the language comes from a person, and the question is not how to drive in general but what the passenger asks for. Cui et al. let an LLM act on verbal commands in highway-env [2], and their Talk2Drive framework translates such commands into executable controls, personalized by a memory module, in field experiments [3]. LaMPilot evaluates language-model programs that carry out driving instructions [24], and [25] aligns an LLM driver with human driving styles. These systems map an instruction to a behavior; we additionally make the refusal of unsafe requests, the strength of a request, and changes of mind explicit decisions and evaluate them in closed loop. 
+
+Prediction and planning. Conventional autonomous driv-ing separates perception, motion prediction, and planning [26]. Motion prediction ranges from physics-based models, such as constant velocity, to learned interaction-aware predictors [27], [28], and the planner chooses a trajectory or maneuver that 3(a) Command grounding 
+
+> Jev, once per command
+
+(b) Language world model 
+
+> every 0.5 s, for each candidate action
+
+(c) Decision                           
+
+> Jev, every 0.5 s
+> Input
+> “I’m late for a meeting, please get me there quickly.”
+> Jev: four typed questions, one call
+> Yes/no unsafe request? 0.03
+> Yes/no off-topic? 0.03
+> Score intensity, 0 (stop) to 4 3.23
+> Choice requested maneuver none
+> Output
+> execute
+> “assertive: drive somewhat faster than traffic”
+> Input the scene as text (this example, written out in words)
+> Road: 2 main lanes and an on-ramp, which ends about 80 m ahead. Now: the ego vehicle is on the ramp at 22.9 m/s, braking, with set speed 20 m/s; vehicle 1 is beside it in the right lane at 20.7 m/s; the other autonomous vehicle is 30 m behind in the left lane at 28.7 m/s; … The same 0.5, 1.0, and 1.5 s ago; the ego’s last actions: Faster, Faster, Slower.
+> Qwen2.5-0.5B
+> + LoRA
+> Control head
+> + action a(ego), c(other AV) → accel. & steering, 2 s
+> Bicycle model
+> → trajectories
+> Intention head → action cof the other AV Faster 0.61, Slower 0.22, Idle 0.12
+> ego other AV
+> ramp end
+> Output consequences computed by code (worst case over the likely actions c)
+> Left
+> “COLLISION within 0.5 s”
+> Faster
+> “DANGER: 0.8 s to a collision”
+> Idle
+> “tight: 1.9 s to a collision”
+> Slower
+> “tight: 1.9 s to a collision”
+> Input
+> passenger_command : “I’m late for a meeting, please get me…”
+> command_interpretation :“assertive: drive somewhat…”
+> situation : “on the on-ramp; it ends in 81 m (3.5 s); …”
+> action_outcomes : {Left: “COLLISION…”, Faster: “DANGER…”,…}
+> recent_actions : Faster, Faster, Slower
+> Choice over the available actions: avoid COLLISION and DANGER; best match to the request
+> Output
+> Idle 0.85
+> Slower 0.13
+> Faster 0.02
+> Left 0.00
+> → Idle
+
+highway-env (KoMA scenarios): both AVs act simultaneously every 0.5 s; the surrounding traffic follows IDM/MOBIL  
+
+> state history action
+> grounded command
+
+Fig. 2. Jev-AD on an example scene (inputs and outputs abbreviated). (a) Jev grounds the command once with four typed questions. (b) The language world model reads the scene text once and predicts, for each candidate action of the AV (and each likely action of the other AV), the controls of up to nine vehicles over 2 s; a bicycle model integrates them into trajectories, and code turns these into consequences. (c) One Jev call chooses I DLE under a hurry command, because turning left is foreseen to collide and accelerating to leave 0.8 s to the ramp end. 
+
+stays safe under the predictions, often judged by surrogate measures such as the time to collision [29]; end-to-end models learn these stages jointly [30]. Jev-AD follows the same predict-then-decide pattern, but its predictor is a language world model and its planner a typed decision model, which reads the predicted consequences in words together with the passenger’s command; constant-velocity prediction serves as the conventional baseline. III. J EV -AD 
+
+A. Overview 
+
+Jev-AD drives in the multi-vehicle setting of KoMA [5]. Every 0.5 s, each AV chooses exactly one of the meta-actions available in highway-env [21], At ⊆ { LEFT , I DLE , R IGHT ,FASTER , S LOWER }, where I DLE keeps the current lane and target speed, L EFT and R IGHT change one lane, and F ASTER 
+
+and S LOWER set the target speed one 5 m/s step above or below the current speed rounded to that grid; all AVs decide simultaneously, and the passenger of each may speak at any time. The agent has two components, which correspond to our first two contributions (Fig. 2): Jev makes every decision (Sec. III-B), and the language world model foresees the consequence of each candidate action for Jev (Sec. III-C). 
+
+B. Typed decisions with Jev 
+
+We use a typed decision model because every decision of the agent is a choice among a few predefined answers: whether to execute a command, how aggressive it is, which maneuver it requests, and which meta-action to take; a typed decision model makes such choices quickly, cheaply, and without output that must be parsed. It evaluates a state (text or JSON) against named, typed questions and returns one answer per question in a single call, with all probabilities computed in parallel rather than generated one token (word piece) at a time [10]. A choice question returns an option, a probability for every option, and a confidence; a score question returns the probability-weighted level on an ordered rubric; a yes/no question returns the probability that a statement is true. Because the model scores predefined answers instead of generating text, a call takes about 0.13 s, well within the 0.5 s decision period, and its probabilities can be thresholded. Jev performs two tasks in Jev-AD, and both are always used. First, when the passenger speaks, Jev grounds the command in one call with four questions: whether it explicitly asks to hit something, harm people, or break a traffic law (yes/no, 
+
+punsafe ); whether it is unrelated to driving (yes/no, poff ); how aggressively it asks the car to drive, from “stop” to “as fast as possible” (score, ℓ ∈ [0 , 4] ); and which maneuver it requests: none, stop, change left or right, or let a merging vehicle in (choice). The command is refused if punsafe ≥ 0.8, held for clarification if 0.2 ≤ punsafe < 0.8, ignored if poff ≥ 0.5, and executed otherwise; these thresholds were fixed before any evaluation. In simulation, a held command is not executed, like a refused one. An executed command is passed on verbatim and in a canonical form, e.g., “assertive: drive somewhat faster than traffic”; the text of a declined command never reaches the driving step. Second, at every step, Jev answers one choice over At.Its state holds the grounded command, a short description of the situation such as the remaining ramp length, and the consequence of each action foreseen by the world model 4
+
+(Sec. III-C); the instruction forbids options foreseen as C OLLI - 
+
+> SION
+
+or D ANGER when a safe one exists and asks for the safe option that best matches the passenger. This is an instruction, not a hard filter; in the merge study, Jev followed it in 98.7% of the decisions in which a safe option existed (99.4% on the roundabout). While a lane change or let-merge request is active, the same call asks whether it has been completed; once this probability reaches 0.5, the command reverts to its requested driving style. A new utterance replaces the active command. When only one action is available, it is executed without a call, unless a completion check is due. 
+
+C. Language world model and foresight 
+
+To choose safely, Jev has to know what each option leads to, and on a real vehicle this future can only be predicted. A 
+
+language world model is a language model trained to predict how a scene described in text evolves under a given action. We predict the future so that the decision model does not have to infer gaps, closing speeds, and the reactions of other drivers from coordinates by itself: a typed decision model judges well what its input states but fails when the right option depends on predicting what the input does not state [31]. We use a language model for the prediction because text describes the vehicles, lanes, and past actions of a scene without a fixed feature layout and a pretrained model can serve as the backbone. The model does not copy the simulator to look into the future; it predicts only from the history that the vehicle has observed. Fig. 2(b) shows the model. Its input text lists four frames 0.5 s apart of the ego and up to eight nearest vehicles within 100 m, in a frame aligned with the ego’s lane, with velocities, headings, and accelerations in the current frame, the set speeds and target lanes of the AVs, and the last three actions of the ego and of the other AV, whose current action is unknown; the two AVs are assumed to share their set points and past actions, e.g., by vehicle-to-vehicle communication, as in cooperative control of connected AVs [32]. A Qwen2.5-0.5B encoder with LoRA (r=16 ) reads the text once, and two MLP heads read its last hidden state. A control head, conditioned on embeddings of the ego’s candidate action and of an action of the other AV, outputs the acceleration and steering angle of up to nine vehicles at ten keyframes over 2 s, and an intention head predicts the other AV’s action. The keyframes are interpolated to 20 Hz and integrated with highway-env’s kinematic bicycle model, so the predicted trajectories are kinematically consistent. At every decision, the model is queried once for all available actions, and foresight is computed from its predictions. For every candidate action, the ego applies it for one step and IDLE for three more (2 s), where I DLE keeps the current target speed and lane; since the other AV decides at the same time, each of its actions with a predicted probability of at least 0.2 (a threshold chosen before the experiments) is considered, also for one step followed by I DLE , and the most severe outcome is kept. From the predicted trajectories and the map, code computes whether and when the ego collides, the minimum time to collision (TTC) with its leader, which may be the ramp end, or follower, its final lane and speed, and whether it has merged, and renders each outcome as a short phrase. The TTC is the time until two vehicles would collide if both kept their current speeds; it is a common surrogate measure of safety because it shows how close an encounter comes to a collision before any collision happens [29]. A TTC below 1.5 s is labeled D ANGER , the threshold below which the Federal Highway Administration’s Surrogate Safety Assessment Model counts a traffic conflict [33]. Numerical computations such as gaps, closing speeds, and TTCs are thus done by code, not by a language model, and Jev receives judgments it can compare. IV. E XPERIMENTS 
+
+We answer the five research questions of Sec. I on KoMA’s scenarios and on traffic replayed from NGSIM recordings: RQ1–RQ4 in Secs. IV-B–IV-E and RQ5 in Secs. IV-F and IV-G. 
+
+A. Setup 
+
+Environments and data. The simulated experiments use KoMA’s scenarios [5], built in highway-env [21]: a merge with a two-lane main road and an on-ramp, its three-lane and one-lane variants, and a roundabout. The vehicles other than the AVs follow the IDM car-following model and the MOBIL lane-change model [34], [35], and each scene is generated from a random seed. The replay experiments use NGSIM [36], vehicle trajectories recorded at 10 Hz on two congested freeways: 45 min on US-101 in Los Angeles (about 640 m, five main lanes and an auxiliary lane) and 45 min on I-80 in Emeryville, California (about 500 m, six lanes including a high-occupancy-vehicle lane). We smooth the recorded posi-tions [37] and split the vehicles by ID into training, validation, and test sets as in [28]; Sec. IV-G describes how the recordings are replayed. 
+
+Scenarios and commands. In merge , one AV starts on a two-lane main road and one on the on-ramp, among five IDM/MOBIL vehicles [34], [35]; the three-lane merge (six other vehicles) is used for lane-change requests. An episode lasts up to 20 decisions (10 s) and ends early, as in KoMA, on a collision or once the merge area has been passed. All methods face identical scenes: the main study uses 50 test scenes and the command tests 10–20, and all design choices were made on separate development scenes. The main study sends five intents in free-form English to both AVs: no command, “ I’m late for a meeting, please get me there quickly ” (hurry), “ Please drive gently, I get carsick easily ” (gentle), “ Please pull over and stop the car ” (stop), and “ Ram into the car next to us ” (unsafe). Lane-change and let-merge requests go to the main-road car only. 
+
+Metrics. Per AV and episode (car-episode), we record colli-sions, completion, mean speed, latency, and cost. Completion is the scenario task (the ramp car has merged without a collision; the main-road car is collision-free) or, for the stop command, stopping without a collision (highway-env has no shoulder, so the car stops in its lane). Scenario success, as in KoMA, requires every AV to complete its task. All methods face the same scenes, so their comparisons are paired; because 5
+
+the episodes of one scene are not independent, the 95% confidence intervals of the collision rates resample whole scenes (Tables IV and VI). The simulation waits for every decision, so latency does not change the closed-loop outcomes; we report it separately (Fig. 3). 
+
+Baselines. Jev + KoMA text has the same model and command grounding but receives KoMA’s scene description, driving attentions, and action list [5] instead of foresight. Two variants change only how the foresight is predicted: an 
+
+oracle that copies the simulator, and hence knows how the surrounding drivers react (an idealized reference, unavailable on a real vehicle), but, like the world model, does not know the action that the other AV chooses at the same time and assumes I DLE ; and constant velocity , a conventional physics-based predictor [27], which treats the AVs like the oracle but lets every other vehicle keep its current speed and heading. All three kinds of foresight use the other AV’s shared set point, which KoMA’s text does not contain (the world model also its recent actions, Sec. III-C). In LLM + WM , GPT-6-luna (a reasoning model) or GPT-4o-mini answers the same typed questions as JSON, with the same grounded commands and foresight, so only the driving decision differs; the LLM drives both AVs, so the world model has to anticipate a decision maker that it was not trained on. The KoMA agent is KoMA’s driver agent, zero-shot with GPT-4o-mini, reasoning in a chain of thought over KoMA’s text with the raw command added to its instructions; it keeps KoMA’s multi-step planning but not its shared memory or reflection. For command understanding, we also prompt Llama-3-8B [38] locally for the four grounding fields. 
+
+Implementation. We use jev-1.13.0 through its HTTP API; a decision state has about 870 input tokens ($0.042 per million at the list price during the experiments, output free). The world model’s loss combines keyframe controls, inte-grated positions, and the other AV’s action, and the simulator model is trained for one epoch (31,860 steps, 7.2 h on two GPUs), the NGSIM model for two (26,000 steps, 6.5 h). Labels are simulated at 20 Hz instead of the environment’s 100 Hz to save time, which changes 0.7% of the collision labels. 
+
+World-model data. Both world models learn from episodes in which the AV itself drives, so that the data contain the states that the AV reaches in closed loop, including its own maneuvers in progress (Table I). An episode starts from a scene of one of the four KoMA scenarios (merge, three-lane merge, one-lane merge, roundabout) or, on NGSIM, from a recorded vehicle at a random moment (Sec. IV-G). In half of the episodes, a randomized rule policy drives: it scores the foreseen outcome of every action against a command-like profile (no request, hurry, gentle, stop, a random target speed, a lane change, or yielding) and random preferences for gaps, speed, and lane changes. In the other half, Jev-AD drives with simulator foresight and one of 141 free-form commands. Commands and profiles shape the driving but are never shown to the model; with probability 0.3, an AV’s command or profile changes once during the episode. Half of the episodes alternate normal driving (3–6 steps) with 2–4 forced actions (faster, slower, left, right, idle, or random), so that the data also contain mistakes and recoveries. At every decision, each candidate                           
+
+> TABLE I WORLD -MODEL DATA ,COLLECTED THE SAME WAY IN BOTH SETTINGS . A
+> LABEL IS THE SIMULATED 2S OUTCOME OF ONE CANDIDATE ACTION AT ONE DECISION .Simulator (KoMA) NGSIM (recorded traffic) Other vehicles IDM/MOBIL recorded, reacting via IDM Episode start a KoMA scene a recorded vehicle as the AV AV driver rule 50 %, Jev-AD 50 % rule 50 %, Jev-AD 50 % Perturbed episodes 49 % 50 % Training episodes 17,982 11,992 States / labels 510 k / 1.86 M 209 k / 0.93 M Label rate 20 Hz 10 Hz (NGSIM’s rate) Held out test scenes test vehicles (by ID [28]) TABLE II COMMAND UNDERSTANDING ON HG-C MD (J EV AND GPT: THREE CALLS PER COMMAND ;BLOCKED :REFUSED OR HELD FOR CLARIFICATION ).
+
+Jev (ours) GPT-6 luna GPT-4o mini Llama-3 8B AUROC unsafe/safe ↑ 1.000 0.999 1.000 0.930 Unsafe blocked (of 23) ↑ 100% 100% 100% 87% Safe blocked (of 105) ↓ 0% 4.1% 0% 1.0% Borderline refused (of 10) 0% 37% 20% 0% Intensity in range ↑ 100% 100% 93.5% 96.8% Graded Spearman ρ ↑ 1.00 0.98 0.98 0.98 Maneuver accuracy ↑ 98.9% 100% 100% 100% 
+
+Chinese: unsafe blocked (of 3) ↑ 100% 100% 100% 67% Chinese: intensity in range ↑ 100% 100% 91% 91% Changed across calls ↓ 0% 8.7% 0.7% –Median latency ↓ 136 ms 1.49 s 770 ms 801 ms †
+
+Cost per 1k calls ‡ ↓ $0.030 $0.079 $0.065 local Borderline requests have no correct answer; held ones are not counted as refused (held: Jev 30%, luna 40%, 4o-mini 33%, Llama 10%). GPT and Llama state their probabilities in their JSON answers. †One Quadro RTX 6000. GPT-6-luna only allows its default temperature (1); GPT-4o-mini runs at 0. ‡Measured tokens at list prices per M input/output tokens: Jev $0.042/0, luna $0.10/$0.50 (incl. reasoning), 4o-mini $0.15/$0.60; mean tokens per call (input/output, as counted by each API): Jev 722/0, luna 289/99, 4o-mini 290/36. 
+
+action is simulated for 2 s, the action followed by I DLE , and the trajectories of the AV and its nearby vehicles form the label. Validation episodes select the checkpoint; test episodes and scenes are held out. 
+
+B. Command understanding 
+
+RQ1: How accurately does Jev ground free-form commands, including unsafe ones? Table II evaluates the four grounding questions of Sec. III-B on HG-Cmd (Human-Guided Com-mands), our set of 138 English and Chinese commands that covers driving styles, graded requests, paraphrases, maneuvers, negations, off-topic remarks, borderline requests, and 23 un-safe requests such as tailgating or running a red light. Jev blocks every unsafe request and no safe one, rates intensities as accurately as the GPT models and maneuvers nearly as accurately, and gives the same answer every time, while it answers several times faster at less than half their cost. Jev thus understands free-form commands as reliably as the GPT models. 6                               
+
+> TABLE III FORESIGHT ACCURACY ON 250 HELD -OUT EPISODES PER SETTING
+> (SIMULATOR : 27,030 CANDIDATE ACTIONS ; NGSIM: 19,383), AGAINST THE SIMULATED OR REPLAYED OUTCOME . E RR .: 2 S POSITION ERROR OF THE SURROUNDING VEHICLES (MEDIAN / 95 TH PCT .; SIMULATOR :ON
+> 1,000 HELD -OUT STATES ). Source Danger recall False alarm Collision recall Err. (m)
+> Simulator (KoMA)
+> Constant velocity 0.891 6.1% 0.951 1.07 / 7.60 Oracle (other AV idle) 0.953 0.6% 0.969 –Jev-AD world model (ours) 0.946 2.9% 0.978 0.29 / 3.65
+> Replayed traffic (NGSIM, Sec. IV-G)
+> Constant velocity 0.923 17.0% 0.951 0.98 / 3.82 Jev-AD world model (ours) 0.927 10.0% 0.913 0.56 / 2.05
+
+C. Accuracy of the foresight 
+
+RQ2: How well does the language world model foresee dangerous actions? Table III compares its foresight with the true outcome on 250 held-out episodes. It detects about as many dangerous actions as the oracle and slightly more of the collisions, because it considers every likely action of the other AV, at the price of more false alarms. Constant velocity detects fewer of the dangerous actions, with twice as many false alarms, and its predicted positions lie almost four times as far from the truth. The world model stays accurate where vehicles change speed and heading, as on the curved lanes of the roundabout, where it misses 7.5% of the dangerous actions and raises false alarms for 1.1% of the safe ones, against 29% and 13% for constant velocity. Its predicted positions after 2 s lie a median of 7 cm (ego) and 18 cm (other AV, given its actual action) from the truth, and it predicts the other AV’s next action correctly in three of four decisions. The learned model therefore foresees dangers nearly as well as a copy of the simulator and better than constant velocity. 
+
+D. Safety and speed in closed loop 
+
+RQ3: How much does foresight reduce collisions? Table IV compares decision makers and kinds of foresight in closed loop. With the same decision model and command grounding, KoMA’s scene text leads to collisions in 26.0% of the car-episodes, and world-model foresight to 2.4%, close to the oracle (2.0%). Even constant-velocity foresight lowers it to 2.8% (in 8 car-episodes only this variant collided, in 6 only the world-model one), so the reduction comes from the foresight itself rather than from how it is predicted. What the world model adds is foresight of how the others react. Constant velocity assumes that the car behind keeps its speed, so under a stop request it foresaw slowing down as a rear-end danger in 36% of the decisions, against 9% with the world model, and the AV stopped in only 90 of 100 stop requests, against all 100. On the roundabout, where vehicles follow curved lanes (30 scenes × 5 commands, one AV), world-model foresight avoided every collision; replayed against the simulator, it missed 7% of the dangerous actions and raised false alarms for 0.6% of the safe ones in the states its car visited. Constant-velocity foresight also avoided every collision there, but it foresaw slowing down under a stop request as a rear-end                    
+
+> TABLE IV CLOSED LOOP ON THE MERGE SCENARIO (50 SCENES ×5COMMANDS ×
+> 2CARS ). C OLL .: COLLISIONS ; C OMPL .: COMPLETION ;¯v:MEAN SPEED ;SUCC .: SCENARIO SUCCESS WITHOUT A COMMAND ; WM: WORLD -MODEL FORESIGHT ;CONST .VEL .: CONSTANT -VELOCITY FORESIGHT . B OTTOM :
+> SUCCESS REPORTED IN [5] ON OTHER SCENES ,FOR REFERENCE ONLY .
+
+¯v (m/s) under command Coll. Compl. hurry none gentle stop Succ. (%) (%) (%) KoMA agent ∗ 33.7 62.0 25.3 20.1 17.6 10.6 50 Jev + KoMA text 26.0 73.8 25.8 20.1 8.8 3.8 60 GPT-4o-mini + WM 2.2 78.2 29.3 25.0 10.2 20.1 98 GPT-6-luna + WM 0.6 98.8 22.9 19.2 13.4 4.2 100 Jev-AD, const. vel. 2.8 94.4 26.8 19.1 12.6 4.8 92 Jev-AD, oracle 2.0 98.0 27.0 19.2 12.0 3.8 92 Jev-AD, WM (ours) 2.4 97.6 26.7 19.2 12.0 4.0 94 
+
+Reported in [5]; 0 / 20 / 40 training episodes 
+
+DiLu [4] 40 / 50 / 50 KoMA, GPT-4 30 / 50 / 70 KoMA, GPT-3.5 † 20 / 30 / 35 MARL [39] § 45 / 51 / 65 95% confidence intervals of Coll. (resampling scenes): KoMA agent 28.0–39.7, Jev + KoMA text 20.0–32.6, GPT-4o-mini + WM 1.0–3.6, GPT-6-luna + WM 0.0–1.6, const. vel. 0.8–5.2, oracle 0.6–3.6, WM 0.6–4.8.   
+
+> ∗Zero-shot, GPT-4o-mini, chain of thought over KoMA’s text; first 30 scenes only (300 car-episodes), on which Jev-AD collides in 0.7%; nine of its 12 collisions occur in three of the other 20 scenes. †Llama-3-8B: 25 / 35 / 40; Qwen2-7B: 25 / 30 / 40. §After 0 / 20,000 / 40,000 episodes, reported on a main road with one lane.
+
+danger in 87% of the decisions, against none with the world model, and the AV took 8.3 s instead of 2.2 s to stop. Of the 12 collisions of Jev-AD on the merge scenario, eight involve a ramp car trapped near the end of the ramp, where every option had been foreseen as dangerous for several steps, and only one follows a choice against the instruction of Sec. III-B, which a hard filter, easy to add in deployment, would have changed. With the same foresight, GPT-4o-mini and GPT-6-luna also collide rarely, but GPT-4o-mini mostly ignores stop requests, and GPT-6-luna needs 2.2 s per decision. KoMA’s own agent, which reasons over the scene text, collides in 33.7% of the car-episodes on the 30 scenes where we ran it, against 0.7% for Jev-AD; every decision maker with foresight succeeds in 92– 100% of the scenes, against 60% for Jev with KoMA’s text. Foresight thus makes collisions rare, and the world model’s more accurate foresight also lets the car stop promptly when asked. Fig. 3 adds the price in time: among these methods, only Jev-AD both collides rarely and decides well within the 0.5 s decision period. Jev answers 8 to 17 times faster than the GPT models at about a quarter of their cost ($3.65 ×10 −5
+
+per decision), and with the foresight, a Jev-AD decision takes about 0.25 s. The typed decision model thus ensures that these decisions are made rapidly. 
+
+E. Following free-form commands 
+
+RQ4: How often does Jev-AD achieve the passenger’s intent? We give it 26 HG-Cmd commands, fixed before the 70.1 0.25 0.5 1 2 5 10 time per decision (s, median) 010 20 30 collisions (%)     
+
+> 0.5 s decision period
+> Jev + KoMA text KoMA agent GPT-4o-mini + WM GPT-6-luna + WM
+> Jev-AD (ours)
+> + foresight
+> Jev decides LLM decides WM foresight no foresight
+> Fig. 3. Time per decision and collisions on the merge scenario (Table IV). Time: median per decision, including the world model’s foresight (124 ms) where used; KoMA agent: 30 scenes, including waits for the API rate limit. stop very slow a bit slower normal a bit faster fast max
+
+10 20 mean speed (m/s)    
+
+> Fig. 4. Mean speed of Jev-AD under seven graded commands, from “ Stop the car ” to “ Drive as fast as you possibly can ” (merge, 30 car-episodes each; bars: 95% bootstrap CI; Spearman ρ= 0 .89 ).
+
+runs, on the first 20 test scenes and compare each episode with the same method’s episode without a command: a faster or slower request must change the mean speed by at least 2 m/s, a stop request must end below 1 m/s, a negation such as “ Don’t drive too fast ” must not make the car do what its words literally suggest, and an unsafe request must be refused (Table V). Jev-AD achieves 93% of these intents, about as many as GPT-6-luna deciding with the same grounding and foresight; most misses are speed-up requests that fell short of 2 m/s or slow-down requests after which the car came almost to a stop. Grounding is what makes this work: on the first ten of these scenes, passing the raw command to the driving step instead lowers the rate from 90% to 65%, mainly for paraphrases and Chinese. The driving also follows graded and structured requests: speed rises with the requested intensity up to “ Drive a bit faster than usual ”, beyond which the three fastest commands drive alike, at about 26 m/s (Fig. 4), most feasible lane changes are completed, the ramp car is let in more often when asked, and a new command given while driving takes effect after about 1 s. Jev-AD thus follows free-form commands while it keeps the collision rate low. 
+
+F. Unfamiliar traffic 
+
+RQ5 (unfamiliar traffic): How accurate is the foresight, and how much does it reduce collisions, when the simulated drivers behave differently from the training data? We made them more aggressive at three levels, with shorter gaps, harder   
+
+> TABLE V FREE -FORM COMMAND FOLLOWING IN CLOSED LOOP (CRITERIA FIXED BEFORE THE RUNS ;LANE CHANGES ON THE THREE -LANE SCENARIO ,
+> OTHER TESTS ON THE MERGE SCENARIO ).
+
+Test Metric Jev-AD GPT-6 luna †
+
+Understanding ‡ intent achieved 92.9% 91.6% 26 commands paraphrases (12) 89.8% 87.3% 
+
+× 20 scenes negations (7) 97.5% 98.6% 
+
+Chinese (3) 90.8% 86.7% unsafe (2) ∗ 98.8% 100% 
+
+collisions 0.6% 0.6% 
+
+Lane change (4) done (52 feasible) 84.6% 86.5% 
+
+changes per episode 1.23 1.12 Let merge (2) ramp car ahead 92.5% 80.0% without command 75% 65% Mid-drive responded; median time 100%; 1.0 s –change (4) collisions (of 160) 0.6% –A slower request must also keep the car moving; lane change done: at least one change in the requested direction; responded: a speed change of at least 3 m/s (stop: below 1 m/s). ∗Refused by Jev’s grounding; a collision counts as failure. †Driving decisions only; commands grounded by Jev. ‡Intent over the 24 scored commands (the other two are borderline requests without a correct answer; Jev executes one and holds “ Stay glued to the bumper of the car ahead so nobody cuts in ” for clarification); collisions over all 26. 
+
+acceleration and braking, and more eager lane changes, and repeated the study of Table IV. Jev-AD collided in 1.8–3.0% of the car-episodes, about as often as with the default drivers (2.4%), and offline the world model still detected 95% of the dangerous actions with 3.8% false alarms (constant velocity: 91% and 7.7%). The main change is that fewer stop requests end in a full stop, because a full stop with a close follower is foreseen as dangerous. The foresight thus stays accurate, and collisions stay rare, in this unfamiliar traffic. 
+
+G. Replayed real-world traffic 
+
+RQ5 (replayed traffic): How accurate is the foresight, and how much does it reduce collisions, among recorded human drivers? We repeat the studies of Tables III and IV on NGSIM (Sec. IV-A). Following [40], we replay the recordings in highway-env: a recorded vehicle becomes the AV, and every other vehicle follows its recording until the AV, or a vehicle that already reacts, is directly ahead of it and closer than both IDM’s desired gap and the gap it had in the recording; from then on, IDM drives it in its recorded lane. As NGSIM traffic is slow, F ASTER and S LOWER accelerate by 3 m/s 2 or brake by 5 m/s 2 for one step, IDM’s comfortable limits, instead of moving the target speed on the 5 m/s grid. The world model keeps its architecture and training code and learns from AV-driven episodes collected as in simulation (Table I). Its text has the same layout but no past actions, as there is no other AV and the AV’s set speed and target lane already show a maneuver in progress, and its trajectories are integrated at NGSIM’s 10 Hz. Because dozens of vehicles are within 100 m in this dense traffic (median 67), the vehicles beyond its eight tracked slots, 8
+
+which are filled first from the AV’s own and adjacent lanes, are extrapolated at constant velocity. Recorded drivers are less predictable than simulated ones, so the world model reports the time to collision minus a margin of 1 s, chosen on the validation episodes. How accurate is the foresight in replayed traffic? Table III (bottom) compares it with the replayed outcome on 250 held-out episodes driven like the training data. The world model detects 93% of the dangerous actions and 91% of the collisions, with false alarms for 10% of the safe actions, and predicts where the nearby vehicles are after 2 s with a median error of 0.56 m. Constant velocity detects about as many dangerous actions but raises false alarms for 17%; at the world model’s false-alarm rate, it would detect only 85%. The world model is most accurate for the vehicles that react to the AV (median 0.28 m, against 1.19 m for constant velocity), whose reactions it has learned from the replayed traffic; Fig. 5 shows its predictions in typical test states for three maneuvers of the AV. Learned from recorded traffic, Jev-AD’s world model thus foresees most dangers with few false alarms. How much does the foresight reduce collisions in replayed traffic? Table VI repeats the closed-loop study on 100 test scenes. In Jev-AD’s episodes, the AV drives among recorded drivers: at a decision, 97% of the other simulated vehicles follow their recordings on average. Fig. 6 shows one of these episodes, in stop-and-go traffic on I-80. The passenger asks to hurry; Jev-AD moves one lane to the left twice, each time when the world model foresees that staying in its lane would bring it too close to the car ahead, and after 10 s it is 15 m ahead of where the recorded driver was. With KoMA’s text, Jev collides in nearly half of the episodes, mostly by accelerating into slower traffic; with world-model foresight, it collides in 2.8%, with constant-velocity foresight in 1.8% (only the world-model car collided in 10 episodes, only the constant-velocity car in 5), and the oracle, which knows how the recorded drivers react, in none. Because the world model foresees that a follower brakes, the car stops 1.8 s after a stop request on average, close to the oracle (1.5 s); constant velocity foresees slowing down under a stop request as a rear-end danger almost twice as often (69% against 37% of the decisions), and the car takes 3.4 s to stop. In the states that the car visited, the world model missed 7.9% of the dangerous actions and raised false alarms for 9.8% of the safe ones (constant velocity: 8.5% and 15.5%). Foresight thus makes collisions rare in replayed traffic too, even at constant velocity, and the world model also lets the car stop promptly. V. C ONCLUSION 
+
+We presented Jev-AD, a language-guided driving agent in which a typed decision model grounds each command once and makes every decision with a single call, while a language world model foresees what each candidate action leads to. The experiments answer the five research questions. RQ1: Jev grounds free-form commands as reliably as the GPT models, blocks every unsafe request of HG-Cmd and no safe one, and answers in about 0.13 s. RQ2: the world model foresees 95% of the dangerous actions in simulation and 93% in 40 20 0 20 40                       
+
+> (a) AV changes lanes at 12 m/s (US-101); median 2 s error 0.7 m
+> AV
+> 40 20 020 40
+> (b) AV brakes at 8 m/s (I-80); median 2 s error 0.5 m
+> AV
+> 40 20 020 40
+> x along the road (m), AV at 0 (lateral scale ×2.5)
+> (c) AV speeds up at 7 m/s (I-80); median 2 s error 0.4 m
+> AV
+> replay world model AV (its controller)
+> Fig. 5. The world model’s foresight for every tracked vehicle in three typical NGSIM test states: replay (solid) and prediction (dashed) over 2 s, with positions after 1 s (dots) and 2 s (boxes); dark grey: vehicles that react to the AV; light grey: untracked vehicles; lateral scale ×2.5. Per maneuver, the state with the median 2 s error among comparable states. TABLE VI CLOSED LOOP ON REPLAYED TRAFFIC (NGSIM; 100 TEST SCENES ×5
+> COMMANDS ,ONE AV AMONG RECORDED DRIVERS WHO REACT TO IT ). COLUMNS AS IN TABLE IV.
+
+¯v (m/s) under command Coll. (%) Compl. (%) hurry none gentle stop Jev + KoMA text 48.2 51.8 11.2 6.8 2.3 0.5 Jev-AD, const. vel. 1.8 98.0 8.4 6.5 3.9 1.2 Jev-AD, oracle 0.0 100.0 8.9 6.6 3.7 0.5 Jev-AD, WM (ours) 2.8 97.0 8.5 6.4 3.6 0.6 95% confidence intervals of Coll. (resampling scenes): Jev + KoMA text 44.8–51.6, const. vel. 0.4–3.6, oracle 0–0.7 (exact binomial bound), WM 1.4–4.4. 
+
+replayed traffic, with fewer false alarms than constant-velocity prediction. RQ3: on KoMA’s merge scenario, foresight lowers the collision rate of the same decision model from 26.0% to 2.4%, close to an oracle that copies the simulator (2.0%), at about 0.25 s per decision; constant-velocity foresight lowers it to 2.8%, so the reduction comes from foresight itself, while 9200 210 220 230 240 250 260          
+
+> position along the road (m)
+> (a) The test on an aerial photo of I-80, t = 0 to 10 s
+> 123456
+> photo from a separate survey; its cars are not in the test
+> 40 30 20 10 010 20 30 40 50
+> time (s), test starts at 0
+> 100 200 300 400 500
+> position along the road (m)
+> (b) Recorded trajectories, lane 4 of I-80
+> the AV's recorded driver the AV driven by Jev-AD
+> (a)
+> 012345
+> speed (m/s)
+
+Fig. 6. One closed-loop test among recorded drivers on I-80, selected as the most congested of the collision-free hurry episodes in which the AV changes lanes and at least two vehicles react to it. (a) Jev-AD’s path (blue) and the recorded driver’s path (dashed), drawn on an aerial photo of the site [36]; the photo comes from a separate survey, and its cars are not part of the test. (b) Recorded trajectories in the AV’s starting lane, colored by speed; box: the part shown in (a). 
+
+the world model, which also foresees how others react, lets the car stop promptly when asked. RQ4: Jev-AD achieves the passenger’s intent in 93% of the command trials, including negated requests and requests in Chinese. RQ5: with more aggressive drivers, it collides in 1.8–3.0% of the car-episodes, and on real traffic replayed from NGSIM, foresight lowers the collision rate from 48.2% to 2.8% (1.8% at constant velocity). The study contributes what is, to our knowledge, the first evaluated language-guided driving architecture that uses a typed decision model for recurring closed-loop action selec-tion, closed-loop evidence in simulation and on replayed real-world traffic that foresight is what lowers the collision rate of such fast decisions, and a language world model that provides this foresight accurately, including how other vehicles react. It also has limitations. The NGSIM study replays recorded drivers, who react to the AV only along their recorded lanes, and no test was run on a vehicle. The world model was trained separately for each setting and not tested across settings. Jev is a proprietary model accessed through an API, whose behavior may change between versions, and adversarial commands were tested only through the unsafe requests of HG-Cmd. The evaluation is simpler than operational driving: the agent reads ground-truth states instead of perception, chooses among five meta-actions with 2 s of foresight, and leaves low-level control to the simulator, in merge, roundabout, and freeway scenes only. The world model gives point predictions without an uncertainty estimate and cannot tell when an input differs from its training data. Future work includes tests on a vehicle, scene text built from perception, a world model trained across datasets that estimates its own uncertainty, a hard filter on foreseen collisions, and studies with passengers. REFERENCES [1] K. D. Kusano, J. M. Scanlon, Y.-H. Chen, T. L. McMurry, R. Chen, T. Gode, and T. Victor, “Comparison of Waymo rider-only crash data to human benchmarks at 7.1 million miles,” Traffic Injury Prevention ,vol. 25, no. sup1, pp. S66–S77, 2024. [2] C. Cui, Y. Ma, X. Cao, W. Ye, and Z. Wang, “Receive, reason, and react: Drive as you say, with large language models in autonomous vehicles,” 
+
+IEEE Intelligent Transportation Systems Magazine , vol. 16, no. 4, pp. 81–94, 2024. [3] C. Cui, Z. Yang, Y. Zhou, Y. Ma, J. Lu, L. Li, Y. Chen, J. Panchal, and Z. Wang, “Personalized autonomous driving with large language models: Field experiments,” in IEEE International Conference on Intelligent Transportation Systems (ITSC) , 2024, pp. 20–27. [4] L. Wen, D. Fu, X. Li, X. Cai, T. Ma, P. Cai, M. Dou, B. Shi, L. He, and Y. Qiao, “DiLu: A knowledge-driven approach to autonomous driving with large language models,” in International Conference on Learning Representations (ICLR) , 2024. [5] K. Jiang, X. Cai, Z. Cui, A. Li, Y. Ren, H. Yu, H. Yang, D. Fu, L. Wen, and P. Cai, “KoMA: Knowledge-driven multi-agent framework for autonomous driving with large language models,” IEEE Transactions on Intelligent Vehicles , vol. 10, no. 10, pp. 4655–4668, 2025. [6] J. Mao, Y. Qian, H. Zhao, and Y. Wang, “GPT-Driver: Learning to drive with GPT,” in NeurIPS Workshop on Foundation Models for Decision Making , 2023. [7] D. Fu, X. Li, L. Wen, M. Dou, P. Cai, B. Shi, and Y. Qiao, “Drive like a human: Rethinking autonomous driving with large language models,” in IEEE/CVF Winter Conference on Applications of Computer Vision Workshops (WACVW) , 2024. [8] X. Tian, J. Gu, B. Li, Y. Liu, Y. Wang, Z. Zhao, K. Zhan, P. Jia, X. Lang, and H. Zhao, “DriveVLM: The convergence of autonomous driving and large vision-language models,” in Conference on Robot Learning (CoRL) , 2024, pp. 4698–4726. [9] J. Mei, Y. Ma, X. Yang, L. Wen, X. Cai, X. Li, D. Fu, B. Zhang, P. Cai, M. Dou, B. Shi, L. He, Y. Liu, and Y. Qiao, “Continuously learning, adapting, and improving: A dual-process approach to autonomous driv-ing,” in Advances in Neural Information Processing Systems (NeurIPS) ,2024. [10] TypeSafe AI, “Introducing system one models & Jev,” https://typesafe. ai/blog/introducing-system-one-models-and-jev, 2026. [11] T. Wu and W. Y. B. Lim, “REFLEX with Jev for efficient selective control in LLM agents,” arXiv preprint arXiv:2609.26532 , 2026. [12] D. Jiang, Y. Li, and B. Li, “Jev-Mem: System-one-controlled agentic memory for efficient AI agents,” arXiv preprint arXiv:2609.23986 , 2026. [13] T. Chen, X. Liu, R. An, Z. Wang, and M. Zhou, “System1-Arena: Which decisions can be left to System 1?” arXiv preprint arXiv:2610.21244 ,2026. [14] D. Ha and J. Schmidhuber, “Recurrent world models facilitate policy evolution,” in Advances in Neural Information Processing Systems (NeurIPS) , 2018. [15] A. Hu, G. Corrado, N. Griffiths, Z. Murez, C. Gurau, H. Yeo, A. Kendall, R. Cipolla, and J. Shotton, “Model-based imitation learning for ur-ban driving,” in Advances in Neural Information Processing Systems (NeurIPS) , 2022. [16] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap, “Mastering diverse control tasks through world models,” Nature , vol. 640, pp. 647–653, 2025. [17] S. Hao, Y. Gu, H. Ma, J. Hong, Z. Wang, D. Wang, and Z. Hu, “Reasoning with language model is planning with world model,” in Pro-ceedings of the Conference on Empirical Methods in Natural Language Processing (EMNLP) , 2023, pp. 8154–8173. [18] Y. Wang, J. He, L. Fan, H. Li, Y. Chen, and Z. Zhang, “Driving into the future: Multiview visual forecasting and planning with world model for autonomous driving,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024, pp. 14 749– 14 759. [19] B. Zhang, N. Song, Y. Wang, J. Deng, X. Zhu, and L. Zhang, “See to-morrow, act today: Foresight-driven autonomous driving,” in Findings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026. 10 
+
+[20] W. Zheng, W. Chen, Y. Huang, B. Zhang, Y. Duan, and J. Lu, “OccWorld: Learning a 3D occupancy world model for autonomous driving,” in European Conference on Computer Vision (ECCV) , 2024, pp. 55–72. [21] E. Leurent, “An environment for autonomous driving decision-making,” https://github.com/eleurent/highway-env, 2018. [22] C. Sima, K. Renz, K. Chitta, L. Chen, H. Zhang, C. Xie, J. Beißwenger, P. Luo, A. Geiger, and H. Li, “DriveLM: Driving with graph visual question answering,” in European Conference on Computer Vision (ECCV) , 2024. [23] Y. Qu, Z. Sheng, Z. Huang, J. Chen, Y. Luo, T. Wang, Y. Feng, S. Labi, and S. Chen, “Found-RL: Foundation model-enhanced reinforcement learning via asynchronous VLM feedback for autonomous driving,” 
+
+Communications in Transportation Research , vol. 6, no. 3, 2026, Art. no. 9640027. [24] Y. Ma, C. Cui, X. Cao, W. Ye, P. Liu, J. Lu, A. Abdelraouf, R. Gupta, K. Han, A. Bera, J. M. Rehg, and Z. Wang, “LaMPilot: An open bench-mark dataset for autonomous driving with language model programs,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024, pp. 15 141–15 151. [25] R. Yang, X. Zhang, A. Fernandez-Laaksonen, X. Ding, and J. Gong, “Driving style alignment for LLM-powered driver agent,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2024, pp. 11 318–11 324. [26] W. Schwarting, J. Alonso-Mora, and D. Rus, “Planning and decision-making for autonomous vehicles,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 1, pp. 187–210, 2018. [27] S. Lefèvre, D. Vasquez, and C. Laugier, “A survey on motion prediction and risk assessment for intelligent vehicles,” ROBOMECH Journal ,vol. 1, no. 1, p. 1, 2014. [28] N. Deo and M. M. Trivedi, “Convolutional social pooling for vehicle trajectory prediction,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW) , 2018, pp. 1468–1476. [29] M. M. Minderhoud and P. H. L. Bovy, “Extended time-to-collision measures for road traffic safety assessment,” Accident Analysis &Prevention , vol. 33, no. 1, pp. 89–97, 2001. [30] Y. Hu, J. Yang, L. Chen, K. Li, C. Sima, X. Zhu, S. Chai, S. Du, T. Lin, W. Wang, L. Lu, X. Jia, Q. Liu, J. Dai, Y. Qiao, and H. Li, “Planning-oriented autonomous driving,” in Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) , 2023, pp. 17 853–17 862. [31] Y. Yang, H. Tang, Y. Ma, X. Fan, W. Wang, J. Li, and T. Yang, “Code owns the simulation, Jev owns the evaluation,” arXiv preprint arXiv:2610.01834 , 2026. [32] S. Chen, J. Dong, P. Y. J. Ha, Y. Li, and S. Labi, “Graph neural network and reinforcement learning for multi-agent cooperative control of con-nected autonomous vehicles,” Computer-Aided Civil and Infrastructure Engineering , vol. 36, no. 7, pp. 838–857, 2021. [33] D. Gettman, L. Pu, T. Sayed, and S. Shelby, “Surrogate safety assess-ment model and validation: Final report,” Federal Highway Administra-tion, Tech. Rep. FHWA-HRT-08-051, 2008. [34] M. Treiber, A. Hennecke, and D. Helbing, “Congested traffic states in empirical observations and microscopic simulations,” Physical Review E, vol. 62, no. 2, p. 1805, 2000. [35] A. Kesting, M. Treiber, and D. Helbing, “General lane-changing model MOBIL for car-following models,” Transportation Research Record , vol. 1999, no. 1, pp. 86–94, 2007. [36] U.S. Department of Transportation Federal Highway Administration, “Next Generation Simulation (NGSIM) vehicle trajectories and support-ing data,” ITS DataHub, https://doi.org/10.21949/1504477, 2016. [37] C. Thiemann, M. Treiber, and A. Kesting, “Estimating acceleration and lane-changing dynamics from Next Generation Simulation trajectory data,” Transportation Research Record , vol. 2088, no. 1, pp. 90–101, 2008. [38] A. Dubey et al. , “The Llama 3 herd of models,” arXiv preprint arXiv:2407.21783 , 2024. [39] D. Chen, M. R. Hajidavalloo, Z. Li, K. Chen, Y. Wang, L. Jiang, and Y. Wang, “Deep multi-agent reinforcement learning for highway on-ramp merging in mixed traffic,” IEEE Transactions on Intelligent Transportation Systems , vol. 24, no. 11, pp. 11 623–11 638, 2023. [40] Z. Huang, J. Wu, and C. Lv, “Driving behavior modeling using natu-ralistic human driving data with inverse reinforcement learning,” IEEE Transactions on Intelligent Transportation Systems , vol. 23, no. 8, pp. 10 239–10 251, 2022.

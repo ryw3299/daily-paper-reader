@@ -1,0 +1,1014 @@
+Title: Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving
+
+URL Source: https://arxiv.org/pdf/2611.24376v1
+
+Published Time: Thu, 19 Nov 2026 02:57:27 GMT
+
+Number of Pages: 41
+
+Markdown Content:
+# Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving 
+
+Hayeon Oh and Donghwan Lee 
+
+Department of Electrical Engineering Korea Advanced Institute of Science and Technology 
+
+{hahao5252, donghwan}@kaist.ac.kr 
+
+Abstract 
+
+End-to-end autonomous driving systems have been shown to suffer from shortcut learning and causal confusion, limiting their ability to generalize robustly under distribution shift. To mitigate these limitations, recent works based on Vision-Language Models (VLMs) have explored incorporating linguistic reasoning ca-pabilities into driving decision-making, reporting improvements in driving per-formance. In particular, counterfactual (CF) reasoning has been proposed to en-able self-reflective, high-level causal understanding. However, it remains unclear whether the language-based reasoning mitigates shortcut learning or merely shifts it from visual representations to linguistic patterns, creating an illusion of causal understanding. Moreover, existing approaches often conflate intervention-based reasoning with CF reasoning, leaving the effects of genuine CF reasoning unex-plored. In this work, we examine what CF reasoning actually induces in VLM-based autonomous driving and observe that it shifts the action distribution to-ward more conservative behaviors while increasing uncertainty in reasoning and decision-making. This effect persists under reinforcement fine-tuning, suggest-ing that it is not merely a transient artifact. Furthermore, visual attention analysis shows that CF reasoning does not alter visual grounding, while causal intervention experiments reveal that masking causally relevant and non-causal factors in acci-dent scenarios results in comparable decision change rates. Overall, these results suggest that CF reasoning does not induce genuine causal reasoning grounded in visual evidence. Instead, it acts as a linguistic shortcut that reshapes the action distribution, teaching models what to say but not how to reason, highlighting a gap between language-based reasoning and causal understanding in autonomous driving. 
+
+1 Introduction 
+
+Autonomous driving based on the conventional end-to-end paradigm has been consistently shown to suffer from inherent limitations in causal reasoning due to issues such as shortcut learning and causal confusion. To address these challenges, recent studies have explored Vision-Language Mod-els (VLMs), where language-based intermediate reasoning steps such as chain-of-thought (CoT) [1, 2] and chain-of-causation (CoC) [3, 4] have been reported to improve driving performance. In particular, counterfactual (CF) reasoning [5, 6, 7, 8] has been regarded as a promising approach for enabling higher-level causal understanding through self-reflective reasoning, thereby strengthening the expectation that VLMs can acquire genuine causal reasoning capabilities. However, according to the formal definition in [9], CF reasoning defined in prior works [5, 6] often does not correspond to retrospective reasoning that reconstructs past events and reasons about al-
+
+> 40th Conference on Neural Information Processing Systems (NeurIPS 2026). arXiv:2611.24376v1 [cs.RO] 18 Nov 2026
+
+ternative causes. Instead, it is more commonly limited to intervention-level reasoning that considers how actions might change under the current observation [10]. In other words, rather than reasoning over unobserved alternative worlds, it is closer to action adjustment conditioned on the current input. Due to this discrepancy, it remains unclear whether the reported performance gains truly originate from causal reasoning. This raises the fundamental question: what effects does genuine retrospective CF reasoning induce in VLMs for autonomous driving (RQ1) ? More specifically, does it induce genuine causal reasoning, or does the introduction of language as an additional modality instead act as a shortcut that reshapes the action distribution (RQ2) ?In this study, we address these questions by analyzing how CF reasoning, as an intermediate step prior to decision-making, influences model behavior and whether it leads to genuine causal un-derstanding. Accordingly, evaluating these aspects requires scenarios with explicit causal factors. Furthermore, single-frame settings are insufficient to capture key causal cues, such as motion dy-namics, trajectory evolution, and temporal risk accumulation, making temporal context essential. Accident video datasets provide a suitable setting for this evaluation, as they contain identifiable causal relationships and temporally ordered event progressions. Moreover, they enable retrospective counterfactual queries, such as "if the underlying cause had not been present, the accident would not have occurred," making them a suitable testbed for assessing genuine CF reasoning. Beyond scenario design, an appropriate action space and evaluation metrics are required to examine how CF reasoning influences decision-making. Conventional trajectory-based evaluations primarily focus on driving performance, making them less suitable for our objective of analyzing changes in the model’s decision-making behavior and its underlying action distribution. In particular, a trajec-tory lies in a continuous action space, whereas a meta-action represents a discrete driving behavior. Moreover, trajectory is less semantically interpretable than meta-actions, making it difficult to in-terpret changes in the likelihood of semantically equivalent decisions. Consequently, meta-action provides a more interpretable basis for analyzing changes in reasoning exploration. Therefore, we adopt meta-action as the decision space for analysis, following prior work[11, 12, 6, 13, 14]. This enables consistent evaluation across likelihood-based analysis using perplexity and direct exami-nation of changes in distributional diversity through policy entropy. Accordingly, we construct a testbed dataset by integrating existing accident video datasets [15, 16, 17] with explicit causal fac-tors, temporal context, and meta-action annotations. Further details of the dataset are provided in Appendix C. In conclusion, we reveal three key findings. First, we observe that CF reasoning induces a con-sistent shift toward more conservative action distributions, accompanied by increased entropy in language-based decision outputs, indicating that the model generates more diverse linguistic ex-planations while its decisions become biased toward conservative directions.The action distribution shift persists even after reinforcement learning fine-tuning (RFT), suggesting that it is not merely a training artifact. Second, we examine changes in visual attention with and without CF reasoning and find no meaningful differences in attention patterns, suggesting that the reasoning process operates independently of visual evidence. Third, in causal intervention experiments, VLMs exhibit similar levels of decision change regardless of whether causal or non-causal objects are masked, unlike hu-mans selectively change their decisions only when causal factors are masked. This indicates that CF reasoning does not enable the model to selectively identify causal factors. Overall, these results indicate that CF reasoning primarily reshapes action distributions rather than improving the grounding of causal reasoning in visual evidence. We further examine whether this effect extends to general driving scenarios and low-level decisions, as in prior work reporting per-formance gains from CF reasoning[5]. An ablation on CF reasoning data reveals that models trained with CF reasoning consistently exhibit lower rates of lateral maneuvers than those trained without it, suggesting that this shift also manifests under existing CF reasoning paradigms. Given the rel-atively low prevalence of lateral maneuvers in the evaluation trajectories, this shift may align with the dataset’s action distribution, potentially explaining the reported performance gains. Taken to-gether, our findings indicate that CF reasoning may not induce causal reasoning capabilities, but rather functions as a linguistic shortcut that shifts the existing policy distribution. 22 Preliminaries 
+
+2.1 Limitation of Driving Metrics for Evaluating Reasoning 
+
+Metrics such as displacement error between predicted and expert trajectories [18] and overall driving success rates [19, 20] are widely used for evaluating autonomous driving systems. However, while these metrics are effective for quantitative performance comparison, they do not directly reflect the underlying reasoning process behind model decisions. Recent studies further show that strong driving performance does not necessarily imply improved visual understanding or causal reasoning ability. In particular, models can achieve competitive results using only non-visual inputs such as ego status and navigation signals [21, 22], and similar behaviors have also been observed in VLM-based approaches [5, 23]. These findings suggest that current performance gains may stem from spurious correlations or shortcut patterns in the data rather than genuine causal reasoning, making it difficult to isolate the effect of CF reasoning using standard driving metrics alone. Consequently, it remains unclear whether performance gains reflect improved reasoning or dataset-induced shortcuts, making it difficult to isolate the effect of CF reasoning. To address this issue, we adopt evaluation metrics designed to quantify latent reasoning behavior. Detailed definitions are provided in Appendix B. 
+
+2.2 Metrics for Reasoning Capacity and Exploration Pass@k. It measures whether a correct answer is included within the top-k generated outputs, and is commonly used to evaluate a model’s potential capability to solve a given problem [24, 25, 26]. Unlike single-prediction metrics such as precision and recall, Pass@k evaluates multiple candidates per input, allowing us to distinguish between generation capability and selection behavior. In par-ticular, Pass@1 reflects the model’s final decision, while larger values of k approximate the set of feasible decisions that the model can generate. This allows us to determine whether CF reasoning introduces new decisions or instead reshapes the distribution of existing actions. 
+
+Perplexity. If the distribution of decision outcomes shifts under CF reasoning, it is necessary to determine whether such changes merely reflect a redistribution of probabilities or arise from substan-tive intervention in the decision generation process. To this end, we additionally analyze perplexity, which measures the likelihood assigned by a model to a given output sequence, and is defined in Appendix H.2. This quantifies how naturally a model generates a given output sequence under its conditional distribution. This aims to distinguish whether the observed action distribution shift is simply a change in output probabilities or a consequence of CF reasoning acting as a conditioning factor in decision making. Specifically, if CF reasoning is merely an auxiliary process unrelated to decision making, both models are expected to assign similar likelihoods to the same Y. In contrast, if CF reasoning substantively contributes to decision generation, the model generating response with CF reasoning may assign a lower likelihood to the same output when evaluated without conditioning on the reasoning process, which would be reflected as higher perplexity. 
+
+RFT as a Verification Framework. The pass@k and perplexity analyses presented above are con-ducted on supervised fine-tuned (SFT) models that are instruction-tuned to perform CF reasoning prior to decision making. However, it remains unclear whether the observed behavioral patterns are merely artifacts. To address this question, we employ reinforcement fine-tuning (RFT) as a diagnos-tic framework. In autonomous driving, RFT enables policy optimization through explicitly designed reward functions that align learning objectives with driving performance metrics [27, 12, 28, 4]. In this work, we adopt GRPO [29] and its variant GDPO [30], both of which generate G outputs per query and update the model based on relative performance within each group. Their shared objective function is defined as follows: 
+
+J (θ) = Eq, {oi}
+
+"
+
+1
+
+G
+
+> G
+
+X
+
+> i=1
+
+min ( wiAi, clip (wi, 1 − ϵ, 1 + ϵ)Ai) − βDKL (πθ ∥πref )
+
+#
+
+where wi denotes the importance sampling ratio and Ai represents the group-relative advantage as defined in Appendix B. Importantly, the KL divergence constraint prevents the updated policy πθ
+
+from deviating excessively from the reference policy πref , thereby stabilizing the optimization pro-cess and preserving the fundamental characteristics of the original policy [25, 31, 32]. Thus, RFT can be a surrogate for probing the latent behavioral properties of the SFT reference model. In par-ticular, if the behavioral tendencies induced by CF reasoning persist throughout RFT optimization, 3this suggests that the observed effects are unlikely to be incidental artifacts of the data distribution, but rather reflect more structured learning signals. 
+
+Policy Entropy as a Real-Time Exploration Probe. correct English Policy entropy, defined in Appendix 4 and recorded throughout RFT, measures token-level decision diversity during generation and has recently been adopted as a real-time indicator of exploration capacity. [33, 34]. Higher entropy indicates that the model explores a broader decision space, whereas a sharp decrease in entropy suggests convergence toward specific action patterns, i.e., reduced exploration. In this work, we leverage policy entropy as an additional diagnostic signal for a more structural analysis of the effect of CF reasoning. Specifically, we aim to examine whether CF reasoning structurally alters the model’s exploratory behavior, or whether the previously observed effects are merely incidental artifacts of the SFT training setup. If CF reasoning indeed acts as an inductive bias that expands the model’s decision-making exploration, it should consistently manifest as higher entropy in CF models, in alignment with the observed action distribution shifts and perplexity changes [35]. 
+
+3 Problem Formulation and Experimental Setup 
+
+We define each sample in the dataset as Y = ( a, e, d, r, y ), where a ∈ { 0, 1} denotes accident oc-currence, e ∈ { 0, 1} indicates ego-vehicle involvement, d represents the scene description extracted from the video, r denotes the CF reasoning component, and y corresponds to the final meta-action decision. Furthermore, we define three longitudinal meta-actions: Stop , Decelerate , and Keep .These span the full range of longitudinal responses from immediate braking to speed maintenance and are mutually exclusive and collectively exhaustive with respect to longitudinal behavior in ac-cident scenarios, making them appropriate for analyzing how CF reasoning affects the action dis-tribution. To analyze the effect of CF reasoning, we fine-tune VLMs to generate responses in the following structured format: accident occurrence, ego involvement, scene descriptions, CF reason-ing, and final decision. This ordering reflects the causal structure of retrospective reasoning: the model first reconstructs what happened and why, then determines the appropriate response, encour-aging it to condition its final action on CF reasoning. As a baseline, we fine-tune a model with the same structure but without the CF reasoning component, enabling a controlled comparison of the effects of CF reasoning on decision making. 
+
+4 Analysis of Counterfactual Reasoning 
+
+4.1 Counterfactual Reasoning Induces Behavioral Shifts 
+
+In this section, we evaluate the impact of CF reasoning on VLMs during the supervised fine-tuning (SFT). To verify whether the observed findings consistently generalize across different VLMs, we extend our evaluation to a diverse set of models, including InternVL2-1B, InternVL2-2B, InternVL2.5-1B, Qwen2.5-VL-3B, and VideoLLaMA2-7B, with detailed selection criteria provided in Appendix F. 
+
+Action Distribution Shift. Pass@1 reflects the model’s single-shot decision behavior, capturing how the most confident action changes depending on the presence of CF reasoning. Across most models, CF reasoning consistently shifts predictions toward more conservative actions such as Stop 
+
+and Decelerate , while reducing the proportion of Keep , suggesting a directional bias in decision preference rather than a simple increase in output variability. Extending this observation, Pass@16 approximates the broader set of reachable decisions under multi-sampling and similarly exhibits a shift toward conservative actions. This indicates that the effect is not limited to stochastic single-generation behavior, but instead reflects a systematic reorganization of the model’s underlying action distribution. Overall, these results suggest that CF reasoning induces a structurally embedded and persistent change in the model’s decision space, which becomes more pronounced in larger models, implying stronger internalization of the induced reasoning structure. 
+
+Does CF Reasoning Intervene in Decision Generation? However, it remains unclear whether the observed distribution shift is a surface-level artifact caused by the co-occurrence of CF reason-ing tokens or whether it reflects a structural intervention of CF reasoning in the decision generation process that reshapes the model’s action distribution. To investigate this, we evaluate both models 4Model Metric Accident Recog. Ego Inclusion Decision 
+
+Yes No Involv. Not In. Stop Decel. Keep 
+
+InternVL2-1B 
+
+P@1 w/o 47.5 64.4 45.8 64.4 20.4 29.2 78.0 P@1 w/ 60.3 50.6 60.3 50.6 26.2 24.9 67.2 
+
+∆ +12.8 -13.8 +14.5 -13.8 +5.8 -4.3 -10.8 P@16 w/o 99.4 99.7 99.4 99.7 87.2 90.3 99.8 P@16 w/ 99.9 99.9 99.9 99.9 93.3 93.6 100.0 
+
+∆ +0.5 +0.2 +0.5 +0.2 +6.1 +3.3 +0.2 
+
+InternVL2-2B 
+
+P@1 w/o 38.8 74.1 38.8 74.1 17.3 22.8 83.2 P@1 w/ 54.3 66.1 54.3 66.1 26.5 26.2 78.8 
+
+∆ +15.5 -8.0 +15.5 -8.0 +9.2 +3.4 -4.4 P@16 w/o 92.9 99.9 92.9 99.9 76.0 80.3 100.0 P@16 w/ 95.8 99.0 95.8 99.0 78.0 84.1 99.7 
+
+∆ +2.9 -0.9 +2.9 -0.9 +2.0 +3.8 -0.3 
+
+InternVL2.5-1B 
+
+P@1 w/o 53.1 65.9 53.1 65.9 20.1 25.4 74.3 P@1 w/ 56.1 63.2 56.1 63.2 27.8 27.4 73.8 
+
+∆ +3.0 -2.7 +3.0 -2.7 +7.7 +2.0 -0.5 P@16 w/o 99.1 99.4 99.1 99.4 85.0 87.4 99.8 P@16 w/ 99.1 98.8 99.1 98.8 87.2 88.7 99.4 
+
+∆ +0.0 -0.6 +0.0 -0.6 +2.2 +1.3 -0.4 
+
+Qwen2.5-VL-3B 
+
+P@1 w/o 60.9 49.4 54.3 52.7 21.7 38.2 59.3 P@1 w/ 75.6 32.6 74.6 33.0 45.7 36.7 45.1 
+
+∆ +14.7 -16.8 +20.3 -19.7 +24.0 -1.5 -14.2 P@16 w/o 98.5 90.3 98.1 93.3 76.7 94.9 97.5 P@16 w/ 100.0 86.0 100.0 86.5 97.1 94.6 92.5 
+
+∆ +1.5 -4.3 +1.9 -6.8 +20.4 -0.3 -5.0 
+
+VideoLLaMA2-7B 
+
+P@1 w/o 47.9 53.3 47.9 53.3 16.9 26.7 69.7 P@1 w/ 72.3 28.7 71.7 30.1 30.0 30.0 53.8 
+
+∆ +24.4 -24.6 +23.8 -23.2 +13.1 +3.3 -15.9 P@16 w/o 99.3 100.0 99.3 100.0 74.8 95.4 100.0 P@16 w/ 100.0 91.8 100.0 92.9 86.6 97.2 98.6 
+
+∆ +0.7 -8.2 +0.7 -7.1 +11.8 +1.8 -1.4 
+
+Table 1: Pass@1 and Pass@16 comparison w/ and w/o counterfactual reasoning in SFT. Conser-vative decisions (Stop / Decel.) are grouped under a shared header. In the ∆ rows, bold blue 
+
+highlights gain and bold red highlights reduction, together indicating a consistent shift toward conservative decision-making when counterfactual reasoning is included. on a shared output, namely the common text Y (−r) 
+
+> GT
+
+, obtained by excluding the CF reasoning com-ponent, and compare their perplexity. If CF reasoning merely serves as an auxiliary output unrelated to decision generation, both models should assign similar likelihoods to Y (−r) 
+
+> GT
+
+. In contrast, if CF reasoning functions as a conditioning variable that actively influences decision generation, the CF model is expected to assign lower likelihood due to the removal of a key conditioning component, resulting in higher perplexity. Accordingly, the gap between PPL base (Y (−r) 
+
+> GT
+
+) and PPL CF (Y (−r) 
+
+> GT
+
+)
+
+serves as a diagnostic signal for structural intervention. As shown in Figure 1, the CF model con-sistently exhibits higher perplexity across all action classes, suggesting that CF reasoning acts as a conditioning factor that reshapes the decision-generation distribution rather than serving as a purely auxiliary output. 
+
+4.2 Persistence of Behavioral Shifts under Reinforcement Fine-Tuning 
+
+However, it remains unclear whether these changes are merely artifacts or reflect a structural bias that persists throughout training. If CF reasoning serves only as a superficial signal for correct an-swers, its effect should diminish under reinforcement learning as reward optimization proceeds. In 5Stop Decelerate Keep          
+
+> 246810
+> InternVL2-1B
+> Stop Decelerate Keep
+> 246810
+> InternVL2-2B
+> Stop Decelerate Keep
+> 1234567
+> InternVL2.5-1B
+> Stop Decelerate Keep
+> 123456
+> Qwen2.5-VL-3B
+> Stop Decelerate Keep
+> 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0
+> VideoLLaMA2-7B
+> No-CF CF
+
+Figure 1: Class-wise perplexity comparison between the models w/o (blue) and w/ CF (orange) 
+
+reasoning on the shared output Y (−r) 
+
+> GT
+
+, corresponding to PPL base (Y (−r) 
+
+> GT
+
+) and PPL CF (Y (−r) 
+
+> GT
+
+), respec-tively. contrast, if it fundamentally reshapes the policy space, the induced bias should persist after rein-forcement learning. To investigate this, we conduct RFT using the SFT models as reference models. We evaluate InternVL2.5-1B, which exhibits the smallest bias based on the combined change in 
+
+stop and decel. under Pass@16, and Qwen2.5-VL-3B, which shows the largest bias. Details of the reward functions are provided in Appendix E. 
+
+Model Metric Accident Recog. Ego Inclusion Decision 
+
+Yes No Involv. Not In. Stop Decel. Keep 
+
+InternVL2.5-1B (GRPO) 
+
+P@1 w/o 36.6 79.9 36.0 80.4 16.9 16.7 87.2 P@1 w/ 39.6 73.5 39.6 73.5 24.6 17.9 80.3 
+
+∆ +3.0 -6.4 +3.6 -6.9 +7.7 +1.2 -6.9 P@16 w/o 92.9 99.7 92.9 99.7 73.8 75.1 100.0 P@16 w/ 96.3 99.9 96.3 99.9 82.7 84.4 99.8 
+
+∆ +3.4 +0.2 +3.4 +0.2 +8.9 +9.3 -0.2 
+
+Qwen2.5-VL-3B (GRPO) 
+
+P@1 w/o 49.9 56.8 47.5 58.5 17.9 35.9 65.8 P@1 w/ 71.0 32.6 67.3 35.3 41.9 32.3 42.4 
+
+∆ +21.1 -24.2 +19.8 -23.2 +24.0 -3.6 -23.4 P@16 w/o 95.7 94.0 95.7 94.8 69.6 92.3 96.7 P@16 w/ 100.0 89.0 100.0 92.9 94.6 92.6 92.8 
+
+∆ +4.3 -5.0 +4.3 -1.9 +25.0 +0.3 -3.9 
+
+Qwen2.5-VL-3B (GDPO) 
+
+P@1 w/o 45.4 62.5 42.7 64.9 13.4 29.0 70.5 P@1 w/ 74.7 38.2 68.8 41.7 44.4 68.8 44.4 
+
+∆ +29.3 -24.3 +26.1 -23.2 +31.0 +39.8 -26.1 P@16 w/o 95.2 97.5 95.2 98.2 68.7 91.0 98.9 P@16 w/ 100.0 87.5 100.0 94.3 93.9 93.6 89.4 
+
+∆ +4.8 -10.0 +4.8 -3.9 +25.2 +2.6 -9.5 
+
+Table 2: Pass@1 and Pass@16 comparison w/ and w/o counterfactual reasoning after RFT (GRPO / GDPO). Conservative decisions (Stop / Decel.) are grouped under a shared header. In the ∆ rows, 
+
+bold blue highlights gain and bold red highlights reduction. The consistent shift toward conser-vative decision-making across both GRPO and GDPO confirms that the observed phenomenon is not a training artifact. 
+
+Persistence of CF-Induced Behavioral Shift under Reinforcement Learning. To examine whether the distribution shift could be mitigated through reinforcement learning, we conducted GRPO on InternVL2.5-1B and Qwen2.5-VL-3B, taking into account both algorithmic and model generality. Subsequently, we conducted GDPO on Qwen2.5-VL-3B, which exhibited the strongest bias during SFT, to further validate algorithmic generality. As shown in Table 2, the decision distri-bution changes induced by CF reasoning were maintained after RFT. If the patterns observed during SFT were mere training artifacts, they should have been corrected during reinforcement learning through reward optimization; however, the results indicate otherwise. In other words, the policy bias formed by CF reasoning persists after RFT. See Appendix I.1 and I.2 for detail analysis. 6Figure 2 shows class-wise perplexity after RFT. Across all action classes, PPL CF (Y (−r) 
+
+> GT
+
+) re-mains consistently higher than PPL base (Y (−r) 
+
+> GT
+
+),following the same trend observed in SFT. Taken together, both pass@k and perplexity re-sults indicate that the distributional effects in-duced by CF reasoning persist after reinforce-ment learning, suggesting a persistent structural influence on the model’s generative distribution rather than a superficial behavioral change. Stop Decelerate Keep      
+
+> 123456
+> InternVL2.5-1B (GRPO)
+> Stop Decelerate Keep
+> 1234567
+> Qwen2.5-VL-3B (GRPO)
+> Stop Decelerate Keep
+> 123456
+> Qwen2.5-VL-3B (GDPO)
+> No-CF CF
+
+Figure 2: Class-wise perplexity comparison be-tween the models w/o (blue) and w/ CF (or-ange) reasoning on the shared output Y (−r) 
+
+> GT
+
+af-ter RFT. 
+
+Policy Entropy as a Dynamic Probe of Exploration. Pass@k and perplexity are metrics that evaluate the resulting action distribution after training convergence; however, they do not directly capture how the policy is formed during learning or how the exploration space evolves over time. To address this limitation, we log and analyze policy entropy throughout the entire RFT process. Since RFT incrementally updates the policy under a KL-divergence constraint with respect to the SFT reference model, it provides a suitable setting for dynamically tracking changes in the action distribution over the full training trajectory. Empirically, models incorporating CF reasoning con-sistently exhibit higher policy entropy throughout RFT. This indicates that CF reasoning alters the exploration structure of the policy during training. In particular, when considered alongside the shift toward conservative actions such as Stop and Decelerate observed in Pass@k, this increase in en-tropy does not reflect a mere rise in randomness. Instead, it can be interpreted as a redistribution of probability mass from a previously over-concentrated preference on Keep toward a more balanced allocation over multiple valid actions. Overall, the policy entropy analysis provides complementary evidence that CF reasoning affects not only the relative preference among actions but also the ex-ploration structure of the policy during training, thereby reinforcing the findings from Pass@k and perplexity regarding its structural impact. 0 1000 2000 3000 4000 5000 6000 Training Step Policy Entropy w/ CF w/o CF 
+
+(a) InternVL2.5-1B (GRPO) 0 1000 2000 3000 4000 5000 6000 Training Step Policy Entropy w/ CF w/o CF (b) Qwen2.5-VL-3B (GRPO) 0 1000 2000 3000 4000 5000 6000 Training Step Policy Entropy w/ CF w/o CF (c) Qwen2.5-VL-3B (GDPO) 
+
+Figure 3: Policy entropy over training steps during RFT. 
+
+4.3 CF Reasoning Decouples from Visual Grounding 
+
+In summary, we indirectly examined the impact of CF reasoning on decision generation by focusing on the model’s generated text outputs and their probabilistic characteristics. However, the metrics used in the previous analysis are suitable for studying latent behavioral reasoning, but they do not directly evaluate alignment with causal structure. Therefore, we conduct a more direct investiga-tion to determine whether the observed effects arise from genuine causal reasoning induced by CF reasoning or from linguistic bias in this section. 
+
+Token Activation Map Analysis. If CF reasoning couples with perceptual awareness, the model’s decisions should rely more strongly on the visual causes of accidents, with attention correspond-ingly focusing on relevant risk-related regions. To examine whether CF reasoning induces decision-making bias through genuine visual risk perception, we conduct a visual attribute analysis using Token Activation Maps (TAM) [36], which isolate token-level activations to estimate the visual re-gions on which each output token depends. Unlike methods affected by inter-token interactions, TAM provides a more stable measure of the visual cues used by specific reasoning tokens. Based on this, we compute three metrics: (i) token-level IoU ( IoU tok ), which measures how precisely in-7dividual causal keyword tokens align with accident-causing objects; (ii) aggregated IoU ( IoU agg ), which evaluates whether attention remains consistently focused on the target object over the entire reasoning process; and (iii) grounding F1 ( F 1gnd ), which jointly accounts for precision and recall to balance the completeness and accuracy of attention localization described in Appendix B.6. As shown in Table 3, IoU values vary across models but remain largely unaffected by prompt variations, indicating consistent spatial grounding patterns. However, no clear alignment between attention and accident-causing objects is observed, suggesting that the CF-induced action distribution shifts may occur independently of visual evidence as shown in Figure 14.                                                                                                                                
+
+> Ablation perception decision counterfactual Type CF RFT IoU tok IoU agg F1gnd IoU tok IoU agg F1gnd IoU tok IoU agg F1gnd
+> InternVL2.5-1B SFT ✗—9.56 10.73 18.67 7.81 8.60 14.91 7.93 8.83 15.14 SFT ✓—9.54 10.91 19.04 8.62 9.67 16.54 8.73 9.71 16.72 RFT ✗GRPO 9.39 10.85 18.85 8.06 8.91 15.21 8.46 9.34 15.91 RFT ✓GRPO 10.39 11.46 19.74 9.22 9.79 16.66 8.70 9.39 16.00 Qwen2.5-VL-3B SFT ✗—16.42 20.04 32.50 17.38 19.75 32.05 16.12 18.33 29.96 SFT ✓—15.97 19.73 31.92 17.46 19.86 32.14 16.64 18.84 30.63 RFT ✗GRPO 16.21 18.84 30.81 16.81 18.66 30.48 15.27 17.15 28.29 RFT ✓GRPO 16.57 19.63 31.79 17.81 19.74 31.89 17.30 19.24 31.10 RFT ✗GDPO 16.68 19.23 31.39 17.43 19.38 31.51 15.75 17.56 28.84 RFT ✓GDPO 16.78 19.72 31.89 18.18 20.26 32.61 18.04 20.16 32.41
+
+Table 3: Quantitative evaluation of visual grounding across different prompt types. 
+
+Causal Intervention Analysis. Previous results suggest that the action distribution shift induced by CF reasoning may be independent of visual evidence. To test this, we conduct a causal interven-tion study on pre-collision frames, where we remove different visual elements and measure changes in model decisions. Specifically, we consider three masking settings: causal masking (removing the accident-causing object), non-causal masking (removing irrelevant objects), and random masking (removing background regions), and compute the decision change rate by comparing predictions with the original video. As shown in Table 4, human evaluation exhibits the highest sensitivity un-der causal masking, while non-causal and random masking yield much lower changes, indicating strong reliance on true causal factors. In contrast, most VLMs show no such selectivity, with similar change rates across all masking conditions and this behavior persists regardless of CF reasoning or reinforcement learning. Overall, these results suggest that the action distribution shifts are unlikely to reflect genuine causal reasoning, but are more consistent with visual-agnostic linguistic biases.                                                                           
+
+> InternVL2-1B InternVL2-2B InternVL2.5-1B Qwen2.5-VL-3B VideoLLaMA2-7B
+> SFT SFT SFT RFT (GRPO) SFT RFT (GRPO) RFT (GDPO) SFT
+> ✗✓✗✓✗✓✗✓✗✓✗✓✗✓✗✓
+> Causal 0.455 0.494 0.408 0.451 0.425 0.382 0.307 0.340 0.457 0.524 0.404 0.520 0.417 0.484 0.434 0.508 Non-causal 0.463 0.498 0.367 0.404 0.416 0.373 0.310 0.346 0.457 0.546 0.416 0.504 0.399 0.548 0.396 0.519 Random 0.475 0.508 0.385 0.416 0.452 0.363 0.295 0.355 0.458 0.519 0.411 0.524 0.388 0.531 0.414 0.513
+
+Table 4: Comparison of causal masking effects across different models and training settings. 
+
+5 Extended Analysis 
+
+Generalization to Trajectory-Level Behavior. To examine whether the conservative shift per-sists beyond crash scenarios and under fine-grained trajectory-level evaluation, we conducted an additional study using the existing counterfactual dataset [5]. We compared models trained with and without CF reasoning. For each sample i, we compute the maximum lateral displacement of the predicted trajectory, di = max t |ℓi,t |, where ℓi,t is the ego-frame lateral coordinate at time t. A trajectory is counted as a lateral maneuver if di ≥ τ . The lateral maneuver rate over an evaluation subset S is 
+
+ρτ (S) = 1
+
+|S| 
+
+X
+
+> i∈S
+
+⊮[di ≥ τ ] , (1) and we report the gap ∆ρ = ρCF  
+
+> τ
+
+− ρNo-CF  
+
+> τ
+
+for τ ∈ { 0.3, 0.5, 0.8} m. We evaluate on all samples (Sall ) and on the subsets whose ground-truth trajectories contain a lateral maneuver, pooled ( SGT )8and split into left-turn ( SL) and right-turn ( SR). As shown in Table 5, the CF model consistently exhibits lower maneuver rates ( ∆ρ < 0) at every threshold, both on Sall and on SGT . The same trend holds for both SL and SR, indicating that the conservative shift is not merely attributable to the prevalence of straight-driving scenarios. These results show that the conservative behavioral bias induced by CF reasoning is also observed in general driving scenarios and under low-level trajectory evaluation. Moreover, performance improvements on nuScenes do not necessarily reflect improved reasoning: since straight trajectories make up most of the ground truth in the dataset [21, 37], conservative predictions can achieve low average error, which is consistent with the model trained with CF reasoning. 
+
+τ (m) Subset N ρNo-CF  
+
+> τ
+
+ρCF  
+
+> τ
+
+∆ρ
+
+0.3m 
+
+Sall 5,119 8.85% 3.07% −5.78 pp 
+
+SGT 2,286 17.94% 5.95% −11 .99 pp 
+
+SL 874 29.52% 11.21% −18 .31 pp 
+
+SR 1,412 10.76% 2.69% −8.07 pp 0.5m 
+
+Sall 5,119 6.58% 1.93% −4.65 pp 
+
+SGT 1,676 18.85% 5.55% −13 .31 
+
+SL 697 32.14% 11.19% −20 .95 pp 
+
+SR 979 9.40% 1.53% −7.87 pp 0.8m 
+
+Sall 5,119 3.48% 0.84% −2.64 pp 
+
+SGT 1,244 13.34% 3.05% −10 .29 pp 
+
+SL 512 25.39% 6.64% −18 .75 pp 
+
+SR 732 4.92% 0.55% −4.37 pp Table 5: Lateral maneuver rate ρτ of No-CF and CF models on OmniDrive, where a trajectory counts as a maneuver if its maximum lateral displacement is at least τ . ∆ρ = ρCF  
+
+> τ
+
+−ρNo-CF  
+
+> τ
+
+. Sall : all samples; 
+
+SGT : samples whose ground-truth trajectory contains a lateral maneuver; SL, SR: its left- and right-turn subsets ( SGT = SL ∪ S R). 
+
+Investigating Semantic Priors as a Cause of the Action Shift. Furthermore, to investigate whether the conservative shift arises from hazard-specific linguistic priors rather than visual and causal grounding, we conducted a conflict test. We injected either adversarial hazard-related text or safety-neutral text into normal driving videos without accidents and measured the false positive rate (FPR) of Stop and Decel. predictions. We define *hazard specificity* as the difference in FPR between hazard-related and safety-neutral text injections, where a positive value indicates a stronger response to hazard-related text. As shown in Table 6, models with CF reasoning already predict Stop and Decel. in 61–69% of cases, compared with 12–25% for models without CF rea-soning, confirming their conservative bias. Under text injection, No-CF models exhibit near-zero or weakly positive hazard specificity ( +0 .71 to +5 .00 pp), whereas CF models exhibit negative hazard specificity across all three training settings ( −6.50 to −14 .21 pp), indicating that they respond more strongly to safety-neutral text than to hazard-related text. This pattern runs counter to what would be expected if hazard-specific semantic priors were driving the conservative shift. Nevertheless, the elevated FPR of CF models under both types of injection suggests that their predictions are sensi-tive to injected text regardless of its safety-related content. Taken together, these results suggest that hazard-related semantic priors alone cannot account for the observed conservative shift.                                 
+
+> Metric Qwen2.5-VL-3B (SFT) Qwen2.5-VL-3B (GRPO) Qwen2.5-VL-3B (GDPO) No-CF CF No-CF CF No-CF CF
+> Baseline FPR 25.00% 69.00% 21.58% 66.96% 12.35% 61.01% Adversarial FPR 33.25% 72.25% 31.21% 63.24% 22.92% 60.20% Neutral FPR 28.25% 78.75% 29.65% 77.46% 22.21% 70.32% Hazard Specificity (Adv. - Neu.) +5.00 pp −6.50 pp +1.56 pp −14.21 pp +0.71 pp −10.12 pp
+
+Table 6: False positive rates and hazard specificity under baseline, adversarial, and neutral conditions across different model architectures and training methods. No-CF and CF denote training without and with CF reasoning, respectively. Hazard specificity is defined as FPR Adv − FPR Neu .96 Related Work 
+
+Shortcut Learning and Causal Confusion. Ensuring robust performance under distribution shift is a central challenge in autonomous driving. Thus, causal reasoning is regarded as a particularly promising solution due to its invariance to environmental changes compared to spurious correlations. However, existing works based on imitation learning, which learn by mimicking expert demonstra-tions, are inherently vulnerable to shortcut learning [38, 39, 40]. This phenomenon, also referred to as causal confusion, arises when models rely on statistical correlations in the data rather than underlying causal structure. As a result, models tend to depend on superficial patterns instead of causal reasoning. A representative example is the observation that competitive driving performance can be achieved even using only ego-status and navigation information [21, 22]. To mitigate such issues, several studies have proposed explicitly disentangling causal factors [41, 42, 43]. However, these approaches still struggle in complex scene understanding and contextual reasoning scenarios, indicating that shortcut learning remains an open challenge in end-to-end autonomous driving. 
+
+Illusion of Causal Reasoning in VLM for Autonomous Driving. To address limitations of conventional end-to-end approaches, recent studies have explored VLMs for autonomous driving, leveraging language as a coarse semantic representation to better capture complex scene contexts and achieving improved performance in closed-loop settings [10, 44, 27]. Building on this, prior work has introduced intermediate linguistic reasoning steps such as chain-of-thought [1], chain-of-causation [3], and counterfactual reasoning [6], leading to consistent performance gains and an implicit assumption that such reasoning reflects genuine causal understanding. However, it remains unclear whether these improvements stem from causal reasoning or from shortcut learning induced by the language modality, as standard driving metrics are confounded and insufficient for analyzing internal reasoning processes [23]. Recent evidence from CausalDriveBench [45] further highlights this limitation, showing that causal QA accuracy is uncorrelated with trajectory prediction accuracy across driving VLAs, indicating that conventional driving metrics alone cannot assess whether a model’s linguistic reasoning reflects genuine causal understanding. To address this, we introduce a framework to evaluate the behavioral effects of CF reasoning by quantifying the induced shifts in a discrete meta-action space and validating whether these shifts persist under reinforcement learning, thereby ruling out training artifacts. This enables a systematic analysis of the gap between linguistic shortcut and genuine causal understanding. 
+
+7 Conclusion and Limitations 
+
+In this study, we investigate the effect of counterfactual (CF) reasoning in VLMs for autonomous driving. Our results indicate that CF reasoning consistently induces an action distribution shift, and that these changes primarily originate from language-level reasoning rather than genuine causal reasoning grounded in visual observations. This finding suggests that CF reasoning can guide the model in determining what to say, but does not necessarily teach the model how to reason. In other words, the behavior shift is more plausibly attributed to the learning of a language-induced spurious correlation, rather than the internalization of genuine causal reasoning. However, this study focuses on open-source VLMs that allow access to internal probability distribu-tions and learning dynamics. Consequently, the generalizability of our findings to closed-source or specialized VLMs [4, 6] remains uncertain, as our analyses based on perplexity and policy entropy require access to internal model probabilities. Therefore, our conclusions are limited to settings where such internal signals are observable, highlighting the need for future work to extend CF rea-soning analysis beyond these constraints. We further discuss potential causes of the observed action distribution shift and outline future directions in Section A. 
+
+8 Acknowledgement 
+
+This work was supported by the National Research Foundation of Korea (NRF) grant funded by the Korea government (MSIT) (RS-2026-25510069), the Institute of Information and Communications Technology Planning and Evaluation (IITP) grant funded by the Korea government (No. 2022-0-00469), and, in part, by the BK21 FOUR (Connected AI Education & Research Program for Industry and Society Innovation, KAIST EE, No. 4120200113769). 10 References 
+
+[1] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen, Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo, Andreas Geiger, and Hongyang Li. Drivelm: Driving with graph visual question answering. In European conference on computer vision , pages 256–274. Springer, 2024. [2] Zhenhua Xu, Yujia Zhang, Enze Xie, Zhen Zhao, Yong Guo, Kwan-Yee K Wong, Zhenguo Li, and Hengshuang Zhao. Drivegpt4: Interpretable end-to-end autonomous driving via large language model. IEEE Robotics and Automation Letters , 2024. [3] Dapeng Zhang, Fei Shen, Rui Zhao, Yinda Chen, Peng Zhi, Chenyang Li, Rui Zhou, and Qingguo Zhou. Coc-vla: Delving into adversarial domain transfer for explainable autonomous driving via chain-of-causality visual-language-action model. arXiv preprint arXiv:2511.19914 ,2025. [4] Yan Wang, Wenjie Luo, Junjie Bai, Yulong Cao, Tong Che, Ke Chen, Yuxiao Chen, Jenna Dia-mond, Yifan Ding, Wenhao Ding, et al. Alpamayo-r1: Bridging reasoning and action prediction for generalizable autonomous driving in the long tail. arXiv preprint arXiv:2511.00088 , 2025. [5] Shihao Wang, Zhiding Yu, Xiaohui Jiang, Shiyi Lan, Min Shi, Nadine Chang, Jan Kautz, Ying Li, and Jose M Alvarez. Omnidrive: A holistic vision-language dataset for autonomous driving with counterfactual reasoning. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22442–22452, 2025. [6] Zhenghao Peng, Wenhao Ding, Yurong You, Yuxiao Chen, Wenjie Luo, Thomas Tian, Yulong Cao, Apoorva Sharma, Danfei Xu, Boris Ivanovic, et al. Counterfactual vla: Self-reflective vision-language-action model with adaptive reasoning. arXiv preprint arXiv:2512.24426 ,2025. [7] Catherine Glossop, William Chen, Arjun Bhorkar, Dhruv Shah, and Sergey Levine. Cast: Counterfactual labels improve instruction following in vision-language-action models. arXiv preprint arXiv:2508.13446 , 2025. [8] Gershom Seneviratne, Jianyu An, Vaibhav Shende, Sahire Ellahy, Yaxita Amin, Kondapi Man-asanjani, Samarth Chopra, Jonathan Deepak Kannan, and Dinesh Manocha. Chop: Counter-factual human preference labels improve obstacle avoidance in visuomotor navigation policies. 
+
+arXiv preprint arXiv:2603.02004 , 2026. [9] Judea Pearl and Dana Mackenzie. The book of why: the new science of cause and effect . Basic books, 2018. [10] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski. Simlingo: Vision-only closed-loop autonomous driving with language-action alignment. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 11993–12003, 2025. [11] Bo Jiang, Shaoyu Chen, Bencheng Liao, Xingyu Zhang, Wei Yin, Qian Zhang, Chang Huang, Wenyu Liu, and Xinggang Wang. Senna: Bridging large vision-language models and end-to-end autonomous driving. arXiv preprint arXiv:2410.22313 , 2024. [12] Bo Jiang, Shaoyu Chen, Qian Zhang, Wenyu Liu, and Xinggang Wang. Alphadrive: Unleash-ing the power of vlms in autonomous driving via reinforcement learning and reasoning. arXiv preprint arXiv:2503.07608 , 2025. [13] Weicheng Zheng, Xiaofei Mao, Nanfei Ye, Pengxiang Li, Kun Zhan, Xianpeng Lang, and Hang Zhao. Driveagent-r1: Advancing vlm-based autonomous driving with active perception and hybrid thinking. arXiv preprint arXiv:2507.20879 , 2025. [14] Yuehao Song, Shaoyu Chen, Hao Gao, Yifan Zhu, Weixiang Yue, Jialv Zou, Bo Jiang, Zihao Lu, Yu Wang, Qian Zhang, et al. Senna-2: Aligning vlm and end-to-end driving policy for consistent decision making and planning. arXiv preprint arXiv:2603.11219 , 2026. 11 [15] Wentao Bao, Qi Yu, and Yu Kong. Uncertainty-based traffic accident anticipation with spatio-temporal relational learning. In Proceedings of the 28th ACM International Conference on Multimedia , pages 2682–2690, 2020. [16] Daniel Moura, Shizhan Zhu, and Orly Zvitia. Nexar dashcam collision prediction dataset and challenge. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 2583–2591, 2025. [17] Ali K AlShami, Ananya Kalita, Ryan Rabinowitz, Khang Lam, Rishabh Bezbarua, Terrance Boult, and Jugal Kalita. Coool: Challenge of out-of-label a novel benchmark for autonomous driving. arXiv preprint arXiv:2412.05462 , 2024. [18] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Giancarlo Baldan, and Oscar Beijbom. nuscenes: A multimodal dataset for autonomous driving. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 11621–11631, 2020. [19] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, et al. Navsim: Data-driven non-reactive autonomous vehicle simulation and benchmarking. Advances in Neural Informa-tion Processing Systems , 37:28706–28719, 2024. [20] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and Junchi Yan. Bench2drive: To-wards multi-ability benchmarking of closed-loop end-to-end autonomous driving. Advances in Neural Information Processing Systems , 37:819–844, 2024. [21] JT Zhai, Z Feng, J Du, Y Mao, JJ Liu, Z Tan, Y Zhang, X Ye, and J Wang. Rethinking the open-loop evaluation of end-to-end autonomous driving in nuscenes (2023). arXiv preprint arXiv:2305.10430 , 2023. [22] Zhiqi Li, Zhiding Yu, Shiyi Lan, Jiahan Li, Jan Kautz, Tong Lu, and Jose M Alvarez. Is ego status all you need for open-loop end-to-end autonomous driving? In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14864–14873, 2024. [23] Xurui Song, Shuo Huai, JingJing Jiang, Jiayi Kong, and Jun Luo. More than meets the eye? un-covering the reasoning-planning disconnect in training vision-language driving models. arXiv preprint arXiv:2510.04532 , 2025. [24] Bradley Brown, Jordan Juravsky, Ryan Ehrlich, Ronald Clark, Quoc V Le, Christopher Ré, and Azalia Mirhoseini. Large language monkeys: Scaling inference compute with repeated sampling. arXiv preprint arXiv:2407.21787 , 2024. [25] Yang Yue, Zhiqi Chen, Rui Lu, Andrew Zhao, Zhaokai Wang, Shiji Song, and Gao Huang. Does reinforcement learning really incentivize reasoning capacity in llms beyond the base model? arXiv preprint arXiv:2504.13837 , 2025. [26] Jinyang Wu, Guocheng Zhai, Ruihan Jin, Jiahao Yuan, Yuhao Shen, Shuai Zhang, Zhengqi Wen, and Jianhua Tao. Atlas: Orchestrating heterogeneous models and tools for multi-domain complex reasoning. arXiv preprint arXiv:2601.03872 , 2026. [27] Zewei Zhou, Tianhui Cai, Seth Z Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. Autovla: A vision-language-action model for end-to-end autonomous driving with adaptive reasoning and reinforcement fine-tuning. arXiv preprint arXiv:2506.13757 , 2025. [28] Zhenlong Yuan, Chengxuan Qian, Jing Tang, Rui Chen, Zijian Song, Lei Sun, Xiangxiang Chu, Yujun Cai, Dapeng Zhang, and Shuo Li. Autodrive-r 2: Incentivizing reasoning and self-reflection capacity for vla model in autonomous driving. arXiv preprint arXiv:2509.01944 ,2025. [29] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Yang Wu, et al. Deepseekmath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300 , 2024. 12 [30] Shih-Yang Liu, Xin Dong, Ximing Lu, Shizhe Diao, Peter Belcak, Mingjie Liu, Min-Hung Chen, Hongxu Yin, Yu-Chiang Frank Wang, Kwang-Ting Cheng, et al. Gdpo: Group reward-decoupled normalization policy optimization for multi-reward rl optimization. arXiv preprint arXiv:2601.05242 , 2026. [31] Rosie Zhao, Alexandru Meterez, Sham Kakade, Cengiz Pehlevan, Samy Jelassi, and Eran Malach. Echo chamber: Rl post-training amplifies behaviors learned in pretraining. arXiv preprint arXiv:2504.07912 , 2025. [32] Darsh J Shah, Peter Rushton, Somanshu Singla, Mohit Parmar, Kurt Smith, Yash Vanjani, Ashish Vaswani, Adarsh Chaluvaraju, Andrew Hojel, Andrew Ma, et al. Rethinking reflection in pre-training. arXiv preprint arXiv:2504.04022 , 2025. [33] Ganqu Cui, Yuchen Zhang, Jiacheng Chen, Lifan Yuan, Zhi Wang, Yuxin Zuo, Haozhan Li, Yuchen Fan, Huayu Chen, Weize Chen, et al. The entropy mechanism of reinforcement learn-ing for reasoning language models. arXiv preprint arXiv:2505.22617 , 2025. [34] Mingjie Liu, Shizhe Diao, Ximing Lu, Jian Hu, Xin Dong, Yejin Choi, Jan Kautz, and Yi Dong. Prorl: Prolonged reinforcement learning expands reasoning boundaries in large language mod-els. arXiv preprint arXiv:2505.24864 , 2025. [35] Daixuan Cheng, Shaohan Huang, Xuekai Zhu, Bo Dai, Xin Zhao, Zhenliang Zhang, and Furu Wei. Reasoning with exploration: An entropy perspective. Proceedings of the AAAI Conference on Artificial Intelligence , 40(36):30377–30385, 2026. [36] Yi Li, Hualiang Wang, Xinpeng Ding, Haonan Wang, and Xiaomeng Li. Token activation map to visually explain multimodal llms. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 48–58, October 2025. [37] Lan Feng, Mohammadhossein Bahari, Kaouther Messaoud Ben Amor, Éloi Zablocki, Matthieu Cord, and Alexandre Alahi. Unitraj: A unified framework for scalable vehicle trajectory pre-diction. arXiv preprint arXiv:2403.15098 , 2024. [38] Pim De Haan, Dinesh Jayaraman, and Sergey Levine. Causal confusion in imitation learning. 
+
+Advances in neural information processing systems , 32, 2019. [39] Xiaosong Jia, Yulu Gao, Li Chen, Junchi Yan, Patrick Langechuan Liu, and Hongyang Li. Driveadapter: Breaking the coupling barrier of perception and planning in end-to-end au-tonomous driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 7953–7963, 2023. [40] Jiankun Li, Hao Li, Jiangjiang Liu, Zhikang Zou, Xiaoqing Ye, Fan Wang, Jizhou Huang, Hua Wu, and Haifeng Wang. Exploring the causality of end-to-end autonomous driving. arXiv preprint arXiv:2407.06546 , 2024. [41] Mozhgan Pourkeshavarz, Junrui Zhang, and Amir Rasouli. Cadet: a causal disentanglement ap-proach for robust trajectory prediction in autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14874–14884, 2024. [42] Jiacheng Tang, Zhiyuan Zhou, Zhuolin He, Jia Zhang, Kai Zhang, and Jian Pu. Causal-vad: De-confounding end-to-end autonomous driving via causal intervention. arXiv preprint arXiv:2603.18561 , 2026. [43] Jiacheng Tang, Mingyue Feng, Jiachao Liu, Yaonong Wang, and Jian Pu. Decoupling scene perception and ego status: A multi-context fusion approach for enhanced generalization in end-to-end autonomous driving. In Proceedings of the AAAI Conference on Artificial Intelligence ,volume 40, pages 9413–9420, 2026. [44] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui, Dingkang Liang, Chong Zhang, Dingyuan Zhang, Hongwei Xie, Bing Wang, and Xiang Bai. Orion: A holistic end-to-end au-tonomous driving framework by vision-language instructed action generation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 24823–24834, 2025. 13 [45] Narendiran Chembu, Navvrat Rao, Shreedhar Shreeshail Kodate, Gayatri Srujana Banda, Arko Sarkar, Abhinav Khanna, Rajarshee Das, Umesh Kanala, Siddarth Khandelwal, Kumar Aman, Aish Dubey, Kaustubh Beedkar, and Arjun Jain. Causaldrivebench: Evaluating causal reason-ing in vision-language-action models for autonomous driving, 2026. [46] Letian Zhang, Xiaotong Zhai, Zhongkai Zhao, Yongshuo Zong, Xin Wen, and Bingchen Zhao. What if the tv was off? examining counterfactual reasoning abilities of multi-modal language models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recog-nition , pages 21853–21862, 2024. [47] Xingyu Wu, Kui Yu, Jibin Wu, and Kay Chen Tan. Llm cannot discover causality, and should be restricted to non-decisional support in causal discovery. arXiv preprint arXiv:2506.00844 ,2025. [48] Simon Gerstenecker, Andreas Geiger, and Katrin Renz. Fail2drive: Benchmarking closed-loop driving generalization. arXiv preprint arXiv:2604.08535 , 2026. [49] Tianrun Xu, Haoda Jing, Ye Li, Yuquan Wei, Jun Feng, Guanyu Chen, Haichuan Gao, Tianren Zhang, and Feng Chen. Defacto: Counterfactual thinking with images for enforcing evidence-grounded and faithful reasoning. arXiv preprint arXiv:2509.20912 , 2025. [50] John Gkountouras, Matthias Lindemann, Phillip Lippe, Efstratios Gavves, and Ivan Titov. Lan-guage agents meet causality – bridging LLMs and causal world models. In The Thirteenth International Conference on Learning Representations , 2025. [51] Minkyoung Cho, Zewei Zhou, Wenhao Ding, Shuhan Tan, Boyi Li, Yuxiao Chen, Yan Wang, Zheng Lian, Min-Hung Chen, Chaowei Xiao, Zhuoqing Mao, Boris Ivanovic, Marco Pavone, and Yulong Cao. Grounding what shapes the plan: Rethinking groundedness for physical intelligence in autonomous driving, 2026. [52] Hanxin Zhang, Mingshuo Xu, Abdulqader Dhafer, Shigang Yue, Hongbiao Dong, and Zhou Daniel Hao. Embodied interpretability: Linking causal understanding to generaliza-tion in vision-language-action models. In Tong Zhang, Miroslav Dudik, Martin Jaggi, Alekh Agarwal, Sharon Li, Dale Schuurmans, Jerry Zhu, Felix Berkenkamp, Hanze Dong, and Al-berto Bietti, editors, Proceedings of the 43rd International Conference on Machine Learning ,volume 306 of Proceedings of Machine Learning Research , pages 159526–159549. PMLR, 06–11 Jul 2026. [53] Sining Ang, Yuguang Yang, Chenxu Dang, Canyu Chen, Cheng Chi, Haiyan Liu, Xuanyao Mao, Jason Bao, Bingchuan Sun, Yan Wang, et al. From representational complementarity to dual systems: Synergizing vlm and vision-only backbones for end-to-end driving. arXiv e-prints , pages arXiv–2602, 2026. [54] Ramprasaath R Selvaraju, Michael Cogswell, Abhishek Das, Ramakrishna Vedantam, Devi Parikh, and Dhruv Batra. Grad-cam: Visual explanations from deep networks via gradient-based localization. In Proceedings of the IEEE international conference on computer vision ,pages 618–626, 2017. [55] Mohammad Sadegh Aliakbarian, Fatemeh Sadat Saleh, Mathieu Salzmann, Basura Fernando, Lars Petersson, and Lars Andersson. Viena: A driving anticipation dataset. In Asian Confer-ence on Computer Vision , pages 449–466. Springer, 2018. [56] Hoon Kim, Kangwook Lee, Gyeongjo Hwang, and Changho Suh. Crash to not crash: Learn to identify dangerous vehicles using a simulator. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 33, pages 978–985, 2019. [57] Khaled Sabry and Mohamed Emad. Road traffic accidents detection based on crash estimation. In 2021 17th International Computer Engineering Conference (ICENCO) , pages 63–68. IEEE, 2021. [58] Hoon Kim, Kangwook Lee, Gyeongjo Hwang, and Changho Suh. Predicting vehicle collisions using data collected from video games. Machine Vision and Applications , 32(4):93, 2021. 14 [59] Karishma Pawar and Vahida Attar. Deep learning based detection and localization of road accidents from traffic surveillance videos. ICT Express , 8(3):379–387, 2022. [60] Yajun Xu, Huan Hu, Chuwen Huang, Yibing Nan, Yuyao Liu, Kai Wang, Zhaoxiang Liu, and Shiguo Lian. Tad: A large-scale benchmark for traffic accidents detection from video surveillance. IEEE Access , 13:2018–2033, 2024. [61] Thakare Kamalakar Vijay, Debi Prosad Dogra, Heeseung Choi, Gipyo Nam, and Ig-Jae Kim. Detection of road accidents using synthetically generated multi-perspective accident videos. 
+
+IEEE Transactions on Intelligent Transportation Systems , 24(2):1926–1935, 2022. [62] Chi-Hsi Kung, Chieh-Chi Yang, Pang-Yuan Pao, Shu-Wei Lu, Pin-Lun Chen, Hsin-Cheng Lu, and Yi-Ting Chen. Riskbench: A scenario-based benchmark for risk identification. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 14800–14807. IEEE, 2024. [63] Tianqi Wang, Sukmin Kim, Ji Wenxuan, Enze Xie, Chongjian Ge, Junsong Chen, Zhenguo Li, and Ping Luo. Deepaccident: A motion and accident prediction benchmark for v2x autonomous driving. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 38, pages 5599–5606, 2024. [64] Jianwu Fang, Lei-lei Li, Junfei Zhou, Junbin Xiao, Hongkai Yu, Chen Lv, Jianru Xue, and Tat-Seng Chua. Abductive ego-view accident video understanding for safe driving perception. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 22030–22040, 2024. [65] Walter Zimmer, Ross Greer, Xingcheng Zhou, Rui Song, Hu Cao, Daniel Lehmberg, Marc Pavel, Ahmed Alaaeldin Ghita, Akshay Gopalkrishnan, Holger Caesar, et al. Towards vision zero: The tum traffic accid3nd dataset. In Proceedings of the IEEE/CVF International Confer-ence on Computer Vision , pages 841–851, 2025. [66] Ana-Maria Marcu, Long Chen, Jan Hünermann, Alice Karnsund, Benoit Hanotte, Prajwal Chi-dananda, Saurabh Nair, Vijay Badrinarayanan, Alex Kendall, Jamie Shotton, et al. Lingoqa: Visual question answering for autonomous driving. In European Conference on Computer Vision , pages 252–269. Springer, 2024. [67] Wenhai Wang, Jiangwei Xie, ChuanYang Hu, Haoming Zou, Jianan Fan, Wenwen Tong, Yang Wen, Silei Wu, Hanming Deng, Zhiqi Li, et al. Drivemlm: Aligning multi-modal large language models with behavioral planning states for autonomous driving. arXiv preprint arXiv:2312.09245 , 2023. [68] Zhijian Huang, Tao Tang, Shaoxiang Chen, Sihao Lin, Zequn Jie, Lin Ma, Guangrun Wang, and Xiaodan Liang. Making large language models better planners with reasoning-decision alignment. In European Conference on Computer Vision , pages 73–90. Springer, 2024. [69] SungYeon Park, MinJae Lee, JiHyuk Kang, Hahyeon Choi, Yoonah Park, Juhwan Cho, Adam Lee, and DongKyu Kim. Vlaad: Vision and language assistant for autonomous driving. In 
+
+Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , pages 980–987, 2024. [70] Julong Wei, Shanshuai Yuan, Pengfei Li, Qingda Hu, Zhongxue Gan, and Wenchao Ding. Occllama: An occupancy-language-action generative world model for autonomous driving. 
+
+arXiv preprint arXiv:2409.03272 , 2024. [71] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song, Steven L Waslander, Yu Liu, and Hong-sheng Li. Lmdrive: Closed-loop end-to-end driving with large language models. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 15120–15130, 2024. [72] Katharina Winter, Mark Azer, and Fabian B Flohr. Bevdriver: Leveraging bev maps in llms for robust closed-loop driving. arXiv preprint arXiv:2503.03074 , 2025. 15 [73] Hidehisa Arai, Keita Miwa, Kento Sasaki, Kohei Watanabe, Yu Yamaguchi, Shunsuke Aoki, and Issei Yamamoto. Covla: Comprehensive vision-language-action dataset for autonomous driving. In 2025 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV) ,pages 1933–1943. IEEE, 2025. [74] Wenru Liu, Pei Liu, and Jun Ma. Dsdrive: Distilling large language model for lightweight end-to-end autonomous driving with unified reasoning and planning. arXiv preprint arXiv:2505.05360 , 2025. [75] Haohan Chi, Huan-ang Gao, Ziming Liu, Jianing Liu, Chenyu Liu, Jinwei Li, Kaisen Yang, Yangcheng Yu, Zeda Wang, Wenyi Li, et al. Impromptu vla: Open weights and open data for driving vision-language-action models. arXiv preprint arXiv:2505.23757 , 2025. [76] Jiajun Cao, Qizhe Zhang, Peidong Jia, Xuhui Zhao, Bo Lan, Xiaoan Zhang, Zhuo Li, Xiaobao Wei, Sixiang Chen, Liyun Li, et al. Fastdrivevla: Efficient end-to-end driving via plug-and-play reconstruction-based token pruning. arXiv preprint arXiv:2507.23318 , 2025. [77] Shiyu Fang, Yiming Cui, Haoyang Liang, Chen Lv, Peng Hang, and Jian Sun. Corevla: A dual-stage end-to-end autonomous driving framework for long-tail scenarios via collect-and-refine. 
+
+arXiv preprint arXiv:2509.15968 , 2025. [78] Yihong Tang, Haicheng Liao, Tong Nie, Junlin He, Ao Qu, Kehua Chen, Wei Ma, Zhenning Li, Lijun Sun, and Chengzhong Xu. E3ad: An emotion-aware vision-language-action model for human-centric end-to-end autonomous driving. arXiv preprint arXiv:2512.04733 , 2025. [79] Hao Lu, Ziyang Liu, Guangfeng Jiang, Yuanfei Luo, Sheng Chen, Yangang Zhang, and Ying-Cong Chen. Uniugp: Unifying understanding, generation, and planing for end-to-end au-tonomous driving. arXiv preprint arXiv:2512.09864 , 2025. [80] Dapeng Zhang, Zhenlong Yuan, Zhangquan Chen, Chih-Ting Liao, Yinda Chen, Fei Shen, Qingguo Zhou, and Tat-Seng Chua. Reasoning-vla: A fast and general vision-language-action reasoning model for autonomous driving. arXiv preprint arXiv:2511.19912 , 2025. [81] Yue Li, Meng Tian, Dechang Zhu, Jiangtong Zhu, Zhenyu Lin, Zhiwei Xiong, and Xinhai Zhao. Drive-r1: Bridging reasoning and planning in vlms for autonomous driving with rein-forcement learning. arXiv preprint arXiv:2506.18234 , 2025. [82] Ziang Guo and Zufeng Zhang. Vdrive: Leveraging reinforced vla and diffusion policy for end-to-end autonomous driving. arXiv preprint arXiv:2510.15446 , 2025. [83] Xuran Zheng and Chang D Yoo. Drivlm: Domain adaptation of vision-language models in autonomous driving. arXiv preprint arXiv:2501.05081 , 2025. [84] Jiahan Li, Zhiqi Li, and Tong Lu. Driving with internvl: Oustanding champion in the track on driving with language of the autonomous grand challenge at cvpr 2024. arXiv preprint arXiv:2412.07247 , 2024. 16 Appendix 
+
+A Discussion 18 B Detailed Implementation 18 
+
+B.1 Group Relative Policy Optimization (GRPO) . . . . . . . . . . . . . . . . . . . . 18 B.2 Group reward-Decoupled Normalization Policy Optimization (GDPO) . . . . . . . 19 B.3 Pass@k . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 B.4 Perplexity . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 B.5 Policy Entropy . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 B.6 Metrics for Token Activation Map (TAM) Evaluation . . . . . . . . . . . . . . . . 20 
+
+C Dataset 22 
+
+C.1 Overview of the Dataset . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22 C.2 Automated Annotation Pipeline . . . . . . . . . . . . . . . . . . . . . . . . . . . 22 C.3 Quality Assurance . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 C.4 Statistical Analysis of the Dataset . . . . . . . . . . . . . . . . . . . . . . . . . . 25 
+
+D Prompt Templates 27 E Reward Functions 32 F Model Selection Criteria 34 G Training Details 35 H Pseudo Codes 36 
+
+H.1 Policy Entropy . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36 H.2 Perplexity (PPL) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36 
+
+I Detailed Experimental Results 39 
+
+I.1 Supervised Fine-Tuning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39 I.2 Reinforcement Fine-Tuning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40 I.3 Attention Map . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41 17 A Discussion 
+
+Why Does CF Reasoning Induce Behavioral Shifts Without Visual Grounding? A key factor is that CF reasoning in current VLM-based autonomous driving systems is primarily learned at the language level. During supervised fine-tuning, supervision is provided only in the form of textual reasoning outputs, without explicit alignment between these texts and the corresponding visual evi-dence. As a result, CF reasoning is optimized as a language modeling objective rather than a visually grounded causal reasoning, leading to a natural decoupling between linguistic reasoning and visual causal structure. This interpretation is consistent with our observations of invariant attention patterns and non-selective responses under causal intervention. These findings further challenge the implicit assumption that performance improvements from language-based reasoning necessarily reflect gen-uine causal understanding. In practice, both LLMs and VLMs exhibit fundamental limitations in stable causal inference, particularly under distribution shift in long-tail scenarios [46, 47, 48]. 
+
+Is Visual Grounding Sufficient for Causal Decision-Making? To address the limitation, prior work has proposed leveraging counterfactual consistency to encourage reliance on visual evidence rather than purely linguistic patterns [49] and further explored integrating LLM-based agents with causal world models, extending decision-making beyond next-token prediction toward structured en-vironments that support intervention and counterfactual reasoning [50]. These directions highlight the importance of developing CF reasoning as a learning signal that is aligned with physical ground-ing, rather than relying solely on linguistic supervision. However, visual grounding alone does not necessarily ensure that the resulting reasoning is effectively reflected in downstream decision-making. In other words, establishing a correspondence between reasoning and visual evidence is distinct from ensuring that such reasoning appropriately guides the model’s actions [51, 52]. 
+
+Future Directions. Despite their ability to capture rich correlational structures and derive coarse semantic representations of scenes in autonomous driving through large-scale pretraining [53], VLMs still lack reliable causal reasoning capabilities. Therefore, the implicit assumption that language-based reasoning enables VLMs to perform causal reasoning in autonomous driving, and that improvements in driving performance necessarily reflect genuine causal understanding, war-rants reconsideration. This calls for evaluation paradigms that go beyond conventional driving per-formance metrics to explicitly examine the gap between causal understanding and downstream driv-ing behavior. In particular, evaluating the alignment between reasoning and action could provide insights into whether the model’s reasoning genuinely informs its decisions, rather than merely ac-companying behavioral improvements. Furthermore, given the substantial challenges involved in endowing VLMs with explicit causal rea-soning capabilities, an alternative research direction is to pursue more tractable objectives that mit-igate the influence of causal confounders, such as linguistic shortcuts. Rather than directly solving the broader problem of causal reasoning, identifying and suppressing such shortcuts may offer a practical step toward more reliable and causally grounded decision-making [42, 41, 43]. 
+
+B Detailed Implementation 
+
+B.1 Group Relative Policy Optimization (GRPO) 
+
+For each query q (comprising an input image and prompt), GRPO samples a group of G outputs 
+
+{o1, o 2, . . . , o G} from the old policy πθold . It then calculates the reward ri for each output and updates the policy using relative advantages computed based on the group mean. The objective function is defined as: 
+
+JGRPO (θ) = Eq∼P (Q),{oi}Gi=1 ∼πθold 
+
+"
+
+1
+
+G
+
+> G
+
+X
+
+> i=1
+
+Ji − βDKL (πθ ∥πref )
+
+#
+
+,
+
+Ji = min 
+
+
+
+wi ˆAi, clip (wi, 1 − ϵ, 1 + ϵ) ˆAi
+
+
+
+,
+
+where wi = πθ (oi|q)  
+
+> πθold (oi|q)
+
+is the importance sampling ratio, and ˆAi denotes the group-relative advantage. 18 B.2 Group reward-Decoupled Normalization Policy Optimization (GDPO) 
+
+Unlike GRPO, which directly incorporates group-relative advantages into the policy objective, GDPO decouples group-wise reward normalization from policy optimization. Specifically, the nor-malized rewards ˜ri are treated as fixed advantages, and no gradients are propagated through the normalization statistics μq and σq . The GDPO objective is formulated in a PPO-style manner as: 
+
+JGDPO (θ) = Eq∼P (Q),{oi}Gi=1 ∼πθold 
+
+"
+
+1
+
+G
+
+> G
+
+X
+
+> i=1
+
+LGDPO  
+
+> i
+
+− βDKL (πθ ∥πref )
+
+#
+
+,
+
+LGDPO  
+
+> i
+
+= min ( wi ˜ri, clip (wi, 1 − ϵ, 1 + ϵ)˜ ri) ,
+
+where wi = πθ (oi|q)  
+
+> πθold (oi|q)
+
+denotes the same importance sampling ratio used in GRPO. 
+
+B.3 Pass@k 
+
+pass @k := E
+
+"
+
+1 −
+
+ n−ck
+
+ nk
+
+#
+
+(2) where n is the total number of generated samples, and c denotes the count of correct (safe) outputs. This metric provides a more robust evaluation of the model’s potential than a single-shot prediction, as it accounts for the probabilistic nature of the model’s reasoning. 
+
+B.4 Perplexity 
+
+Given a model m, a prompt x, and a sequence of tokens Y = ( y1, . . . , y T ), the perplexity is defined as the exponentiated average negative log-likelihood: 
+
+PPL m(Y | x) = exp − 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+log Pm(yt | x, y 1, . . . , y t−1)
+
+!
+
+B.5 Policy Entropy 
+
+Ht(πθ ) = − X
+
+> v∈V
+
+πθ (v | x, y<t ) log πθ (v | x, y<t ) (3) where V is the vocabulary. To ensure a fair comparison across models with varying response lengths (e.g., concise standard SFT vs. verbose Counterfactual models), we employ a length-normalized 
+
+average entropy: 
+
+Hpolicy (πθ , x, y) = 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+Ht(πθ ) (4) By normalizing for sequence length T , Hpolicy reduces the influence of verbosity on entropy com-parisons. We note, however, that this normalization may not fully eliminate length-related effects, as per-token entropy tends to decrease toward the end of longer sequences (e.g., during repetitive closing patterns). Consequently, if CF models produce longer responses on average, the length-normalized estimator is likely to underestimate their true entropy relative to shorter non-CF re-sponses. This structural bias works against our hypothesis, making the observed entropy elevation in CF models a conservative estimate of the underlying distributional shift. To further validate that the entropy elevation is not primarily driven by response length, we compute the Pearson correlation coefficient between mean completion length and policy entropy during RFT. As shown in Table 7, the correlation is consistently lower for CF models (0.365–0.392) than for non-CF models (0.439–0.499) across all settings, suggesting that response length explains less of the entropy variance in CF models than in their non-CF counterparts. 19 Model w/ CF w/o CF 
+
+InternVL2.5-1B (GRPO) 0.365 0.499 Qwen2.5-VL-3B (GRPO) 0.392 0.461 Qwen2.5-VL-3B (GDPO) 0.370 0.439 Table 7: Pearson correlation coefficient between mean completion length and policy entropy during RFT. CF models consistently exhibit lower correlation than their non-CF counterparts across all settings, suggesting that the entropy elevation in CF models is not primarily driven by response length. 
+
+B.6 Metrics for Token Activation Map (TAM) Evaluation 
+
+To quantitatively evaluate whether counterfactual reasoning enhances visual grounding on accident-causing objects, we employ Token Activation Map (TAM) [36], which attributes each output token’s generation to specific visual regions. Unlike standard attention visualization that conflates multi-head and multi-layer interactions, TAM isolates the contribution of vision tokens to each decoded token through targeted perturbation of hidden states. For a generated token ti at decoding step i, TAM computes the activation map Ai ∈ RH×W by measuring the sensitivity of the token’s logit to each vision token embedding. Specifically, given vision tokens {vj }H×Wj=1 from the vision encoder and the LLM hidden state hi before the language head, TAM perturbs each vision token and observes the change in output probability: 
+
+Ai(x, y ) = log p(ti|hi) − log p(ti|h(x,y )→0 
+
+> i
+
+) (5) where h(x,y )→0 
+
+> i
+
+denotes the hidden state when vision token at spatial position (x, y ) is zeroed out. The resulting map Ai is then normalized to [0 , 1] and resized to the original image resolution for bounding box comparison. Based on it, we define three complementary metrics to measure visual grounding at different granularities: 
+
+Token-level IoU ( IoU tok ) For each causal keyword token (e.g., “car”, “pedestrian”) in the gener-ated response, we compute the Intersection over Union (IoU) between its activation map Ai and the ground-truth bounding box Bcausal of the accident-causing object: 
+
+IoU i = |Mi ∩ B causal ||Mi ∪ B causal | (6) where Mi = {Ai ≥ 0.2 · max( Ai)} is the binary mask obtained by thresholding at 20% of the peak activation, following standard practice in CAM-based methods [54]. Token-level IoU is then averaged over all causal tokens: 
+
+IoU tok = 1
+
+Ncausal 
+
+X
+
+> i∈T causal
+
+IoU i (7) where Tcausal is the set of causal keyword token indices and Ncausal = |T causal |.
+
+Aggregated IoU ( IoU agg ) To capture the cumulative visual focus across the entire reasoning pro-cess, we aggregate activation maps from all causal tokens by summing their normalized maps: 
+
+Aagg = X
+
+> i∈T causal
+
+Ai − min( Ai)max( Ai) − min( Ai) (8) The aggregated IoU is then computed on the combined map: 20 IoU agg = |Magg ∩ B causal ||Magg ∪ B causal | (9) where Magg = {Aagg ≥ 0.2 · max( Aagg )}. This metric reflects whether the model’s attention, when viewed holistically across all reasoning tokens, aligns with the causal object. 
+
+Grounding F1 ( F 1gnd ) IoU alone may underweight scenarios where the model attends to the causal region but also includes spurious areas, or conversely, misses parts of the object. We therefore compute precision and recall on the aggregated binary mask: Precision = |Magg ∩ B causal ||Magg | (10) Recall = |Magg ∩ B causal ||B causal | (11) The Grounding F1 score balances these two aspects: 
+
+F 1gnd = 2 · Precision · Recall Precision + Recall (12) A high F 1gnd indicates that the model’s visual attention is both concentrated on the causal object (high precision) and covers it comprehensively (high recall), suggesting genuine visual grounding rather than diffuse or misaligned activation. In summary, if counterfactual reasoning improves causal understanding, CF-enabled models are expected to exhibit higher IoU tok , indicating that each reasoning token attends more precisely to the accident cause; higher IoU agg , reflecting that the cumulative reasoning process focuses more consistently on the causal region; and higher F 1gnd , suggesting that the attention is both precise (i.e., low false positives) and comprehensive (i.e., low false negatives). However, as shown in Table 3, no such improvements are observed after instruction fine-tuning with counterfactual reasoning, indicating that the decision shifts via counterfactual reasoning operate independently of visual evidence. 21 C Dataset 
+
+C.1 Overview of the Dataset Dataset Year Type Perspect. #Frames Acc. Recog. Desc. CF QA Decision                                                                                                  
+
+> VIENA 2[55] 2019 synth vehicle 2,250,000 ✓✗✗✗
+> GTACrash [56] 2019 synth vehicle 751,610 ✓✗✗✗
+> Argus [57] 2021 real roadside 120,000 ✓✗✗✗
+> YoutubeCrash [58] 2021 real vehicle 7,720 ✓✗✗✗
+> IITH Road [59] 2022 real roadside 127,138 ✓✗✗✗
+> TAD [60] 2022 real roadside 24,810 ✓✗✗✗
+> MP-RAD [61] 2023 synth roadside 366,600 ✓✗✗✗
+> RiskBench [62] 2024 synth vehicle N/A ✓✗✗✗
+> DeepAccident [63] 2024 synth V2V & V2I 57,000 ✓✗✗✗
+> MM-AU [64] 2024 real vehicle 2,190,000 ✓✓✗✗
+> TUMTraf-Accid3nD [65] 2025 real roadside 111,656 ✓✓✗✗
+> Ours 2026 real vehicle 2,620,356 ✓✓✓✓
+
+Table 8: Comparison of our testbed dataset with existing accident and traffic datasets. Unlike previ-ous works limited to recognition, our dataset supports high-level reasoning tasks including descrip-tion, counterfactual QA, and decision making. The testbed dataset used in this study was constructed by integrating [15, 17, 16] and applying captioning to each video. Importantly, each video in these datasets has been annotated by domain experts with labels indicating whether an accident occurs. Each dataset provides predefined labels indicating whether a given video corresponds to an accident scenario or a normal driving scenario. However, these existing driving accident datasets primarily focus on recognition of the scene and do not include driving actions or counterfactual supervision. As a result, they lack counterfactual captions and decision required to address the central question of this study: whether counterfactual reasoning truly affects safety-relevant performance.                
+
+> Decision Class Train Test Total
+> stop 1,026 (15.4%) 336 (25.0%) 1,362 decelerate 1,423 (21.4%) 336 (25.0%) 1,759 keep 4,212 (63.2%) 672 (50.0%) 4,884
+> Total 6,661 1,344 8,005
+
+Table 9: Dataset composition. Test set is intentionally balanced for robust evaluation of safety-critical decisions. 
+
+C.2 Automated Annotation Pipeline 
+
+To address these limitations, we introduce a multi-stage automated annotation pipeline to con-struct a dataset for analyzing whether counterfactual reasoning truly affects safety-relevant performance from existing accident driving videos. Drawing inspiration from the visual question answering methodology proposed in [66], we leverage the advanced multimodal capabilities of Qwen2.5-VL-32B-Instruct to generate structured captions [44, 6]. Our annotation pro-cess produces six key components for each video: accident occurrence, ego-vehicle involvement, scene description, counterfactual question, counterfactual answer , and driving decision . The pipeline consists of three sequential steps: • Step 1: Scene Recognition and Description. First, we feed the raw accident video into 
+
+Qwen2.5-VL-32B-Instruct to extract fundamental scene information. The model is prompted to identify whether an accident occurred ( accident occurrence ) and whether the ego-vehicle was involved ( ego involvement ). Simultaneously, it generates a detailed textual explanation of the traffic scenario ( description ), focusing on the behavior of road agents and environmental conditions. • Step 2: Counterfactual Reasoning Generation. Based on the description obtained in Step 1, we guide the model to generate a counterfactual question and its corresponding 22 Figure 4: The automated annotation pipeline for the dataset. 
+
+counterfactual answer . This step aims to augment the dataset with reasoning capabilities by asking "what-if" scenarios (e.g., "what would have happened if the ego-vehicle had not braked?" ), thereby enhancing the model’s understanding of causal relationships in safety-critical situations. • Step 3: Decision Making. Finally, we synthesize the decision for the original video. The model aggregates all prior information—accident status, ego-involvement, scene description, and coun-terfactual reasoning—to deduce the optimal driving maneuver (e.g., stop, decelerate, keep). This ensures that the final decision is logically grounded in both the observed reality and potential alternative outcomes. 
+
+C.3 Quality Assurance 
+
+Figure 5: Diagnosis tool for quality assessment. To ensure the reliability of our dataset while maintaining the scalability of the construction process, we implemented a rigorous quality assurance protocol. Unlike traditional datasets that rely on labor-intensive manual labeling, we leverage the zero-shot reasoning capabilities of 23 Qwen2.5-VL-32B-Instruct to establish an automated pipeline, which we then statistically val-idate through a detailed human audit. 
+
+Verification Protocol. We randomly sampled 100 videos from our dataset for a formal verifica-tion. Independent annotators evaluated each sample in terms of factual correctness (i.e., the accuracy of the scene description relative to the visual content), counterfactual plausibility (i.e., the logical and physical soundness of the hypothetical scenarios), and decision appropriateness (i.e., the safety and optimality of the predicted driving actions). 
+
+Quantitative Validation. The automated pipeline achieved an 86.0% usability rate. The remaining 14.0% exhibited major errors or hallucinations. While we acknowledge these imperfections, an 86% reliability rate in complex, multi-modal reasoning tasks is highly competitive and justifies the use of raw model-generated data for large-scale training and benchmarking [66]. 
+
+Category Count Percentage (%) 
+
+Correct 77 77.0% Minor Errors (e.g., phrasing) 9 9.0% Major Errors (e.g., logic flaws) 8 8.0% Hallucinations (e.g., phantom objects) 6 6.0% 
+
+Usable (Correct + Minor) 86 86.0% 
+
+Table 10: Human audit results ( N = 100 ). Samples categorized as ’Correct’ or ’Minor Error’ are considered usable for robust training and evaluation.                                                                                                                    
+
+> Model Metric Accident Recog. Ego Inclusion Decision
+> Yes No Involv. Not In. Stop Decel. Keep
+> InternVL2-1B
+> P@1 w/o 69.4 58.0 58.0 69.4 33.3 32.1 71.4 P@1 w/ 66.7 30.0 66.7 30.0 22.2 32.1 59.2
+> ∆-2.7 -28.0 +8.7 -39.4 -11.1 0.0 -12.2
+> InternVL2-2B
+> P@1 w/o 41.7 66.6 41.7 66.6 11.1 25.0 83.7 P@1 w/ 50.0 56.0 50.0 56.0 22.2 32.1 83.7
+> ∆+8.3 -10.6 +8.3 -10.6 +11.1 +7.1 0.0
+> InternVL2.5-1B
+> P@1 w/o 44.4 60.0 44.4 60.0 22.2 28.6 69.4 P@1 w/ 52.8 60.0 52.8 60.0 44.4 25.0 73.5
+> ∆+8.4 0.0 +8.4 0.0 +22.2 -3.6 +4.1
+> Qwen2.5-VL-3B
+> P@1 w/o 63.9 42.0 55.6 44.0 33.3 46.4 55.1 P@1 w/ 75.0 38.0 75.0 38.0 55.6 21.4 44.9
+> ∆+11.1 -4.0 +19.4 -6.0 +22.3 -25.0 -10.2
+> VideoLLaMA2-7B
+> P@1 w/o 47.2 68.0 47.2 68.0 11.1 17.9 77.6 P@1 w/ 77.8 34.0 75.0 34.0 33.3 28.6 46.9
+> ∆+30.6 -34.0 +27.8 -34.0 +22.2 +10.7 -30.7
+
+Table 11: Pass@1 comparison w/ and w/o counterfactual in SFT for random samples. To verify robustness to annotation noise, we re-evaluated on the 86 high-quality samples confirmed through human audit. The Pass@1 results demonstrate identical directional trends to those observed in the full dataset, confirming that the 14% noise does not systematically bias our conclusions. 24 C.4 Statistical Analysis of the Dataset Train Test 
+
+> Split
+> 0500 1000 1500 2000 2500 3000 3500 4000
+> Count
+
+Accident Distribution  
+
+> No Accident Accident Train Test
+> Split
+> 01000 2000 3000 4000 5000
+> Count
+
+Ego Vehicle Involvement         
+
+> Non-Ego Ego-Involved 0500 1000 1500 2000 2500 3000 3500 4000
+> Count
+> train test
+> Decision
+
+Decision Distribution 
+
+> Stop Decelerate Keep
+
+Figure 6: Overview of dataset statistics and label distributions. The plots illustrate the imbalance in accident occurrence (top-left) and ego-vehicle involvement (bottom-left). The horizontal bar chart (right) compares the distribution of driving decisions (stop, decelerate, keep) across the training (blue) and testing (red) splits, demonstrating a consistent class distribution between the two sets. accident no accident accident Decelerate Keep Stop decision 52.7 2.2 7.8 97.2 39.5 0.6 
+
+Train: Decision by Accident (%)     
+
+> accident no accident accident Decelerate Keep Stop decision 44.6 5.3 2.8 90.4 52.6 4.2
+
+Test: Decision by Accident (%)     
+
+> involved not involved ego_involved Decelerate Keep Stop decision 30.8 19.7 16.5 71.6 52.7 8.7
+
+Train: Decision by Ego Involvement (%)     
+
+> involved not involved ego_involved Decelerate Keep Stop decision 45.9 5.7 2.9 88.0 51.2 6.4
+
+Test: Decision by Ego Involvement (%) 
+
+> 010 20 30 40 50 %
+> 010 20 30 40 50 %
+> 010 20 30 40 50 %
+> 010 20 30 40 50 %
+
+Figure 7: Conditional distribution of driving decisions with respect to accident occurrence and ego-vehicle involvement. The heatmaps display column-normalized percentages to analyze the cor-relation between decisions and scenario attributes. The top row shows the relationship between decisions and accidents, while the bottom row depicts ego-involvement. Left columns represent the training set (blue scale), and right columns represent the test set (red scale). 25 0 50 100 150 200 
+
+> Total Words
+> 0.000 0.005 0.010 0.015 0.020
+> Density
+
+Total Word Count Distribution    
+
+> Train Test Desc1 Desc2 CF-Q CF-A 0.0 2.5 5.0 7.5 10.0 12.5 15.0 17.5 20.0
+> Average Words
+
+Average Word Count by Component  
+
+> Train Test Train Test Split 020 40 60 80
+> Word Count
+
+Counterfactual Answer Length  
+
+> Train Test Split 0510 15 20 25 30
+> Word Count
+
+Counterfactual Question Length Figure 8: Analysis of linguistic characteristics and token distributions. (top-left) Kernel Density Estimation (KDE) of total word counts showing alignment between training and testing splits. (top-right) Average word counts broken down by descriptions, counterfactual Q&A. (bottom) Violin plots illustrating the distribution of word counts for counterfactual answers (bottom-left) and questions (bottom-right). Blue indicates the training set, and red indicates the test set. 0 100 200 300 400 500 600 700 800 
+
+> Count
+> Perception Failure Decision Violation Control Loss Other Environment Vehicle Failure
+
+Train: Top Accident Causes      
+
+> 0100 200 300 400 500
+> Count
+> Decision Violation Other Perception Failure Control Loss Environment Speed Related
+
+Test: Top Accident Causes 
+
+Figure 9: Distribution of primary accident causes. The horizontal bar charts display the frequency of the top annotated accident causes (e.g., control loss, perception failure) for the training (left, blue) and testing (right, red) sets. The semantic distribution of accident scenarios is preserved across the splits. 26 D Prompt Templates 
+
+description and counterfactual Q&A generation for normal video 
+
+System prompt: 
+
+You are given a video of driving scene with no accident. For this video, **there is no accident**. Describe the following information in natural language sentences (each item should be 10-20 words): 1. Accident occurrence (always 0) 2. Whether the ego-car is involved (always 0) 3. Scene description (describe what is actually happening in the video) 4. Counterfactual question (what-if scenario) 5. Counterfactual answer (what would happen in the what-if scenario) Use complete sentences to report all six items. Video Description: <scene summary or keyframe captions here> Ego-car involvement: <yes/no> Strictly follow this output format: 1, 1, <accident>...</accident>, <accident>...</accident>, <no_accident>...</no_accident>, <no_accident>...</no_accident> For counterfactual question and answer, create diverse what-if scenarios beyond vehicle swerving. Consider weather, pedestrians, traffic signals, road conditions, or mechanical failures. Now, generate the annotation for the given video as a single comma-separated line. Do not add any extra text. 
+
+description and counterfactual Q&A generation for accident video 
+
+System prompt: 
+
+You are given a video of an accident. For this video, **an accident occurs or harzard scene exists**. Describe the following information in natural language sentences (each item should be 10-20 words): 1. Accident occurrence (always 1) 2. Whether the ego-car is involved (0 for no, 1 for yes) 3. Accident result 4. Accident cause 5. Counterfactual question (what-if scenario) 6. Counterfactual answer (what would happen if no accident occurred) Use complete sentences to report all six items. Video Description: <scene summary or keyframe captions here> Ego-car involvement: <yes/no> Strictly follow this output format: 
+
+27 Output: 1, (0 for no, 1 for yes), <accident>...</accident>, <accident>...</accident>, <no_accident>...</no_accident>, <no_accident>...</no_accident> Now, generate the annotation for the given video as a single comma-separated line. Do not add any extra text. 
+
+decision generation 
+
+System prompt: 
+
+You are an expert driving policy annotator. You are given a video and its captions describing a driving scene. The video may show either normal driving or the moments just before a potential accident. The caption always follows this format: 1. Accident occurrence (0 for no accident, 1 for accident) 2. Whether the ego-car is involved (0 for no, 1 for yes) 3. Accident result 4. Accident cause 5. Counterfactual question (what-if scenario) 6. Counterfactual answer (what would happen if no accident occurred) Examples: # Accident occurred Accident occurrence: 1 Ego involved: 0 or 1 Accident result: a car in front of ego-car collides with a pedestrian Accident cause: the pedestrian violates traffic signal Counterfactual question: what if the pedestrian does not violate the signal? Counterfactual answer: there would be no collision # No accident Accident occurrence: 0 Ego involved: 0 Accident result: no accident Accident cause: the car in front of ego-car turns right Counterfactual question: what if the car suddenly stopped? Counterfactual answer: there would be a collision ---Caption for the given video: {data[’conversations’][1][’value’]} Your task: Return the **driving decision** as a single action class. The possible action classes are: - STOP 
+
+28 - DECELERATE - KEEP Rules: 1. If an accident occurs and the ego-car is involved: return the action the ego-car should have taken before the accident 2. If an accident occurs but the ego-car is not involved: return the safe action to avoid the accident 3. If no accident occurs or no action is required: return <decision>KEEP</decision>. 4. You may refer to the counterfactual question and answer if it helps decide the correct action. Output format: <decision>ACTION</decision> Return only a single line in this format. Do not add any explanation or extra text. 
+
+Fine-Tuning and Test-Time Prompts for model w/o CF reasoning 
+
+System prompt: 
+
+You are given a video of a driving scene. The video may show normal driving or the moments just before a potential accident. Describe the following information in natural language sentences (each item should be 10-20 words): 1. Accident occurrence (0 for no accident, 1 for accident) 2. Whether the ego-car is involved (0 for no, 1 for yes) 3. Accident result 4. Accident cause 5. Decision for given scene Use complete sentences to report all six items. Video Description: <scene summary or keyframe captions here> Examples: # Accident occurred Accident occurrence: 1 Ego involved: 0 or 1 Accident result: a car in front of ego-car collides with a pedestrian Accident cause: the pedestrian violates traffic signal # No accident Accident occurrence: 0 Ego involved: 0 Accident result: no accident Accident cause: the car in front of ego-car turns right Now, describe the following video in the same sentence-style format: <scene summary or keyframe captions of your target video> Format of Accident occurred: Output: 1, (0 for no, 1 for yes), 
+
+29 <accident>Accident result</accident>, <accident>Accident cause</accident>, <decision>DECISION</decision> Format of No accident: Output: 0, 0, <no_accident>Accident result</no_accident>, <no_accident>Accident cause</no_accident>, <decision>DECISION</decision> Now, generate the response for the given video as a **single comma-separated line**. Do not add any extra text. 
+
+Fine-Tuning and Test-Time Prompts for model w/ CF reasoning 
+
+System prompt: 
+
+You are given a video of a driving scene. The video may show normal driving or the moments just before a potential accident. Describe the following information in natural language sentences (each item should be 10-20 words): 1. Accident occurrence (0 for no accident, 1 for accident) 2. Whether the ego-car is involved (0 for no, 1 for yes) 3. Accident result 4. Accident cause 5. Counterfactual question (what-if scenario) 6. Counterfactual answer (what would happen if no accident occurred) 7. Decision for given scene Use complete sentences to report all six items. Video Description: <scene summary or keyframe captions here> Examples: # Accident occurred Accident occurrence: 1 Ego involved: 0 or 1 Accident result: a car in front of ego-car collides with a pedestrian Accident cause: the pedestrian violates traffic signal Counterfactual question: what if the pedestrian does not violate the signal? Counterfactual answer: there would be no collision # No accident Accident occurrence: 0 Ego involved: 0 Accident result: no accident Accident cause: the car in front of ego-car turns right Counterfactual question: What if the car suddenly stopped? 
+
+30 Counterfactual answer: there would be a collision Now, describe the following video in the same sentence-style format: <scene summary or keyframe captions of your target video> Format of Accident occurred: Output: 1, (0 for no, 1 for yes), <accident>Accident result</accident>, <accident>Accident cause</accident>, <no_accident>Counterfactual question</no_accident>, <no_accident>Counterfactual Answer</no_accident> <decision>DECISION</decision> Format of No accident: Output: 0, 0, <no_accident>Accident result</no_accident>, <no_accident>Accident cause</no_accident>, <accident>Counterfactual Question</accident>, <accident>Counterfactual Answer</accident> <decision>DECISION</decision> Now, generate the response for the given video as a **single comma-separated line**. Do not add any extra text. 
+
+Token Activation Map Analysis Prompts 
+
+System prompt: 
+
+# perceptual prompt What is the most critical object the ego-car should be cautious of in this driving scene? # decision prompt Based on the current visual scene, what is the immediate action required for the ego-car? # counterfactual prompt (counterfactual question on the main factor based on the GT scene description) (e.g.) What if the car suddenly stopped? 
+
+31 E Reward Functions 
+
+To align the model’s outputs with safety-critical driving standards, we design a comprehensive re-ward function R composed of six sub-rewards. Let y denote the generated completion and y∗ denote the ground truth. The total reward is defined as a weighted sum: 
+
+R = wacc Racc + wego Rego + wdec Rdec + wsafe Rsafe + wcorr Rcorr + wfmt Rfmt (13) where the weights are set to wacc = 0 .1, wego = 0 .1, wdec = 0 .4, wsafe = 0 .2, wcorr = 0 .1, and 
+
+wfmt = 0 .1, prioritizing the correct driving decision and safety. 
+
+Recognition Rewards ( Racc , R ego ) We verify the fundamental perception capabilities: accident occurrence ( yacc ) and ego-vehicle involvement ( yego ). These rewards utilize the indicator function 
+
+I(·), which equals 1 if the condition is met and 0 otherwise: 
+
+Racc = I(yacc = y∗
+
+> acc
+
+), Rego = I(yego = y∗
+
+> ego
+
+) (14) 
+
+Decision Reward ( Rdec ) The core driving decision (e.g., decelerate, stop) is extracted from the 
+
+<decision> tags. 
+
+Rdec = I(ydec = y∗
+
+> dec
+
+) (15) 
+
+Safety Critical Reward ( Rsafe ) To penalize dangerous failures, we introduce a specialized reward for “stop” scenarios. If the ground truth requires a stop ( y∗ 
+
+> dec
+
+= stop), the model receives a penalty for missing it: 
+
+Rsafe =
+
+
+
+1.0 if y∗ 
+
+> dec
+
+= stop ∧ ydec = stop 
+
+−0.5 if y∗ 
+
+> dec
+
+= stop ∧ ydec ̸ = stop 
+
+0.0 otherwise (16) 
+
+Consistency Reward ( Rcorr ) To ensure logical consistency between the classification flag and the textual description, Rcorr verifies whether the predicted accident flag yacc matches the ground truth and aligns with the corresponding XML tags. Let T (y) be the set of tags generated in the description. The reward is defined as: 
+
+Rcorr = I(yacc = y∗
+
+> acc
+
+) · I
+
+(yacc = 1 ∧ <accident> ∈ T (y)) ∨
+
+(yacc = 0 ∧ <no_accident> ∈ T (y)) 
+
+
+
+(17) 
+
+Format Rewards ( Rfmt ) This reward ensures structural validity by verifying the number of parsed segments |Sy |. The expected length differs depending on the reasoning mode. For models utilizing counterfactual reasoning, we require extended segments for the traces: 
+
+Rfmt =
+
+I(|Sy | = 7) if w/ CF reasoning) 
+
+I(|Sy | = 5) otherwise (18) The Rsafe assigns additional weight to emergency stop predictions, which may amplify the safety prior observed in SFT. However, since both w/ CF and w/o CF reference models are trained under identical reward structures, the observed difference in RFT action distribution shift is attributable to the CF reasoning effect in the reference model rather than the reward design alone. The persistence of the SFT-RFT gap suggests that CF reasoning establishes a prior that interacts with, rather than is replaced by, the reward signal. 
+
+Disentangling CF Reasoning from Reward Design. To verify whether the observed action dis-tribution shift is attributable to the reward design rather than CF reasoning itself, we conduct an ablation study by removing the safety-critical reward Rsafe from the reward function. We select Qwen2.5-VL-3B (GRPO) as the target model, as it exhibited the strongest CF-induced bias in Ta-ble 2. To compensate for the removed Rsafe , we increase the decision reward weight from wdec = 0 .4
+
+to wdec = 0 .6, ensuring that the total reward scale remains comparable to the original setting. 32 1 2 4 8 16 0.0 0.5 1.0                          
+
+> accident
+> 124816
+> no accident
+> 124816
+> ego involved
+> 124816
+> not involved
+> 124816
+> Stop
+> 124816
+> Decel.
+> 124816
+> Keep
+> Number of samples ( k)
+> w/o Rsafe w/ Rsafe
+
+Figure 10: Class-wise pass@ k performance across model scales and CF reasoning in ablation on 
+
+Rsafe .Metric Accident Recog. Ego Inclusion Decision 
+
+Yes No Involv. Not In. Stop Decel. Keep P@1 w/o CF 50.6 57.3 46.7 60.7 19.3 32.3 65.8 P@1 w/ CF 64.2 44.8 61.5 46.0 37.0 28.5 53.2 
+
+∆ +13.6 -12.5 +14.8 -14.7 +17.7 -3.8 -12.6 P@16 w/o CF 95.7 93.9 95.7 97.9 69.5 91.8 96.9 P@16 w/ CF 99.7 97.6 99.7 98.7 94.5 92.6 98.3 
+
+∆ +4.0 +3.7 +4.0 +0.8 +25.0 +0.8 +1.4 Table 12: Effect of counterfactual (CF) reasoning without Rsafe across different k on Qwen2.5-VL-3B (GRPO). While the magnitude of the shift is reduced compared to the full setting, consistent improvements in accident-related and safety-critical decisions (e.g., Stop) persist across both P@1 and P@16, indicating that the effect is not limited to low-k sampling. As shown in Table 12 and Figure 10, the distribution shift induced by CF reasoning persists even in the absence of Rsafe : the Stop decision rate increases by +17 .7%p under the CF condition compared to the non-CF condition. While the magnitude of the shift is reduced compared to the full reward setting ( +31 .0%p), the direction remains consistent, indicating that Rsafe amplifies the bias but does not cause it. These results provide direct evidence that the action distribution shift originates from CF reasoning itself, rather than from the reward design. 33 F Model Selection Criteria 
+
+To ensure the generality of our findings, we select backbone models according to three principles: (1) prevalence in recent Vision-Language-Action (VLA) literature, (2) architectural diversity in mul-timodal fusion strategies, and (3) scalability across different parameter regimes under practical com-putational constraints. 
+
+Architectural Coverage. We adopt models from three representative multimodal families that are widely used in contemporary autonomous driving research: • InternVL2-1B, InternVL2-2B and InternVL2.5-1B: These models have recently emerged as strong open-source backbones in driving-related VLA systems. Using multi-ple scales within the same architectural family enables controlled analysis of parameter scaling effects. • Qwen2.5-VL-3B: A widely adopted backbone in recent large-scale VLA frameworks, rep-resenting a distinct multimodal alignment strategy compared to InternVL. • VideoLLaMA2-7B: A temporally-aware video-language model, included to evaluate whether the observed trends persist in video-native architectures with larger parameter scales. Collectively, our selection spans diverse multimodal fusion designs and parameter regimes rang-ing from 1B to 7B parameters, mitigating the risk that the observed effects are backbone-specific artifacts.         
+
+> Category Rationale for Selection Related Works LLaMA & Mistral
+> Standard baseline in early VLA research. We adopt VideoLLaMA2-7B
+> to represent this lineage. DriveMLM [67], RDA-Driver [68], DriveLM [1], DriveGPT4 [2], VLAAD [69], OccLLaMA [70], OmniDrive [5], LMDrive [71], BEVDriver [72], CoVLA-Agent [73], DSDrive [74]
+> Qwen Family Dominant in 2025 research. We adopt
+> Qwen2.5-VL-3B to align with SOTA trends. ImpromptuVLA [75], DriveAgent-R1 [13], FastDriveVLA [76], AutoDrive-R 2[28], CoReVLA [77], AutoVLA [27], E3AD [78], UniUGP [79], Reasoning-VLA [80]
+> InternVL Family Vision-Centric alternative. We adopt
+> InternVL2 to verify scalability. Drive-R1 [81], SimLingo [10], VDRive [82], DriVLM [83], Li et al. [84]
+
+Table 13: Summary of VLA Models and Related Works. We categorize models based on their archi-tectural lineage. 
+
+Use of Public Resources. We acknowledge the use of the following publicly available resources in this work. : • InternVL2-1B 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Apache License 2.0 • InternVL2-2B 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Apache License 2.0 • InternVL2.5-1B 3 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Apache License 2.0 • Qwen2.5-VL-3B 4 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Apache License 2.0 • VideoLLaMA2-7B 5 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Apache License 2.0 
+
+> 1https://huggingface.co/OpenGVLab/InternVL2-1B
+> 2https://huggingface.co/OpenGVLab/InternVL2-2B
+> 3https://huggingface.co/OpenGVLab/InternVL2_5-1B
+> 4https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
+> 5https://huggingface.co/DAMO-NLP-SG/VideoLLaMA2-7B-Base
+
+34 G Training Details 
+
+For supervised fine-tuning (SFT), we utilized four NVIDIA A5000 GPUs, whereas reinforcement fine-tuning (RFT) was conducted using a single NVIDIA L40S GPU. 
+
+Setting Model Hyperparameter Value 
+
+SFT InternVL2-1B Batch size 4Precision bf16 
+
+Epoch 5Learning rate 1 × 10 −5
+
+Weight decay 0.05 # of frames 8InternVL2-2B Batch size 4Precision bf16 
+
+Epoch 5Learning rate 1 × 10 −5
+
+Weight decay 0.05 # of frames 8InternVL2.5-1B Batch size 4Precision bf16 
+
+Epoch 5Learning rate 1 × 10 −5
+
+Weight decay 0.05 # of frames 8Qwen2.5-VL-3B Batch size 2Precision bf16 
+
+Epoch 5Learning rate 1 × 10 −5
+
+Weight decay 0.01 # of frames 8VideoLLaMA2-7B Batch size 2Precision bf16 
+
+Epoch 5Learning rate 2 × 10 −5
+
+Weight decay 0.01 # of frames 8RFT InternVL2.5-1B (GRPO) Batch size 2Temperature 0.9 KL loss coefficient 4 × 10 −2
+
+Group size 2Learning rate 1 × 10 −6
+
+Qwen2.5-VL-3B (GRPO, GDPO) Batch size 2Temperature 1.2 KL loss coefficient 4 × 10 −2
+
+Group size 2Learning rate 1 × 10 −6
+
+Table 14: Training hyperparameters for SFT and RFT. 35 H Pseudo Codes 
+
+H.1 Policy Entropy 
+
+def calculate_policy_entropy(logits, completion_mask, temperature=1.0): """ Computes the length-normalized policy entropy for generated completions. Args: logits (Tensor): Shape (Batch, Seq_Len, Vocab_Size) completion_mask (Tensor): Shape (Batch, Seq_Len). 1 for completion, 0 for prompt. temperature (float): Scaling factor for logits. Returns: float: Average entropy per token (invariant to sequence length). """ # 1. Temperature Scaling # Adjusts the sharpness of the distribution. logits = logits / temperature # 2. Compute Entropy Per Token # H(t) = - sum(p(x) * log p(x)) probs = softmax(logits, dim=-1) log_probs = log_softmax(logits, dim=-1) # Shape: (Batch, Seq_Len) per_token_entropy = -sum(probs * log_probs, dim=-1) # 3. Apply Completion Mask # Filter out prompt tokens (entropy = 0 for prompt positions) masked_entropy = per_token_entropy * completion_mask # 4. Length Normalization (Critical Step) # Calculate effective length of the generated completion sequence_length = sum(completion_mask, dim=-1) # Divide total entropy by sequence length # This ensures the metric reflects ’uncertainty density’ rather than total uncertainty. policy_entropy = sum(masked_entropy, dim=-1) / clamp(sequence_length, min=1.0) return mean(policy_entropy) # Average over batch 
+
+H.2 Perplexity (PPL) 
+
+import re from math import exp def extract_common_text(full_response: str) -> str: """ Extracts only the shared text segments (Description & Decision) from the model output, filtering out Counterfactual (CF) Q&A sections to ensure fair comparison. """ # 1. Extract all tagged sections (e.g., <accident>...</accident>) sections = re.findall(r’<[^>]+>.*?</[^>]+>’, full_response) # 2. Extract prefix numbers (Accident Occurrence, Ego Involvement) prefix_match = re.match(r’^(\d+,\s*\d+)’, full_response) prefix_numbers = prefix_match.group(1) if prefix_match else "" 
+
+36 # 3. Filter common sections if len(sections) >= 5: # Case: Model with CF reasoning (Output includes CF Q&A) # Format: [Desc1, Desc2, CF_Q, CF_A, Decision] # Action: Remove CF_Q (idx 2) and CF_A (idx 3) common_sections = [sections[0], sections[1], sections[-1]] else: # Case: Baseline Model (No CF Q&A) # Format: [Desc1, Desc2, Decision] # Action: Keep all sections common_sections = sections # 4. Reconstruct the common text return prefix_numbers + ", " + ", ".join(common_sections) def compute_perplexity(model, video, prompt, target_text): """ Computes the perplexity of the target_text given the video and prompt. """ # 1. Construct full input sequence full_input = prompt + target_text # 2. Forward pass (Video + Text) # Inputs are tokenized and fed into the model to obtain logits logits = model(video, full_input) # 3. Set loss calculation range (Shifted Labels) # Exclude the prompt portion from loss computation; # focus only on ’target_text’ start_idx = len(tokenized_prompt) target_logits = logits[:, start_idx-1 : -1] target_labels = full_input_ids[:, start_idx:] # 4. Compute Cross Entropy Loss and Perplexity loss = CrossEntropyLoss(target_logits, target_labels) perplexity = exp(loss) return perplexity # Main Evaluation Loop def main(model_path, dataset_path): # Load model and dataset model = load_model(model_path) dataset = load_json(dataset_path) # Dictionary to store perplexity results ppl_results = { ’overall’: [], ’stop’: [], ’decelerate’: [], ’keep’: [] }print("Starting Fair Perplexity Evaluation (Common Text Only)...") for sample in dataset: video_path = sample[’video’] # Original Ground Truth full_gt_text = sample[’ground_truth’] # Extract common text for fair comparison # Ensures that both CF and No-CF models # are evaluated on identical text segments. 
+
+37 common_target_text = extract_common_text(full_gt_text) # Extract decision class for breakdown analysis # (Stop/Decelerate/Keep) decision_class = extract_decision_tag(full_gt_text) # Compute PPL based on the common text ppl = compute_perplexity(model, video_path, PROMPT, common_target_text) # Store results ppl_results[’overall’].append(ppl) if decision_class in ppl_results: ppl_results[decision_class].append(ppl) # Compute and save final statistics print_statistics(ppl_results) save_results(ppl_results) if __name__ == "__main__": main() 
+
+38 I Detailed Experimental Results 
+
+I.1 Supervised Fine-Tuning 0.0 0.2 0.4 0.6 0.8 1.0                                         
+
+> InternVL2-1B
+> accident no accident ego involved not involved Stop Decel. Keep
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> InternVL2-2B
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> InternVL2.5-1B
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Qwen2.5-VL-3B
+> 124816 0.0 0.2 0.4 0.6 0.8 1.0
+> VideoLLaMA2-7B
+> 124816 124816 124816 124816 124816 124816
+> Number of samples ( k)
+> SFT w/o CF SFT w/ CF
+
+Figure 11: Class-wise pass@ k performance across model scales and CF reasoning settings in SFT. 
+
+Analysis of Accident Recognition and Ego Inclusion. As illustrated in Fig. 11, CF reasoning consistently enhances the pass@1 performance for accident recognition and ego inclusion across all model scales. In smaller models, such as InternVL2-1B and 2B , the performance gap between models with and without CF reasoning progressively diminishes as k approaches 16, eventually con-verging to a similar baseline. However, a distinct trade-off emerges as the model size increases. In larger models like Qwen2.5-VL-3B and VideoLLaMA2-7B , while CF reasoning significantly boosts performance on accident-related labels ("accident", "ego involved"), it simultaneously leads to a performance degradation on non-accident labels ("no accident", "not involved") compared to the baseline. This suggests that CF reasoning does not merely provide additional information but funda-mentally recalibrates the model’s perception, making it inherently more sensitive to safety-critical risk factors. 
+
+Persistence of Safety-bias in Decision Fields. This trend is further pronounced in the decision field, revealing a clear disparity in "confidence levels" tied to model scale. For the Stop , while smaller models show converging performance curves as k increases, larger models—specifically 
+
+Qwen2.5-VL-3B and VideoLLaMA2-7B —maintain a persistent ∆pass@ k that does not dissipate even at k=16. Conversely, for the Dec. and Keep , the baseline models without CF reasoning exhibit superior performance in these larger scales. This indicates that larger models internalize accident-related cues learned via CF reasoning as a robust "world prior." Consequently, in large-scale VLM, CF reasoning induces a deep-seated action distribution shift that remains resistant to stochastic sam-pling, acting as a dominant mechanism that drives the model toward conservative decision-making. 39 1 2 4 8 16 0.0 0.5 1.0                                                                                            
+
+> InternVL2.5-1B (GRPO)
+> accident
+> 124816
+> no accident
+> 124816
+> ego involved
+> 124816
+> not involved
+> 124816
+> Stop
+> 124816
+> Decel.
+> 124816
+> Keep
+> 124816 0.0 0.5 1.0
+> Qwen2.5-VL-3B (GRPO)
+> 124816 124816 124816 124816 124816 124816
+> 124816 0.0 0.5 1.0
+> Qwen2.5-VL-3B (GDPO)
+> 124816 124816 124816 124816 124816 124816
+> Number of samples ( k)
+> RFT w/o CF RFT w/ CF
+
+Figure 12: Class-wise pass@ k performance across model scales and CF reasoning settings in RFT. 
+
+I.2 Reinforcement Fine-Tuning 0.2                    
+
+> 0.0 0.2
+> InternVL2.5-1B
+> accident no accident ego involved not involved Stop Decel. Keep
+> 0.2
+> 0.0 0.2
+> Qwen2.5-VL-3B (GRPO)
+> Pass@1 Pass@16 0.2
+> 0.0 0.2
+> Qwen2.5-VL-3B (GDPO)
+> Pass@1 Pass@16 Pass@1 Pass@16 Pass@1 Pass@16 Pass@1 Pass@16 Pass@1 Pass@16 Pass@1 Pass@16
+> CF (SFT) CF (RFT)
+
+Figure 13: ∆pass@ k (Pw/ CF − Pw/o CF ) for SFT and RFT across varying model scales and tasks, showing persistent gaps in larger models. 
+
+Distribution Shift and Performance Transfer in RFT. SFT models served as references for the RFT stage. As illustrated in Fig. 12, accident-relevant tasks ("accident", "ego involved") exhibit a significant pass@1 distribution shift, mirroring SFT trends. While this gap converges at k = 16 for 
+
+InternVL2.5-1B , larger model like Qwen2.5-VL-3B demonstrate a persistent trade-off between accident sensitivity and non-accident performance. 
+
+Amplification of Decision-Making Bias via RFT. As shown in Fig. 13, RFT amplifies the be-havioral patterns established during SFT. For the Stop in Qwen2.5-VL-3B , the ∆pass@ k gap be-tween models with and without CF reasoning is notably wider than that observed in the SFT stage. Similarly, for Dec. and Keep , the initial gap at k = 1 is more pronounced than in SFT, although differences diminish as k approaches 16. This suggests RFT reinforces risk-related priors, leading to a more ingrained safety-bias. 40 I.3 Attention Map 
+
+Figure 14: Qualitative comparison of interference activations among SFT w/o CF, SFT w/ CF, RFT w/o CF, and RFT w/ CF based on Qwen2.5-VL-3B. Visualization of activation maps for causal factors immediately before accidents shows no noticeable differences across the models. 41

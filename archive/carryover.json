@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-11-21T04:42:49.177683+00:00",
-  "updated_date": "20261112-20261121",
+  "generated_at": "2026-11-21T04:49:35.805711+00:00",
+  "updated_date": "20261023-20261121",
   "carryover_days": 9,
   "tag_states": {
     "kg-rag-agent": {
-      "updated_date": "20261112-20261121",
+      "updated_date": "20261023-20261121",
       "carryover_days": 9,
       "items": []
     }

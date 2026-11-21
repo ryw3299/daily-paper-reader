@@ -1,0 +1,241 @@
+Title: Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning
+
+URL Source: https://arxiv.org/pdf/2611.09414v1
+
+Published Time: Mon, 09 Nov 2026 02:51:28 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning 
+
+Rosario Napoli 
+
+University of Messina 
+
+Messina, Italy 0009-0006-2760-9889 
+
+Antonio Celesti 
+
+University of Messina 
+
+Messina, Italy 0000-0001-9003-6194 
+
+Massimo Villari 
+
+University of Messina 
+
+Messina, Italy 0000-0001-9457-0677 
+
+Maria Fazio 
+
+University of Messina 
+
+Messina, Italy 0000-0003-3574-1848 
+
+Abstract —Knowledge Graphs (KGs) and Large Language Models (LLMs) represent two approaches for knowledge rep-resentation and reasoning over heterogeneous data. Recent re-search has explored their integration through Graph Retrieval-Augmented Generation (GraphRAG) systems, which use KGs to provide structured context to LLMs. However, existing GraphRAG approaches treat KGs as homogeneous graphs and rely on textual similarity between the input prompt and the con-text, rather than using it as a source of deterministic knowledge. This work proposes an agent-based GraphRAG system that introduces a symbolic layer to integrate deterministic reason-ing alongside text similarities. This approach is based on the definition of typed centralities for KGs, where centrality mea-sures are computed separately for each specific KG’s class. This information is used to construct a symbolic representation that is provided to the LLM as a deterministic source. The proposed system was mathematically validated and evaluated on a real-world POLE (Person, Object, Location, Event) dataset, comparing reasoning and information retrieval with and without the symbolic layer. The results indicate that the our approach leads to responses that are more consistent with the context, improving the generated outputs. 
+
+Index Terms —Knowledge Graphs, GraphRAG, LLMs, Agentic AI. 
+
+I. I NTRODUCTION 
+
+In order to get value from large-scale heterogeneous data, research is increasingly moving toward knowledge-based ap-proaches for structured representation and AI-based method-ologies for data processing [1]. Knowledge Graphs (KGs) are graph-based data structures that represent different types of nodes and relationships using labels to describe their nature. They combine the principles of graph theory with the semantic meaning of labels to extract information from data [2]. While KGs use a deterministic strategy, Large Language Models (LLMs) have emerged as an AI-based probabilistic approach. LLMs work through statistical distributions learned from sequences of tokens, linking the input prompt to the knowledge acquired during extensive pre-training [3]. Both approaches have shown great effectiveness in the analysis of heterogeneous data, achieving significant results in areas such as healthcare and finance [4]. The recent literature aims to combine the deterministic rigor of KGs with the probabilistic approach of LLMs, with the aim of improving information analysis over data [5]. In this context, Graph Retrieval-Augmented Generation (GraphRAG) has emerged as one of the most effective hybrid mechanisms to link these two strategies, allowing LLM responses to be grounded in a structured context provided by the KG [6]. Despite the high capabilities demonstrated by GraphRAG systems in complex reasoning and information retrieval, they inherit many of the limitations of the two methodologies considered individually [7]. On the one hand, KGs model reality through deterministic centrality measures that treat the underlying structure as a homogeneous graph, producing values that do not accurately reflect the represented domain [8]. On the other hand, LLMs’ responses generation is only based on textual similarity between the provided input and the available knowledge, which in GraphRAG systems is represented by the labels on the graph. This leads to the production of semantically plausible but incorrect responses, a phenomenon commonly known as hallucinations [9]. There-fore, GraphRAG works as a retrieval-enhanced framework where KGs act as additional textual information to augment the LLM, providing supplementary context rather than enforc-ing a strictly deterministic model of reality. To achieve this full integration, this work proposes aGraphRAG system that addresses their respective limitations. To better model the context from the KG, we introduce the concept of typed centrality, where centrality measures are computed separately for each specific KG’s class. These values are used to build the Symbolic Layer, an additional context that acts as a deterministic base for the GraphRAG system. This allows inference and information retrieval to rely not only on textual similarity but also on symbolic measures. As a result, LLM’s knowledge is grounded in a more accurate context, since the generated responses depend on both probabilistic and deterministic information. This results in: stronger grounding, fewer hallucinations and improved answer explainability. To validate the effectiveness of this approach, the system was mathematically validated and tested on a real POLE (Person, Object, Location, Event) dataset, conducting a series of experiments aimed at comparing reasoning capabilities with and without the Symbolic Layer. The results showed that arXiv:2611.09414v1 [cs.AI] 6 Nov 2026 our integration gave a deterministic anchor to the data, with answers that were more consistent with the given context. The remainder of this paper is structured as follows. Section II reviews the current state of the art and the inherent limita-tions of existing GraphRAG systems. The core of our contri-bution is detailed in Section III, which describes the proposed four-layer hierarchical architecture and the implementation of the Symbolic Layer. Section IV provides a formal validation of the framework. The technical background is defined in Section V, while the experimental setup and the evaluation are detailed across Sections VI and VII. We report and discuss the results in Section VIII before concluding and outlining potential directions for future research in Section IX. II. R ELATED WORK 
+
+The evolution of information retrieval systems has recently shifted toward hybrid architectures, as the research commu-nity seeks more robust methodologies to ground generative AI in structured contexts [10]. Early RAG approaches were introduced to expand LLMs’ knowledge by retrieving external textual information to supplement what was learned during their initial training [11]. These techniques were further ex-tended through the use of KGs, giving rise to GraphRAG systems that integrate structured knowledge into the LLM [12]. The transition from standard RAG pipelines to GraphRAG has been facilitated by protocols such as MCP [13], which standardize interactions between LLMs and external tools, integrating knowledge retrieval and reasoning directly into the LLM’s decision-making loop. However, most existing implementations retain the classical assumptions of standard RAG pipelines [14]. Specifically, KGs are traversed to extract textual information from nodes and relationships that are added in the context. Nonetheless, there remains a lack of consideration of the graph structure as a deterministic guide for the inference process [15]. Within this setting, recent GraphRAG’s benchmarks pri-marily evaluate the LLM’s ability to select and invoke the correct tools for a specific task [16]. However, these criteria do not consider whether the information retrieved is actually consistent with the KG’s semantics. This limitation becomes particularly evident in distributed agentic systems, where de-cisions are made across multiple sequential reasoning steps. As shown in [17], a semantic misinterpretation during the early information selection process can propagate through the reasoning chain, leading to outputs that are procedurally valid but grounded in incorrect assumptions. Several works have attempted to partially address this limitation by introducing retrieval criteria based on graph’s properties. For instance, meta-path–based methodologies re-strict the search space using predefined sequences of node and relation types [18]. These methods heavily rely on domain knowledge to define meaningful paths. As a consequence, they struggle to generalize without extensive manual intervention. Other approaches like post-hoc verification methods operate exclusively on final outputs but do not influence intermediate retrieval or planning decisions made during execution [19]. So, they fail to prevent error propagation during the reasoning chain, making it impossible to get the system back on track once an early mistake occurs. Other studies propose heteroge-neous or type-aware node representations that preserve seman-tic information within embedding spaces [20]. Nonetheless, these techniques are typically employed as isolated retrieval components and evaluated on supervised tasks such as link prediction or node classification, rather than being integrated into the iterative decision-making loop of an LLM agent. Recent proposals such as [21] utilize graph neural networks (GNNs) to improve KG retrieval for multi-hop Questions-Answers (QA), but the paths are verbalized and fed to the LLM without embedding semantic constraints into agent reasoning. Similarly, iterative frameworks like KG-IRAG aim to integrate multi-stage retrieval for temporal reasoning, but they do not formalize KG schema information within the agent’s real-time decision loop [22]. Works such as GRIL [23] explore joint graph-LLM optimization, reducing dependence on entity annotations, but still treats retrieval and reasoning as separated processes. Other contributions like KG²RAG and K-RagRec [24] apply graph-guided retrieval to improve coherence and downstream tasks such as recommendation, but they similarly fall short of using deterministic guidance during reasoning. Recent surveys highlight that even if LLM-based agents have the capacity to plan multi-step queries, their actual nav-igation refers only to global metrics or simple text similarity rather than deep semantic reasoning [16]. As a result, current GraphRAG systems rely on embedding-based retrieval that treats graph’s paths as unstructured text blocks, prioritizing semantic proximity in a latent vector space [25]. Some existing approaches attempt to construct contextual information by relying on global centrality measure but this causes a mis-interpretation of the KG’s modeled reality [26]. Specifically, these methods treat all nodes uniformly, losing the semantic diversity of the KG and leading to outputs that are coherent in language but inconsistent with the graph’s organization. III. P ROPOSED ARCHITECTURE : T YPED -C ENTRALITY 
+
+GROUNDING FOR AGENTIC GRAPH RAG To the best of our knowledge, there is currently no complete integration of KGs-based symbolic reasoning with LLM-based approaches. Addressing this gap requires a shift from passive retrieval toward real hybrid approaches. By using KG-based centrality measures for symbolic reasoning, the GraphRAG can actually have a source of deterministic knowledge rather than a simple text concatenation. This enables the combination of the deterministic structure of KGs with the probabilistic nature of LLMs, allowing the data retrieval process to be also grounded on both semantics and graph-modeled reality. To address the identified limitations, we introduce the Typed-Centrality Grounding for Agentic GraphRAG, a frame-work that treats KGs as deterministic signals for LLM’s reasoning. This hybrid approach integrates the symbolic nature of KGs in GraphRAGs by redefining centrality measures as a deterministic background. Instead of applying heterogeneous metrics across the entire network, the framework represents centrality as a composition of class-specific measures calcu-lated independently for each node type. This method allows for a coherent characterization of the modeled context by considering the different semantics within the graph. These type-specific metrics are used in the Symbolic Layer, an additional input which acts as a deterministic anchor to ground the GraphRAG inference process. The overall architecture is organized into four layers, spanning from data storage to the reasoning loop (Fig. 1).  
+
+> Fig. 1. Layered architecture of the Typed-Centrality Grounding framework.
+
+A. Data Layer 
+
+The Data Layer provides the source of truth by storing the KG in a Graph Database Management System (DBMS). This layer represents the main context from which the LLM agent will perform its reasoning. 
+
+B. Symbolic Layer 
+
+The Symbolic Layer is the core component of the frame-work, responsible for computing typed centrality measures. Specifically, the layer divides the KG by nodes type, producing type-specific subgraphs. Standard centrality measures (e.g., PageRank and Betweenness) are then computed independently within each subgraph, resulting in Sub-Centralities Vectors that quantify the relative node importance over the KG. To calculate each typed-centrality, a topology-based mecha-nism classifies nodes according to local connectivity patterns, specifically: 1) Direct Connection (1-hop): entities with direct connec-tions or self-loops are directly represented as subgraphs. 2) Structural Bridges (2-hop): For node types that lack self connections, the system identifies latent associations by treating the schema as a bipartite network. In particular, it uses shared bridge nodes at distance one to perform a one-mode projection between entities of the same type. This mechanism allows us to compute centrality even in the absence of explicit direct links, capturing the connectivity through intermediate common neighbors. 3) Isolated Entities: nodes without connections are ex-cluded from the centrality computation. 
+
+C. GraphRAG Layer 
+
+This layer integrates the structural signals from the Sym-bolic Layer with textual similarity. Subgraphs are analyzed according to prompt-based textual similarity and type-specific centrality. 
+
+D. Agentic Layer: Reasoning and Orchestration 
+
+The top layer implements an autonomous reasoning loop, specifically:  
+
+> •
+
+LLM Reasoning Engine: interprets user input, determines high-level reasoning strategies and directs the retrieval process.  
+
+> •
+
+Orchestrator: coordinates execution, manages conversa-tion state and interfaces with a Context Client.  
+
+> •
+
+Context Client and Server: the client translates orchestra-tor commands into protocol-specific requests, while the server exposes the GraphRAG Layer. IV. M ODEL VALIDATION 
+
+In this section, we formally demonstrate why global central-ity metrics fail to capture the reality of KGs and we prove that our type-partitioned approach restores the necessary signal for accurate reasoning. 
+
+Definition IV.1 (Global vs. Typed Graph) . Let G = ( V, E ) be the global KG containing all nodes V and edges E. Let Gτ =(Vτ , E τ ) be a type-specific subgraph, where Vτ ⊂ V contains only nodes of a specific entity type τ , and |Vτ | represents the number of nodes in that type. 
+
+Definition IV.2 (Centrality Magnitude) . Let C(v, G ) be the centrality score of a node v computed within graph G. Since centrality metrics represent a probability distribution, the sum of scores over the graph is normalized to 1: 
+
+X
+
+> v∈G
+
+C(v, G ) = 1 (1) We first prove that mixing different entity types causes relevant signals to vanish. 
+
+Lemma IV.1 (The Dilution Lemma) . In a global graph G, if the total number of nodes |V | is significantly larger than the number of relevant target nodes |Vτ | (i.e., |V | ≫ | Vτ |), then the average centrality score of a target node approaches zero. 
+
+Proof. Consider the average centrality score μ in the global graph. Since the total probability is 1 and is distributed across 
+
+|V | nodes: 
+
+μglobal ≈ 1
+
+|V | (2) If the graph is dominated by irrelevant nodes, |V | becomes very large. Consequently, the score for any specific relevant node v ∈ Vτ is suppressed by the massive denominator |V |.
+
+C(v, G ) ∝ 1
+
+|V | ≈ 0 (3) This makes the relevant node statistically indistinguishable from noise. We now demonstrate how the Symbolic Layer resolves this limitation. 
+
+Theorem IV.1 (Signal Restoration) . Computing centrality within the type-partitioned subgraph Gτ amplifies the signal of relevant nodes by a factor proportional to the ratio of irrelevant data removed. 
+
+Proof. When we project to the subgraph Gτ , we remove all irrelevant nodes ( V − Vτ ). The new domain size is |Vτ |. The average centrality score μτ in this projection becomes: 
+
+μτ ≈ 1
+
+|Vτ | (4) We define the Signal Amplification Factor A as the ratio between the typed score and the global score: 
+
+A = μτ
+
+μglobal 
+
+≈ 1/|Vτ |
+
+1/|V | = |V ||Vτ | (5) Since |V | ≫ | Vτ |, it follows that A ≫ 1. This proves that the Typed-Centrality score is mathematically guaranteed to be orders of magnitude larger than the global score, allowing to clearly distinguish important nodes (”Hubs”) from unimpor-tant ones. Standard GraphRAG operates in the domain of G, where valid signals are weak ( Score ≈ 0). Our approach operates in Gτ , where signals are strong ( Score ≫ 0). By forcing the LLM to select paths based on amplified C(v, G τ ) scores, we effectively filter out topologically irrelevant nodes that act as ”distractors” in the global graph. Therefore, the consequence of Theorem IV.1 is a better context for the GraphRAG. V. B ACKGROUND : C ENTRALITY MEASURES FOR 
+
+KNOWLEDGE GRAPHS 
+
+In graph analysis, centrality measures quantify the structural importance of nodes. Below, we define the set of centralities used in this work [27]. 
+
+A. Degree Centrality 
+
+Degree centrality captures the number of edges incident to a node. For node v ∈ V in graph G = ( V, E ):
+
+Cdegree (v, G ) = deg( v) = |{ u ∈ V : ( v, u ) ∈ E}| (6) 
+
+B. Betweenness Centrality 
+
+Betweenness centrality quantifies the extent to which a node lies on shortest paths between other nodes: 
+
+Cbet (v, G ) = X 
+
+> s̸=v̸=t
+
+σst (v)
+
+σst 
+
+(7) where σst is the number of shortest paths between nodes s and 
+
+t, and σst (v) counts how many of those paths pass through 
+
+v. In KGs, nodes with high betweenness can act as bridges connecting distinct clusters or entity types. 
+
+C. Closeness Centrality 
+
+Closeness centrality measures how close a node is to all other nodes: 
+
+Cclose (v, G ) = 1
+
+P 
+
+> u∈V
+
+d(v, u ) (8) where d(v, u ) is the shortest path distance between v and u.In type-specific subgraphs, closeness highlights nodes that can efficiently reach other entities of the same type. 
+
+D. PageRank 
+
+PageRank extends degree centrality by considering the importance of neighbors recursively. For node v:
+
+P R (v) = α X
+
+> u∈In (v)
+
+P R (u)deg( u) + (1 − α) (9) where α ∈ [0 , 1] is a damping factor and In (v) is the set of nodes linking to v.
+
+E. Eigenvector Centrality 
+
+Eigenvector centrality evaluates node importance based on the importance of its neighbors: 
+
+Ceig (v) = 1
+
+λ
+
+X
+
+> u∈Neighbors (v)
+
+Ceig (u) (10) where λ is the largest eigenvalue of the adjacency matrix. For KGs, this measure highlights nodes embedded within highly connected and influential substructures. VI. E XPERIMENTAL SETUP 
+
+This section describes the experimental setup and evaluation of the Typed-Centrality Grounding framework, focusing on the reasoning comparison between standard GraphRAG with global metrics and type-aware metrics computed via the Sym-bolic Layer. 
+
+A. Data Layer: POLE Dataset 
+
+Experiments use the POLE (Person, Object, Location, Event) dataset, derived from open crime data for the Greater Manchester area 1 on Neo4j 1.6.2 (Fig. 2). The graph schema consists of several distinct node types representing the en-tities of the POLE model. The main node class is Person, which is connected to personal identifiers such as Phone (via HAS PHONE) and Email (via HAS EMAIL). Social inter-actions rely on Person self-relationships. Crime nodes define the event context by linking to: people (PARTY TO), physi-cal entities (INVOLVED IN), officers (INVESTIGATED BY) and locations (OCCURRED AT). Geographical data is hier-archical, connecting Location to PostCode and Area. Finally, communication patterns are captured by the PhoneCall node, which links two Phone nodes via CALLER and CALLED edges.  
+
+> 1https://www.data.police.uk/data/ Fig. 2. POLE Schema.
+
+B. Symbolic Layer Evaluation 
+
+To analyze the network’s structure and node importance, we calculated the five centrality measures defined above: De-gree Centrality, Betweenness Centrality, Closeness Centrality, PageRank and Eigenvector Centrality. Then, we compared Global metrics (baseline) with Typed metrics computed on type-specific subgraphs. Signal magnitude restoration addresses the dilution of global metrics observed in high-cardinality nodes, where values such as the Global PageRank for Crime ( ≈ 0.15 ) and Global Degree for PostCode ( ≈ 1) are significantly suppressed. By implementing typed metrics, the signal magnitude is suc-cessfully restored, reaching approximately 0.96 for Typed PageRank and 292 for Typed Degree, reflecting the relevance of these nodes within their specific type-subgraphs (Figs. 3, 4). Topological consistency is further validated through Typed Closeness Centrality, which confirms that the projections result in fully connected subgraphs for both Crime and Location entities (Fig. 5).  
+
+> Fig. 3. Typed PageRank restores signal magnitude compared to the global baseline.
+
+C. GraphRAG and Agentic Layer 
+
+The Similarity Engine fuses textual relevance with Typed-Centrality metrics. Orchestration is handled by Claude Desk-  
+
+> Fig. 4. Typed Degree reveals local density for PostCode nodes compared to the global baseline.
+> Fig. 5. Typed Closeness confirms formation of dense hubs.
+
+top via MCP, enabling the LLM to query the KG and integrate structured signals into reasoning. VII. E XPERIMENTAL EVALUATION 
+
+To test our system, we evaluated and compared the re-sponses of two configurations in performing reasoning tasks related to investigative analysis. In particular, the experiments aimed to compare the system’s responses with and without the symbolic layer. Then we wanted to reconstruct the process that led to the generation of specific responses through the typed and global centrality measures analysis. 
+
+A. Experiment 1: Resolving Ranking Blindness 
+
+To test type-agnostic ranking limitations, the agent was prompted: 
+
+“Using neo4j MCP, identify the ‘PostCode’ entity acting as the most critical structural bridge in the crime network.” 
+
+The baseline approach, utilizing global metrics, identifies node WA14 2SP due to its high Global Betweenness ( 38 .5) (Fig. 6). However, this score is primarily driven by connections to numerous unrelated entities across the KGs, such as Person or Location nodes that lack direct relevance to crime events. Consequently, the global metric is amplified, failing to accu-rately represent the node’s role as a bridge within the specific crime subgraph. In contrast, the typed approach identifies node M1 3EZ as the critical bridge, characterized by a Typed Degree of 114 .0 (Fig. 7). By computing centrality exclusively within the Location/Crime subgraph, the Symbolic Layer filters out irrel-evant nodes from the computation, ensuring that the centrality scores reflect only real connections. This explains the agent’s selection of M1 3EZ, which emerges as a truly central hub within the subgraph connecting crime events.   
+
+> Fig. 6. Comparison of centrality metrics for PostCode WA14 2SP.
+> Fig. 7. Comparison of centrality metrics for PostCode M1 3EZ.
+
+M1 3EZ also shows a Bridging Efficiency of 144.0 and 288 distinct paths connecting 30 crime events across 7 categories, confirming that its high Typed Degree corresponds to genuine structural importance rather than misinterpretation related to the global graph. 
+
+B. Experiment 2: Quantitative Signal Restoration 
+
+The second experiment assesses whether type-aware central-ity restores meaningful signal magnitude for high-cardinality nodes. The agent was prompted: 
+
+“Using neo4j MCP, identify the most influential Crime node based on the importance of its connec-tions within the network structure.” 
+
+The baseline approach, relying on global metrics, ranks node 57116 as the most significant due to its high Global Between-ness ( 68 .75 ) (Fig. 8). However, this value is artificially inflated by indirect connections to non-crime entities, a factor that dilutes the actual relevance of the node’s interactions within the Crime subgraph. This difference is evidenced by its Typed Degree of only 36 , which indicates that the node’s influence is significantly less pronounced when restricted to crime-specific interactions. In contrast, the typed approach identifies node cc45 (Fig. 9) as the top-ranking entity, exhibiting a Typed PageRank of 
+
+0.9612 and a Typed Degree of 49 .0, despite having much lower global counterparts ( 0.2775 and 2.0, respectively). By comput-ing centrality specifically within the Crime-only projection, the Symbolic Layer restores the relative importance of nodes within their relevant context. This enables the LLM to base its reasoning on structural importance that is aligned with a better model representation, effectively filtering out noise from unrelated subgraphs.   
+
+> Fig. 8. Typed-Centrality metrics for Crime Node 57116.
+> Fig. 9. Typed-Centrality metrics for Crime Node cc45.
+
+VIII. R ESULTS DISCUSSION 
+
+The experimental results align with the formal validation of the Typed-Centrality Grounding framework. The model validation demonstrated that global centrality metrics in KGs are affected by signal dilution (Lemma IV.1). In the first experiment, this effect is evident, as the baseline using global metrics selected node WA14 2SP due to high Global Between-ness, even though its connections were mostly outside the relevant Location/Crime subgraph. The Typed approach, which computes centrality within type-specific subgraphs, correctly identified M1 3EZ as the critical bridge. By working on a subgraph, the signal of relevant nodes is amplified relative to irrelevant nodes (Theorem IV.1), allowing the agent to prioritize structurally significant entities. In the second experiment, global metrics underestimated the influence of nodes in high-cardinality classes, such as crimes connected to many persons and locations. Node cc45 with Global PageRank of 0.2775 increased to 0.9612 in the Typed projection, and its Degree increased from 2.0 to 49.0. This confirms that the Symbolic Layer restores the magnitude of centrality scores, highlighting nodes that are important within the relevant subgraph. Overall, the Symbolic Layer improves node selection and signal clarity without modifying the underlying graph data. By filtering out irrelevant nodes and focusing on type-aware subgraphs, the framework provides interpretable supported guidance for agentic reasoning. IX. C ONCLUSION AND FUTURE WORK 
+
+In this paper, we presented a Typed-Centrality Grounding for Agentic GraphRAG, a framework designed to address the limitations of symbolic-agnostic reasoning in GraphRAG systems. By introducing a Symbolic Layer that computes typed centrality metrics within type-specific subgraphs, the framework adds a deterministic grounding to the context. Our approach led to an improved selection of structural hubs, a more accurate ranking of critical nodes, and a clearer identification of subgraph topologies. These symbolic signals guide reasoning and nodes can be better traced by the agent via interpretable typed metrics. In future work, we plan to extend the framework by inte-grating a neurosymbolic layer that combines typed-centrality measures with graph embeddings. This will allow the agent to use both explicit structural signals and learned semantic representations, supporting richer reasoning over the observed KGs. Overall, the Typed-Centrality Grounding Framework demonstrates that KGs can serve as active, interpretable guides for agentic reasoning. By combining type-aware centrality with a symbolic layer that is fed into the GraphRAG, the framework can provide symbolic-informed support for com-plex reasoning. ACKNOWLEDGMENTS 
+
+Rosario Napoli is a PhD student enrolled in the National PhD in Artificial Intelligence, XL cycle, course on Health and life sciences. This work has been partially funded by the Horizon Europe “Open source deep learning platform dedicated to Embedded hardware and Europe” project (Grant Agreement, project 101112268 - NEUROKIT2E) REFERENCES [1] Rosario Napoli, Gabriele Morabito, Antonio Celesti, Massimo Villari, and Maria Fazio. Knowledge graphs-driven intelligence for distributed decision systems. In Proceedings of the 18th IEEE/ACM International Conference on Utility and Cloud Computing , UCC ’25, New York, NY, USA, 2026. Association for Computing Machinery. [2] Chessa et al. Enriching data lakes with knowledge graphs (short paper). In TEXT2KG/MK@ESWC , 2022. [3] Minghao et al. Shao. Survey of different large language model architec-tures: Trends, benchmarks, and challenges. IEEE Access , 2024. Received 13 August 2024, accepted 8 October 2024, published 16 October 2024, current version 20 December 2024. [4] Rosario Napoli, Antonio Celesti, Massimo Villari, and Maria Fazio. Unlocking advanced graph machine learning insights through knowledge completion on neo4j graph database. In 2025 IEEE Symposium on Computers and Communications (ISCC) , pages 1–7, 2025. [5] Linders et al. Knowledge graph-extended retrieval augmented generation for question answering. Applied Intelligence , 55(17):1102, 2025. [6] Knollmeyer et al. Document graphrag: Knowledge graph enhanced retrieval augmented generation for document question answering within the manufacturing domain. Electronics , 14(11):2102, 2025. Published by MDPI, Basel, Switzerland. [7] B. Wang, J. Wu, Y. Shi, W. Chen, and F. Gong. Structured reflective reasoning for precise medical knowledge graph retrieval augmented generation. Health Information Science and Systems , 13(1):76, 2025. [8] Rosario Napoli, Antonio Celesti, Massimo Villari, and Maria Fazio. How to evaluate nosql database paradigms for knowledge graph processing. In Proceedings of the IEEE/ACM 12th International Conference on Big Data Computing, Applications and Technologies , BDCAT ’25, New York, NY, USA, 2025. Association for Computing Machinery. [9] D. Anh-Hoang, V. Tran, and L. M. Nguyen. Survey and analysis of hal-lucinations in large language models: attribution to prompting strategies or model behavior. Frontiers in Artificial Intelligence , 8:1622292, 2025. [10] Al-Sarori et al. BERT and beyond: A comprehensive survey of natural language processing techniques for information retrieval. Journal of Intelligent Communication , 4(2):93–114, sep 2025. [11] Zongxi Li et al. Retrieval-augmented generation for educational ap-plication: A systematic survey. Computers and Education: Artificial Intelligence , 8:100417, 2025. [12] Luo H. et al. Graph-r1: Towards agentic graphrag framework via end-to-end reinforcement learning. arXiv preprint arXiv:2507.21892 , July 2025. [13] X. et al. Gao. Mcp-radar: A multi-dimensional benchmark for eval-uating tool use capabilities in large language models. arXiv preprint arXiv:2505.16700 , May 2025. [14] Yi et al. Huang. Mcp-enabled llm for meta-optics inverse design: leveraging differentiable solver without llm expertise. Nanophotonics ,14(27):5589–5602, December 2025. [15] Knollmeyer et al. Document graphrag: Knowledge graph enhanced retrieval augmented generation for document question answering within the manufacturing domain. Electronics , 14(11), 2025. [16] Z. Wang et al. Mcp-bench: Benchmarking tool-using llm agents with complex real-world tasks via mcp servers. arXiv preprint arXiv:2508.20453 , August 2025. [17] J. et al. Fang. We should identify and mitigate third-party safety risks in mcp-powered agent systems. arXiv preprint arXiv:2506.13666 , June 2025. [18] Y. et al. Zhang. Adaprop: Learning adaptive propagation for graph neural network based knowledge graph reasoning. In Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and Data Mining ,May 2022. [19] M. Rateike, C. Cintas, J. Wamburu, T. Akumu, and S. Speakman. Weakly supervised detection of hallucinations in llm activations. arXiv preprint arXiv:2312.02798 , December 2023. [20] C.et al. Xu. Time-aware graph neural network for entity alignment between temporal knowledge graphs. In Conference on Empirical Methods in Natural Language Processing (EMNLP) , March 2022. [21] Costas Mavromatis and George Karypis. GNN-RAG: Graph neural retrieval for efficient large language model reasoning on knowledge graphs. In Wanxiang Che, Joyce Nabende, Ekaterina Shutova, and Mohammad Taher Pilehvar, editors, Findings of the Association for Computational Linguistics: ACL 2025 , pages 16682–16699, Vienna, Austria, July 2025. Association for Computational Linguistics. [22] Ruiyi Yang et al. Beyond single pass, looping through time: Kg-irag with iterative knowledge retrieval, 2025. [23] Jialin Chen et al. Gril: Knowledge graph retrieval-integrated learning with large language models, 2025. [24] Zhu et al. Knowledge graph-guided retrieval augmented generation. In Luis Chiruzzo, Alan Ritter, and Lu Wang, editors, Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Asso-ciation for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers) , pages 8912–8924, Albuquerque, New Mexico, April 2025. Association for Computational Linguistics. [25] Zhouyang Lu, Hailin Xu, Anrui Chen, Siyuan Tang, Junyi Zhang, Yifei Feng, Wentao Pan, and Jiangli Huang. Hsg-rag: Hierarchical knowledge base construction for embedded system development. ACM Trans. Des. Autom. Electron. Syst. , 30(6), October 2025. [26] Jingchao Wang et al. Conee: Global and local context-enhanced embedding for inductive knowledge graph completion. Expert Systems with Applications , 246:123116, 2024. [27] Bugedo et al. A family of centrality measures for graph data based on subgraphs. ACM Trans. Database Syst. , 49(3), May 2024.

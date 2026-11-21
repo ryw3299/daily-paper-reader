@@ -1,0 +1,73 @@
+{
+  "date": "20261023-20261121",
+  "date_label": "2026-10-23 ~ 2026-11-21",
+  "generated_at": "2026-11-21 04:50:01 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.05448v1",
+      "route": "20261023-20261121/2611.05448v1-jev-with-foresight-safe-language-guided-autonomous-driving-via-a-language-world-model",
+      "title": "Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向语言引导自动驾驶的大模型决策",
+      "first_seen_at": "2026-11-21 04:50:01 UTC",
+      "updated_at": "2026-11-21 04:50:01 UTC"
+    },
+    {
+      "paper_id": "2611.07517v1",
+      "route": "20261023-20261121/2611.07517v1-embodied-rag-retrieval-augmented-generation-from-what-exists-to-what-works-in-embodied-scenes",
+      "title": "Embodied RAG++: Retrieval-Augmented Generation From What Exists to What Works in Embodied Scenes",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "结合场景图与检索增强生成的具身推理",
+      "first_seen_at": "2026-11-21 04:50:01 UTC",
+      "updated_at": "2026-11-21 04:50:01 UTC"
+    },
+    {
+      "paper_id": "2611.09414v1",
+      "route": "20261023-20261121/2611.09414v1-typed-centrality-grounding-for-agentic-graphrag-a-symbolic-approach-for-agentic-reasoning",
+      "title": "Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "基于类型化中心性符号接地的智能体GraphRAG确定性推理",
+      "first_seen_at": "2026-11-21 04:50:01 UTC",
+      "updated_at": "2026-11-21 04:50:01 UTC"
+    },
+    {
+      "paper_id": "2611.24376v1",
+      "route": "20261023-20261121/2611.24376v1-teaching-vlms-what-to-say-not-how-to-reason-rethinking-counterfactual-reasoning-in-autonomous-driving",
+      "title": "Teaching VLMs What to Say, Not How to Reason: Rethinking Counterfactual Reasoning in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "自动驾驶视觉语言模型中的反事实因果推理鲁棒性",
+      "first_seen_at": "2026-11-21 04:50:01 UTC",
+      "updated_at": "2026-11-21 04:50:01 UTC"
+    }
+  ]
+}

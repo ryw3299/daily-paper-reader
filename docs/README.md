@@ -48,7 +48,7 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-12 ~ 2026-11-21</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-23 ~ 2026-11-21</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 4 篇</strong>
@@ -58,7 +58,7 @@
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 04:43:11 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 04:50:01 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>本期速读4篇AI应用论文，聚焦自动驾驶视觉模型诊断、封闭电厂LLM助手部署与长周期智能体安全审计。最值得看的是“VLM是否真的看路”的诊断评估，以及智能体状态转移审计与管控框架，三篇均6.0分、偏应用与风险视角。普通读者可先速览自动驾驶诊断一文，再带着“模型是否可靠、如何管控”的问题看智能体审计部分。</p>
+<p>本期共筛出4篇速读、0篇精读，其中三篇重点论文均获8.0分，聚焦语言世界模型驱动的自动驾驶、面向具身场景的RAG++，以及智能体GraphRAG的类型化中心性 grounding。</p>
+<p>最值得看的是两条主线：用语言世界模型提升语言引导自动驾驶的安全性，以及把RAG从“能检索”推进到“在具身场景中真正好用”。</p>
+<p>建议普通读者先挑与自身场景最贴近的一篇通读摘要和实验部分，再判断是否需要回溯精读。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -94,7 +96,7 @@
     <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Do VLMs Really Look at the Road? A Diagnostic Evaluation for Autonomous Driving">Do VLMs Really Look at the Road? A Diagnostic Evaluation for Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="Deploying a Control-Logic LLM Assistant in Air-Gapped Power Plants: Lessons in Source Authority and Bounded Retrieval">Deploying a Control-Logic LLM Assistant in Air-Gapped Power Plants: Lessons in Source Authority and Bounded Retrieval</span></li><li><span class="dpr-home-dashboard-paper-title" title="Securing and Auditing Long-Horizon LLM Agents: State-Transfer Auditing and Controls in the Agent Harness">Securing and Auditing Long-Horizon LLM Agents: State-Transfer Auditing and Controls in the Agent Harness</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model">Jev with Foresight: Safe Language-Guided Autonomous Driving via a Language World Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="Embodied RAG++: Retrieval-Augmented Generation From What Exists to What Works in Embodied Scenes">Embodied RAG++: Retrieval-Augmented Generation From What Exists to What Works in Embodied Scenes</span></li><li><span class="dpr-home-dashboard-paper-title" title="Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning">Typed-Centrality Grounding for Agentic GraphRAG: A Symbolic Approach for Agentic Reasoning</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>4</strong></span></div>
 </section>
