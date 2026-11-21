@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-20</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-21</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 15 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>3 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>15</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-20 12:36:36 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 00:51:37 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-11-20 日报共收录15篇论文并全部完成速读（精读0篇），内容覆盖本体自动归纳、图检索问答与深度研究智能体安全三个方向。最值得关注的是AutoOntic用文本自动归纳本体来辅助知识图谱构建（7.0/10），以及GRASP用交叉注意力评分和路径充分性验证实现查询自适应图检索（7.0/10）；这两项对构建可溯源的知识问答系统有直接参考价值。建议普通读者先浏览这两篇的摘要和方法图，再根据自身场景决定是否深入阅读，并留意《Security of Deep Research Agents》中关于研究规划攻击面的风险提示。</p>
+<p>今天速读 1 篇、精读 0 篇，重点浏览了视觉语言模型用于驾驶场景的 SuperGlance（6.0/10）。</p>
+<p>该文值得关注的方向是“一瞥式”驾驶感知，即用视觉语言模型在有限视野或快速判断下理解路况，但 6.0 分说明其成熟度中等，结论宜谨慎看待。</p>
+<p>普通读者可先把它当作了解视觉语言模型用于自动驾驶的技术示例，不必急着据此判断实际落地能力，等后续更多验证再深入。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">15 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction">AutoOntic: Automatic Ontology Induction from Text for Knowledge Graph Construction</span></li><li><span class="dpr-home-dashboard-paper-title" title="GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering">GRASP: Query-Adaptive Graph Retrieval framework with Cross-Attention Scoring and Path Sufficiency Verification for Question Answering</span></li><li><span class="dpr-home-dashboard-paper-title" title="Security of Deep Research Agents: Attack Surface, Defenses, Benchmarks, and Agenda Seeding against Research Planning">Security of Deep Research Agents: Attack Surface, Defenses, Benchmarks, and Agenda Seeding against Research Planning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SuperGlance: Driving at a Glance with a Vision-Language Model">SuperGlance: Driving at a Glance with a Vision-Language Model</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>15</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span></div>
 </section>
 </div>
 

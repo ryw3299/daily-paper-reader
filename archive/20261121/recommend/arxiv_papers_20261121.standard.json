@@ -1,0 +1,63 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-11-21T00:51:15.263131+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 0,
+    "deep_cap": 6,
+    "deep_selected": 0,
+    "quick_candidates": 1,
+    "quick_skim_target": 11,
+    "quick_selected": 1
+  },
+  "deep_dive": [],
+  "quick_skim": [
+    {
+      "id": "2611.19138v2",
+      "source": "arxiv",
+      "title": "SuperGlance: Driving at a Glance with a Vision-Language Model",
+      "abstract": "Autonomous driving is turning to vision-language-action models (VLAs). They answer and plan by decoding, one step at a time. Each step is another forward pass, so a plan can take over a second of GPU time. Embodied AI often pairs such a slow, reasoning System 2 with a fast System 1 that acts. Human drivers plan at a glance, with System 1. Faster designs usually put System 1 outside the vision-language model (VLM), in a planner without its abilities. Yet before a VLM writes its first token, it has already read the scene into one hidden state. We show that, once trained, this hidden state is enough to drive and to answer questions about what the model sees. SuperGlance reads it to turn a decoder-only VLM into an encoder-style driving policy. Its linear head scores a fixed set of 5,273 candidate trajectories. With the set fixed, rewards are computed offline, so supervised targets can be reward-weighted and reinforcement learning maximizes the exact expected reward. Before and during policy training, multiple-choice training keeps the VLM's visual abilities in one pass, so the policy still answers questions about driving scenes. Training questions are built against shortcuts. Each must be answered right in two option orders. Against drift, a KL term keeps each stage near its starting model. One pass offers VLAs a more plausible path to System 1. SuperGlance answers visual multiple-choice questions as well as its base VLM does by decoding. It plans in 84 ms of GPU time, six times faster than Qwen-Drive-1.0, and at least as well on NAVSIM, PAI-AV and WOD-E2E. In AlpaSim closed loop, km per at-fault incident holds for both planners up to a 300-ms delay and drops beyond. With GPU time charged as delay, SuperGlance's lead over Qwen-Drive-1.0 grows from 2.8 to 3.9 times. Delayed by 1.2 s, our model falls below Qwen-Drive-1.0 at its own 518 ms.",
+      "authors": [
+        "Jieyuan Pei",
+        "Xin Yan",
+        "Mingwei Xu",
+        "Haiyi Zhang",
+        "Siyu Zou",
+        "Zhangyi Hu",
+        "Zhuoxuan Li",
+        "Yuguang Yang",
+        "Rongjunchen Zhang",
+        "Cheng Chi",
+        "Hui Xiong",
+        "Yan Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-14T03:59:37+00:00",
+      "link": "https://arxiv.org/pdf/2611.19138v2",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "vision-language driving policy that also answers questions about the scene",
+      "llm_evidence_cn": "兼具场景问答能力的视觉语言驾驶策略",
+      "llm_evidence": "兼具场景问答能力的视觉语言驾驶策略",
+      "canonical_evidence": "兼具场景问答能力的视觉语言驾驶策略",
+      "llm_tldr_en": "SuperGlance turns a decoder-only vision-language model into a fast encoder-style driving policy by reading its pre-token hidden state, enabling glance-level planning and scene question answering.",
+      "llm_tldr_cn": "针对视觉语言动作模型逐步解码导致规划耗时过长、而快速规划器又脱离模型理解能力的问题，论文提出SuperGlance。该方法发现视觉语言模型在生成首个词元前已把场景编码为单一隐状态，遂用线性头读取该状态，把解码器式模型改造为编码器式驾驶策略。实验表明仅凭该隐状态即可完成驾驶规划并回答关于所见场景的问题，显著降低推理延迟。该工作为车载场景理解与实时决策支持提供了轻量化的模型复用思路。",
+      "llm_tldr": "针对视觉语言动作模型逐步解码导致规划耗时过长、而快速规划器又脱离模型理解能力的问题，论文提出SuperGlance。该方法发现视觉语言模型在生成首个词元前已把场景编码为单一隐状态，遂用线性头读取该状态，把解码器式模型改造为编码器式驾驶策略。实验表明仅凭该隐状态即可完成驾驶规划并回答关于所见场景的问题，显著降低推理延迟。该工作为车载场景理解与实时决策支持提供了轻量化的模型复用思路。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

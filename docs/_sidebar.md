@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-11-21 <!--dpr-date:20261121-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202611/21/2611.19138v2-superglance-driving-at-a-glance-with-a-vision-language-model" data-sidebar-item="{&quot;title&quot;: &quot;SuperGlance: Driving at a Glance with a Vision-Language Model&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2611.19138v2-superglance-driving-at-a-glance-with-a-vision-language-model&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;kg-rag-agent&quot;}], &quot;evidence&quot;: &quot;兼具场景问答能力的视觉语言驾驶策略&quot;}">SuperGlance: Driving at a Glance with a Vision-Language Model</a>
   * 2025-11-20 ～ 2026-11-19 <!--dpr-date:20251120-20261119-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/20251120-20261119/2608.19964v1" data-sidebar-item="{&quot;title&quot;: &quot;G-MARK: Grounded Multi-Agent Reasoning for Cooperative Driving via Knowledge Graphs&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2608.19964v1&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;kg-rag-agent&quot;}], &quot;evidence&quot;: &quot;面向知识图谱与多智能体协同推理专题，用来源感知图谱组织车车协同证据，属相关邻近工作。&quot;}">G-MARK: Grounded Multi-Agent Reasoning for Cooperative Driving via Knowledge Graphs</a>

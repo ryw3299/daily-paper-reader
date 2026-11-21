@@ -1,0 +1,25 @@
+{
+  "date": "20261121",
+  "date_label": "",
+  "generated_at": "2026-11-21 00:51:37 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.19138v2",
+      "route": "202611/21/2611.19138v2-superglance-driving-at-a-glance-with-a-vision-language-model",
+      "title": "SuperGlance: Driving at a Glance with a Vision-Language Model",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "兼具场景问答能力的视觉语言驾驶策略",
+      "first_seen_at": "2026-11-21 00:51:37 UTC",
+      "updated_at": "2026-11-21 00:51:37 UTC"
+    }
+  ]
+}
