@@ -1,0 +1,488 @@
+Title: Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules
+
+URL Source: https://arxiv.org/pdf/2611.20648v1
+
+Published Time: Tue, 17 Nov 2026 04:45:41 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+> JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 1
+
+# Competent Autonomous Driving Through Fine-Tuning Vision–Language–Action Models with Symbolic Traffic Rules 
+
+Barkin Dagda 1, Vinal Asodia 1, Iman Sharifi 2, Peng Wei 2, Saber Fallah 1
+
+Abstract —Vision-language-action (VLA) models offer a unified approach to perception, reasoning, and control for autonomous driving, but accurate action prediction alone does not establish compliance with traffic regulations. This paper presents a rule-guided VLA framework that incorporates symbolic traffic-rule feedback into policy optimisation. The framework combines supervised fine-tuning on expert demonstrations with reinforce-ment learning (RL) refinement using a reward that encourages encoded-rule compliance while penalising deviations from expert actions. Selected provisions of the United Kingdom Highway Code are formalised as executable first-order logic rules using PyReason, covering speed adaptation, following distance, and road-user priority. A frozen vision-language model extracts scene predicates, which are combined with vehicle-state information to assess the projected consequences of candidate control actions. Offline evaluation on held-out data collected in the CARLA simulator compares three group-based RL methods. The results show improvements in both action prediction accuracy and encoded-rule compliance over the supervised baseline. The best-performing variant increases the overall rule pass rate from 92.9% to 97.6%, with zero observed violations of the encoded road-user-priority check in the evaluated samples. These findings support symbolic rule feedback as a means of improving VLA policy alignment with explicit traffic-rule criteria. 
+
+Index Terms —Vision-language-action models, reinforcement learning, autonomous driving, first-order logic. 
+
+I. I NTRODUCTION 
+
+# Autonomous driving requires intelligent systems capable of perceiving complex environments, reasoning about dy-namic traffic situations, and executing safe driving manoeuvres that comply with traffic regulations [1]. End-to-end learning addresses these interconnected tasks by mapping sensor obser-vations to driving actions within a unified differentiable model. By jointly optimising perception and control, such approaches simplify system design and learn representations of complex driving behaviour [2]. However, ensuring that learned policies comply with explicit traffic rules remains a challenge. Large language models (LLMs) and vision-language models (VLMs) have expanded the role of semantic scene understand-ing and language-based reasoning in autonomous driving [3], [4]. Frameworks such as DriveLM, LMDrive, and DriveGPT4 explore connections between scene understanding, reasoning, planning, and vehicle control [5]–[7]. Vision-language-action (VLA) models further integrate multimodal observations, lan-guage, and action generation within a shared framework.                     
+
+> 1Barkin Dagda, Vinal Asodia, and Saber Fallah are with the Connected and Autonomous Vehicles Lab (CAV-Lab), University of Surrey, Guildford, GU2 7XH, UK.
+
+[bd00242, va00191, s.fallah]@surrey.ac.uk 
+
+> 2Iman Sharifi and Peng Wei are with the Department of Mechanical and Aerospace Engineering, George Washington University, Washington, DC 20052, USA.
+
+[i.sharifi, pwei]@gwu.edu 
+
+Related models and benchmarks investigate the capabilities and limitations of these approaches in scene understanding, visual grounding, and driving decision-making [8]–[10], [12]– [16]. Their development extends beyond imitation learning: AutoVLA employs reinforcement learning (RL) to refine plan-ning and reasoning efficiency [11], while AutoDrive-R 2 uses RL to improve reasoning and self-reflection [17]. Nevertheless, imitation objectives measure agreement with demonstrations, and RL objectives depend on the chosen rewards; neither inherently provides an explicit assessment of compliance with codified traffic rules. Symbolic representations offer a means of making these requirements explicit. Traffic rules describe context-dependent constraints on driving behaviour, which can be encoded as logical conditions and evaluated against scene and vehicle-state information. Previous research has integrated symbolic knowledge into learning-based autonomous driving to support safety [18], interpretability [19], and policy alignment [20]. SafeAuto [21], for example, represents traffic regulations using Markov logic networks to assess whether generated behaviours satisfy specified constraints. These developments motivate connecting symbolic rule evaluation with VLA policy refine-ment. The challenge addressed here is to translate contextual traffic-rule checks into action-dependent feedback that directly guides continuous-control policy optimisation. This paper proposes a rule-guided VLA framework that integrates symbolic traffic-rule evaluation into a two-stage learning procedure. Supervised fine-tuning (SFT) first adapts a pretrained VLM using expert driving actions and reference reasoning annotations. Reinforcement learning fine-tuning (RLFT) then refines the policy using a reward that combines rule-compliance feedback with a penalty for deviation from ex-pert actions. Selected provisions of the United Kingdom (UK) Highway Code [23] are formalised as executable first-order logic (FOL) rules using the PyReason symbolic reasoning engine [22]. A separate frozen VLM extracts scene predicates, which are combined with vehicle-state information to evaluate the projected consequences of candidate actions. The resulting checks cover speed adaptation, following distance, and road-user priority, providing explicit learning signals for compliance with the encoded criteria. We investigate this framework using three group-based opti-misation methods: group relative policy optimisation (GRPO) [24], [25], group reward-decoupled normalisation policy opti-misation (GDPO) [26], and GRPO Done Right (Dr. GRPO) [27]. Offline experiments on held-out simulated driving data compare action prediction accuracy and encoded-rule compli-ance, while ablations examine the contribution of individual rules to policy refinement. The results show improvements arXiv:2611.20648v1 [cs.CV] 16 Nov 2026 JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 2
+
+Fig. 1: Overview of the proposed rule-guided VLA framework. SFT (top) trains the model to predict driving actions and generate reasoning outputs from visual observations and textual inputs. RLFT (bottom) refines the policy using symbolic traffic-rule feedback and an imitation penalty that encourages consistency with expert actions. over the SFT baseline in both evaluated objectives, supporting the use of symbolic rule feedback within the studied setting. The main contributions are as follows:  
+
+> •
+
+We develop a VLA fine-tuning framework that incorpo-rates symbolic traffic-rule feedback into policy optimisa-tion while encouraging consistency with expert driving actions.  
+
+> •
+
+We formalise selected UK Highway Code provisions as executable FOL rules and construct a symbolic evaluator that assesses candidate actions against context-dependent compliance criteria.  
+
+> •
+
+We compare GRPO, GDPO, and Dr. GRPO through offline evaluation and rule ablations, examining their effects on action prediction accuracy and compliance with the encoded rules. Sections II and III describe the learning framework and symbolic evaluator, respectively. Section IV presents the ex-perimental setup, Section V reports the results, and Section VI concludes with limitations and future directions. II. R ULE -G UIDED VLA L EARNING FRAMEWORK 
+
+The proposed framework combines a VLA driving policy with a symbolic traffic-rule evaluator, as illustrated in Figure 1. Learning proceeds in two stages: SFT first adapts a pretrained VLM using expert actions and reference reasoning annota-tions, after which RL refines the policy using rule-compliance feedback and an imitation penalty. A separate frozen VLM extracts the scene predicates required for symbolic evaluation. 
+
+A. Problem Formulation 
+
+At time t, the driving policy receives a visual observa-tion St, the ego-vehicle state and telemetry xt, and a high-level navigation instruction L. The policy is represented by 
+
+πθ (at, yt | St, xt, L ), where θ denotes its trainable parameters, 
+
+at is a continuous vehicle-control action, and yt is a natural-language reasoning output. The learning task is to produce driving actions that satisfy the applicable encoded traffic rules while remaining consistent with expert demonstrations. Let R = {r1, r 2, . . . , r K } denote the set of encoded traffic rules. These rules depend on semantic properties of the driving scene, represented by the symbolic predicates zt extracted from St by the frozen VLM. Given these predicates, the vehicle-state information, and a candidate action, the symbolic evaluator determines which rules apply and whether the action satisfies them: qt = Q(zt, xt, at, R) = [ q1,t , q 2,t , . . . , q K,t ] ,
+
+where qk,t records whether rule rk is inactive, satisfied, or violated under the supplied scene information and candidate-action evaluation. Only applicable rules contribute to the rule-compliance reward. The scene representation, action projec-tion, and individual rule checks underlying Q are specified in Section III. The objective of rule-guided refinement is to improve com-pliance with these rules while penalising deviations from the corresponding expert actions. Accordingly, the policy-learning objective is formulated as 
+
+θ∗ = arg max  
+
+> θ
+
+Eπθ
+
+Rrule  
+
+> t
+
+− λR imit 
+
+> t
+
+ , (1) where Rrule  
+
+> t
+
+is derived from the compliance assessment qt,
+
+Rimit  
+
+> t
+
+penalises deviation from the expert action a∗ 
+
+> t
+
+, and λ con-trols the relative weight of the imitation penalty. This objective allows explicit rule feedback to influence policy updates while encouraging consistency with demonstrated driving behaviour. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 3
+
+B. VLA Policy Architecture 
+
+The driving policy is built on the Qwen3-VL-2B-Instruct backbone. The visual observation St is provided as an image, while the ego-vehicle state and telemetry xt are converted into textual descriptions and combined with the navigation instruction L to form the accompanying prompt. These in-puts are encoded as visual and text tokens within a shared multimodal sequence. A learnable action token, denoted as 
+
+[ACT_TOKEN] , is added to the vocabulary and appended to the input sequence to provide a dedicated representation for continuous action prediction. The multimodal sequence is processed by the transformer backbone, which integrates the visual, vehicle-state, and nav-igation information through self-attention. The resulting con-textualised hidden states support both action prediction and language generation. In particular, the hidden state associated with [ACT_TOKEN] represents the driving context used by the action head. Two output heads generate the vehicle-control action and the natural-language reasoning output. The action head is a multilayer perceptron with Gaussian error linear unit (GELU) activations that maps the action-token hidden state to at =(at, throttle , a t, steering ) ∈ [0 , 1] × [−1, 1] . A sigmoid activation bounds the throttle output to [0 , 1] , while a tanh activation bounds the steering output to [−1, 1] . The language-modeling head autoregressively generates the reasoning output yt from the corresponding language-token hidden states. These two outputs are supervised using expert control actions and ref-erence reasoning annotations, respectively, as described next. 
+
+C. Supervised Fine-Tuning 
+
+Supervised fine-tuning adapts the policy using driving ob-servations paired with expert control actions and reference reasoning annotations. The demonstration dataset is denoted by Dexpert = {(St, xt, L, a∗ 
+
+> t
+
+, c∗ 
+
+> t
+
+)}Tt=1 , where T is the number of training samples, a∗ 
+
+> t
+
+is the expert action, and c∗ 
+
+> t
+
+is the ref-erence reasoning annotation associated with the observation. These targets jointly supervise the policy’s action and language outputs, establishing an initial behavioural and reasoning prior. The action loss measures the squared error between the predicted control vector ˆat and the expert action: 
+
+Laction (θ) = 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+∥ˆat − a∗ 
+
+> t
+
+∥22 . (2) The language loss supervises autoregressive generation of the reference reasoning annotation: 
+
+Lreason (θ) = − 1
+
+T
+
+> T
+
+X
+
+> t=1
+> Kt
+
+X
+
+> k=1
+
+log pθ
+
+ c∗ 
+
+> t,k
+
+| St, xt, L, c ∗
+
+> t,<k
+
+ , (3) where Kt is the annotation length, c∗ 
+
+> t,k
+
+is its k-th token, and 
+
+c∗ 
+
+> t,<k
+
+denotes the preceding tokens. The two losses are com-bined as LSFT (θ) = Laction (θ) + Lreason (θ). This objective encourages the policy to reproduce expert controls and gener-ate reasoning outputs consistent with the reference annotations. The resulting SFT checkpoint provides the initialisation for the rule-guided reinforcement-learning stage. 
+
+D. Rule-Guided Reinforcement Learning 
+
+Following SFT, the policy is refined using symbolic rule feedback together with an imitation penalty. For each driving observation, the deterministic action prediction is treated as the mean of a Gaussian distribution, N (μθ (St, xt, L ), Σ) , where 
+
+Σ is the action-sampling covariance. A group of G candidate actions {at,i }Gi=1 is sampled from this distribution. Evaluating alternatives within the same driving context provides the relative feedback used to update the policy. Each candidate action is projected over a short horizon and assessed by the symbolic evaluator using the resulting vehicle-state information and the scene predicates zt. The projection procedure and individual rule checks are detailed in Section III. For each rule r ∈ R , the evaluator assigns 
+
+sr (at,i ) = 
+
+
+
+−1, rule violated ,
+
+0, rule inactive ,
+
++1 , rule satisfied .
+
+(4) Let Ractive ⊆ R denote the rules applicable to the current scene, with nactive = |R active |. The rule-compliance reward averages the scores over these active rules and includes a small bonus proportional to the fraction satisfied: 
+
+Rrule  
+
+> t,i
+
+= 1
+
+nactive 
+
+X
+
+> r∈R active
+
+sr (at,i ) + β npass ,t,i 
+
+nactive 
+
+, (5) where npass ,t,i is the number of active rules satisfied by candidate i and β = 0 .05 . The bonus slightly increases the contribution of rule satisfaction to the reward. To retain consistency with demonstrated driving behaviour, an imitation penalty measures the candidate’s deviation from the corresponding expert action: 
+
+Rimit  
+
+> t,i
+
+= ∥at,i − a∗ 
+
+> t
+
+∥22 . (6) The two terms form the composite reward 
+
+Rt,i = Rrule  
+
+> t,i
+
+− Rimit  
+
+> t,i
+
+, (7) which corresponds to the unit-weight case, λ = 1, of Equation 1. This reward encourages satisfaction of the en-coded rules while penalising deviations from expert controls. Mission completion, trajectory smoothness, and ride comfort are not explicitly included in the reward; the imitation term encourages consistency with demonstrations without directly constraining these temporal properties. Policy updates use a clipped, group-relative surrogate ob-jective that requires no separate critic network. For a candidate sampled from the previous policy πθold , the likelihood ratio is 
+
+ρt,i = πθ (at,i | St, xt, L )
+
+πθold (at,i | St, xt, L ) . (8) The shared clipped surrogate is 
+
+Jclip (θ) = 1
+
+G
+
+> G
+
+X
+
+> i=1
+
+min( ρt,i At,i ,
+
+clip ( ρt,i , 1 − ϵclip , 1 + ϵclip ) At,i ),
+
+(9) where At,i is the candidate’s group-relative advantage and ϵclip 
+
+controls the clipping interval. GRPO and GDPO additionally JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 4
+
+use KL regularisation relative to the SFT policy, while this term is omitted for Dr. GRPO. The three variants differ in how they construct advantages from the candidate rewards. Let Rt = ( Rt, 1, . . . , R t,G ) denote the rewards for a sampled group: 
+
+• GRPO centres the composite rewards and normalises them by their within-group standard deviation: 
+
+At,i = Rt,i − mean( Rt)std( Rt) + ϵ ,
+
+where ϵ is a small constant for numerical stability. 
+
+• GDPO centres and normalises the rule-compliance and imitation components separately before combining their advantages: At,i = Arule 
+
+t,i − Aimit 
+
+t,i . This separates the normalisation of the two components so that their dif-ferent scales do not directly determine their relative contributions. 
+
+• Dr. GRPO centres the composite rewards without divid-ing by their standard deviation: At,i = Rt,i − mean( Rt).
+
+These updates favour candidate actions according to their relative rule compliance and imitation error. III. S YMBOLIC TRAFFIC -R ULE REPRESENTATION AND 
+
+EVALUATION 
+
+The symbolic evaluator provides the rule-compliance feed-back used by the learning framework described in Section II. It operationalises selected UK Highway Code provisions covering speed adaptation, following distance, and road-user priority. Evaluation proceeds by extracting symbolic scene information, inferring contextual factors, and applying the encoded rules to the projected consequences of candidate actions. The following subsections describe these components and how they produce the compliance assessments used during training and evaluation. 
+
+A. Symbolic Scene Representation 
+
+The information required for symbolic evaluation is iden-tified through manual analysis of the selected Highway Code provisions. This analysis defines a predicate vocabulary de-scribing road geometry, environmental conditions, nearby road users, and vehicle interactions. Qualitative scene properties are represented by these predicates, while numerical quantities required for action evaluation, such as ego speed and following distance, are supplied separately through the vehicle-state information xt.A frozen Qwen2.5-VL-7B-Instruct model extracts the pred-icates from the visual observation: zt = fϕ(St), where fϕ is the fixed visual-to-symbolic mapping and zt contains the rule-relevant predicates for the observed scene. Structured prompts specify the meanings of the predicates and consistency re-quirements, such as mutually exclusive road-surface labels. The model’s output is parsed into a dictionary of Boolean predicates that serves as input to the symbolic reasoning engine. PyReason applies logical inference rules to these predicates to derive the contextual factors used by the compliance checks. This step connects individual scene attributes to the parameters of the encoded traffic rules. For example, predicates indicating Rule 125:  The speed limit is the absolute maximum and does not mean it is safe to drive at that speed irrespective of conditions.                     
+
+> Driving at speeds too fast for the road and tra ffi c conditions is dangerous. You should always reduce your speed when: ●the road layout or condition presents hazards, such as bends ● sharing the road with pedestrians ,
+> cyclists and horse riders , particularly children , and motorcyclists ●
+> weather conditions make it safer to do so ● driving at night as it is more di ffi cult to see other road users.
+> Road Layout
+> Concept:
+> bends
+> Predicate:
+> is_bending
+> Road Users
+> Concept:
+> pedestrians ,
+> cyclists ,horse riders ,children ,
+> motorcyclists
+> Predicate:
+> ped_crossing
+> cyc_on_road
+> hrider_on_road
+> child_on_road
+> motorcyc_on_road
+> Visibility
+> Concept:
+> night
+> Predicate:
+> poor_visibility
+> road_layout_factor road_user_factor weather_factor visibility_factor
+> Contextual Factor Inference (PyReason)
+> Highway Code Rule Representation (Rule 125 - Safe Speed)
+> Speed is within safe limit
+> (Compliant)
+> No
+> Rule 125 Violation
+> Vehicle is travelling too fast for the current conditions and context. Is > ds? $$v_{ego}$$
+> Yes
+> Each factor provides a recommended max safe speed (SL). Most restrictive (minimum) i selected
+
+$$v_{ego}$$   
+
+> Weather
+> Concept:
+> weather conditions
+> Predicate:
+> wet_road
+> ice_road
+> 1) Combine contextual factors to determine safe speed limit
+> 2) Compare with ego vehicle speed
+> 3) If speed exceeds the safe limit
+> ds =min( sl_layout ,
+> sl_user ,
+> sl_weather ,
+> sl_visibility )
+
+Fig. 2: An illustrative example of translating a UK Highway Code rule into symbolic predicates, contextual factors, and an executable compliance check. a wet road or poor visibility inform the factors used to adjust speed and following-distance thresholds. Figure 2 illustrates the progression from traffic-rule concepts to predicates, con-textual factors, and an executable check. The resulting factors parameterise the rule formalizations described next. 
+
+B. Formalization of Selected Traffic Rules 
+
+The contextual factors derived from the scene representation parameterise three compliance checks: speed adaptation, safe following distance, and road-user priority. These checks oper-ationalise selected Highway Code provisions through explicit conditions and thresholds. The equations below define the framework’s numerical interpretation of those provisions. 
+
+Rule 125 – Safe Speed: Rule 125 in UK Highway Code advises drivers to adapt their speed to the prevailing road, traffic, and environmental conditions, while Rule 124 specifies the applicable maximum speed limits. The contextual speed check uses factors associated with road layout, nearby road users, weather, and visibility to determine a desired speed: 
+
+DS = min  SL layout , SL users , SL weather , SL visibility 
+
+, where each SL term denotes the speed threshold associated with the corresponding contextual factor. The minimum selects the JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 5
+
+most restrictive of these thresholds. A violation is recorded when the ego speed evaluated for a candidate action exceeds 
+
+DS .
+
+Rule 126 – Safe Following Distance: Rule 126 in UK Highway Code addresses the separation needed to stop safely if a preceding vehicle slows or stops, accounting for the driving conditions. Within the framework, a base stopping distance is adjusted using factors associated with traffic, vis-ibility, road conditions, and vehicle characteristics: SD =
+
+BSD × max  Ftraffic , F visibility , F road , F vehicle 
+
+, where BSD 
+
+is the base stopping distance under normal conditions and the 
+
+F terms are the contextual scaling factors. This aggregation applies the largest individual multiplier to obtain the required distance SD . The check records a violation when the follow-ing distance evaluated for the candidate action is less than 
+
+SD .
+
+Rule H – Hierarchy of Road Users: According to UK Highway Code, the hierarchy principle in Rule H1 assigns greater responsibility for reducing danger to road users capable of causing greater harm, while Rule H2 specifies priority guidance for pedestrians and other vulnerable road users. The framework implements a selected set of yielding conditions using information about junctions, crossings, road users, and traffic signals:  
+
+> •
+
+pedestrians crossing or waiting to cross the road into or out of which the ego vehicle is turning;  
+
+> •
+
+pedestrians at zebra crossings, and pedestrians or cyclists at parallel crossings;  
+
+> •
+
+pedestrians at light-controlled crossings when the signal controlling the ego vehicle is red. These conditions define the scope of the implemented road-user-priority check. For each situation, the symbolic predicates describing road-user location, crossing intent, and the relevant road or signal context determine whether a yielding response is required. Vehicle-motion information is then used to assess whether the candidate action initiates the required deceleration. A violation is recorded when the yielding condition is active but this response is absent. This separates the applicability of the check from the assessment of the vehicle’s response. The following subsection explains how the evaluator applies these checks to the projected consequences of candidate actions. 
+
+C. Candidate-Action Evaluation 
+
+To assess the consequences of a candidate action without executing it in the simulator during fine-tuning, the evalu-ator projects the ego-vehicle state over a short horizon ∆t
+
+using a kinematic bicycle model [33]. For candidate at,i , this projection is represented as ˆxt+1 ,i = F∆t (xt, at,i ) , where 
+
+F∆t denotes the state-projection model and ˆxt+1 ,i is the predicted ego-vehicle state at the end of the horizon. The model provides a computationally inexpensive approximation of vehicle motion, while omitting higher-order dynamics such as tyre slip. The projected state is evaluated together with the symbolic predicates zt and the relevant vehicle-state information. Can-didates sampled for the same observation share the extracted scene predicates, while their projected states reflect their different control actions. PyReason uses the scene predicates and inferred contextual factors to identify the applicable rules and their parameters. The candidate’s projected motion is then assessed against the corresponding criteria defined in the preceding subsection. Rules whose activation conditions are absent remain inactive and are excluded from the rule-compliance reward. For each candidate, this procedure produces a compliance vector qt,i through the evaluator Q introduced in Section II. Its entries are mapped to the satisfied, violated, or inac-tive scores defined in Equation 4, which supply the rule-compliance reward in Equation 5. The same checks support the offline assessment of predicted actions. Their outputs indicate satisfaction of the encoded criteria under the supplied scene in-formation and the state-projection assumptions. The following section describes the data collection, training configuration, and evaluation protocol used to study the framework. IV. EXPERIMENTAL SETUP 
+
+A. Data Collection 
+
+To train and evaluate a VLA model with traffic-rule compli-ance, scene attributes serve as key inputs for the symbolic rule engine. The CARLA simulation environment [30] provides ground-truth scene attributes, including road conditions, road geometry, the presence of nearby vehicles, and the proximity of vulnerable road users. To collect the expert driving data, an automated rule-based agent navigates across multiple CARLA towns, covering residential, urban, highway, and multi-lane environments under clear and rainy weather conditions, along with dedicated pedestrian-crossing scenarios. The agent op-erates with a two-level planning architecture: at the global level, it calculates optimal routes across the road network to generate target waypoints and high-level navigation commands (e.g., LANEFOLLOW , TURNLEFT , TURNRIGHT ). At the local level, it tracks these waypoints and manages speed using proportional-integral-derivative controllers [31] while reacting to red lights and leading obstacles. At each time step, the system records synchronized data, including a front-facing RGB image, vehicle kinematic states (speed, heading, and acceleration), distance to leading vehicles, the high-level nav-igation commands, the executed steering, throttle, and braking actions. To extract scene attributes directly from raw perceptual data for the symbolic rule engine, each collected front-facing RGB image is processed using a frozen pre-trained Qwen2.5-VL-7B-Instruct model. The model is guided by structured prompt instructions with explicit semantic definitions and logical consistency constraints, such as ensuring road surface conditions remain mutually exclusive and asserting pedestrian presence whenever crossing behavior is identified. Each visual frame is parsed into a verified dictionary of boolean predicates representing environmental visibility, road geometry, obstacle categories, and vulnerable road users. Reasoning annotations ( c∗ 
+
+> t
+
+) are created automatically by combining vehicle sensor data with information about the scene. For each frame, the system combines measurements such as the vehicle speed compared with the speed limit, IMU JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 6
+
+Fig. 3: An illustrative example of the trajectory predictions made by the SFT, GRPO, GDPO and Dr. GRPO pretrained VLA models. The figures show the throttle, steering, projected speed and the trajectory waypoints. acceleration, the curvature of the upcoming road, traffic light signals, and the distance to pedestrians with scene information extracted by the vision-language model. These inputs are organized into three reasoning steps:  
+
+> •
+
+Perception: Describes what is happening around the vehicle. It includes the road condition, weather and visibility, traffic light state, detected obstacles, and the distance to pedestrians or other vulnerable road users.  
+
+> •
+
+Analysis: Explains the driving situation by considering the planned route and safety conditions. It checks the road curvature using the projected waypoints, compares the vehicle speed with the speed limit, and identifies important safety situations, such as a red traffic light or a nearby pedestrian.  
+
+> •
+
+Reaction: Explains what the vehicle should do next. It describes whether the vehicle should accelerate, maintain its motion, coast, or brake. It also explains any steering changes needed to safely follow the planned path. To avoid having too many similar frames when the vehicle is stopped for a long time, a temporal filter removes repeated stationary frames. Important frames, such as the start of braking and the beginning of movement, are kept. Finally, the generated reasoning text is combined with the vehicle-state prompt, the input image, and the continuous driving actions. Together, these form the final multi-modal training samples. 
+
+B. Training & Testing 
+
+The Qwen3-VL-2B-Instruct backbone is fine-tuned using LoRA adapters applied to the attention projection layers (q_proj , k_proj , v_proj , and o_proj ), with a rank of 16 , a scaling factor of 32 , and a dropout rate of 0.05 .SFT is conducted on a dataset of approximately 20,000 CARLA images partitioned into an 80/20 train-validation split. Training is performed over four epochs with a batch size of 16 and a maximum sequence length of 2048 tokens. Optimization is governed by the AdamW optimizer with a learning rate of 2 × 10 −5, utilizing a cosine learning-rate scheduler, gradient clipping, mixed-precision training, and gradient check-pointing to maximize memory efficiency. To jointly optimize the VLA model for both continuous vehicle control and interpretable driving reasoning, a multi-task ob-jective is formulated, consisting of an action prediction loss and a language reasoning loss. The action prediction loss is defined via MSE, which minimizes the discrepancy between the predicted control commands and the expert trajectories. Concurrently, the language reasoning loss trains the model to generate scene-grounded explanations through auto-regressive next-token prediction over the ground-truth captions. RLFT was initialized from the pretrained SFT checkpoint and op-timized using AdamW with a learning rate of 1 × 10 −6.For each training sample, four candidate action trajectories were generated to estimate relative advantages, and KL reg-ularization was applied to constrain policy drift from the supervised initialization in GRPO and GDPO. RL training was conducted for 15 epochs, a duration determined empirically by monitoring reward curves. All experiments are conducted on a machine equipped with NVIDIA RTX 5070 Ti GPU, with 16 GB VRAM, using the same effective batch size and mixed-precision configuration as SFT. The SFT-pretrained and RLFT VLA policies are evaluated with approximately 3,600 image test dataset. The test dataset includes selected driving scenarios to ensure that each of the three active Highway Code rules is triggered across a sufficient number of frames for statistically meaningful per-rule compliance estimation. The test set covers a diverse range of driving scenarios, including pedestrian crossings, rainy weather conditions, and highway driving. For each scenario, the VLA model is tasked with predicting vehicle actions over the next five time steps, thereby generating a future vehicle trajectory. Figure 3 presents an illustrative comparison of the trajectories predicted by the SFT-pretrained and RLFT VLA policies, together with the estimated vehicle speed and the predicted throttle and steering commands. 
+
+C. Evaluation Metrics 
+
+Four complementary evaluation criteria are used to assess the performance of the SFT and RLFT policies. Control accuracy is measured via mean absolute error (MAE) and root mean square error (RMSE) for throttle and steering commands, quantifying how closely the predicted actions match expert demonstrations. Aggregate rule compliance is reported as an overall pass rate and violation rate across all test samples, JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 7
+
+> (a) Exponential Moving Average (EMA) of SFT training loss.
+> (b) Mean reward over 15 epochs for RL fine-tuning.
+
+Fig. 4: Training dynamics of the proposed rule-compliant VLA method. (a) SFT loss trajectory. (b) Reward curves for the subsequent RLFT stage. providing a measure of how consistently the policy satisfies the active UK Highway Code rules. Per-rule compliance is assessed using the PyReason rule score defined in Equation 4, which assigns a graded value in [−1, +1] for each rule aver-aged only over frames in which that rule is active. Scenario-specific compliance is further examined through a condition-level breakdown, isolating policy behaviour under individual driving scenarios that activate each rule’s predicates. Finally, an ablation study is conducted using the same evaluation protocol, with each UK Highway Code rule systematically removed from the composite reward signal, to quantify the individual contribution of each rule to the learned policy’s compliance behaviour. V. RESULTS & DISCUSSION This section evaluates the proposed rule-compliant VLA method from both optimization and deployment perspectives. During RL, training dynamics, including reward convergence and rule-learning behaviour are analyzed. The resulting policy is then evaluated on unseen driving scenarios with respect to driving performance, learned driving behaviour, UK High-way Code compliance at both the aggregate and condition-specific levels, and the contribution of individual symbolic rules through ablation. 
+
+A. Training Performance & Policy Convergence 
+
+Figure 4 summarizes the optimization behaviour of the proposed approach throughout both SFT and RLFT. During the SFT stage, the training loss shown in Figure 4a decreases monotonically before converging to a stable plateau, indicat-ing that the model successfully learns the joint distribution of driving actions and their corresponding chain-of-thought reasoning from expert demonstrations. In the RL stage, Figure 4b shows the reward curves for GRPO, GDPO, and Dr. GRPO. All three methods converge to a stable maximum reward, demonstrating a stable policy optimization. Dr. GRPO consistently achieves higher reward values compared to GRPO and GDPO. This improvement can be attributed to the removal of sequence-length and standard-deviation normalization terms, which reduces variance intro-duced by dynamic scaling during optimization. In addition to that, omitting the KL-divergence regularization term appears to yield a smoother reward trajectory, as it reduces competing constraints on policy updates, allowing for more consistent reward maximization over training. Figure 5 presents the violation rates of each UK Highway Code rule during RLFT, where optimization is initialized from the SFT-pretrained policy. These plots provide insight into how effectively each RLFT approach acquires and retains rule-compliant behaviours during optimization. The three rules show distinct learning patterns. For Rule H - Hierarchy of Road Users , the SFT policy initially violates the constraint nearly 100% of the time. Here, a violation occurs whenever the vehicle fails to decelerate in a yield scenario, regardless of whether a collision happens. Successfully obeying this rule requires the policy to recog-nize contextual cues and transition from nominal driving to precautionary slowing. This high failure rate indicates that such context-dependent behavioural adaptation is not reliably acquired through SFT alone. All three RLFT methods re-duce violations over the first three epochs. However, their subsequent performance diverges sharply. GRPO and GDPO plateau between 10–35% with frequent spikes, indicating that learned compliance is periodically lost during optimization. In contrast, Dr. GRPO reduces violations to almost zero by the third epoch and maintains near-perfect compliance for the remainder of RLFT. Under Rule 125 – Safe Speed , the SFT policy shows a low initial violation rate of just 2–3%. This suggests that basic speed regulation is easily learned from expert demonstrations. Because maintaining speed is a low-level control task rather than a context-dependent yield decision, the policy masters this behaviour before RLFT. The RLFT primarily serves to refine an already competent policy here rather than introduc-ing an entirely new behaviour. All three optimization meth-ods converge rapidly within the first four epochs. However, Dr. GRPO consistently achieves the lowest residual violation rate, remaining below 0.1% throughout most of RLFT. Considering Rule 126 – Safe Following Distance , it remains challenging for all optimization methods. Unlike rules gov-JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 8
+
+Fig. 5: Per-rule violation rates over 15 RLFT epochs. Rates are computed over all symbolic rollout evaluations where the rule was active. erned by static limits or discrete yielding triggers, Rule 126 demands continuous spacing control that depends not only on the ego vehicle’s control, but also on external dynamic factors such as the speed of lead vehicles, traffic light state transitions, and environmental road conditions. Because the required separation margin fluctuates constantly in response to these surrounding changes, the policy must maintain precise, ongoing longitudinal control. This increased environmental coupling is directly reflected in the training dynamics: all three algorithms exhibit persistent performance oscillations (between 8% and 16%) without a clear convergence trend. Although Dr. GRPO achieves slightly lower violation rates in later epochs, its gains are modest compared to the substantial improvements seen for Rules H and 125. These findings suggest that maintaining a safe following distance requires modeling complex, long-horizon multi-agent interactions that remain difficult for the policy to internalize fully through RLFT alone. 
+
+B. Evaluation of Driving Performance 
+
+Table I compares the action prediction accuracy and rule compliance of the SFT model against the three RLFT methods. To assess stability, each method was evaluated across three independent random seeds controlling dataset ordering and ac-tion noise sampling, with results reported as mean ± standard deviation. Notably, all RLFT variants consistently outperform the SFT policy across every metric. The simultaneous increase in rule compliance alongside reductions in throttle and steering errors demonstrates that optimizing the proposed rule-guided reward does not induce a trade-off between task performance and safety constraint adherence. This is expected because the reward formulation not only encourages compliance with symbolic traffic rules but also preserves an imitation-based objective that discourages unnecessary deviations from the demonstrated driving behaviour. Among the RLFT methods, Dr. GRPO achieves the best overall performance, obtaining the lowest action prediction errors and the highest pass rate (97.59%). Although the differences between the RLFT meth-ods are relatively small, the consistent improvements suggest that Dr. GRPO is able to utilize the reward signal more effectively. One possible explanation is that removing the KL-divergence regularization provides greater flexibility for optimizing rule compliance, while the imitation component of the reward continues to keep the policy close to expert driving behaviour. To complement the aggregate pass rates, Table II reports the symbolic compliance score of Equation 4. This metric mea-sures how consistently the policy satisfies each rule when the corresponding traffic scenario is active, where +1 .0 indicates complete compliance and −1.0 denotes complete violation. By restricting the average to frames in which a rule is triggered, the score isolates policy behaviour under the precise driving conditions that each constraint governs. For safe speed rule, the SFT policy already achieves a high baseline score of 
+
+0.92 , confirming that maintaining safe speeds is largely cap-tured during imitation learning. RLFT refines this capability further, with all variants reaching perfect compliance +1 .0.This demonstrates that explicit rule-guided rewards effectively eliminate the remaining edge cases where the SFT policy fails. In comparison, the safe distance rule remains considerably challenging. Although RLFT methods consistently improve compliance from 0.75 to approximately 0.80 , none of the optimization methods achieves perfect compliance. These ob-servations are consistent with the training dynamics presented previously, where Rule 126 exhibited the slowest convergence and the largest fluctuations throughout RLFT. Maintaining a safe following distance requires continuous reasoning over relative vehicle motion and environmental conditions rather than a single discrete behavioural adjustment, making precise compliance inherently more difficult to learn. The largest improvement is seen for the hierarchy of road users rule. The SFT policy consistently violates this rule and results in the minimum possible score of −1.0. This demonstrates that SFT alone fails to reliably initiate the required deceleration behaviour when a must-give-way condition is active. RLFT fundamentally changes this behaviour. Both GRPO and GDPO increase the compliance score to approximately 0.88 , while Dr. GRPO achieves perfect compliance. This indicates that explicit symbolic supervision is highly effective for learning context-dependent behavioural responses that are rarely ac-JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 9
+
+Fig. 6: Distribution of longitudinal and lateral driving decisions learned by each RL optimization method. Longitudinal actions are grouped into braking, coasting, and acceleration. Lateral actions are grouped into left, straight, and right steering. quired reliably through SFT alone. Figure 6 summarizes the distribution of longitudinal (brake, coast, accelerate) and lateral (left, straight, right) control decisions produced by each RLFT method over the evaluation dataset. Among the evaluated methods, Dr. GRPO exhibits the most noticeable shift in longitudinal behaviour. Compared with GRPO and GDPO, Dr. GRPO adopts a more conserva-tive longitudinal driving strategy. It performs braking actions more frequently while reducing acceleration across all steering directions. This difference is most apparent during straight driving, where the proportion of braking actions increases from approximately 30% for GRPO and GDPO to 38.7% for Dr. GRPO. At the same time, straight-line acceleration decreases from around 10% to only 4%. Similar reductions in acceleration are also observed during left and right steering manoeuvres. These behavioural changes are consistent with the improvements in UK Highway Code compliance reported previously. The encoded traffic rules primarily require the vehicle to reduce speed or initiate timely deceleration when approaching hazards, vulnerable road users, or preceding ve-hicles. By favouring braking over unnecessary acceleration, Dr. GRPO is better able to satisfy these safety requirements. 
+
+C. Rule Compliance Analysis 
+
+The previous evaluations provide aggregate measures of rule compliance. They do not reveal how the learned policy behaves under individual traffic scenarios. To address this, a scenario-specific analysis is performed by evaluating each UK Highway Code rule under different driving conditions that activate its predicates. Figure 7 presents the corresponding pass rates for the SFT policy together with the improvements achieved by RLFT optimization methods. Several driving scenarios are already handled reliably by the SFT policy. For Rule 125, compliance reaches 100% under clear weather, wet roads, bending roads, and pedestrian-related conditions, while poor-visibility scenarios achieve 98.4% compliance. These results suggest that conventional speed regulation under common driving conditions is effectively learned through supervised imitation. However, rule compliance drops significantly under icy-road conditions. Although this scenario is governed by the same safe speed rule, the SFT policy achieves only 43.6% compliance. This reveals a fundamental limitation of VLA policies trained without explicit rule guidance. SFT policy ef-fectively learns to match expert demonstrations however those demonstrations themselves do not always comply with traffic rules. In contrast, the rule-guided RLFT methods eliminate these violations and improve the compliance by 56.4% points to achieve perfect performance. Considering the safe following distance rule, across all vehicle-following scenarios, the SFT policy achieves moderate compliance ranging from 75% to 87%, indicating that SFT policy captures nominal headway maintenance but remains inconsistent across different environ-mental conditions. Unlike the Safe Speed rule, no individual scenario reaches complete compliance after RLFT, and only modest improvements of approximately 2–4 percentage points are observed. The most significant behavioural deficiency of the SFT policy is observed for Rule H. Compliance is zero across all pedestrian- and child-related scenarios, demonstrat-ing a systematic inability to initiate the required precautionary deceleration when a must-give-way condition is triggered. RL substantially improves performance in all three scenarios, indi-cating that explicit symbolic supervision successfully teaches the policy to adapt its behaviour in the presence of vulner-able road users. While GRPO and GDPO recover compli-ance to approximately 86–90%, Dr. GRPO achieves complete compliance across every evaluated condition, suggesting that the optimized policy generalizes consistently across different must-give-way situations rather than correcting only individual cases. 
+
+D. Ablation Study 
+
+To assess the individual contribution of each rule to the composite reward signal, an ablation study is conducted with the best-performing RL variant, Dr. GRPO. The policy is systematically retrained with each UK Highway Code rule omitted from the reward function while maintaining all other training parameters constant. Each ablation variant is trained across three independent random seeds as previously done in Table I with performance reported as mean ± standard devi-ation. Table III demonstrate that each symbolic rule primarily JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 10 
+
+TABLE I: VLA action regression error and rule pass/violation rates for SFT, GRPO, GDPO, and Dr. GRPO, reported for about 3,600 held-out samples. To estimate training variance, each method was trained with three independent random seeds controlling dataset ordering and action noise sampling. All runs were initialized from the same supervised fine-tuned checkpoint. Values are reported as mean ± standard deviation.                                                                                                     
+
+> Metric SFT GRPO GDPO Dr. GRPO
+> Throttle MAE (%) 47 .38 ±0.00 21 .19 ±0.05 20 .77 ±0.02 19 .16 ±0.02
+> Steer MAE (%) 18 .70 ±0.02 9.17 ±0.10 7.11 ±0.10 5.36 ±0.20
+> Throttle RMSE (%) 48 .31 ±0.05 23 .71 ±0.08 23 .54 ±0.05 23 .17 ±0.00
+> Steer RMSE (%) 20 .96 ±0.10 13 .74 ±0.10 12 .95 ±0.10 12 .74 ±0.10
+> Euclidean MAE (%) 73 .39 ±0.05 43 .07 ±0.05 42 .30 ±0.05 40 .57 ±0.05
+> Euclidean RMSE (%) 81 .07 ±0.05 45 .82 ±0.20 45 .43 ±0.20 45 .01 ±0.10
+> Pass Rate (%) 92 .93 ±1.00 97 .34 ±0.50 97 .39 ±0.50 97 .59 ±0.50
+> Violate Rate (%) 7.07 ±1.00 2.66 ±0.50 2.61 ±0.50 2.41 ±0.50
+
+contributes to learning the behaviour it explicitly supervises. Removing Rule H increases the corresponding violation rate from 0.0% to 6.1%, while compliance with Rules 125 and 126 remains largely unaffected. Similarly, excluding Rule 126 produces the largest degradation for the safe following distance rule, increasing its violation rate from 5.9% to 8.0%, whereas the remaining rules exhibit only marginal changes. These observations indicate that the proposed reward formulation successfully provides targeted supervision for distinct driving behaviours rather than relying on indirect transfer between rules. The magnitude of the performance degradation varies considerably across rules. Removing Rule 125 results in only a marginal increase in safe speed violations, suggesting that speed regulation is already well captured through the imitation objective and reinforced indirectly by the remaining safety constraints. In contrast, removing either Rule H or Rule 126 produces substantially larger degradations, indicating that these behaviours depend more strongly on explicit symbolic supervision. This observation agrees with the earlier evalu-ation, where yielding and following-distance behaviours are identified as the most challenging aspects of policy learning. Removing individual rules produces only minor changes in throttle and steering prediction errors. This suggests that the symbolic reward primarily influences safety-critical decision making rather than the policy’s ability to reproduce expert control commands. In other words, the improvements in rule compliance cannot simply be attributed to better action re-gression but instead arise from learning behaviours that more consistently satisfy the encoded traffic regulations. TABLE II: Symbolic compliance score (Eq. (4)) for each UK Highway Code rule, averaged over frames in which the rule is active, for SFT, GRPO, GDPO, and Dr. GRPO. Higher is better; +1 .0 indicates satisfaction in every active frame.                 
+
+> Rule SFT GRPO GDPO Dr. GRPO
+> Safe Speed Rule Score 0.9200 1.0000 1.0000 1.0000
+> Safe Distance Rule Score 0.7468 0.7848 0.7975 0.7975
+> Hierarchy of Road Users Rule Score -1.0000 0.8820 0.8820 1.0000
+
+VI. C ONCLUSION 
+
+This paper presented a rule-guided VLA framework for autonomous driving that combines supervised learning from expert demonstrations with symbolic traffic-rule feedback dur-ing RL fine-tuning. Selected UK Highway Code provisions are formalised as executable FOL rules using PyReason to eval-uate the projected consequences of candidate control actions. The resulting reward encourages compliance with the encoded rules while penalising deviations from expert actions. Offline experiments on held-out CARLA data show that the three evaluated RL methods—GRPO, GDPO, and Dr. GRPO— improve both action prediction accuracy and encoded-rule compliance over the SFT baseline. Dr. GRPO achieves the highest overall rule pass rate, increasing it from 92.9% for the SFT baseline to 97.6%, with zero observed violations of the encoded road-user-priority check in the evaluated samples. These findings support explicit symbolic feedback as a com-plement to demonstration-based learning, allowing traffic-rule criteria to directly influence VLA policy refinement. Several limitations remain. The evaluation is conducted entirely with pre-collected multimodal CARLA data, and the degree to which these findings transfer to real-world driving conditions remains an open question. The symbolic rule set is also limited to three checks covering selected UK Highway Code provisions, and broader coverage of traffic regulations, as well as adaptation to other regulatory frameworks, warrants future investigation. Future work will focus on extending the symbolic rule set to cover a wider range of traffic scenarios, exploring closed-loop evaluation in CARLA to assess the impact of rule-guided actions on longer driving trajectories, and investigating the transferability of the framework to real-world driving datasets and regulatory frameworks beyond the UK Highway Code. ACKNOWLEDGMENT The first author thanks research funding support from UK Engineering and Physical Science Research Council. REFERENCES [1] T. Hu, X. Liu, S. Wang, Y. Zhu, A. Liang, L. Kong, G. Zhao, Z. Gong, J. Cen, Z. Huang, X. Hao, L. Li, H. Song, X. Li, J. Ma, S. Shen, J. Zhu, D. Tao, Z. Liu, and J. Liang, “Vision-Language-Action Models for Autonomous Driving: Past, Present, and Future,” arXiv preprint arXiv:2512.16760, 2026. [Online]. Available: https://arxiv.org/abs/2512.16760 [2] L. Chen, P. Wu, K. Chitta, B. Jaeger, A. Geiger, and H. Li, “End-to-End Autonomous Driving: Challenges and Frontiers,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 46, no. 12, pp. 10164– 10183, Dec. 2024, doi: 10.1109/TPAMI.2024.3435937. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 11 
+
+TABLE III: Rule ablation study for Dr. GRPO. Each row corresponds to a variant trained with a different subset of rules in the reward signal. Violation rates and control accuracy (MAE) are reported on the held-out test set. Values are reported as mean ± standard deviation over three random seeds. ↓ denotes lower is better. 
+
+Control Accuracy Rule Violation Rate ↓
+
+Rules in Reward Throttle MAE (%) ↓ Steer MAE (%) ↓ Rule H Rule 125 Rule 126 
+
+Rule-H + Rule-125 + Rule-126 19 .29 ± 0.02 6.50 ± 0.02 0.00 ± 0.10 % 0.10 ± 0.10 % 5.90 ± 0.30% 
+
+Rule-125 + Rule-126 21 .04 ± 0.02 5.67 ± 0.01 6.10 ± 0.30% 0.20 ± 0.10% 5.50 ± 0.20 %
+
+Rule-H + Rule-126 21 .54 ± 0.02 6.75 ± 0.02 5.40 ± 0.20% 0.20 ± 0.10% 5.70 ± 0.20% 
+
+Rule-H + Rule-125 20 .61 ± 0.02 6.98 ± 0.02 4.40 ± 0.20% 0.10 ± 0.10 % 8.00 ± 0.40% 
+
+Fig. 7: Per-condition rule compliance for the SFT checkpoint and the change ( ∆) introduced by each RL variant (GRPO, GDPO, Dr. GRPO), grouped by UK Highway Code rule. The leftmost column reports the absolute SFT pass rate (%); the remaining columns report the pass-rate change relative to SFT in percentage points. 
+
+[3] S. Jiang, Y. Zhang, Y. Wang, Z. Li, C. Sima, J. F. P. Kooij, G. P. R. Pa-pandreou, H. Zhao, and L. Chen, “A Survey on Vision-Language-Action Models for Autonomous Driving,” in 2025 IEEE/CVF International Conference on Computer Vision Workshops (ICCVW) , 2025, pp. 4583– 4595, doi: 10.1109/ICCVW69036.2025.00476. [4] M. Yildirim, B. Dagda, V. Asodia and S. Fallah, “Highwayllm: Decision-making and navigation in highway driving with rl-informed language model,” Robotics and Autonomous Systems , 2025, 193, p.105114. [5] S. Shao, Z. Zou, L. Chen, Y. Li, J. Yan, B. Jaeger, K. Chitta, P. Wu, Y. Zhang, and H. Li, “DriveLM: Driving with Graph Vi-sual Question Answering,” in Proc. IEEE/CVF Conf. Computer Vi-sion and Pattern Recognition (CVPR) , 2024. [Online]. Available: https://arxiv.org/abs/2312.14150 [6] H. Wang, C. Sima, J. Dai, H. Hu, L. Chen, S. Wu, H. Zhang, and J. Yan, “LMDrive: Closed-Loop End-to-End Driving with Large Language Models,” in Proc. Conf. Robot Learning (CoRL) , 2023. [Online]. Avail-able: https://arxiv.org/abs/2312.07442 [7] Z. Xu, Y. Zhang, E. Xie, Z. Zhao, Y. Guo, K.-Y. K. Wong, Z. Li, and H. Zhao, “DriveGPT4: Interpretable End-to-End Autonomous Driving Via Large Language Model,” IEEE Robotics and Automation Letters , vol. 9, no. 10, pp. 8186–8193, Oct. 2024, doi: 10.1109/LRA.2024.3440097. [8] X. Guo, R. Zhang, Y. Duan, Y. He, C. Zhang, S. Liu, and L. Chen, “DriveMLLM: A Benchmark for Spatial Understanding with Multi-modal Large Language Models in Autonomous Driving,” arXiv preprint arXiv:2411.13112, 2024. [9] B. Jiang, S. Chen, B. Liao, X. Zhang, W. Yin, Q. Zhang, C. Huang, W. Liu, and X. Wang, “Senna: Bridging Large Vision-Language Models and End-to-End Autonomous Driving,” arXiv preprint arXiv:2410.22313, 2024. [10] S. Xie, L. Kong, Y. Dong, C. Sima, W. Zhang, Q. A. Chen, Z. Liu, and L. Pan, “Are VLMs Ready for Autonomous Driving? An Empirical Study from the Reliability, Data, and Metric Perspectives,” in Proceed-ings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pp. 6585–6597, 2025. [11] Z. Zhou, T. Cai, S. Z. Zhao, Y. Zhang, Z. Huang, B. Zhou, and J. Ma, “AutoVLA: A Vision-Language-Action Model for End-to-End Autonomous Driving with Adaptive Reasoning and Reinforcement Fine-Tuning,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 39, 2025. [12] X. Zhou, X. Han, F. Yang, Y. Ma, and A. C. Knoll, “OpenDriveVLA: Towards End-to-End Autonomous Driving with Large Vision Lan-guage Action Model,” Proceedings of the AAAI Conference on Ar-tificial Intelligence , vol. 40, no. 16, pp. 13782–13790, 2026, doi: 10.1609/aaai.v40i16.38386. [13] Y. Ma, Y. Cao, W. Ding, S. Zhang, Y. Wang, B. Ivanovic, M. Jiang, M. Pavone, and C. Xiao, “dVLM-AD: Enhance Diffu-sion Vision-Language-Model for Driving via Controllable Reason-ing,” arXiv preprint arXiv:2512.04459, 2025. [Online]. Available: https://arxiv.org/abs/2512.04459 [14] K. Renz, L. Chen, E. Arani, and O. Sinavski, “SimLingo: Vision-Only Closed-Loop Autonomous Driving with Language-Action Alignment,” in Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 11993–12003, doi: 10.1109/CVPR52734.2025.01120. [15] F. Du, F. Yan, J. Wu, X. Xu, W. Zhang, W. Wang, Y. Guo, B. Qian, Z. He, F. Wang, and H. Yang, “CF-VLA: Efficient Coarse-to-Fine Action Generation for Vision-Language-Action Poli-cies,” arXiv preprint arXiv:2604.24622, 2026. [Online]. Available: https://arxiv.org/abs/2604.24622 [16] J. Han, M. Tian, J. Zhu, F. He, H. Zhang, S. Guo, D. Zhu, H. Tang, P. Xu, Y. Guo, M. Niu, H. Zhu, Q. Dong, X. Yan, S. Dong, L. Hou, Q. Huang, X. Jia, and H. Xu, “Percept-WAM: Perception-Enhanced World-Awareness-Action Model for Robust End-to-End Autonomous Driving,” in Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR) , 2026. [17] Z. Yuan, C. Qian, J. Tang, R. Chen, Z. Song, L. Sun, X. Chu, JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 12 
+
+Y. Cai, D. Zhang, and S. Li, “AutoDrive-R 2: Incentivizing Reason-ing and Self-Reflection Capacity for VLA Model in Autonomous Driving,” arXiv preprint arXiv:2509.01944, 2026. [Online]. Available: https://arxiv.org/abs/2509.01944 [18] I. Sharifi, M. Yildirim, and S. Fallah, “Toward Safe Autonomous Highway Driving Policies using a Neuro-Symbolic Deep Reinforcement Learning Approach,” Transportation Research Record: Journal of the Transportation Research Board , vol. 2680, no. 1, pp. 416–431, Sep. 2025. [19] I. Sharifi, M. Yildirim, and S. Fallah, “Symbolic Imitation Learning: From Black-Box to Explainable Driving Policies,” Applied Sciences ,vol. 15, no. 23, p. 12464, Nov. 2025. [20] V. Asodia, I. Sharifi, and S. Fallah, “Reinforcement Learning Enhancement Using Vector Semantic Representation and Sym-bolic Reasoning for Human-Centered Autonomous Emergency Brak-ing,” arXiv preprint arXiv:2602.05079, 2026. [Online]. Available: https://arxiv.org/abs/2602.05079 [21] J. Zhang, X. Yang, T. Wang, Y. Yao, A. Petiushko, and B. Li, “SafeAuto: Knowledge-Enhanced Safe Autonomous Driving with Multimodal Foun-dation Models,” in Proceedings of the 42nd International Conference on Machine Learning (ICML) , PMLR, 2025, pp. 76497–76517. [22] D. Aditya, K. Mukherji, S. Balasubramanian, A. Chaudhary, and P. Shakarian, “PyReason: Software for Open World Temporal Logic,” 
+
+CEUR Workshop Proceedings , vol. 3433, 2023. [23] UK Department for Transport, The Highway Code , GOV.UK, 2015, up-dated Oct. 2025. [Online]. Available: https://www.gov.uk/guidance/the-highway-code [24] D. Guo, D. Yang, H. Zhang, L. Song, R. Zhang, R. Xu, Q. Zhu, S. Ma, P. Wang, Z. Shao, J. Yuan, Y. K. Li, W. Gao, S. Wu, Y. Wu, and D. Guo, “DeepSeek-R1 incentivizes reasoning in LLMs through reinforcement learning,” Nature , vol. 645, no. 8081, pp. 633–638, Sept. 2025, doi: 10.1038/s41586-025-09422-z. [25] Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi, H. Zhang, M. Zhang, Y. K. Li, Y. Wu, and D. Guo, “DeepSeekMath: Push-ing the Limits of Mathematical Reasoning in Open Language Mod-els,” arXiv preprint arXiv:2402.03300, 2024. [Online]. Available: https://arxiv.org/abs/2402.03300 [26] S.-Y. Liu, X. Dong, X. Lu, S. Diao, P. Belcak, M. Liu, M.-H. Chen, H. Yin, Y.-C. F. Wang, K.-T. Cheng, Y. Choi, J. Kautz, and P. Molchanov, “GDPO: Group reward-Decoupled Normalization Policy Optimization for Multi-reward RL Optimization,” in Proceedings of the 43rd Interna-tional Conference on Machine Learning (ICML) , 2026. [27] Z. Liu, C. Chen, W. Li, P. Qi, T. Pang, C. Du, W. S. Lee, and M. Lin, “Understanding r1-zero-like training: A critical perspective,” in Conference on Language Modeling (COLM) , 2025. [28] S. J. Russell and P. Norvig, Artificial Intelligence: A Modern Approach ,4th global ed. London, U.K.: Pearson, 2022. [29] Y. Luo, Q. Chen, F. Li, S. Xu, J. Liu, Z. Song, Z.-x. Yang, and F. Wen, “Unleashing VLA Potentials in Autonomous Driving via Explicit Learn-ing from Failures,” arXiv preprint arXiv:2603.01063, 2026. [Online]. Available: https://arxiv.org/abs/2603.01063 [30] A. Dosovitskiy, G. Ros, F. Codevilla, A. Lopez, and V. Koltun, “CARLA: An Open Urban Driving Simulator,” in Proceedings of the 1st Annual Conference on Robot Learning (CoRL) , 2017, pp. 1–16. [31] K. J. ˚ Astr¨ om and R. M. Murray, Feedback Systems: An Introduction for Scientists and Engineers , 2nd ed. Princeton, NJ: Princeton University Press, 2021. [32] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, Q. Vuong, T. Kollar, B. Burchfiel, R. Tedrake, D. Sadigh, S. Levine, P. Liang, and C. Finn, “OpenVLA: An Open-Source Vision-Language-Action Model,” in 
+
+Proceedings of the 8th Conference on Robot Learning (CoRL) , 2024. [33] R. Rajamani, Vehicle Dynamics and Control , 2nd ed., Mechanical Engi-neering Series. New York, NY, USA: Springer, 2012, doi: 10.1007/978-1-4614-1433-9. 
+
+VII. B IOGRAPHY SECTION 
+
+Barkin Dagda received the B.Eng. degree in Me-chanical Engineering and the M.Sc. degree in Elec-tronic Engineering from the University of Surrey, Guildford, U.K., in 2021 and 2022, respectively. He is currently pursuing the Ph.D. degree in Automotive Engineering at the University of Surrey, within the Connected and Autonomous Vehicles (CAV) Lab. His PhD focuses on vision-based foundation mod-els for autonomous vehicles. With experience in academia and industry, he has worked on AI-driven robotics, navigation, and automation 
+
+Vinal Asodia is a Ph.D. Researcher in the Connected and Autonomous Vehicles (CAV) Lab at the Uni-versity of Surrey, Guildford, U.K. He received the B.Sc. degree in Computer Science from the Univer-sity of Surrey. His research focuses on developing end-to-end deep reinforcement learning methods for autonomous driving systems that are explainable and aligned with human values. His research interests include enhancing the transparency, safety, and so-cial acceptability of AI-driven autonomous systems, contributing to the reliability of these technologies in real-world applications. He has published his work in the IEEE International Conference on Robotics and Automation (ICRA). 
+
+Iman Sharifi is a Ph.D. Candidate in Mechanical and Aerospace Engineering at George Washington University. He received his M.Sc. in Mechanical Engineering from Sharif University of Technology in 2022. His research focuses on neuro-symbolic artifi-cial intelligence, multi-agent reinforcement learning, and large language and vision models in autonomous driving and aviation applications. He is currently a visiting researcher at Stanford Intelligent Systems Laboratory (SISL), Department of Aeronautics and Astronautics, Stanford University. He has conducted research funded by NASA’s University Leadership Initiative (ULI). 
+
+Peng Wei received his PhD degree in aerospace engineering from Purdue University in 2013. He is currently a Professor at the Department of Mechani-cal and Aerospace Engineering, George Washington University, with courtesy appointments at the Elec-trical and Computer Engineering Department and the Computer Science Department. His current research interests include safety, efficiency and scalability of decision-making systems in complex, uncertain, and dynamic environments. 
+
+Saber Fallah is a Professor of Safe AI and Au-tonomy at the University of Surrey, UK, where he directs the Connected and Autonomous Vehicles Lab (CAV-Lab). His research centres on safe and trust-worthy artificial intelligence for autonomous sys-tems, particularly autonomous vehicles and robotics. His work combines reinforcement learning, neuro-symbolic AI, vision-language-action models, and safety assurance to develop autonomous systems capable of reliable reasoning and decision-making in complex environments. He has led research funded by EPSRC, Innovate UK, the European Commission, and industry, and works extensively across academia, industry, and policy on the development and deployment of trustworthy autonomous technologies.

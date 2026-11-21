@@ -1,10 +1,58 @@
 {
   "date": "20261112-20261121",
   "date_label": "2026-11-12 ~ 2026-11-21",
-  "generated_at": "2026-11-21 14:53:14 UTC",
+  "generated_at": "2026-11-21 14:57:16 UTC",
   "recommend_exists": true,
-  "run_count": 2,
+  "run_count": 3,
   "papers": [
+    {
+      "paper_id": "2611.20648v1",
+      "route": "20261112-20261121/2611.20648v1-competent-autonomous-driving-through-fine-tuning-vision-language-action-models-with-symbolic-traffic-rules",
+      "title": "Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "以符号交通规则约束视觉-语言-动作驾驶策略的框架",
+      "first_seen_at": "2026-11-21 14:57:16 UTC",
+      "updated_at": "2026-11-21 14:57:16 UTC"
+    },
+    {
+      "paper_id": "2611.22880v1",
+      "route": "20261112-20261121/2611.22880v1-learning-agent-centric-vision-language-action-world-models-for-autonomous-driving",
+      "title": "Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向自动驾驶推理与规划的智能体中心视觉语言动作世界模型",
+      "first_seen_at": "2026-11-21 14:57:16 UTC",
+      "updated_at": "2026-11-21 14:57:16 UTC"
+    },
+    {
+      "paper_id": "2611.24887v1",
+      "route": "20261112-20261121/2611.24887v1-ground-iterate-trace-decomposing-ai-research-ideation",
+      "title": "Ground, Iterate, Trace: Decomposing AI Research Ideation",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "基于语义知识图谱与图检索工具的智能体框架",
+      "first_seen_at": "2026-11-21 04:43:11 UTC",
+      "updated_at": "2026-11-21 14:57:16 UTC"
+    },
     {
       "paper_id": "2611.17788v1",
       "route": "20261112-20261121/2611.17788v1-rag-fgo-dynamic-optimization-of-query-rewriting-agents-for-generative-rag",
@@ -35,22 +83,6 @@
       "score": 6.0,
       "evidence": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
       "first_seen_at": "2026-11-21 14:53:14 UTC",
-      "updated_at": "2026-11-21 14:53:14 UTC"
-    },
-    {
-      "paper_id": "2611.24887v1",
-      "route": "20261112-20261121/2611.24887v1-ground-iterate-trace-decomposing-ai-research-ideation",
-      "title": "Ground, Iterate, Trace: Decomposing AI Research Ideation",
-      "section": "quick",
-      "tags": [
-        {
-          "kind": "query",
-          "label": "kg-rag-agent"
-        }
-      ],
-      "score": 6.0,
-      "evidence": "基于语义知识图谱与图检索工具的智能体框架",
-      "first_seen_at": "2026-11-21 04:43:11 UTC",
       "updated_at": "2026-11-21 14:53:14 UTC"
     },
     {

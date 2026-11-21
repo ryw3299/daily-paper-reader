@@ -51,14 +51,14 @@
       <span class="dpr-home-dashboard-kicker">2026-11-12 ~ 2026-11-21</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 8 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>3 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 14:53:14 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 14:57:16 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>本期速读 6 篇、精读 0 篇，重点集中在 RAG 优化与 AI 研究构思分解两条线上。</p>
-<p>最值得看的是两篇同为 6.0 分的 RAG 工作：《RAG-FGO》讨论查询改写智能体的动态优化，《RAG in a Trenchcoat》则回答了“最小记忆何时够用、何时不够”这一实用边界问题。</p>
-<p>普通读者可先读这两篇的结论部分，判断自己的场景是否真需要复杂记忆或改写模块，再决定是否深入《Ground, Iterate, Trace》的研究构思拆解思路。</p>
+<p>本期速读 8 篇论文，全部为速读、无精读，重点集中在自动驾驶的视觉-语言-动作（VLA）模型方向。最值得看的是《Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules》（7.0/10），它用符号化交通规则微调 VLA 模型；其次是两篇 6.0 分工作，分别讲以智能体为中心的 VLA 世界模型，以及 AI 研究构思的拆解方法。建议普通读者先读 7.0 分那篇，理解“规则注入”的思路，再按兴趣扫读另外两篇的摘要与实验设置。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG">RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG</span></li><li><span class="dpr-home-dashboard-paper-title" title="RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn&#x27;t">RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn&#x27;t</span></li><li><span class="dpr-home-dashboard-paper-title" title="Ground, Iterate, Trace: Decomposing AI Research Ideation">Ground, Iterate, Trace: Decomposing AI Research Ideation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules">Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving">Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="Ground, Iterate, Trace: Decomposing AI Research Ideation">Ground, Iterate, Trace: Decomposing AI Research Ideation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>8</strong></span></div>
 </section>
 </div>
 

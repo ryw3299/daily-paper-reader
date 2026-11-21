@@ -1,6 +1,6 @@
 {
   "mode": "standard",
-  "generated_at": "2026-11-21T14:52:49.993083+00:00",
+  "generated_at": "2026-11-21T14:56:37.415674+00:00",
   "stats": {
     "mode": "standard",
     "tag_count": 1,
@@ -14,88 +14,80 @@
   "deep_dive": [],
   "quick_skim": [
     {
-      "id": "2611.17788v1",
+      "id": "2611.20648v1",
       "source": "arxiv",
-      "title": "RAG-FGO: Dynamic Optimization of Query-Rewriting Agents for Generative RAG",
-      "abstract": "In retrieval-augmented generation (RAG), query rewriting serves as a core interface that aligns user intent with external knowledge bases, and its effectiveness directly determines overall system performance. However, generative retrieval faces three critical challenges in real-world deployment: noisy retrieval feedback, the difficulty of jointly optimizing discrete prompt templates and continuous decoding-control parameters, and the limited generalization of static rewriting strategies under semantically complex scenarios. To address these issues, we propose RAG-FGO, a dynamic optimization framework for generative retrieval strategies. RAG-FGO formulates query rewriting as a non-differentiable black-box optimization problem in a mixed discrete-continuous space, and represents prompt templates and decoding parameters as adaptively optimizable query-rewriting agents. The framework performs global search to enable semantic jumps and structural reorganization that escape local optima, while applying local perturbations for fine-grained alignment and precise refinement. In addition, RAG-FGO introduces an elite-preserving memory pool that accumulates high-quality strategies across iterations, thereby mitigating the impact of stochasticity and noisy feedback on optimization stability. Experimental results on a diverse suite of benchmarks demonstrate the effectiveness and robustness of the proposed method, supporting its applicability to complex semantic retrieval tasks.",
+      "title": "Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules",
+      "abstract": "Vision-language-action (VLA) models offer a unified approach to perception, reasoning, and control for autonomous driving, but accurate action prediction alone does not establish compliance with traffic regulations. This paper presents a rule-guided VLA framework that incorporates symbolic traffic-rule feedback into policy optimisation. The framework combines supervised fine-tuning on expert demonstrations with reinforcement learning (RL) refinement using a reward that encourages encoded-rule compliance while penalising deviations from expert actions. Selected provisions of the United Kingdom Highway Code are formalised as executable first-order logic rules using PyReason, covering speed adaptation, following distance, and road-user priority. A frozen vision-language model extracts scene predicates, which are combined with vehicle-state information to assess the projected consequences of candidate control actions. Offline evaluation on held-out data collected in the CARLA simulator compares three group-based RL methods. The results show improvements in both action prediction accuracy and encoded-rule compliance over the supervised baseline. The best-performing variant increases the overall rule pass rate from 92.9% to 97.6%, with zero observed violations of the encoded road-user-priority check in the evaluated samples. These findings support symbolic rule feedback as a means of improving VLA policy alignment with explicit traffic-rule criteria.",
       "authors": [
-        "Qigan Sun",
-        "Xudong Wang",
-        "Chaoning Zhang",
-        "Chenghao Li",
-        "Jiaquan Zhang",
-        "Jiehui Xie",
-        "Sungyoung Lee",
-        "Jie Zou",
-        "Ning Xie",
-        "Peng Wang",
-        "Yang Yang",
-        "Heng Tao Shen"
+        "Barkin Dagda",
+        "Vinal Asodia",
+        "Iman Sharifi",
+        "Peng Wei",
+        "Saber Fallah"
       ],
-      "primary_category": "cs.CL",
+      "primary_category": "cs.CV",
       "categories": [
-        "cs.CL"
+        "cs.CV"
       ],
-      "published": "2026-11-13T06:01:09+00:00",
-      "link": "https://arxiv.org/pdf/2611.17788v1",
+      "published": "2026-11-16T07:06:44+00:00",
+      "link": "https://arxiv.org/pdf/2611.20648v1",
+      "tags": [
+        "keyword:kg-rag-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "rule-guided VLA framework enforcing symbolic traffic-rule compliance in driving policy",
+      "llm_evidence_cn": "以符号交通规则约束视觉-语言-动作驾驶策略的框架",
+      "llm_evidence": "以符号交通规则约束视觉-语言-动作驾驶策略的框架",
+      "canonical_evidence": "以符号交通规则约束视觉-语言-动作驾驶策略的框架",
+      "llm_tldr_en": "A rule-guided vision-language-action framework formalises Highway Code provisions as first-order logic rules and refines driving policy with supervised fine-tuning plus rule-reward reinforcement learning.",
+      "llm_tldr_cn": "视觉-语言-动作模型虽能统一感知、推理与控制，但仅靠动作预测难以保证遵守交通法规。本文提出规则引导的VLA框架，用PyReason将英国高速公路法规条款形式化为一阶逻辑规则，并结合专家示范监督微调与以规则合规为奖励的强化学习精修。实验表明该框架在保持与专家动作一致性的同时提升了规则遵从性，为知识/规则增强的自动驾驶决策提供了可行路径。",
+      "llm_tldr": "视觉-语言-动作模型虽能统一感知、推理与控制，但仅靠动作预测难以保证遵守交通法规。本文提出规则引导的VLA框架，用PyReason将英国高速公路法规条款形式化为一阶逻辑规则，并结合专家示范监督微调与以规则合规为奖励的强化学习精修。实验表明该框架在保持与专家动作一致性的同时提升了规则遵从性，为知识/规则增强的自动驾驶决策提供了可行路径。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.22880v1",
+      "source": "arxiv",
+      "title": "Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving",
+      "abstract": "Recent progress in integrating vision-language-action (VLA) models with world modeling has significantly advanced end-to-end autonomous driving by allowing systems to reason about imagined futures instead of merely reacting to current observations. However, most world VLA models generate future frames at the pixel level with plenty of dense visual tokens. Although such generated futures can be visually plausible, they preserve many driving-irrelevant appearance details, i.e., only a small portion of the tokens directly encode critical planning-relevant factors, such as agent geometry, motion dynamics, and interactions. This introduces a significant performance bottleneck. An important question thus arises: what world state should a world VLA model reason over to support planning beyond pixel-level prediction? We argue that planning-oriented world modeling should focus on a compact and structured agent-centric latent state that captures the interactions between objects in the driving scene over time. As such, we introduce AgentWorld, an agent-centric VLA world model that uses discrete agent tokens jointly for reasoning and trajectory planning. Each token is dynamically grounded to a surrounding agent associated with its object's state, such as semantic identity, 3D geometry, motion, and interaction context. AgentWorld learns these tokens through three key processes: explicit geometric grounding, reasoning-oriented supervised fine-tuning, and agent-oriented reinforcement learning. Extensive open-loop and closed-loop experiments under diverse driving scenarios show that AgentWorld enhances planning capabilities, fully exploits visual evidence and agent dynamics, and yields interpretable agent-centric world states.",
+      "authors": [
+        "Guoqing Wang",
+        "Pin Tang",
+        "Xiangxuan Ren",
+        "Chao Ma"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-11-17T14:53:49+00:00",
+      "link": "https://arxiv.org/pdf/2611.22880v1",
       "tags": [
         "keyword:kg-rag-agent",
         "query:kg-rag-agent"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "dynamic optimization of query-rewriting agents for retrieval-augmented generation",
-      "llm_evidence_cn": "面向检索增强生成的查询改写智能体动态优化",
-      "llm_evidence": "面向检索增强生成的查询改写智能体动态优化",
-      "canonical_evidence": "面向检索增强生成的查询改写智能体动态优化",
-      "llm_tldr_en": "RAG-FGO treats query rewriting as black-box optimization over mixed discrete-continuous prompt and decoding parameters, making retrieval agents robust to noisy feedback and complex queries.",
-      "llm_tldr_cn": "针对生成式检索中检索反馈噪声大、离散提示模板与连续解码参数难以联合优化、静态改写策略在复杂语义场景下泛化不足的问题，本文提出RAG-FGO。该方法把查询改写建模为混合离散-连续空间中的非可微黑盒优化问题，动态优化查询改写智能体的提示模板与解码控制参数。实验表明其能提升检索增强生成在复杂场景下的效果，为知识增强智能体的检索接口提供了可迁移的鲁棒优化方法。",
-      "llm_tldr": "针对生成式检索中检索反馈噪声大、离散提示模板与连续解码参数难以联合优化、静态改写策略在复杂语义场景下泛化不足的问题，本文提出RAG-FGO。该方法把查询改写建模为混合离散-连续空间中的非可微黑盒优化问题，动态优化查询改写智能体的提示模板与解码控制参数。实验表明其能提升检索增强生成在复杂场景下的效果，为知识增强智能体的检索接口提供了可迁移的鲁棒优化方法。",
+      "llm_evidence_en": "agent-centric vision-language-action world models for autonomous driving reasoning and planning",
+      "llm_evidence_cn": "面向自动驾驶推理与规划的智能体中心视觉语言动作世界模型",
+      "llm_evidence": "面向自动驾驶推理与规划的智能体中心视觉语言动作世界模型",
+      "canonical_evidence": "面向自动驾驶推理与规划的智能体中心视觉语言动作世界模型",
+      "llm_tldr_en": "Proposes agent-centric vision-language-action world models that model planning-relevant world states instead of pixel-level futures, improving end-to-end autonomous driving reasoning.",
+      "llm_tldr_cn": "现有世界视觉语言动作模型在像素级生成未来帧，保留大量与驾驶无关的外观细节，仅有少量token编码几何、运动与交互等规划关键因素，构成性能瓶颈。论文提出以智能体为中心的世界状态建模，聚焦对规划真正重要的因素而非稠密视觉token。实验表明该表示能更高效地支撑端到端自动驾驶的推理与规划。其贡献在于重新定义了世界模型应建模的状态，为自动驾驶智能体决策提供新思路。",
+      "llm_tldr": "现有世界视觉语言动作模型在像素级生成未来帧，保留大量与驾驶无关的外观细节，仅有少量token编码几何、运动与交互等规划关键因素，构成性能瓶颈。论文提出以智能体为中心的世界状态建模，聚焦对规划真正重要的因素而非稠密视觉token。实验表明该表示能更高效地支撑端到端自动驾驶的推理与规划。其贡献在于重新定义了世界模型应建模的状态，为自动驾驶智能体决策提供新思路。",
       "llm_tags": [
         "query:kg-rag-agent"
       ],
       "matched_query_tag": "query:kg-rag-agent",
-      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
-      "matched_requirement_id": "req-3",
-      "selection_source": "fresh_fetch",
-      "quick_tier": "6"
-    },
-    {
-      "id": "2611.22179v1",
-      "source": "arxiv",
-      "title": "RAG in a Trenchcoat: When Minimal Memory Is Enough for Agentic Systems, and When It Isn't",
-      "abstract": "Agentic memory research has accumulated extraction, supersession, reflection, and graph synthesis on top of retrieval-augmented generation. However, we found that almost none of those primitives earn their cost in our tested memory benchmarks: we show this with BRIDGE, a deliberately minimal RAG memory with chained observation notes, hybrid BM25 with cosine retrieval, and chronological rendering, which reaches parity within bootstrap CI with the prior SOTA on LongMemEval-S and BEAM, and beats the best memory baseline on EverMemBench by 5.7-6.3 points at matched reader. It runs at ~5-7K reader-prompt tokens per query, using a single LLM call for each ingestion or query. We argue that this parity is itself the result: standard benchmarks score what memory retrieves, not what memory enables when the agent acts. To test the latter, we introduce five adversarial probes (Rule Application +-, Pattern Induction Style / Procedural, Dynamic Multiturn) judged at generation time by a cross vendor verification chain, where each query can only be solved by applying a remembered rule or pattern it never mentions. Across 5 probes x 20 scenarios, no architecture wins universally: atomic fact extractors (LangMem) win rule application, while BRIDGE's block-summary memory wins pattern induction. This result holds across four domains, three graders, and three reader families. Each design fails where the other wins, for reasons a recall benchmark cannot see: atomic-fact extractors discard the form a demonstrated pattern takes, while block-summary memory retrieves the rule but the reader does not act on it, a gap that presenting the rule more prominently largely closes. What separates memory designs is not what they retrieve but what they enable an agent to do, and that is what agentic memory should be evaluated on.",
-      "authors": [
-        "Jingyu Liu",
-        "Zongze Li",
-        "Zach Xu",
-        "Zhanhui Zhou",
-        "Tahseen Rabbani",
-        "Dawn Song",
-        "Ce Zhang"
-      ],
-      "primary_category": "cs.AI",
-      "categories": [
-        "cs.AI"
-      ],
-      "published": "2026-11-17T04:16:34+00:00",
-      "link": "https://arxiv.org/pdf/2611.22179v1",
-      "tags": [
-        "query:kg-rag-agent"
-      ],
-      "llm_score": 6.0,
-      "llm_evidence_en": "minimal RAG memory versus graph synthesis primitives for agentic systems",
-      "llm_evidence_cn": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
-      "llm_evidence": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
-      "canonical_evidence": "对比图合成等记忆原语与极简RAG记忆的智能体方案",
-      "llm_tldr_en": "BRIDGE shows a minimal RAG memory with chained notes and hybrid BM25-cosine retrieval matches prior SOTA agentic memory and beats the best baseline on EverMemBench by 5.7-6.3 points.",
-      "llm_tldr_cn": "针对智能体记忆研究不断叠加抽取、更新、反思与图合成等复杂组件的问题，本文提出极简记忆方案BRIDGE，仅使用链式观察笔记、BM25与余弦混合检索以及按时间顺序渲染。在LongMemEval-S与BEAM上其表现与先前最优方法在置信区间内持平，并在EverMemBench上领先最佳记忆基线5.7至6.3分。结果表明许多记忆原语并未带来实际收益，提示知识增强智能体应审慎评估检索与图结构的真实增益。",
-      "llm_tldr": "针对智能体记忆研究不断叠加抽取、更新、反思与图合成等复杂组件的问题，本文提出极简记忆方案BRIDGE，仅使用链式观察笔记、BM25与余弦混合检索以及按时间顺序渲染。在LongMemEval-S与BEAM上其表现与先前最优方法在置信区间内持平，并在EverMemBench上领先最佳记忆基线5.7至6.3分。结果表明许多记忆原语并未带来实际收益，提示知识增强智能体应审慎评估检索与图结构的真实增益。",
-      "llm_tags": [
-        "query:kg-rag-agent"
-      ],
-      "matched_query_tag": "query:kg-rag-agent",
-      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
-      "matched_requirement_id": "req-3",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
       "selection_source": "fresh_fetch",
       "quick_tier": "6"
     },
@@ -123,19 +115,19 @@
         "query:kg-rag-agent"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "semantic knowledge graph with graph-retrieval tools for an agentic reasoning pipeline",
-      "llm_evidence_cn": "为智能体配备图检索工具的语义知识图谱",
-      "llm_evidence": "为智能体配备图检索工具的语义知识图谱",
-      "canonical_evidence": "为智能体配备图检索工具的语义知识图谱",
-      "llm_tldr_en": "CAR is an agentic ideation framework that builds a semantic knowledge graph from retrieved literature and equips an agent with graph-retrieval tools and four conceptual operators, recording traced transformations.",
-      "llm_tldr_cn": "大模型生成研究想法时缺乏对文献依据的追溯，难以说明新颖性从何而来。作者提出创意AI研究者框架CAR，从检索文献构建语义知识图谱，并为智能体配备图检索工具与类比、探索等四类概念算子。每次算子调用都经过结构化接受条件检验并记录，形成可追溯的推理轨迹。该工作展示了知识图谱与图检索增强对智能体推理过程的可控化价值。",
-      "llm_tldr": "大模型生成研究想法时缺乏对文献依据的追溯，难以说明新颖性从何而来。作者提出创意AI研究者框架CAR，从检索文献构建语义知识图谱，并为智能体配备图检索工具与类比、探索等四类概念算子。每次算子调用都经过结构化接受条件检验并记录，形成可追溯的推理轨迹。该工作展示了知识图谱与图检索增强对智能体推理过程的可控化价值。",
+      "llm_evidence_en": "semantic knowledge graph with graph-retrieval tools for an agentic framework",
+      "llm_evidence_cn": "构建语义知识图谱并为智能体配备图检索工具",
+      "llm_evidence": "构建语义知识图谱并为智能体配备图检索工具",
+      "canonical_evidence": "构建语义知识图谱并为智能体配备图检索工具",
+      "llm_tldr_en": "Strong method match: CAR builds a semantic knowledge graph from literature and equips an agent with graph-retrieval tools, a transferable KG/GraphRAG agent design though applied to research ideation rather than driving.",
+      "llm_tldr_cn": "该论文针对大语言模型生成研究想法时缺乏依据与可追溯性的问题，提出智能体框架CAR，将文献接地、迭代发展与显式概念算子相结合。CAR从检索文献构建语义知识图谱，并为构思智能体配备图检索工具与四种算子，每次调用都经结构化接受条件校验并记录变换轨迹。实验在两种语言模型上进行评估，展示了知识图谱增强的智能体推理在可追溯性与有效性上的价值，其图检索增强设计对车载知识增强智能体具有可迁移的方法意义。",
+      "llm_tldr": "该论文针对大语言模型生成研究想法时缺乏依据与可追溯性的问题，提出智能体框架CAR，将文献接地、迭代发展与显式概念算子相结合。CAR从检索文献构建语义知识图谱，并为构思智能体配备图检索工具与四种算子，每次调用都经结构化接受条件校验并记录变换轨迹。实验在两种语言模型上进行评估，展示了知识图谱增强的智能体推理在可追溯性与有效性上的价值，其图检索增强设计对车载知识增强智能体具有可迁移的方法意义。",
       "llm_tags": [
-        "query:kg-rag-agent"
+        "query:kg-rag-agent:composite"
       ],
-      "matched_query_tag": "query:kg-rag-agent",
-      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
-      "matched_requirement_id": "req-3",
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
       "selection_source": "fresh_fetch",
       "quick_tier": "6"
     }
