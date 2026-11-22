@@ -128,22 +128,12 @@ subscriptions:
           keyword_cn: 汽车大语言模型
           query: large language models tailored to automotive scenarios and vehicle-mounted deployment
       intent_queries:
-        - query: How are in vehicle intelligent agents designed to interact with drivers and passengers?
-          query_cn: 车载智能体如何设计以与驾驶员和乘客交互？
-          enabled: true
-          source: manual
-          note: ''
-        - query: What large language models are developed by car manufacturers for vehicle applications?
-          query_cn: 车企为车辆应用开发了哪些大语言模型？
-          enabled: true
-          source: manual
-          note: ''
         - query: How do automotive companies build an in car AI agent powered by large models?
           query_cn: 车企如何构建由大模型驱动的车载智能体？
           enabled: true
           source: generated
           note: ''
-      updated_at: '2026-11-22T12:23:05.092Z'
+      updated_at: '2026-11-22T12:39:06.126Z'
 source_backends:
   arxiv:
     papers_table: arxiv_papers
