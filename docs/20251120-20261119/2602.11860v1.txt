@@ -1,0 +1,733 @@
+Title: Talk2DM: Enabling Natural Language Querying and Commonsense Reasoning for Vehicle-Road-Cloud Integrated Dynamic Maps with Large Language Models
+
+URL Source: https://arxiv.org/pdf/2602.11860v1
+
+Published Time: Fri, 13 Feb 2026 01:55:45 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+1
+
+# Talk2DM: Enabling Natural Language Querying and Commonsense Reasoning for Vehicle-Road-Cloud Integrated Dynamic Maps with Large Language Models 
+
+Lu Tao, Jinxuan Luo, Yousuke Watanabe, Zhengshu Zhou, Yuhuan Lu, Shen Ying, Pan Zhang, Fei Zhao, Hiroaki Takada 
+
+Abstract —Dynamic maps (DM) serve as the fundamental infor-mation infrastructure for vehicle-road-cloud (VRC) cooperative autonomous driving in China and Japan. By providing com-prehensive traffic scene representations, DM overcome the lim-itations of standalone autonomous driving systems (ADS), such as physical occlusions. Although DM-enhanced ADS have been successfully deployed in real-world applications in Japan, exist-ing DM systems still lack a natural-language-supported (NLS) human interface, which could substantially enhance human-DM interaction. To address this gap, this paper introduces VRCsim, a VRC cooperative perception (CP) simulation framework designed to generate streaming VRC-CP data. Based on VRCsim, we construct a question-answering data set, VRC-QA, focused on spatial querying and reasoning in mixed-traffic scenes. Building upon VRCsim and VRC-QA, we further propose Talk2DM, a plug-and-play module that extends VRC-DM systems with NLS querying and commonsense reasoning capabilities. Talk2DM is built upon a novel chain-of-prompt (CoP) mechanism that progressively integrates human-defined rules with the common-sense knowledge of large language models (LLMs). Experiments on VRC-QA show that Talk2DM can seamlessly switch across different LLMs while maintaining high NLS query accuracy, demonstrating strong generalization capability. Although larger models tend to achieve higher accuracy, they incur significant efficiency degradation. Our results reveal that Talk2DM, powered by Qwen3:8B, Gemma3:27B, and GPT-oss models, achieves over 93% NLS query accuracy with an average response time of only 2∼5 seconds, indicating strong practical potential. 
+
+Index Terms —Large language models, Dynamic maps, Vehicle-road-cloud Integration. 
+
+I. I NTRODUCTION 
+
+# THE emergence of Large Language Models (LLMs) has significantly sparked a paradigm shift in the field of Autonomous Driving (AD), involving perception, prediction and planning tasks [1]–[4]. Compared with conventional AD systems (ADS), LLMs-enhanced ADS offer greater interoper-ability, interpretability, and flexibility between humans and ve-hicles, thus gaining more and more attentions in both academia and industry. However, most studies on LLM-enhanced AD 
+
+Lu Tao and Shen Ying are with the School of Resource and Environmental Sciences, Wuhan University, Wuhan, China. Jinxuan Luo and Fei Zhao are with the School of Earth Sciences, Yunnan University, Kunming, China. Zhengshu Zhou is with the College of Artificial Intelligence, Tianjin University of Science & Technology, Tianjin, China. Yuhuan Lu is with the Department of Computer and Information Engineer-ing, Khalifa University, Abu Dhabi, United Arab Emirates. Pan Zhang is with NVIDIA, Shanghai, Chian. Yousuke Watanabe and Hiroaki Takada are with the Institutes of Innovation for Future Society, Nagoya University, Nagoya, Japan. Q: within an 100-meter radius, what type of vehicle is driving close to my vehicle? 
+
+A: 6 vehicles are detected near the ego vehicle: three cars, one truck, and two buses. To ensure safety, maintain an appropriate following 
+
+distance, monitor adjacent 
+
+lanes using mirrors and blind-spot checks. 
+
+Q: within an 100-meter radius, how many vehicles are in my surroundings? 
+
+A: 18 vehicles are detected in the ego vehicle’s surroundings. 
+
+The traffic flow appears mixed: 
+
+a bus ahead is accelerating northward while the ego vehicle is decelerating southward. It is recommended to brake smoothly to maintain a safe gap, especially as multiple vehicles exhibit braking behavior, and to 
+
+remain prepared for stop-and-go 
+
+conditions. 
+
+Q: I’m preparing to merge into the Ishio-sen-segment2 lane. Is there any vehicles? 
+
+A: there is a car on the Ishio-sen-segment2. Furthermore, the vehicle is traveling south at 11.75 m/s and is accelerating; it is advisable to monitor the available gap carefully, 
+
+maintain smooth speed control (including 
+
+gentle braking if needed), and continuously observe surrounding traffic to execute the merge safely.     
+
+> Ishio-sen-segment2
+> 20 m
+> 20 m
+> 20 m
+> legend
+> car ego-vehicle bus truck target vehicles
+
+Fig. 1. Talk2DM–A human interface of VRC-DM framework, enabling over-the-horizon perception, natural-language-supported querying, and common-sense reasoning. A demonstration video of Talk2DM can be viewed at Youtube or Bilibili .(LLM-AD) primarily focus on a single Autonomous Vehicle (AV), owing to the lack of Question-Answer (QA)-annotated cooperative AD datasets. Recently, NVIDIA has released a Vehicle-to-Vehicle (V2V) QA dataset , V2V-QA [5], bridging the gap between LLM-AD and cooperative AD. However, their study only focus on two-vehicle V2V collaboration in grounding and planing tasks when AVs’ Line-of-Sight (LoS) and Field-of-View (FoV) are blocked. In China, the Vehicle-Road-Cloud Integration System (VRCIS) is regarded as the 
+
+> arXiv:2602.11860v1 [cs.AI] 12 Feb 2026 2
+
+next AD stage that comprehensively enhances vehicle perfor-mance, traffic safety and efficiency [6], [7]. Unfortunately, to date, the study on LLM-enhanced VRCIS remains unexplored due to the absence of an open QA-annotated VRCIS dataset. Dynamic maps (DM) [8] serve as the fundamental informa-tion infrastructure for cooperative ADS in Japan, integrating cloud, edge and embedded systems. God’s Eye View (GEV) [9] is a DM-embedded data representation that extends the widely-known Bird’s Eye View (BEV) concept in both spatial and temporal domains through the Cooperative Perception (CP) and Cooperative Prediction (CPd) modules within a Vehicle-Road-Cloud (VRC) integrated Dynamic Map (VRC-DM) framework. GEV represents structured cooperative per-ception and prediction data on VRC-DM platforms, in contrast to conventional BEV, which rasterizes the local environment using onboard sensor observations from a single AV. By leveraging cooperative information, GEV overcomes inherent BEV limitations, such as Line-of-Sight (LoS), Field-of-View (FoV) and Range-of-Time (RoT), and demonstrates greater potential for comprehensive traffic scene representation. DM is built upon relational models, enabling standardized informa-tion query and data operation using SQL-like languages with high efficiency, e.g., prediction [9]. However, the standardiza-tion weaken its flexibility. Recent studies on LLM-AD [1], [2], [5] highlight the strong commonsense reasoning, out-of-distribution generalization, knowledge retrieval abilities and broad applicability of pre-trained LLMs in AD. The com-prehension and reasoning capabilities, along with the feature of natural language input, greatly benefit their flexibility and diversity in information retrieval. These strengths, however, are largely absent in SQL-based DM platforms. Current LLM-AD studies can be viewed as an adaption of the classical Visual Question Answering (VQA) task [10] to AD domain, both entailing modality conversion from image to text. There are two typical paradigms: modular and integrated methods. The modular methods [1], [2], [11]–[14] add a plug-and-play pre-processing module before the frozen LLMs, making them model-agnostic. The pre-processing module can be a pre-trained caption model [1], [12]–[14], an off-the-shelf VQA model [11], or a trainable injection module [2], all of which convert images into textual input for the LLMs. This configuration brings two benefits [14]: first, it reduces the deployment cost and simplify the deployment; second, upgrad-ing the underlying LLMs is straightforward. The integrated methods finetune a vision encoder jointly with the LLMs to align visual and linguistic representations [5], [15]–[18]. These methods finetune LLMs’ parameters to tailor integrated models for various AD tasks, potentially harming the gener-alization and commonsense reasoning ability of the LLMs. In addition, funetuning LLMs incur prohibitive computational and data cost, which is unaffordable for most researchers. To bridge the aforementioned gaps, we propose Talk2DM, a plug-and-play module designed to enable natural-language querying and commonsense reasoning on VRC-DM platforms. Specifically, we first introduce a VRC simulation framework (VRCsim) that supports structured CP data generation in a VRC collaborative manner, closely mimicking the real-world deployed VRC-DM systems for Level4 AD in mixed-traffic environments [9]. Second, we construct a VRC Question Answering dataset (VRC-QA) comprising over 10K mixed-traffic scenes and 100K QA pairs. Third, we develop Talk2DM as a baseline LLM plugin for VRC-DM platforms, enhancing flexibility and diversity in information retrieval while en-dowing the system with commonsense reasoning capabilities. Finally, we conduct comprehensive evaluations of Talk2DM on the VRC-QA dataset and establish a VRC-QA benchmark to facilitate future research on LLMs for VRC-cooperative AD. Our contributions are summarized as follows:  
+
+> •
+
+VRCsim is devised for simulating Vehicle-Road-Cloud Cooperative Perception (VRC-CP). It generates data streams under collaborative scenarios involving Road Side Units (RSUs), AVs and cloud nodes, where percep-tion data from RSUs and AVs are aggregated in the cloud. The cloud node subsequently reconstructs digital scenes and renders them into textual representations, enabling downstream information retrieval and commonsense rea-soning through LLMs. To the best of our knowledge, VRCsim is the first simulation framework specifically designed for VRCIS.  
+
+> •
+
+VRC-QA is created to support the development and evaluation of LLM-enhanced VRC-DM, with a particular focus on spatial querying and reasoning in mixed-traffic scenes. VRC-QA comprises over 10K VRC-CP scenes paired with more than 100K QA pairs and has been made publicly available 1. 
+
+> •
+
+Talk2DM , as demonstrated in Fig. 1, is proposed to enhance the information retrieval flexibility of VRC-DM and to equip it with commonsense reasoning ca-pabilities. Talk2DM enables Over-The-Horizon (OTH), Natural-Language-Supported (NLS) querying and com-monsense reasoning. Moreover, it operates in a plug-and-play manner and leverages off-the-shelf pre-trained LLMs, allowing for painless generalization as well as low-cost development and deployment. The remainder of this paper is organized as follows: section 2 reviews related work; section 3 introduces the system architecture; section 4 presents the experiments and section 5 concludes this paper. II. R ELATED WORK 
+
+A. Large Language Model Enhanced Autonomous Driving 
+
+Integrating LLMs and Vision-Language Models (VLMs) with ADS has attracted widespread attention due to their remarkable potential in scene understanding, logical reasoning and response generating [19], [20]. Pioneering works, such as Cityscapes-Ref [21] and Talk2Car [22], attempt to incorporate natural language into object detection tasks in AD. However, both Cityscapes-Ref and Talk2Car limit each expression to refer to a individual object in each image. To overcome this limitation, Refer-KITTI [23] is developed, where each prompt can refer to multiple objects. Recently, NuScene-QA [17] has made a significant stride, where VQA is adopted to propel referring expression understanding into high-level                                                                              
+
+> 1https://github.com/LuTaonuwhu/VRC-QA.git 3
+> TABLE I COMPARISON WITH RELATED STUDIES .
+> Model Publication Domain Input modality Methodogy Backbone LLMs / Models image / video point cloud text structured object data training / fine-turning prompting PICa [13] AAAI 2022 VQA √√√GPT-3 Prophet [11] CVPR 2023 VQA √√√GPT-3 Img2LLM [14] CVPR 2023 VQA √√√OPT, GPT-J, GPT-Neo, BLOOM DriveGPT4 [15] IEEE RAL 2024 AV(C) √√√LLaMA2 BEV-InMLLM [2] CVPR 2024 AV(3P) √√√BLIP-2,MiniGPT-4, Video-Llama Talk2BEV [1] ICRA 2024 AV(P1P3) √√√√BLIP-2, MiniGPT-4 InstructBLIP-2 NuScenes-QA [17] AAAI 2024 AV(P1) √√√√MCAN LLM-Driver [18] ICRA 2024 AV(P3) √√√LlaMA-7b PromptTrack [16] AAAI 2025 AV(P1) √√√PF-Track V2V-LLM [5] arXiv 2025 CAV(V2V-P1P3) √√√√LlaVA-v1.5-7b Talk2DM [this] –CAV(V2C-QP3) √√√gpt-oss, deepseek-r1, qwen3, magistral, llama3.1, gemma3 C: Control; 3P: Perception (P1), Prediction (P2), Planning (P3); Q: Query (OTH and NLS querying); V2C: vehicle-to-cloud.
+
+driving scenario understanding. Concurrently, Talk2BEV [1] is proposed to augment BEV maps with natural language, enabling general-propose visuolinguistic reasoning for AD scenarios. In more fine-grained 3D object tracking tasks, NuPrompt is constructed and an end-to-end 3D tracker, PromptTrack, is proposed to match referent objects following human instructions [16]. In [2], a holistic language-driving dataset, NuInstruct, is curated; and BEV-InMLLM is proposed to integrate instruction-aware BEV features with pre-trained MLLMs. In [15], DriveGPT4 is presented for interpretable end-to-end AD; it can process multimodal input data and generate text responses as well as low-level control signals, such as speed and turning angle. These studies focus on merging visual and textual modalities for LLM adaptation in individual AV scenarios. Different from them, [18] proposes an object-level multi-modal LLM architecture to fuse object-level numeric data with LLMs, bypassing the visual features extraction and alignment. V2V-LLM [5] is a pioneering study that dedicates to V2V cooperative AD utilizing LLMs, in which scene-level feature maps and object-level feature vectors obtained by multiple connected AVs (CAVs) are fused and fed to central LLMs to answer grounding and planning related questions for CAVs. This paper is closely related to Talk2BEV [1], V2V-LLM [5] and LLM-Driver [18]. Following these insightful studies, we mainly focus on OTH and NLS querying as well as commonsense reasoning in a VRC cooperative framework, an uncharted aspect in the literature. A comparison with related work is presented in Tab. I. 
+
+B. Cooperative Perception 
+
+Cooperative perception utilizes wireless communication to exchange sensing data across vehicles and infrastructures, expanding FoV of CAVs. This concept firstly appeared in the grand cooperative driving challenge where participants competed in cooperative driving tasks, such as platoon driving in 2011 [24] and cooperative merging in 2016 [25]. Con-temporary CP strategies consist of three patterns [26]: early, intermediate and late cooperation. Early cooperation fuses raw sensor data obtained by agents (vehicles and infrastructures), such as point cloud [27]. However, sharing raw sensor data needs substantial communication bandwidth. Intermediate co-operation shares middle features that are pre-processed by agents, like BEV features [28]. Late cooperation that shares perceptual outcomes at object-level is prevailing [29], owning to the limited communication capabilities and complexity of feature extraction. Among these studies, V2V-based architec-ture is prevailing [25], [28], while placing excessive workload on local vehicles potentially impairs the real-time process-ing capacities of their systems. As wireless communication and cloud computing technologies evolve rapidly, distributing heavy workload to edge and cloud side becomes a more cost-effective and promising solution [7], [9]. 
+
+C. Dynamic Maps 
+
+The concept of DM stems from the Local Dynamic Map (LDM) [30] proposed by European Telecommunication Stan-dards Institute (ETSI). It is designed to be a logical data set that overlays dynamic data gathered from multiple sources onto static road maps [8]. Instead of relying solely on sensor data from the surrounding environment, DM collects, man-ages, and utilizes city-scale sensor data and maps through a geographically decentralized and VRC-cooperative architec-ture, which comprises embedded devices, edge servers, and cloud servers. Experiments show that the distributed VRC-DM system is able to process a large volume of data in real time with high scalability [31]. GEV is a representation about the CP and CPd data in such a VRC-DM platform [9]. In this paper, we focus on the CP data within DM. III. S YSTEM ARCHITECTURE 
+
+In this section, three key components of our system are introduced, including VRCsim for simulating VRC coopera-tion, Talk2BEV that enables NLS querying and commonsense reasoning within VRC-DM platforms, and VRC-QA dataset 4SUMO 
+
+## AV DM Nodes 
+
+V2N 
+
+# TraCI 
+
+## RSU DM Nodes 
+
+> vehicle data interface
+> RSU data interface
+
+I2N  Cloud DM Node 
+
+OI  + map 
+
+digital 
+
+vector 
+
+scene 
+
+LLM Node 
+
+# Cloud 
+
+linguistic 
+
+scene 
+
+NLS query 
+
+LLM 
+
+Answer: 
+
+there are 5 cars 
+
+around you… 
+
+## AV DM Node …
+
+VRCsim  Talk2DM VRC-QA 
+
+generation  evaluation  
+
+> How many cars are around me?
+> linguistic
+> scene
+> NLS query
+> Answer
+> linguistic
+> scene
+> NLS query
+> Answer
+> linguistic
+> scene
+> NLS query
+> Answer
+> There are 5 cars…
+> Fig. 2. The system architecture. The blue arrows indicate communication connections; the orange arrows represent the data processing flow.
+
+for LLMs capacity evaluations. The overall architecture is shown in Fig. 2. 
+
+A. VRCsim 
+
+VRCsim plays two major roles: 1) simulating the CP scenarios in a VRC cooperation framework and generating structured CP data streams; 2) reconstructing digital traffic scenes based on the aggregated CP data and then rendering these scenes to textual representations for LLMs inputs. VRCsim is developed based on three renowned open source platforms: SUMO [32]–the microscopic traffic simulation plat-form, ROS2 [33]–the second generation of the Robot Operat-ing System, and Qt6 [34]–the powerful, cross-platform GUI software development framework. The architecture of VRCsim is depicted in Fig. 3. In VRCsim, SUMO is used to simulate real-world traffic flows and generate traffic data streams. These data are accessed via Traffic Control Interface (TraCI) [35], based on which vehicle and RSU data interfaces are established. Using the interfaces, we propose AV and RSU perception models that mimic onboard and roadside sensors, as expressed in equations (1) and (2). 
+
+Pav =
+
+n
+
+obj || (xo, y o) − (xe, y e)|| 2 ≤ Rs
+
+o
+
+(1) 
+
+Prsu =
+
+n
+
+obj (xo, y o) ∈ Ls, Ls = ∪(Li)
+
+o
+
+(2) where Pav and Prsu represent the perception models of AVs and RSUs; obj denotes the perceived object; (xo, y o)
+
+and (xe, y e) are the coordinates of detected objects and ego vehicles, respectively. Rs represents the sensor’s detection range of AVs. Li denotes a lane section on which vehicles are traveling and their movements are captured by roadside sensors. SUMO 
+
+TraCI 
+
+AV DM node  RSU DM node 
+
+ROS2 
+
+/OI 
+
+Qt6  Cloud DM node 
+
+OI + Map 
+
+Digital Vector Scene 
+
+Linguistic Scene 
+
+LLM 
+
+Queue  
+
+> Fig. 3. The architecture of VRCsim.
+
+Based on (1) and (2), we are able to retrieve associated Object Information (OI, see Tab. II) from SUMO using TraCI. The OI from the AV perception model is sent to the AV DM nodes, and the OI from the RSU perception model to the RSU DM nodes. Note that the AV reports the information of both its detected objects and itself. These data are labeled with corresponding detecting sensor ID and then published via the “/OI” topic based on ROS2, which builds upon Data Distribution Service (DDS). The “/OI” topic is subscribed by a cloud DM node for maintaining the received data. Eventually, we set up a straightforward VRC communication system, 5
+
+simulating the data transmission among a VRC cooperation system like what has been established in [9].                                 
+
+> TABLE II SCHEMA OF OBJECT INFORMATION RETRIEVED FROM SUMO.
+> Field Description Field Description
+> id identifier wi width of the object ttime stamp he height of the object xx coordinate ty object type yy coordinate co object color slongitudial lane position ln the current lane tlateral lane position lx lane index vvelocity rd the current road aacceleration sg signal status hheading ds the detecting sensor le length of the object
+
+The streaming perception data–separately obtained by the AV and RSU DM nodes from local areas–are aggregated in the cloud DM node for constructing a more comprehensive traffic scene. A fixed-size queue embedded in the cloud DM node manages these data. To ensure the freshness of received OI, the oldest records are discarded when new data arrive and the queue reaches its capacity. A scene constructor is designed to pull OI from the queue at a predefined frequency (e.g., 5 Hz) to build a comprehensive digital vector scene (DVS) upon on a pre-established static HD map. For the sake of efficiency, the scene constructor is decoupled from DVS, which can then be rendered into both visual and linguistic representations in any desired scale. However, as an initial attempt, this study focuses only on the linguistic scene ( LS ). The LS is transmitted to the downstream LLM node for scene understanding and reasoning using JSON format, as shown in Fig. 3. Totally, we generate 12,094 LS s for following VRC-QA generation. 
+
+B. VRC-QA 
+
+VRC-QA is a primary contribution of this study. To the best of our knowledge, it is the first VRC-CP dataset that simultaneously involves multiple RSUs and AVs, specially tailored for LLM-AD in VRC cooperative driving scenarios. The procedure of VRC-QA dataset generation is as follows. 
+
+1) Object Association and Relation Calculation: given a linguistic scene, 
+
+LS = {oi, e j }, i = 1 , · · · , N ; j = 1 , · · · , M. (3) We firstly identify the AV entities ej and its associated object entities oi based on their spatial and topological relations. The AV can be easily identified by the id field, which is marked with keyword “AV”. For example, the id of an AV may be “AV001”. We then associate the AV entities ej
+
+with surrounding objects oi based on spatial and topological relations that underpin human’s spatial cognition. To express the relations among the entities in LS , four spatial relations ( RS )–front, rear, left, and right–are defined in this paper. Given a AV OI record: 
+
+e = [ xe, y e, h e, ln e, lx e, rd e, · · · ] (4) and a random object OI record: 
+
+o = [ xo, y o, h o, ln o, lx o, rd o, · · · ] (5) the direction angle θ between them can be calculated by: 
+
+θ = arccos (xo − xe) sin he + ( yo − ye) cos he
+
+p(xo − xe)2 + ( yo − ye)2 , (6) and then the spatial relation between the AV and the object is then determined through: 
+
+RS =
+
+
+
+f ront, θ ∈ (−45 ◦, 45 ◦]
+
+rear, θ ∈ (135 ◦, 180 ◦] ∪ (−180 ◦, −135 ◦]
+
+lef t, θ ∈ (45 ◦, 135 ◦]
+
+right, θ ∈ (−135 ◦, −45 ◦]
+
+(7) Besides, we also define three lane topology relations ( RL): on the left lane, on the right lane, and on the same lane, via: 
+
+RL =
+
+
+
+lef tlane, rd e = rd o ∧ lx e − lx o = 1 
+
+rightlane, rd e = rd o ∧ lx o − lx e = 1 
+
+samelane, rd e = rd o ∧ lx e = lx o
+
+(8) and one road topology relation (RR): driving on road 
+
+⟨roaddname ⟩:
+
+RR = roadname, roadname → rd o. (9) 
+
+RS and RL describe the vehicle-to-vehicle relations and 
+
+RR presents the vehicle-to-road relation. Eventually, we can construct a AV-centric entity-relation graph: 
+
+G = ( LS, R ), R = RS ∪ RL (10) It should be noted that a 100-meter spatial limitation is implicitly imposed in the calculation of G.
+
+2) Attribute-entity-relation Graph Construction: an entity can be regarded as a collection of attributes. A subset of these attributes is often used for entity identification, while other attributes, possibly outside this subset, constitute the informa-tion of interest. The attribute subset de facto corresponds to the observations on which a question is raised regarding the attributes of interest. In other words, humans rely on some attributes to identify the entity of interest, and subsequently query specific attributes associated with it. For example, when we ask: “ :::: 
+
+who is the beautiful lady in front of us wearing a red skirt and smiling at us ?”, we are in fact using an attribute set (italicized) together with a relation (underlined) to query an ::::::: 
+
+unknown :::::::: 
+
+attribute :: 
+
+of ::::::: 
+
+interest :::::::::::::::: 
+
+(wavy-underlined), i.e., the name of the lady. Motivated by this observation, we construct an attribute-entity-relation (AER) graph, as describe below. Given an LS , the attributes listed in Tab. II are firstly attached to their corresponding entities. One attribute is then masked (denoted as amasked ), either randomly or deterministi-cally, and used as the query target. The obtained entity-relation graph in Eq. (10) can be enriched into an AER graph, as shown in Fig. 4. We construct an ARE graph for each AV in each 
+
+LS .
+
+3) QA Template Design and Refinement: a) ego-centric QA: in a given road space, drivers identify entities of interest using the relation relative to the ego vehicle and an attribute set. For example, in the question “ ::: 
+
+how ::: 
+
+far 
+
+> ::::
+
+away is the red truck that has stopped on the left lane from me?”, the attribute sequence ⟨color ⟩⟨ type ⟩⟨ velocity ⟩ along with the relation ⟨lef tlane ⟩ actually points to an entity of 6…        
+
+> …
+> masked
+> masked
+> Fig. 4. Attribute-entity-relation graph, in which ejdenotes an AV entity (ego vehicle), oiis an associated object, akis an attached attribute, and Ri
+> represents a kind of relations. The attributes and relations are used to generate QA pair.
+
+interest. Suppose there exists a mapping from attributes and relations to objects of interest: 
+
+⟨ax1, a x2, · · · , a xi ⟩⟨ Rxj ⟩ → { o}, (11) where {o} represents object entities of interest; we can gen-erate QA pairs based on this mapping: 1) selecting a relation from R and an attribute subset from the ARE graph, and fill them into a random question template; 2) assigning the masked attribute (or calculate an attribute, e.g., distance) as the answer. We use the subscripts xi, xj to emphasize that these attributes and relations are variables of unfixed length. Based on Eq. (11), we design four kinds of primitive question templates, covering attribute, distance, count, and existence queries, as shown in Fig. 5. They can be instantiated by an attribute subset ⟨ax1, a x2, · · · , a xi ⟩ and a relation ⟨Rxj ⟩;and the answers to these questions can be directly obtained from the ARE graph (the masked attributes amasked ) or com-puted based on it. Eq. (11) indicates that ego-centric questions are one-hop, since before answering a specific question, we have to identify the relevant entities. 
+
+b) ego-agnostic QA: in real world, drivers might be interest in environmental statuses that are indirectly relevant to the ego vehicle, for example the road statuses. We further design four similar primitive question templates, as shown in Fig. 6. Different with ego-centric QA, the ego-agnostic road status QA are zero-hop where objects of interest are associated by RR, which is straightforward. Therefore, the answers of these questions can be directly obtained from the linguistic scene LS .These manually-designed primitive question templates shown in Fig. 5 and Fig. 6 are fed to ChatGPT to enrich their expressing forms. Eventually, we manually check and select 1,121 template variants. Their distribution is expressed in Tab. III. We denote these question templates as TQ.
+
+4) QA Instantiation: using TQ and the ARE graph, we can instantiate diverse QA pairs for each LS . To create VRC-QA, we randomly select one question template from TQ to What is 𝑎 𝑚𝑎𝑠𝑘𝑒𝑑 of < 𝑎 𝑥1 >…< 𝑎 𝑥𝑖 >< 𝑅 𝑥𝑗 ><ego>? 
+
+Attribute query 
+
+> e.g., What is the current speed of the truck to my right ?
+
+How many < 𝑎 𝑥1 >…< 𝑎 𝑥𝑖 > are < 𝑅 𝑥𝑗 ><ego>? 
+
+Count query 
+
+> e.g., How many vehicles are in front of me?
+
+Is there a < 𝑎 𝑥1 >…< 𝑎 𝑥𝑖 >< 𝑅 𝑥𝑗 ><ego>? 
+
+Existence query 
+
+> e.g., Is there a gray car moving in the left lane alongside
+> me ?
+
+How far is < 𝑎 𝑥1 >…< 𝑎 𝑥𝑖 >< 𝑅 𝑥𝑗 ><ego>? 
+
+Distance query          
+
+> e.g., How far is the vehicle ahead of me?
+> Fig. 5. Primitive question templates designed for the ego-centric QA generation. These questions are one-hop.
+
+Attribute query on road 
+
+What is < 𝑎 𝑥1 >…< 𝑎 𝑥𝑖 > on < RoadName >? 
+
+> e.g., What is the color of the truck to Ishio-Sen?
+
+Distance query on road 
+
+How many meters away are the vehicles traveling on < RoadName >? 
+
+> e.g., How many meters away is the vehicle traveling on Takamori-Sen?
+
+Count query on road 
+
+How many cars are driving on < RoadName >? 
+
+> e.g., How many cars are driving on Ishio-Sen?
+
+Existence query on road 
+
+Is there a < 𝑎 𝑥1 >…< 𝑎 𝑥𝑖 > on < RoadName >?  
+
+> e.g., Is there a truck on this Takamori-Higashi-Sen?
+> Fig. 6. Primitive question templates designed for the ego-agnostic QA generation. These questions are zero-hop.
+
+instantiate a QA pair using ARE graph for each LS , and repeat this process until 100K QA pairs are obtained. The statistics of VRC-QA is shown in Fig. 7. 
+
+C. Talk2DM 
+
+Talk2DM is devised to enable NLS querying and common-sense reasoning, serving as a human interface of VRC-DM platforms. In order to maintain the generalization ability of our system and preserve the commonsense reasoning capability of underlying LLMs, Talk2DM is designed as an independent, 7                                                                        
+
+> TABLE III QUESTION TEMPLATE DISTRIBUTION .
+> ego-centric Type Number
+> attribute query velocity 93 acceleration 120 heading 95 color 72 classification 112 size 96 status 115 distance query 80 count query 107 existence query 88 total 978
+> ego-agnostic Type Number
+> attribute query velocity 19 acceleration 16 heading 17 color 9classification 14 size 16 status 14 distance query 10 count query 18 existence query 10 total 143 911 13 15 17 19 21 23 25 05k 10k 15k 20k Count Acceleration Classification Color Count Distance Existence Heading Size(length) Status Velocity
+> (a) Question distribution (the left: word count; the right: word cloud). 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+> Probability
+> Acceleration Classification Color Count Distance Existence Heading Size(length) Status Velocity <0 [0,0.5) [0.5,1) >=1 bus car truck black blue brown gold gray green orange red silver white yellow [1,3) [3,9) >=9 [10,30) m [30,50) m [50,100) m No Yes East North South West 5.0 m 10.0 m 12.0 m Brake Left Right 0 km/h (0,30) km/h >=30 km/h
+> (b) Answer distribution. Fig. 7. The statistics of VRC-QA dataset.
+
+plug-and-play module built upon open-sourced LLMs, purely based on prompt engineering. To achieve accurate attribute and space querying, we pro-pose a Chain-of-Prompt (CoP, as shown in Fig. 8) mechanism to guide LLMs to perform accurate NLS querying from struc-tured GEV representations in DM. Essentially, CoP fuses com-monsense knowledge implicit in LLMs with human-defined rules, bridging the gap between ambiguous natural language inputs and precise query requirements. This fusion enhances the flexibility of information retrieval in structured database systems. Meanwhile, CoP grounds numerical query results in commonsense knowledge, thereby endowing numeric outputs with interpretable semantic meaning. This capability is crucial for driving decision-making. As shown in Fig. 8, the proposed CoP comprises three prompting phases, progressively “suturing” human-defined rules and the commonsense knowledge of LLMs. The prompt, in this paper, consists of head and body; the head assigns the role of LLMs and specifies the task to be performed; the body provides detailed information (or rules) to guide the LLMs to complete the tasks, while confining the output to fixed formats to facilitate result processing. The three CoP phases are detailed below. 
+
+1) Task Classification Prompting: to perform precise query task, it is necessary to figure out the potential query type based on the question Q. In conventional database system, this process is conducted by human engineers: understanding the query tasks and modeling them through SQL language. In this paper, this process is assigned to LLMs through task classification prompting, as expressed in Eq. (12). 
+
+Ti = LLM (Q, P tc ), Ti ∈ T (12) where Ptc denotes the task classification prompt; Ti is the task ID, which is reasoned out based on the question Q from a pre-defined task set T . In this paper, T corresponds with the query types exhibited in Tab. III, containing 10 kinds of query tasks. As shown in Fig. 8, Ptc instructs LLMs to understand the question and outputs a task ID considering the following task descriptions: (1) speed: querying vehicle speeds, the question may contains keywords like: speed, velocity, how fast, km/h, etc. (2) acceleration: querying vehicle accelerations, the question may contains keywords like: acceleration, deceleration, slowing down, speeding up, etc. (3) heading: querying heading angles of vehicles, the ques-tion may contains keywords like: direction, heading, driving toward, etc. (4) color: querying vehicle colors, the question may contains the keyword: color. (5) classification: querying vehicle types, the question may contains keywords like: type, what type, kind, what kind, what vehicle, etc. (6) size: querying vehicle sizes, the question may contains keywords like: size, length, width, height, how large, how big, body dimension, etc. (7) status: querying vehicle status, the question may contains keywords like: turn signal, lights, blinker, indicator, sig-naling, etc. (8) distance: querying the distance between target vehicles and ego vehicle, the question may contains keywords like: distance, how far, how many meters, etc. (9) count: querying the number of target vehicles, the ques-tion may contains keywords like: how many, crowded, blocking, dense, etc. (10) existence: querying whether there are vehicles in a certain direction or on a specific lane, the question may contains keywords like: is there, does...exist, is there any, etc. Choose this only when the question is purely about presence/absence and not about lights, signals, distance, color, size, or type. 
+
+2) Parameter Extraction Prompting: in this paper, the accu-rate query functionality is realized mainly through a set of spa-tial calculation operators maintained by the query toolbox. The toolbox requires three inputs: a task id Ti, query parameters 
+
+P for function calling, and a structured scene representation 8Task_ID 
+
+LLM 
+
+Task Classification Prompt 
+
+Head: 
+
+> “Role and task description: You are a query task classification assistant. Your task is to
+> understand my question and
+> classify it into the following specific tasks…”
+
+Body:   
+
+> Task descriptions
+> Explaining the meaning and key
+> words of each query task.
+> Output constrains
+> Confining the output to fixed formats.
+> Question
+
+Parameter Extraction Prompt 
+
+Head: 
+
+> “Role and task description: You are a driving assistant. Your task is to
+> accurately understand my driving
+> demands and extract the key parameters from the following question…”
+
+Body:        
+
+> Attribution parameters
+> Explicitly defining each attribute
+> parameter and its value range.
+> Relation parameters
+> Explaining the relation parameter including R,RRand surrounding (default).
+> In-context examples
+> Providing some example for in-context
+> learning.
+> Output constrains
+> Confining the output to fixed formats.
+> Question
+
+Q: within an 100-
+
+meter radius, How 
+
+many vehicles are around me? 
+
+LS 
+
+Parameters 
+
+Commonsense Enhancement Prompt 
+
+> “Role and task description: You are a driving assistant. Your task is to generate 1) an explicit answer to the question completely based on the provided results; 2) driving advice considering safety and comfort…”
+
+Head: 
+
+Body:   
+
+> Objects of interest
+> Providing structured textual descriptions of the objects of interest.
+> Driving advice instruction
+> Offering driving advice, considering
+> the ego status and the objects of interest.
+> Question
+> Accurate Query Results
+
+Query 
+
+Toolbox 
+
+CoP 
+
+Rules 
+
+Commonsense knowledge 
+
+A:  There are 6 vehicles 
+
+around you. Please maintain a safe following distance. 
+
+> Fig. 8. The proposed CoP bridges commonsense knowledge implicit in LLMs and human-defined rules to perform accurate query tasks while offering driving advice. Please note that each question includes a prefixed subtext, “within an 100-meter radius”. This subtext leads to an abnormal performance degradation in one of our experiments, which we analyze in detail in Sec. IV-D1.
+
+LS . In this phase, LLMs are employed to extract the query parameters from the natural language question Q through parameter extraction prompting, as expressed in Eq. (13). 
+
+P = LLM (Q, P pe ) (13) where Ppe denotes the parameter extraction prompt; the pa-rameter set P = {axi , R xi } serves as relation and attribute constrains that are used to determine function calls in the query toolbox; the logic of the determination is similar to that of Eq. (11). The attribute parameters mainly include vehicle type and color ; The relation parameters encompass R and RR.If the question Q does not explicitly indicate a relation type in R ∪ RR, a default value (surrounding) is assigned. In real world, human typically use these parameters to indicate the ob-jects of interest, for example, “the yellow ⟨color ⟩ truck ⟨type ⟩
+
+on my left lane ⟨lef tlane ⟩” or “the yellow ⟨color ⟩ truck ⟨type ⟩⟨default: surrounding ⟩”. These key parameters are used to identify the objects of interest from a LS by the operators in the query toolbox, and they must firstly be extracted from the question Q prior to function execution. Leveraging the powerful reasoning capability, we instruct LLMs to perform parameter extraction using Ppe , as shown in Fig. 8. The attribute and relation parameters are explicitly defined in Ppe in natural language. In-context learning (ICL) ability is commonly observed in LLMs, pioneering studies [36], [37] show that feeding in-context examples leads to better few-shot performance. In Ppe , we include several examples to guide LLMs to perform parameter extraction from questions. Using the query task id Ti and query parameters P, accurate calculations can be performed by the toolbox within a specific structured LS :
+
+Rn = ToolBox (Ti, P, LS ) (14) where Rn represents the accurate numeric results retrieved from the traffic scenes. Essentially, function ToolBox() is a branching logic that controls the functions calling and execution flow and produces the numeric results Rn.
+
+3) Commonsense Enhancement Prompting: the queried nu-merical results are insufficient for driving decisions, since they are often inconclusive and lack clear semantic implications. Therefore, enriching the query result with semantic driving advice–namely, commonsense enhancement–is crucial. This phase is also perform by LLMs through commonsense en-hancement prompting, as expressed in Eq. (15). 
+
+Rs, V = LLM (Rn, Q, P ce ) (15) where Pce represents the commonsense enhancement prompt; 
+
+Rs is the semantic query results; V is the driving advice. The final answer A of question Q equals to Rs ⊕ V .It is worth noting that in Pce , we include the complete OI data (see Tab. II) of retrieved objects, which can be regarded as a description of the relevant surrounding environments. Pce 
+
+instructs LLMs to provide driving advice by jointly consid-ering the information of the ego vehicle and its surrounding environments. 9
+
+Finally, Talk2DM is established based on the aforemen-tioned CoP, which can be formally expressed by: 
+
+A = LLM (ToolBox (LLM (Q, P tc ), LLM (Q, P pe ), LS ), Q, P ce )
+
+(16) IV. R ESULTS 
+
+A. Experimental Configurations 1) Data: we randomly select 10K QA pairs from VRC-QA to evaluate the NSL querying performance of Talk2DM. These data cover all the query types (see Tab. IV) and span 1,420 VRC cooperation scenes, which are evenly distributed over the entire simulation lifetime (see Fig. 9).                   
+
+> TABLE IV
+> DISTRIBUTION OF QA PAIRS USED IN THIS EXPERIMENT .
+> Question type Number
+> attribute query velocity 962 acceleration 999 heading 990 color 956 classification 941 size 959 status 943 distance query 926 count query 961 existence query 1,363 total 10,000 05000 10000 12094 Simulation lifetime
+> Fig. 9. Simulation lifetime and sampled scenes; a blue vertical line is plotted at each sampled timestamp along the simulation lifetime axis (frame id).
+
+2) Models: Talk2DM is designed as a plug-and-play mod-ule independent of underlying LLMs, enabling seamless inte-gration with different models to exploit their commonsense reasoning capabilities. We evaluate six series of reasoning LLMs (17 models in total), whose configurations are reported in Tab. V. 
+
+3) Metrics: given a predicted task classification id Ti and a ground-truth task id ˆTi, the classification accuracy AC is defined as: 
+
+AC =
+
+PNi=1 Ci
+
+Np
+
+× 100% (17) where Ci = 1 if Ti = ˆTi and Ci = 0 otherwise; Np denotes the total number of predictions. AC reflects the query task comprehension capacities of LLMs. Further, suppose the numeric query results are denoted by 
+
+Rn = [r1, r 2, · · · , r k] and the corresponding ground-truth results by ˆRn = [ˆ r1, ˆr2, · · · , ˆrk], we consider ˆRn to be correct if: 
+
+Rn = ˆRn ⇐⇒ ∀ i = 1 , · · · , k, r i = ˆ ri. (18)                                                                            
+
+> TABLE V OVERVIEW OF LLM CONFIGURATIONS .
+> Model Archit -
+> ecture Context length Embedding length Quanti -
+> zation Family Size
+> GPT-oss 20B gptoss 131072 2880 MXFP4 Deepseek-r1 1.5B qwen2 131072 1536 Q4 K M 8B qwen3 131072 4096 Q4 K M 14B qwen2 131072 5120 Q4 K M 32B qwen2 131072 5120 Q4 K M Qwen3 0.6B qwen3 40960 1024 Q4 K M 1.7B qwen3 40960 2048 Q4 K M 4B qwen3 262144 2560 Q4 K M 8B* qwen3 40960 4096 Q4 K M 14B qwen3 40960 5120 Q4 K M 30B qwen3moe 40960 5120 Q4 K M Magistral 24B llama 40000 5120 Q4 K M Gemma 1B gemma3 32768 1152 Q4 K M 4B gemma3 131072 2560 Q4 K M 12B gemma3 131072 3840 Q4 K M 27B gemma3 131072 5376 Q4 K M Llama3 8B llama 8192 4096 Q4 0 *Reference model used in Talk2DM development.
+
+Given a query task Ti, the query accuracy performance of model Mk is defined as: 
+
+AMk 
+
+> Q
+
+(Ti) = Nc
+
+Nq
+
+× 100% , (19) where Nc is the total number of correct queries and Nq is the total number of queries. AMk 
+
+> Q
+
+reflects the query accuracy of Talk2DM using model Mk, implicitly capturing the common-sense reasoning capacities of LLMs . To access the task-specific performance bias, we define the following task bias indicator: 
+
+BMk 
+
+> Ti
+
+=
+
+
+
++1 , if AMk 
+
+> Q
+
+(Ti) ≥ A Mk 
+
+> Q
+
+(Tj ), i ̸ = j;
+
+−1, if AMk 
+
+> Q
+
+(Ti) < AMk 
+
+> Q
+
+(Tj ), i ̸ = j;0, else. (20) The task-specific performance bias of Talk2DM on a specific query task is: 
+
+BTi = X BMk 
+
+> Ti
+
+, (21) which reflect the task-specific performance bias of Talk2DM. 
+
+4) Experiments: in this paper, we design three experiments to evaluate Talk2DM in collaboration with different LLMs:  
+
+> •
+
+OSP-QA: one-shot prompting-based QA, which performs question-answering using a single prompting step; such strategies have been adopted in classical VQA applica-tions [11], [13], [14];  
+
+> •
+
+CoP-QA-F: CoP-based QA, which applies the proposed CoP strategy to perform QA tasks with different LLM families (F); this experiment aims to identify the strongest model in terms of NLS querying and commonsense reasoning;  
+
+> •
+
+CoP-QA-S: CoP-based QA, which applies the proposed CoP strategy to conduct QA tasks with different model sizes (S); this experiment aims to identify the most appropriate model by jointly considering query accuracy and efficiency. All experiments are conducted locally on an RTX 5090 D GPU with 32GB of memory. We use the same CoP {Ptc , P pe , P ce }10 
+
+when integrating different underlying LLMs; these prompts are developed and iteratively refined using Qwen3:8B model as the reference model; they are then directly applied to other models without further modification to examine the generalization ability of Talk2DM. 
+
+B. OSP-QA 
+
+In this experiment, we compare the NLS querying per-formance of the proposed CoP with the classical one-shot prompting (OSP) method. We design four OSP approaches:  
+
+> •
+
+OSP1: the prompt only includes role setting, LS , road information, and output constrains;  
+
+> •
+
+OSP2: OSP1 + explanations of OI (Tab. II);  
+
+> •
+
+OSP3: OSP1 + inference rules (defined by us);  
+
+> •
+
+OSP4: OSP1 + few-shot examples. They are evaluated on VRC-QA and compared with Talk2DM employing the CoP. Both the SOP methods and Talk2DM use the Qwen3:8B model as underlying the LLM. The results are presented in Tab. VI.                                                                 
+
+> TABLE VI NLS QUERY ACCURACIES OF OSP METHODS AND TALK 2DM. Query task / method OSP1 OSP2 OSP3 OSP4 Talk2DM (1) velocity 37.86 36.89 40.78 35.56 96.81 (2) acceleration 15.79 18.95 16.84 17.86 86.27 (3) heading 32.35 34.31 32.35 37.21 87.50 (4) color 33.70 33.70 39.13 41.03 99.06 (5) classification 29.79 41.49 42.55 43.21 96.60 (6) size 32.95 23.86 27.27 28.21 97.82 (7) status 33.67 34.69 30.61 40.70 89.34 (8) distance 1.11 2.22 1.11 1.28 97.73 (9) count 45.00 47.00 46.00 42.22 96.70 (10) existence 74.64 83.33 71.74 81.51 95.55
+> Average 33.69 35.65 34.84 36.88 94.34
+> AQ, unit: percent %.
+
+The results in Tab. VI clearly show that Talk2DM sig-nificantly outperforms the classical OSP methods. The best-performing OSP4 method achieves only 36.88% query ac-curacy, which lags far behind Talk2DM, attaining 94.34%. Generally, OSP methods severely botch space-related NLS queries, as evidenced by their poor performance, particularly on distance queries. A noticeable exception is the existence query, for which OSP methods achieve results comparable to those of Talk2DM. In fact, LLMs do not truly reason over this kind of questions; instead, they largely rely on guessing based on the input LS .Since existence queries are binary (yes or no), the limited output space inflates the apparent accuracy. Consequently, high accuracy can be obtained even through no actual spatial computation is performed by the OSP methods. 
+
+C. CoP-QA-F 
+
+This experiment demonstrates the generalization ability of Talk2DM and compares NLS querying performance across different LLM families. We choose the largest models of different LLM families executable on our hardware settings. The overall results are presented in Tab. VII. The experimental results shows that Talk2DM can be effort-lessly adopted to various LLMs from Qwen3 family, such as GPT-oss and Gemma3 families, while maintaining competitive performance. Qwen3:30B model achieves the highest query accuracy AQ = 95 .15% , followed by GPT-oss:20B model with AQ = 94 .45% , and then Gemma3:27B model with 
+
+AQ = 93 .09% . It is worth noting that Gemma3:27B achieves the best result in query task classification with AC = 97 .60% ,better than Qwen3:30B ( AC = 96 .55% ) model which severs as the reference model in Talk2DM development. These results demonstrate the robust generalization ability of Talk2DM. The Qwen3:30B, GPT-oss:20B and Gemma3:27B mod-els demonstrate competitive performance in query demand comprehension and commonsense reasoning, preserving high levels of both AC and AQ (above 93%). The Magistral:24B model performs well in understanding query demands, with 
+
+AC = 90 .81% , but exhibits poor performance in query parameter extraction, likely due to its relatively weak common-sense reasoning capacity, resulting in a low query accuracy of 
+
+AQ = 71 .78% . The Deepseek-r1:32B model, which shares the same architecture and size as Qwen3:30B, shows a significant accuracy gap compared to Qwen3:30B. The Llama3.1:8B model performs the worst among these LLMs, possibly be-cause of its small model size. Notably, the Magistral:24B model, despite using the same llama architecture with a larger 24B size, still does not perform well in NLS querying. Tab. VII shows that Talk2DM struggles with acceleration (BT2 = −2) and heading ( BT3 = −2) related queries, while performing well on color ( BT4 = +4 ) and classification (BT5 = +2 ) queries. This discrepancy primarily stems from ambiguities in natural language questions. For example, ques-tions such as “ is the bus close to my car keeping a constant speed? ” and “ is the truck near me suddenly slowing down? ”, implicitly require inferring vehicle acceleration rather than retrieving speed. This literal ambiguity encourages surface-level reasoning, leading to failures on acceleration queries. The negative performance bias of acceleration query is commonly observed in Qwen3 ( BT2 = −4, see Tab. VIII), Deekseek-r1 ( BT2 = −2, see Tab. XI) and Gemma3 ( BT2 = −2, see Tab. X). Besides, Talk2DM using the Llama3.1:8B model underperforms on heading queries, as nearly 80% of them are misclassified into other query types. For instance, the question “ where is the vehicle ahead currently driving to-wards? ” is incorrectly interpreted as an acceleration-related query by Llama3.1:8B model. This phenomenon appears to be model-specific, as it is not observed in other models reported in Tab. VIII-Tab. X. In contrast, color queries are typically explicit and unambiguous (e.g., “ what is the color of the bus around me?” and “ what color does the vehicle around my car appear to be? ”), and therefore achieve strong performance. These observations indicate that, when faced with ambiguous or implicit natural language questions, LLMs still lack sufficient depth of reasoning. 
+
+D. CoP-QA-S 1) Accuracy: In this experiment, we evaluate Talk2DM’s query accuracy across different model sizes, ranging from 0.6B 11                                                                                                                                                                      
+
+> TABLE VII EXPERIMENTAL RESULTS OF COP-QA-F.
+> Talk2DM using: Qwen3:30B GPT-oss:20B Magistral:24B Deepseek-r1:32B Gemma3:27B Llama3.1:8B BTiQuery task ACAQACAQACAQACAQACAQACAQ
+> (1) velocity 99.01 97.03 99.48 96.59 83.77 66.33 78.92 77.45 96.75 94.12 36.31 34.48 -1 (2) acceleration 76.60 75.53 90.05 88.36 66.00 50.70 82.83 81.31 93.56 91.95 57.55 54.53 -2 (3) heading 100 92.08 98.30 87.90 84.16 62.77 92.20 85.37 98.22 92.67 20.59 15.05 -2 (4) color 100 ::
+> 100 100 ::::
+> 99.79 100 ::::
+> 86.29 90.16 89.62 100 ::
+> 100 99.79 87.55 +4 (5) classification 100 ::
+> 100 100 97.47 98.98 75.36 87.88 87.88 100 84.11 99.80 ::::
+> 91.65 +2 (6) size 98.85 98.85 100 99.69 98.95 72.38 92.89 ::::
+> 91.88 100 93.72 100 87.24 +1 (7) status 96.88 94.79 90.93 89.87 93.19 75.96 69.70 68.18 90.00 83.83 96.38 85.74 -1 (8) distance 100 ::
+> 100 100 99.03 96.23 74.28 91.71 90.61 100 98.23 90.91 82.26 +1 (9) count 100 99.05 99.07 96.59 99.38 80.21 88.89 87.88 99.18 96.49 98.56 89.90 0(10) existence 94.16 94.16 90.28 89.19 87.48 73.51 93.29 91.52 98.25 95.78 91.70 86.17 0
+> Average 96.55 ::::
+> 95.15 96.81 94.45 90.81 71.78 86.85 85.17 97.60 93.09 79.16 71.46 –minimum AQ,::::::
+> maximum :::
+> AQ.
+
+to 32B, using the Qwen3, Deepseek-r1, and Gemma3 model families. Detailed model configurations have been summarized in Tab. V. The overall results of the CoP-QA-S experiment are reported in Tab. VIII, Tab. XI and Tab. X for the Qwen3, Deepseek-r1, and Gemma3 model families, respectively. For clarity, all these results are further visualized in Fig. 10. Fig. 10 clearly demonstrates that the average query accuracy of Talk2DM consistently improves as model size increases, across all model families. The Qwen3 family outperforms the Deepseek-r1 and Gemma3 families, primarily because the Qwen3:8B model was used as the reference model dur-ing Talk2DM development. The Gemma3 family and GPT-oss:20B model achieve performance comparable to that of the Qwen3 family as model size increases, even though no modifications are applies to the CoP when switching the underlying LLMs from Qwen3:8B to Gemma3 and GPT-oss models. A similar trend is observed for the Deepseek-r1 family; however, a clear performance gap remains between it and the other three families. 1 4 8 12 14 20 27 30 32 Number of Parameters (Billion) 0% 20% 40% 60% 80% 100% Query Accuracy  
+
+> velocity distance count status color classification existence size(length) acceleration heading Talk2DM using Qwen3 family Talk2DM using Gemma3 family Talk2DM using Deepseek-r1 family Talk2DM using GPT-oss
+> Fig. 10. Query accuracy of the Qwen3, Deepseek-r1, Gemma3 model families. The solid lines denote the average query accuracy across ten types of query tasks, while the dotted lines represent the query accuracy for individual query types.
+
+Tab. VIII presents the detailed experimental results of Qwen3 model family across each query task. Averagely, the querying performance improves as the model size increases, achieving the best performance of 95.15% with 30B model. However, due to the reference model setting of Qwen3:8B, we can only observe marginal performance improvements using 14B and 30B models. Among the Qwen3 family experiments, an abnormal and sharp drop is observed on existence query tasks when using the 4B model with AQ(T10 ) decreasing from 92% to 44% (with AC = 44 .5% ) as the model size increases from 1.7B to 4B. To figure out the reason, we carry out an ablation experiment and present the results in Tab. IX. This table shows that the drop is mainly caused by 1) the prefixed subtext of each question, “ within an 100-meter radius ” (denoted as s); and 2) the restrictive rule (refer to Sec. III-C1) for existence query in task classification prompt Ptc , “ Choose this only when the question is purely about presence/absence and not about lights, signals, distance, color, size, or type ” (denoted as r). The subtext s confuses the Qwen3:4B model, causing 43.43% of existence queries to be misclassified as distance queries. After removing s, this rate is reduced to 11.26%. Although replacing the subtext with a fixed parameter could potentially improve the overall performance, we retain it to preserve the flexibility of Talk2DM. The restrictive rule r was originally designed to prevent the misclassification of existence queries and functions well with Qwen3:8B and other models; however, it exhibits a negative effect when the Qwen3:4B model is used. Ultimately, removing both s and r improves the classification accuracy of existence queries from 44.8% to 98.93%. This ablation experiment reveals that well-tested prompts do not always perform well on specific tasks; however, we can also observe the generalization ability of our CoP when applied to the Qwen3:4B and Qwen3:1.7B models, maintaining relatively high query accuracies of 81.28% and 86.21%, respectively. The experimental results for Gemma3 and Deepseek-r1 fam-ilies are respectively summarized in Tab. X and Tab. XI. Simi-lar to Qwen3 family, larger models consistently achieve better performance. The Gemma3:12B and Gemma3:27B models preserve strong performance when directly used in Talk2DM, achieving query accuracies of 87.56% and 93.09%, respec-tively, which are comparable to those of the Qwen3:4B-30B 12 
+
+TABLE VIII EXPERIMENTAL RESULTS OF COP-QA-S USING QWEN 3 FAMILY .
+
+Talk2DM using Qwen3:0.6B Qwen3:1.7B Qwen3:4B Qwen3:8B* Qwen3:14B Qwen3:30B BTiQuery task AC AQ AC AQ AC AQ AC AQ AC AQ AC AQ
+
+(1) velocity 96.55 48.88 99.63 88.76 99.25 88.39 99.59 96.81 99.70 96.96 99.01 97.03 0(2) acceleration 26.36 20.52 59.02 51.50 91.73 89.47 88.56 86.27 84.08 82.28 76.60 75.53 -4 (3) heading 8.71 4.75 89.21 72.30 97.84 67.99 97.80 87.50 95.69 94.83 100 92.08 -1 (4) color 95.36 65.19 100 86.18 100 :: 
+
+100 99.89 :::: 
+
+99.06 99.04 99.04 100 :: 
+
+100 +3 (5) classification 86.56 57.03 99.26 91.52 100 97.42 99.59 96.60 99.70 98.19 100 :: 
+
+100 +1 (6) size 88.70 57.11 97.71 77.86 100 96.95 99.06 97.82 99.69 :::: 
+
+99.39 98.85 98.85 +1 (7) status 31.06 20.64 93.80 78.29 88.76 81.40 90.82 89.34 85.53 85.53 96.88 94.79 0(8) distance 67.40 50.11 95.49 84.02 100 99.18 100 97.73 99.67 99.00 100 :: 
+
+100 +1 (9) count 94.85 70.31 98.85 90.38 99.62 97.31 98.86 96.70 99.09 98.17 100 99.05 0(10) existence 97.53 :::: 
+
+80.06 96.53 :::: 
+
+92.00 44.50 44.00 97.37 95.55 97.87 96.17 94.16 94.16 +1 
+
+Average 69.31 47.46 92.95 81.28 92.20 86.21 97.15 94.34 96.01 94.96 96.55 95.15 –TABLE IX ABLATION ANALYSIS OF THE SHARP DROP IN EXISTENCE -QUERY PERFORMANCE WITH QWEN 3:4B. Task classification: velocity ↓ acceleration ↓ heading ↓ color ↓ classification ↓ size ↓ status ↓ distance ↓ count ↓ none ↓ existence ↑
+
+with s & r 4.83 2.15 1.88 0.27 0.80 0 1.07 43.43 1.07 0 44.50 remove s 1.61 4.02 2.68 0 1.07 0.27 0.27 11.26 0 0.80 78.02 remove s & r 0 0 0 0 0.80 0 0 0 0.27 0 98.93 unit: percent %; this table reports the proportion of existence questions classified into different query types; for example, the value of 4.83 indicates that 4.83% of existence questions are misclassified as velocity queries; the existence column reflects the correct task classification rate; the none column indicate classification failure rate. TABLE X EXPERIMENTAL RESULTS OF COP-QA-S USING GEMMA 3 FAMILY .
+
+Talk2DM using Gemma3:1B Gemma3:4B Gemma3:12B Gemma3:27B BTiQuery task AC AQ AC AQ AC AQ AC AQ
+
+(1) velocity 11.56 1.62 95.13 76.06 99.19 92.29 96.75 94.12 0(2) acceleration 0 0 20.93 19.32 89.54 80.89 93.56 91.95 -2 (3) heading 0 0 81.19 39.60 98.42 91.88 98.22 92.67 -1 (4) color 95.78 32.28 100 76.79 100 91.35 100 :: 
+
+100 +1 (5) classification 0 0 100 80.65 100 89.41 100 84.11 -1 (6) size 51.05 38.91 100 73.64 100 :::: 
+
+93.10 100 93.72 +1 (7) status 0 0 98.30 61.06 89.57 71.91 90.00 83.83 -2 (8) distance 0 0 85.81 69.40 98.89 87.80 100 98.23 -1 (9) count 89.90 63.92 99.18 79.18 98.76 88.45 99.18 96.49 0(10) existence 99.85 76.56 100 :::: 
+
+90.10 93.01 88.50 98.25 95.78 +1 
+
+Average 34.81 21.33 88.05 66.58 96.74 87.56 97.60 93.09 –
+
+models. However, models from Deepseek-r1 family do not exhibit competitive performance: even the largest Deepseek-r1:32B model achieves only 85.17% query accuracy, which is inferior to that of the Gemma3:12B (87.56%) and Qwen3:4B (86.21%) models. 
+
+2) Efficiency: Fig. 10 shows that, to achieve a query accu-racy exceeding 90%, the Qwen3:8B, Qwen3:14B, Qwen3:30B, Gemma3:27B and GPT-oss models are potentially applica-ble to Talk2DM. This experiment evaluates the time cost of Talk2DM’s NLS querying function when deployed with these models. As shown in Fig. 11, Gemma3:27B is the fastest, with a mean query time of μ = 3.2 s, followed by GPT-oss ( μ = 4.62 s), and Qwen3:8B ( μ = 7.61 s). These three models are considered suitable for Talk2DM, as they achieve a favorable trade-off between query accuracy and efficiency, making them potentially deployable on edge devices. In contrast, although Qwen3:14B and Qwen3:30B provide only marginal accuracy gains, they incur substantial efficiency degradation and are therefore deemed unsuitable. Finally, we summarize the most important experimental conclusions in Tab. XII, which shows that GPT-oss and Gemma3:27B are the best underlying LLMs for Talk2DM, completing accurate NLS querying within 2 ∼5 s. V. C ONCLUSION 
+
+In this paper, we propose VRCsim, a VRC-DM simulation framework that generates virtual onboard and roadside sensor data streams and aggregates them in the cloud. Based on VRCsim, we construct VRC-QA, a dataset comprising 10K VRC-CP scenes and 100K QA pairs on spatial queries, to facilitate research on VRC-CP question answering. Building upon VRCsim and VRC-QA, we further introduce Talk2DM, a human interface that enables OTH and NLS querying, as well as commonsense reasoning in VRC-DM systems. Talk2DM overcomes the NLoS and FoV limitations of conventional standalone ADS, while enhancing the flexibility and diversity of information retrieval through DMs. Within Talk2DM, we propose a CoP mechanism to guide underlying LLMs in accurately performing NLS querying over structured CP data 13 
+
+TABLE XI EXPERIMENTAL RESULTS OF COP-QA-S USING DEEPSEEK -R1 FAMILY .
+
+Talk2DM using Deepseek-r1:1.5B Deepseek-r1:8B Deepseek-r1:14B Deepseek-r1:32B BTiQuery task AC AQ AC AQ AC AQ AC AQ
+
+(1) velocity 63.69 24.02 90.38 ::: 
+
+75.00 65.52 63.29 78.92 77.45 -1 (2) acceleration 9.04 1.20 58.62 53.79 60.16 56.94 82.83 81.31 -2 (3) heading 19.10 5.62 92.99 50.32 72.28 65.15 92.20 85.37 -1 (4) color 75.00 20.00 87.77 73.39 80.38 79.11 90.16 89.62 0(5) classification 70.91 27.88 85.21 71.13 76.99 73.93 87.88 87.88 0(6) size 70.30 22.42 84.17 71.22 77.82 74.69 92.89 :::: 
+
+91.88 +1 (7) status 55.03 16.57 77.63 61.18 63.62 58.94 69.70 68.18 0(8) distance 59.48 16.99 88.89 74.07 69.40 66.52 91.71 90.61 0(9) count 70.66 34.13 90.48 82.31 73.61 69.90 88.89 87.88 0(10) existence 76.54 :::: 
+
+38.68 49.30 45.07 90.39 :::: 
+
+88.21 93.29 91.52 +2 
+
+Average 56.97 20.75 80.54 65.75 73.02 69.67 86.85 85.17 –TABLE XII THE MOST SUITABLE CONFIGURATIONS OF TALK 2DM. 
+
+Talk2DM using Qwen3:8B Gemma3:27B GPT-oss Accuracy ↑ 94.34% 93.09% 94.45% 
+
+Efficiency ↓ 7.61s 3.20s 4.62s Qwen3:8B Qwen3:14B Qwen3:30B Gemma3:27B GPT-oss 010 20 30 40 Time Cost (seconds) 
+
+> =7.61
+> =9.97
+> =47.01
+> =3.20
+> =4.62
+
+Fig. 11. Query time cost of Talk2DM with selected LLMs. 
+
+in VRC-DM. We conduct extensive experiments on VRC-QA to evaluate Talk2DM, and the results demonstrate its strong generalization capability, as it seamlessly adapts to different LLMs while consistently achieving query accuracy above 90%. In contrast, classical one-shot prompting methods attain only about 30% accuracy. Moreover, the experimental results reveal a clear trade-off: larger models tend to deliver higher query accuracy while incurring substantially greater query la-tency. Considering both accuracy and efficiency, Gemma3:27B and GPT-oss emerge as the most suitable LLMs for Talk2DM, achieving over 93% query accuracy while maintaining high querying efficiency in natural language interactions, with av-erage response time of approximately 2 ∼5 s. REFERENCES [1] T. Choudhary, V. Dewangan, S. Chandhok, S. Priyadarshan, A. Jain, A. K. Singh, S. Srivastava, K. M. Jatavallabhula, and K. M. Krishna, “Talk2bev: Language-enhanced bird’s-eye view maps for autonomous driving,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 16 345–16 352. [2] X. Ding, J. Han, H. Xu, X. Liang, W. Zhang, and X. Li, “Holistic autonomous driving understanding by bird’s-eye-view injected multi-modal large models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 13 668–13 677. [3] M. Peng, X. Guo, X. Chen, K. Chen, M. Zhu, L. Chen, and F.-Y. Wang, “Lc-llm: Explainable lane-change intention and trajectory predictions with large language models,” Communications in Transportation Re-search , vol. 5, p. 100170, 2025. [4] J. Mao, Y. Qian, J. Ye, H. Zhao, and Y. Wang, “Gpt-driver: Learning to drive with gpt,” arXiv preprint arXiv:2310.01415 , 2023. [5] H.-k. Chiu, R. Hachiuma, C.-Y. Wang, S. F. Smith, Y.-C. F. Wang, and M.-H. Chen, “V2v-llm: Vehicle-to-vehicle cooperative autonomous driving with multi-modal large language models,” arXiv preprint arXiv:2502.09980 , 2025. [6] Q. Xu, K. Li, J. Wang, Q. Yuan, Y. Yang, and W. Chu, “The status, challenges, and trends: An interpretation of technology roadmap of intelligent and connected vehicles in china (2020),” Journal of Intelligent and Connected Vehicles , vol. 5, no. 1, pp. 1–7, 2022. [7] B. Gao, J. Liu, H. Zou, J. Chen, L. He, and K. Li, “Vehicle-road-cloud collaborative perception framework and key technologies: A review,” 
+
+IEEE Transactions on Intelligent Transportation Systems , 2024. [8] Y. Watanabe, K. Sato, and H. Takada, “Dynamicmap 2.0: A traffic data management platform leveraging clouds, edges and embedded systems,” 
+
+International Journal of Intelligent Transportation Systems Research ,vol. 18, no. 1, pp. 77–89, 2020. [9] L. Tao, Y. Watanabe, R. Takeuchi, S. Kusayama, S. Yamada, and H. Takada, “Enhancing autonomous vehicles’ situational awareness with dynamic maps: Cooperative prediction on edge, cloud and vehicle,” 
+
+IEEE Transactions on Intelligent Vehicles , 2024. [10] S. Antol, A. Agrawal, J. Lu, M. Mitchell, D. Batra, C. L. Zitnick, and D. Parikh, “Vqa: Visual question answering,” in Proceedings of the IEEE international conference on computer vision , 2015, pp. 2425–2433. [11] Z. Shao, Z. Yu, M. Wang, and J. Yu, “Prompting large language models with answer heuristics for knowledge-based visual question answering,” in Proceedings of the IEEE/CVF Conference on computer vision and pattern recognition , 2023, pp. 14 974–14 983. [12] ¨O. ¨ Ozdemir and E. Akag¨ und¨ uz, “Enhancing visual question answering through question-driven image captions as prompts,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2024, pp. 1562–1571. [13] Z. Yang, Z. Gan, J. Wang, X. Hu, Y. Lu, Z. Liu, and L. Wang, “An empirical study of gpt-3 for few-shot knowledge-based vqa,” in 
+
+Proceedings of the AAAI conference on artificial intelligence , vol. 36, no. 3, 2022, pp. 3081–3089. [14] J. Guo, J. Li, D. Li, A. M. Huat Tiong, B. Li, D. Tao, and S. Hoi, “From images to textual prompts: Zero-shot visual question answering with frozen large language models,” in 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023, pp. 10 867– 10 877. 14 
+
+[15] Z. Xu, Y. Zhang, E. Xie, Z. Zhao, Y. Guo, K.-Y. K. Wong, Z. Li, and H. Zhao, “Drivegpt4: Interpretable end-to-end autonomous driving via large language model,” IEEE Robotics and Automation Letters , 2024. [16] D. Wu, W. Han, Y. Liu, T. Wang, C.-z. Xu, X. Zhang, and J. Shen, “Language prompt for autonomous driving,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 39, no. 8, 2025, pp. 8359– 8367. [17] T. Qian, J. Chen, L. Zhuo, Y. Jiao, and Y.-G. Jiang, “Nuscenes-qa: A multi-modal visual question answering benchmark for autonomous driving scenario,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 38, no. 5, 2024, pp. 4542–4550. [18] L. Chen, O. Sinavski, J. H¨ unermann, A. Karnsund, A. J. Willmott, D. Birch, D. Maund, and J. Shotton, “Driving with llms: Fusing object-level vector modality for explainable autonomous driving,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 14 093–14 100. [19] X. Zhou, M. Liu, E. Yurtsever, B. L. Zagar, W. Zimmer, H. Cao, and A. C. Knoll, “Vision language models in autonomous driving: A survey and outlook,” IEEE Transactions on Intelligent Vehicles , 2024. [20] C. Cui, Y. Ma, X. Cao, W. Ye, Y. Zhou, K. Liang, J. Chen, J. Lu, Z. Yang, K.-D. Liao et al. , “A survey on multimodal large language models for autonomous driving,” in Proceedings of the IEEE/CVF winter conference on applications of computer vision , 2024, pp. 958–979. [21] A. B. Vasudevan, D. Dai, and L. Van Gool, “Object referring in videos with language and human gaze,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2018, pp. 4129–4138. [22] T. Deruyttere, S. Vandenhende, D. Grujicic, L. Van Gool, and M.-F. Moens, “Talk2car: Taking control of your self-driving car,” arXiv preprint arXiv:1909.10838 , 2019. [23] D. Wu, W. Han, T. Wang, X. Dong, X. Zhang, and J. Shen, “Referring multi-object tracking,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2023, pp. 14 633–14 642. [24] R. Kianfar, B. Augusto, A. Ebadighajari, U. Hakeem, J. Nilsson, A. Raza, R. S. Tabar, N. V. Irukulapati, C. Englund, P. Falcone et al. ,“Design and experimental validation of a cooperative driving system in the grand cooperative driving challenge,” IEEE transactions on intelligent transportation systems , vol. 13, no. 3, pp. 994–1007, 2012. [25] P. Xu, G. Dherbomez, E. H´ ery, A. Abidli, and P. Bonnifait, “System architecture of a driverless electric car in the grand cooperative driving challenge,” IEEE Intelligent Transportation Systems Magazine , vol. 10, no. 1, pp. 47–59, 2018. [26] T. Huang, J. Liu, X. Zhou, D. C. Nguyen, M. Rahimi Azghadi, Y. Xia, Q.-L. Han, and S. Sun, “Vehicle-to-everything cooperative perception for autonomous driving,” Proceedings of the IEEE , vol. 113, no. 5, pp. 443–477, 2025. [27] R. Chen, Y. Mu, R. Xu, W. Shao, C. Jiang, H. Xu, Y. Qiao, Z. Li, and P. Luo, “CO3: Cooperative unsupervised 3d representation learning for autonomous driving,” in The Eleventh International Conference on Learning Representations , 2023. [Online]. Available: https://openreview.net/forum?id=QUaDoIdgo0 [28] H. X. W. S. B. Z. J. M. Runsheng Xu, Zhengzhong Tu, “Cobevt: Coop-erative bird’s eye view semantic segmentation with sparse transformers,” in Conference on Robot Learning (CoRL) , 2022. [29] B. C. Tedeschini, M. Brambilla, L. Barbieri, G. Balducci, and M. Nicoli, “Cooperative lidar sensing for pedestrian detection: Data association based on message passing neural networks,” IEEE Transactions on Signal Processing , 2023. [30] ETSI, “Intelligent transport systems (its); vehicular communications; basic set of applications; local dynamic map (ldm),” ETSI EN 302 895 V1.1.1 , 2014-09. [31] K. Hosono, A. Maki, Y. Watanabe, H. Takada, and K. Sato, “Imple-mentation and evaluation of load balancing mechanism with multiple edge server cooperation for dynamic map system,” IEEE Transactions on Intelligent Transportation Systems , vol. 23, no. 7, pp. 7270–7280, 2021. [32] P. A. Lopez, M. Behrisch, L. Bieker-Walz, J. Erdmann, Y.-P. Fl¨ otter¨ od, R. Hilbrich, L. L¨ ucken, J. Rummel, P. Wagner, and E. Wießner, “Microscopic traffic simulation using sumo,” in 2018 21st international conference on intelligent transportation systems (ITSC) . Ieee, 2018, pp. 2575–2582. [33] S. Macenski, T. Foote, B. Gerkey, C. Lalancette, and W. Woodall, “Robot operating system 2: Design, architecture, and uses in the wild,” Science robotics , vol. 7, no. 66, p. eabm6074, 2022. [34] Qt, “Qt 6 - The latest version of Qt — qt.io,” https://www.qt.io/product/ qt6, 2025, [Accessed 08-10-2025]. [35] SUMO, “TraCI - SUMO Documentation — sumo.dlr.de,” https://sumo. dlr.de/docs/TraCI.html, 2025, [Accessed 09-10-2025]. [36] T. Brown, B. Mann, N. Ryder, M. Subbiah, J. D. Kaplan, P. Dhariwal, A. Neelakantan, P. Shyam, G. Sastry, A. Askell et al. , “Language mod-els are few-shot learners,” Advances in neural information processing systems , vol. 33, pp. 1877–1901, 2020. [37] M. Tsimpoukelli, J. L. Menick, S. Cabi, S. Eslami, O. Vinyals, and F. Hill, “Multimodal few-shot learning with frozen language models,” 
+
+Advances in Neural Information Processing Systems , vol. 34, pp. 200– 212, 2021.

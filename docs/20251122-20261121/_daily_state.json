@@ -57,7 +57,7 @@
       "paper_id": "2607.16181v1",
       "route": "20251122-20261121/2607.16181v1",
       "title": "Vision-Language Assistant for Emotional Reactions to Risky Driving",
-      "section": "quick",
+      "section": "deep",
       "tags": [
         {
           "kind": "query",
@@ -97,7 +97,7 @@
         }
       ],
       "score": 6.0,
-      "evidence": "",
+      "evidence": "以自动驾驶座舱实验提出多感官环境界面，为车载AI智能体交互提供环境中介的新视角。",
       "first_seen_at": "2026-11-22T11:33:31.468364+00:00",
       "updated_at": "2026-11-22T11:33:31.468364+00:00"
     },

@@ -310,10 +310,14 @@
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
         }
       ],
       "score": 7.0,
-      "evidence": "",
+      "evidence": "面向车路云动态地图的自然语言查询与常识推理，属车载AI智能体交互方向。",
       "first_seen_at": "2026-11-20T13:43:08.669319+00:00",
       "updated_at": "2026-11-20T13:43:08.669319+00:00"
     },
