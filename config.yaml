@@ -103,37 +103,81 @@ subscriptions:
             updated_at: '2026-11-20T12:33:46.399658+00:00'
       updated_at: '2026-11-21T14:49:46.309Z'
       paused: false
-    - tag: car-ai-agent
-      description: 车载智能体，车企大模型
+    - tag: in-car-agent
+      description: 关注系统如何理解驾驶员或乘客的需求，结合当前情境决定是否追问、提醒或执行任务；覆盖任务型对话、主动交互、导航与出行服务、工具调用和车辆功能操作。
       enabled: true
       paper_sources:
         - arxiv
       keywords:
-        - keyword: in-vehicle intelligent agent
-          keyword_cn: 车载智能体
-          query: in-vehicle intelligent agent for cockpit interaction and occupant services
         - keyword: intelligent cockpit assistant
           keyword_cn: 智能座舱助手
           query: intelligent cockpit assistant providing natural language interaction in vehicles
         - keyword: automotive intelligent agent
           keyword_cn: 汽车智能体
           query: intelligent agent designed for automotive scenarios and vehicle services
-        - keyword: in-car conversational agent
-          keyword_cn: 车内对话智能体
-          query: conversational agent embedded in car for driver and passenger dialogue
-        - keyword: vehicle intelligence platform
-          keyword_cn: 车载智能平台
-          query: platform supporting intelligent vehicle applications and services
-        - keyword: automotive large language model
-          keyword_cn: 汽车大语言模型
-          query: large language models tailored to automotive scenarios and vehicle-mounted deployment
+        - keyword: vehicle function control
+          keyword_cn: 车辆功能控制
+          query: controlling vehicle functions through natural language commands and dialogue
+        - keyword: in-vehicle assistant
+          keyword_cn: 车载助手
+          query: in-vehicle assistants that understand occupant needs and complete tasks
       intent_queries:
-        - query: How do automotive companies build an in car AI agent powered by large models?
-          query_cn: 车企如何构建由大模型驱动的车载智能体？
+        - query: >-
+            Research on in vehicle assistants and interactive cockpit systems that help drivers or passengers get
+            information, use services, or operate vehicle functions. Include in car voice assistants, automotive
+            dialogue systems, multimodal interaction, and studies of any individual assistant capability, such as
+            understanding requests, providing proactive or personalized assistance, or carrying out tasks. Relevant
+            surveys, datasets, benchmarks, and user studies are also in scope.
+          query_cn: >-
+            关注帮助驾驶员或乘客在车内获取信息、使用服务或操作车辆功能的座舱助手与交互系统。涵盖车内语音助手、车载对话系统、多模态交互，也收录只研究某项助手能力的论文，例如请求理解、主动或个性化服务、任务执行。相关综述、数据集、评测基准和用户实验也可纳入。
           enabled: true
           source: generated
           note: ''
-      updated_at: '2026-11-22T12:39:06.126Z'
+      updated_at: '2026-11-22T14:56:45.066Z'
+    - tag: self-driving
+      description: 关注道路车辆的自动驾驶、自动化驾驶系统、相关高级驾驶辅助系统（ADAS）以及车载智能体，涵盖感知、定位建图、行为预测、决策规划、车辆控制、端到端驾驶、人机交互、安全鲁棒性及数据集仿真评测。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: automated driving system
+          keyword_cn: 自动化驾驶系统
+          query: automated driving systems for road vehicles
+        - keyword: driver assistance system
+          keyword_cn: 驾驶辅助系统
+          query: advanced driver assistance systems and driving functions
+        - keyword: vehicle control
+          keyword_cn: 车辆控制
+          query: vehicle control and actuation for automated driving
+        - keyword: end-to-end driving
+          keyword_cn: 端到端驾驶
+          query: end-to-end learning from sensor input to driving control
+      intent_queries:
+        - query: >-
+            Find research on perception, localization, behavior prediction, planning, and control for autonomous road
+            vehicles.
+          query_cn: 查找关于自动驾驶道路车辆感知、定位、行为预测、规划与控制的研究。
+          enabled: true
+          source: manual
+          note: ''
+        - query: >-
+            Find work on advanced driver assistance systems, automated driving functions, and in vehicle intelligent
+            agents.
+          query_cn: 查找关于高级驾驶辅助系统、自动驾驶功能与车载智能体的工作。
+          enabled: true
+          source: manual
+          note: ''
+        - query: Find studies on end to end driving architectures and human machine interaction in automated vehicles.
+          query_cn: 查找关于端到端驾驶架构与自动驾驶车辆人机交互的研究。
+          enabled: true
+          source: manual
+          note: ''
+        - query: Find methods for safety, robustness, simulation, datasets, and evaluation of autonomous driving systems.
+          query_cn: 查找关于自动驾驶系统安全性、鲁棒性、仿真、数据集与评测的方法。
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-11-22T15:12:53.260Z'
 source_backends:
   arxiv:
     papers_table: arxiv_papers
