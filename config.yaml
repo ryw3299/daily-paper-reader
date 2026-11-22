@@ -143,7 +143,7 @@ subscriptions:
           enabled: true
           source: generated
           note: ''
-      updated_at: '2026-11-22T12:20:39.553Z'
+      updated_at: '2026-11-22T12:23:05.092Z'
 source_backends:
   arxiv:
     papers_table: arxiv_papers
