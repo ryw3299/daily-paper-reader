@@ -2,6 +2,7 @@
 
 任务状态与固定名单分开记录；有结果不代表全部阅读内容已生成。
 
+- [in-car-agent · 大礼包](#/starter-pack/20261122-a04aee8c6135/README) · 阅读内容/导读待补充 · 23 篇
 - [car-ai-agent · 365天](#/starter-pack/20261122-e8b38c2bb745/README) · 已完成 · 10 篇
 - [car-ai-agent · 大礼包](#/starter-pack/20261122-c95597c0e3c8/README) · 已完成 · 10 篇
 - [car-ai-agent · 大礼包](#/starter-pack/20261122-f7bf6220a719/README) · 已完成 · 10 篇

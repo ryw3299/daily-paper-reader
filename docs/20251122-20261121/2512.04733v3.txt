@@ -1,0 +1,1799 @@
+E3AD: An Emotion-Aware Vision-Language-Action Model for Human-Centric
+End-to-End Autonomous Driving
+Yihong Tang1ã, Haicheng Liao2ã, Tong Nie3, Junlin He3, Ao Qu4, Kehua Chen5, Wei Ma3,
+Zhenning Li2B, Lijun Sun1B, Chengzhong Xu2B
+1McGill University
+2University of Macau
+3The Hong Kong Polytechnic University
+4Massachusetts Institute of Technology
+5University of Washington
+yihong.tang@mail.mcgill.ca
+{yc27979,zhenningli,czxu}@um.edu.mo
+lijun.sun@mcgill.ca
+Abstract
+End-to-end autonomous driving (AD) systems increasingly
+adopt vision-language-action (VLA) models, yet they ig-
+nore the passenger’s emotional state, which is central
+to comfort and AD acceptance.
+We introduce Open-
+Domain End-to-End (OD-E2E) AD, where an autonomous
+vehicle must interpret free-form natural-language com-
+mands, infer the emotion, and plan a physically feasi-
+ble trajectory. We propose E3AD, an emotion-aware VLA
+framework that augments semantic understanding with two
+cognitively inspired components: a continuous Valence-
+Arousal-Dominance (VAD) emotion model that captures
+tone and urgency from language, and a dual-pathway spa-
+tial reasoning module that fuses egocentric and allocen-
+tric views for human-like spatial cognition. A consistency-
+oriented training scheme, combining modality pretraining
+with preference-based alignment, further enforces coher-
+ence between emotional intent and driving actions. Across
+real-world datasets, E3AD improves visual grounding and
+waypoint planning and achieves state-of-the-art (SOTA)
+VAD correlation for emotion estimation. These results show
+that injecting emotion into VLA-style driving yields more
+human-aligned grounding, planning, and feedback.
+1. Introduction
+Autonomous driving (AD) has evolved from modular
+pipelines to vision-language-action end-to-end (E2E) sys-
+tems that directly map sensor inputs to vehicle controls
+through unified optimization. This paradigm significantly
+improves efficiency and adaptability by integrating percep-
+tion, prediction, and planning into a single learning frame-
+work [5, 29]. Despite these advances, a fundamental obsta-
+cle remains that is not purely technical but human-centered:
+ensuring public trust and acceptance of fully AD [71].
+ã Equal contribution.
+B Corresponding Authors.
+Planning
+Vision Language Action
+(a) Existing VLA for End-to-End AD (Others) 
+(b) Emotion-Aware VLA for Open-Domain End-to-End AD (Ours)
+Emotion Modeling
+Vision Language Action
+Planning
+Grounding
+Feedback
+Command
+MVIs
+Multi-view 
+Images (MVIs)
+Got it. I’ll pull up to the man in the white shirt, and stop beside him. All under control!
+Command: I wish to talk to the person with the white shirt. Get closer to him Now!
+Grounding
+Planning
+(C) Open-Domain End-to-End AD Task 
+Emotion
+Valence
+Arousal
+Dominance
+Figure 1. Overview of our E3AD. (a) Existing VLAs behave as
+emotion-agnostic systems, mapping multi-view images directly to
+a planning output without human-in-the-loop interaction or emo-
+tion understanding. (b) Our model adds explicit emotion modeling
+and closed-loop feedback, allowing the agent to infer intent inten-
+sity, ground referents more reliably, and adapt its plan accordingly.
+(c) This yields the Open-Domain E2E AD task, where the agent
+jointly reasons over language, emotion, perception, and navigation
+to enable human-centered and context-aware autonomy.
+While current E2E systems [20, 21, 45] exhibit strong
+control and perception capabilities, passengers often feel
+uneasy about delegating decisions to opaque algorithms that
+operate without acknowledging human intent or emotion.
+Surveys [68] and behavioral studies [6, 33, 66] consistently
+indicate that emotional interaction is a critical determinant
+of user comfort and perceived safety. However, most ex-
+isting models [27, 43] are designed for closed-loop ratio-
+nal control and remain insensitive to emotion cues such as
+anxiety or urgency. This disconnection between computa-
+tional reasoning and emotional understanding forms what
+can be described as an emotion gap for autonomous vehi-
+cles (AVs). Bridging this gap requires reconsidering the
+role of human-vehicle interaction in AD. An intelligent sys-
+tem should understand “what” a passenger says and “how”
+arXiv:2512.04733v3  [cs.CV]  28 May 2026
+
+
+it is expressed. For instance, the tone difference between
+“stop here” and “stop here now!” carries implicit emotional
+meaning that influences how the vehicle should respond.
+Recognizing such differences enables the system to regulate
+behavior that aligns with the passenger’s emotional state,
+providing reassurance and enhancing acceptance [23].
+As illustrated in Fig. 1, we extend the conventional E2E
+AD framework toward a more human-centric paradigm. Fu-
+ture AVs must reason not only over visual and spatial cues
+but also interpret and respond to natural-language com-
+mands that convey the passenger’s intent and emotional
+state. We define this capability as the task of Open-Domain
+End-to-End AD (OD-E2E), where the driving agent jointly
+reasons over semantic content, emotion context, and spa-
+tial environment to generate physically realizable trajecto-
+ries consistent with the passenger’s instructions. This for-
+mulation moves beyond purely reactive control toward in-
+teractive, emotion-aware driving assistants that better match
+human expectations and preferences, transforming AVs into
+empathetic and user-aligned driving agents [29].
+Technically,
+our approach builds on the emerging
+Vision-Language-Action (VLA) paradigm [50], which uni-
+fies perception, reasoning, and control through large-scale
+multimodal modeling. By coupling visual and linguistic
+representations, VLA frameworks enable agents to perform
+complex goal-driven behaviors with improved generaliza-
+tion, interpretability, and alignment to human intent. Fol-
+lowing this paradigm, we propose an Emotion-aware End-
+to-End Autonomous Driving framework, E3AD, which ex-
+tends VLA from purely semantic understanding to emotion
+and spatially consistent reasoning. To enhance cognitive
+capability, E3AD incorporates two key components within
+a unified pipeline: (1) Emotion Modeling, which maps
+commands into a continuous Valence-Arousal-Dominance
+(VAD) space [16] to interpret emotional tone and behavioral
+urgency; and (2) Spatial Reasoning, which fuses egocentric
+and allocentric pathways to achieve human-like spatial cog-
+nition. These components are jointly optimized through a
+consistency-oriented learning strategy that enforces coher-
+ence between the semantic and emotional context of the
+command and the resulting trajectory. This design enables
+E3AD to reason jointly over what the passenger intends and
+how it is expressed, producing emotion-aware and human-
+aligned driving behaviors in a fully E2E manner. From a
+safety perspective, modulating behavior according to pas-
+senger state decouples request satisfaction from the safety
+envelope, which is essential for calibrated trust in E2E AD.
+Overall, the contributions of this study are threefold:
+• We define Open-Domain End-to-End AD for human-
+centric AVs, which unifies semantic, emotional, and spa-
+tial reasoning from natural-language commands.
+• We propose E3AD, an emotion-aware VLA framework
+that integrates continuous emotion modeling and dual-
+system spatial reasoning in a unified E2E pipeline, en-
+abling emotion-grounded response and planning.
+• We show that E3AD outperforms strong baselines on vi-
+sual grounding, emotion estimation, and waypoint plan-
+ning across multiple benchmarks, with particularly large
+gains on emotion-sensitive and corner-case scenarios.
+2. Related Work
+VLA for End-to-end AD. Recent work explores VLA ar-
+chitectures that inject world knowledge and reasoning from
+large multimodal models into E2E AD [8]. Existing ap-
+proaches can be broadly grouped into three paradigms [23].
+The first paradigm, represented by DriveGPT-4 [61], Open-
+EMMA [60], and CoT-Drive [32], produces scene-level
+explanations via QA-style prompts. While improving in-
+terpretability, they act as “commentators”, lacking precise
+spatial grounding and direct control fidelity. The second
+paradigm, such as Senna [22], VLP [44], and LMDrive
+[51], employs VLMs to generate discrete “meta-behaviors”
+to guide a low-level controller. This approach provides only
+sparse guidance that limits its capacity for continuous spa-
+tial reasoning, resulting in marginal gains in driving per-
+formance.
+The third paradigm, like Simlingo [47], Au-
+toVLA [74], and FSDrive [67], couples VLM-based per-
+ception with dedicated planning modules that directly out-
+put trajectories or control signals, achieving strong perfor-
+mance. However, current VLAs [28, 35, 73] face two core
+issues: weak spatial understanding, operating largely in
+2D without explicit 3D or allocentric (map-based) reason-
+ing [54, 55], and a purely rational sequence-prediction view
+that ignores passenger emotion, crucial for behavior align-
+ment [53, 56]. Building on the third paradigm, we propose
+an emotion-aware, spatially grounded end-to-end VLA.
+Emotion Computing in AD. Emotional interaction be-
+tween humans and AVs offers a promising path to improv-
+ing public acceptance, safety, and comfort in AD [26].
+However, enabling AVs to accurately perceive, interpret,
+and respond to human emotions remains a fundamental
+challenge [52].
+Early work [7, 42] emphasized driver-
+state monitoring (fatigue, distraction, stress) via physiolog-
+ical signals (EEG/ECG [4]) and visual cues (facial expres-
+sions [59] or gaze tracking); with higher-level AD, the focus
+shifted to passenger experience (e.g., ride comfort [30, 31],
+anxiety [25, 58]).
+Most approaches perform passive de-
+tection with discrete labels and decouple emotion estima-
+tion from downstream control. We instead ground emotion
+in the continuous VAD space, integrating it into a unified
+VLA. To our knowledge, E3AD is the first framework to
+use a VAD vector to guide: (1) ambiguity resolution for
+nuanced commands, and (2) the generation of planning tra-
+jectories. Through consistency-oriented fine-tuning, E3AD
+aligns emotion with driving behavior, advancing from emo-
+tion recognition to a human-centric AD system [65].
+
+
+Action Token
+Emotion
+Grounding
+Waypoint
+(a) Architecture of E3AD
+Tom is right ahead. 
+Let’s get there!
+Decoder
+Vision Encoder
+Text Tokenizer
+Multi-view Observations
+Command
+Emotion CoT
+Vision Language Model
+...
+...
+...
+Grounding &  Planning
+(c) Spatial Reasoning
+(b) Emotion Modeling
+1. Ego. Estimate
+3. Waypoint Planning
+2. Depth
+Estimation
+1. Spatial Relation
+3. Spatial Grounding
+Egocentric
+17k
+Samples
+30k
+Samples
+Space Mapping
+VAD Space
+Discrete Emotion States
+Allocentric
+2. Target Location
+Allocentric Samples
+Egocentric Samples
+Ego-Centric Perceptual Reasoning
+World-Centric Location and Planning
+(e) Joint Fine-Tuning
+(d) Modality Pretraining
+VLM
+LoRA
+(f) Emotion-Action Alignment (DPO)
+Neg.
+Traj.
+Real
+Traj.
+𝑪𝒂𝒖𝒈
+Neg.
+Traj.
+You are given two synchronized perception views:
+Allocentric: covers 120 m ahead (X-axis) and 80 m laterally (Y-axis).
+Egocentric: shares the same orientation as the allocentric, 
+The ego vehicle is located at (0, 0).
+Command:
+Based on the images and command, perform three tasks in sequence:
+1. Analyze the VAD (Valence, Arousal, Dominance) of the command.
+2. Locate the target object referred to by the command.
+3. Provide future waypoints (X, Y) in meters that fulfill the command.
+Tom is right ahead. Let’s get there!
+<EmoThink>
+Estimated VAD: (0.59, 0.36, 0.51), The 
+user is feeling moderately positive and 
+motivated, showing mild excitement.
+</EmoThink>
+<Feedback>
+Got it! Tom’s just ahead, let’s move 
+steadily forward. All under control!
+</Feedback>
+(g) Inference
+VLM
+LoRA
+𝓛𝐝𝐩𝐨
+𝓛𝐉𝐨𝐢𝐧𝐭
+𝓛𝐞𝒎𝒐
+𝓛𝐬𝐩𝐚
+VLM
+LoRA
+Command
+Decoder
+VAD
+Grounding
+Waypoint
+Command
+VLM
+LoRA
+Decoder
+VLM
+LoRA
+Command
+𝑪𝒂𝒖𝒈
+Emotion Modelling & 
+Human-Centric Feedback
+Grounding & Planning
+E3AD
+Grounding
+Planning
+Emotion
+Feedback
+Command
+Inference Pipeline
+Dominance
+Valence
+Arousal
+Command
+Figure 2. Overview of E3AD and its training/inference pipeline. Given egocentric and allocentric views with a natural-language command
+(a), E3AD outputs emotion, grounding, and waypoint tokens via two core modules: Emotion Modeling (b) encodes commands in contin-
+uous VAD space (c), and Spatial Reasoning fuses egocentric and allocentric pathway cues. Training proceeds from Modality Pretraining
+for emotion/spatial skills (d) to Joint Fine-Tuning that predicts (ˆe, ˆb, ˆτ) in a single autoregressive chain (e), followed by Emotion-Action
+Alignment (f). During inference (g), E3AD runs end-to-end to estimate (ˆe), ground (ˆb), and plan (ˆτ), producing human-centric feedback.
+3. Methodology
+3.1. Problem Formulation
+We consider OD-E2E AD, where an autonomous vehicle
+receives multi-view observations and a natural-language
+command and must execute the command through spatial
+grounding and motion planning. Let C denote the passen-
+ger’s command and I = \{I_{\ text {ego}}, I_{\text {allo}}\ } denote the multi-view
+observations containing egocentric and allocentric views of
+the scene. The agent must (i) localize the object or location
+referenced in C and (ii) generate a physically feasible tra-
+jectory that fulfills the instructed intent. Formally, given the
+tuple (I, C), the task aims to learn a mapping:
+  f _\t he t a : (I, C) \rightarrow \hat {\mathcal {Y}} = \{\hat {b}, \hat {\tau }\}, 
+(1)
+where \protect \hat  {b} denotes the grounded target in the scene and \p r
+otect \hat  {\tau } = \{y_t\}_{t=1}^{T }
+denotes the future waypoints. Unlike prior lan-
+guage grounding setups that restrict command vocabular-
+ies and decouple referent localization from motion planning
+into separate modules, the OD-E2E task learns a single pol-
+icy f_\theta that, under a unified objective, jointly predicts (\ha t {b}, \hat {\tau } )
+conditioned on (I, C). This elevates language grounding
+from an auxiliary perception task to an integral component
+of the end-to-end decision-making objective.
+3.2. Overview
+Fig. 2 illustrates the overall architecture of E3AD, a cog-
+nitively inspired VLA system built on Qwen2.5-VL-7B-
+Instruct [1] that integrates Emotion Modeling, Two-System
+Spatial Representation, and Consistency-Oriented Action
+Planning in a unified pipeline. To strengthen its cognitive
+competence, we adopt a three-stage training strategy: (i)
+Foundational Modality Pretraining to establish emotion and
+spatial priors, (ii) Joint Reasoning Fine-tuning to optimize
+Figure 3. Visualization of emotion distributions before and af-
+ter augmentation. (a) Proportions of GoEmotion categories across
+Talk2Car splits.
+(b) VAD distribution of GoEmotion.
+(c) In-
+corporating driving commands enriches emotional diversity. (d)
+Emotion-aware augmentation expands and smooths the VAD dis-
+tribution, providing broader and continuous emotion supervision.
+end-to-end multimodal operation, and (iii) Emotion-Action
+Alignment to ensure planning behaviors remain consistent
+with emotional intent.
+This progressive design provides
+fine-grained emotion understanding, cognitively grounded
+spatial reasoning, and behaviorally consistent planning, all
+aligned with the passenger’s semantic and emotional intent.
+3.3. Emotion Modeling
+Human-vehicle interaction in AD inherently involves emo-
+tional communication.
+Yet, most existing systems are
+emotion-agnostic and model affect, if at all, with a small
+set of discrete labels such as happy, angry, or sad [31].
+Such coarse encoding cannot capture small but behaviorally
+meaningful tone changes that influence how a command
+
+
+should be executed. We therefore adopt a continuous repre-
+sentation based on the Valence-Arousal-Dominance (VAD)
+model [57], representing emotion as e ∈R3.
+Valence
+measures positivity, arousal measures activation, and domi-
+nance measures control; in driving contexts, these axes cor-
+respond to attitude (calm vs. anxious), alertness (fatigued
+vs. vigilant), and control (confident vs. overwhelmed) [40].
+To supervise this space, we derive VAD labels from both
+sentence-level and word-level cues. For each command C,
+we first apply the GoEmotions classifier [10] to obtain a
+distribution over discrete emotions and map it to sentence-
+level VAD scores using the label-VAD dictionary in [57]. In
+parallel, we compute a word-level VAD vector by removing
+stop words and averaging lexical scores over the remaining
+tokens. The final label e is obtained by combining these
+two sources, so that both global interpretation and emotion-
+bearing phrases are reflected (details in Appendix A.1).
+Driving commands, however, are often emotionally neu-
+tral, which would encourage the model to ignore emotion
+if trained naively. To break this bias and disentangle intent
+from tone, we introduce emotion-aware command augmen-
+tation. For each command C(i), Qwen2.5-VL generates K
+paraphrases C(i)
+aug = {C(i)
+1 , . . . , C(i)
+K } that preserve the driv-
+ing goal while varying the attitude or intensity. Each aug-
+mented command C(i)
+k
+is assigned a VAD label e(i)
+k
+via the
+same mapping procedure, forming an augmented set C∗that
+creates neighborhoods of semantically equivalent but affec-
+tively distinct commands (Fig. 3). This forces the model to
+attribute changes in e to changes in tone rather than intent.
+We then perform supervised fine-tuning (SFT) to equip
+the VLM with explicit emotion understanding. Given aug-
+mented command-emotion pairs {(C(i)
+k , e(i)
+k )} ⊂C∗, we
+cast emotion prediction as conditional generation with an
+instruction template (Appendix D) and define the loss as:
+  \m a thcal {
+L }_{\t
+e xt {
+e
+mo} } = -\m
+a
+t hbb 
+{ E
+}
+_{(C^{(i)}_k, e^{(i)}_k)\sim \mathcal {C}^*} \big [\log p_{\theta }(e^{(i)}_k \mid C^{(i)}_k)\big ], 
+(2)
+where pθ denotes the model’s distribution over quantized
+VAD tokens.
+Rather than adding a separate sentiment
+head, this continuous, instruction-style formulation embeds
+e within the same generative reasoning process as other out-
+puts, enabling E3AD to represent fine-grained shifts in af-
+fect while keeping the underlying intent fixed, and to con-
+dition planning behavior directly on the inferred emotion.
+3.4. Spatial Reasoning
+Inspired by the dual-system model of human spatial percep-
+tion [2], we design the VLA backbone to reason over two
+complementary spatial pathways: an egocentric frame for
+immediate, action-oriented perception and an allocentric
+frame for global, map-based structure. This design compels
+the model to fuse local sensory cues with world-centered
+priors, mirroring how humans combine first-person obser-
+vations with internal cognitive maps for reliable navigation.
+Egocentric Pathway. The egocentric pathway captures the
+agent’s first-person perceptual field. Using annotated data
+samples, the model predicts (i) the relative 3D direction to
+the referent, (ii) its distance, and (iii) its grounded location
+in image coordinates from (Iego, C). These auxiliary signals
+provide fine-grained, short-horizon spatial cues essential for
+immediate control. We curate a dataset of 30K samples to
+establish a robust foundation for egocentric spatial reason-
+ing, which directly supports subsequent planning.
+Allocentric Pathway.
+The allocentric pathway encodes
+a world-centered representation akin to a cognitive map.
+Given BEV input Iallo, the model learns to (i) predict the tar-
+get location in BEV coordinates and (ii) generate a coarse
+trajectory τ
+= {yt}T
+t=1 from the ego pose to that tar-
+get. This supervision yields long-horizon spatial structure,
+road topology, occlusions, and multi-agent layout, produc-
+ing map-consistent priors that complement egocentric per-
+ception. We use roughly 17K samples to teach this world-
+centered reasoning. In combination, the two pathways sup-
+ply complementary local and global spatial cues that down-
+stream planning modules can exploit for grounding and
+waypoint generation in cluttered, partially observed scenes.
+3.5. Action and Feedback
+Action Decoder. Following the VLA backbone, we append
+a lightweight action decoder fact for translating the VLA’s
+high-level outputs into a precise, physically-realizable tra-
+jectory ˆτ. Conditioned on the grounded target ˆb, the coarse
+trajectory eτ, and visual observations I, the decoder outputs
+the final trajectory ˆτ = fact(ˆb, eτ, I), where ˆτ ∈RT ×2 rep-
+resents the spatial coordinates of waypoints.
+Human-centric Verbal Feedback. To mitigate the “black-
+box” anxiety of passengers, E3AD provides verbal feed-
+back ˆr after planning the waypoints. We employ the trained
+Qwen2.5-VL backbone to generate this response. Specif-
+ically, the model is guided by structured prompts, condi-
+tioning the generation of ˆr on the complete output of the
+VLA pipeline: the predicted emotion state ˆe, the grounded
+target ˆb, and the planned waypoints ˆτ. The response pol-
+icy adapts tone, length, and specificity to emotion and ur-
+gency: for calm states, it offers brief confirmations, whereas
+for high arousal, it produces direct, time-critical guidance.
+This emotion-aware feedback loop transforms the AV from
+an opaque tool into a human-centric agent.
+3.6. Consistency-Oriented Training and Inference
+We adopt a three-stage consistency-driven training strat-
+egy to progressively endow E3AD with emotion awareness,
+spatial reasoning, and coherent decision-making. The train-
+ing stages consist of: (1) Modality Pretraining, which es-
+tablishes foundational representations for spatial and emo-
+tional cues; (2) Joint Fine-tuning, unifying emotion ground-
+ing, scene understanding, and trajectory planning within a
+
+
+single autoregressive generation process; and (3) Emotion-
+Action Alignment, designed for stable, emotion-consistent
+driving behaviors. Each training stage is as follows:
+Stage-1: Modality Pretraining. In this initial stage, we ap-
+ply supervised fine-tuning to equip E3AD with spatial and
+emotion perception skills separately: (1) Emotion Model-
+ing is trained on our augmented command dataset C∗using
+the emotion regression loss Lemo. (2) Spatial Reasoning is
+trained on our synthetic egocentric and allocentric pathways
+using the negative log-likelihood loss Lspatial of next-token
+prediction to optimize spatial reasoning across both views.
+Stage-2: Joint Fine-Tuning. After modality pretraining,
+we fine-tune the VLA to unify these capabilities into a sin-
+gle, coherent reasoning process. We employ an instruction-
+based SFT paradigm where the model autoregressively pre-
+dicts the full output sequence T = (ˆe,ˆb, ˆτ) in a single for-
+ward pass. This joint objective Ljoint is defined as follows:
+  \mat h cal {L}_ {
+\t e
+x
+t {
+Joi nt}} = -\m at hbb {E}_{(I, C, T)} \sum _{t=1}^{|T|} \log p_\theta (T_t \mid T_{<t}, I, C), 
+(3)
+where pθ is the conditional token distribution. This encour-
+ages the VLA to form an emotion-aware chain of thought,
+where the predicted emotion ˆe and spatial grounding ˆb di-
+rectly inform the subsequent generation of waypoints ˆτ.
+Stage-3: Emotion-Action Alignment (DPO). While LJoint
+aligns tasks, it does not explicitly enforce behavioral consis-
+tency with different emotional intent. Standard preference-
+based alignment methods (like DPO) are non-trivial to ap-
+ply in this field, as AD datasets typically provide only a
+single, actual trajectory τ (i) for any given command C(i),
+rather than ranked preference pairs. To address this, we
+construct a dataset of pseudo-preference pairs via emotion-
+augmented commands. For each original command C(i)
+and its actual trajectory τ (i), we identify an emotion-
+augmented variant C(i)
+k−whose VAD embedding deviates
+most from the original. We use this “negative” command
+to generate a dispreferred, emotion-shifted trajectory eτ (i)
+k−:
+  \l
+ab e l { eq:
+n
+egati
+v e sample} \ beg
+in {ali g ned}
+ C^ {(i)}_{k^-} = \arg \max _k \| e^{(i)}_k - e^{(i)} \|_2, \widetilde {\tau }^{(i)}_{k^-} \sim p_\theta (\tau \mid C^{(i)}_{k^-}, I^{(i)}), \end {aligned} 
+(4)
+This yields a preference pair (τ (i) ≻eτ (i)
+k−) for the command
+C(i). We apply DPO [46] to optimize this preference:
+  \l a bel
+ 
+{eq :
+d
+p
+o
+} \ begi n { a ligne
+d } \ mathc al 
+{L } _{\te
+xt 
+{dpo}} = -\mathbb {E}_{i}\Big [ \log \sigma \!\Big (\beta \Big ( &\log p_\theta (\tau ^{(i)} \mid C^{(i)}) \\ - &\log p_\theta (\widetilde {\tau }^{(i)}_{k^-} \mid C^{(i)}) \Big )\Big )\Big ]. \end {aligned} 
+(5)
+Notably, this stage encourages the model to assign higher
+likelihood to trajectories consistent with the original com-
+mand’s intent while suppressing emotionally perturbed al-
+ternatives, leading to stable yet emotion-aware behavior.
+Inference. After the VLA backbone is trained, its outputs
+are integrated into a lightweight action decoder for precise
+trajectory waypoint generation. During inference, E3AD
+operates end-to-end: it seamlessly processes the input tuple
+(Iego, Iallo, C) to directly produce the emotion state ˆe, the
+grounded target ˆb, coarse trajectory waypoints ˆτ, and the
+verbal response ˆr for passengers. This integrated process
+enables emotion-grounded visual grounding and human-
+aligned planning without additional post-processing.
+4. Experiments
+Datasets.
+This study conducts experiments on sev-
+eral
+challenging
+real-world
+benchmarks,
+including
+Talk2Car [17],
+DrivePilot [34],
+MoCAD [31],
+and
+Talk2Car-Trajectory [14].
+To further assess model ro-
+bustness, we follow the ThinkDeeper protocol [34] and
+introduce refined data splits for the DrivePilot and Mo-
+CAD, resulting in two tailored subsets: Long-Text and
+Corner-Case, each presenting distinct challenges.
+Evaluation Metrics. We evaluate models along two axes:
+(1) joint end-to-end performance and (2) sub-task ablations.
+For end-to-end evaluation, we report trajectory metrics, in-
+cluding ADE, FDE, Fr´echet, DTW, SSPD, and planning ac-
+curacy within g meters (PAg). For sub-task evaluation, we
+follow the Talk2Car C4AV protocol [13] and report IoU for
+visual grounding; MAE and IoU for spatial reasoning; and
+Spearman’s (ρ) and Kendall’s (τ) for emotion awareness.
+Implementation Details. We train E3AD using the MS-
+Swift library [72] with LoRA fine-tuning [19] (rank 16,
+scaling factor 32), a constant learning rate of 10−4, and
+a per-device batch size of 16 for one epoch over the full
+dataset. Training is conducted in two stages: (i) modality
+pretraining and unified fine-tuning to adapt the backbone to
+domain data, and (ii) behavioral alignment via DPO to re-
+fine responses toward the desired driving behavior. All ex-
+periments are run on 8×NVIDIA H200 GPUs. To ensure
+a fair comparison, we freeze the Qwen2.5-VL-7B back-
+bone and train only low-rank adapters, keeping the trainable
+parameter budget comparable to or smaller than the base-
+lines. The gains in Tables 1-2 thus mainly stem from the
+proposed emotion modeling, dual-path spatial reasoning,
+and consistency-oriented training rather than model size.
+Larger generic VLMs (Qwen2.5-VL-72B, Qwen3-VL-8B)
+still underperform E3AD, indicating that task-aligned struc-
+ture and objectives matter more than raw capacity.
+4.1. Joint Evaluation Results
+Table 1 reports the end-to-end performance of E3AD and
+SOTA baselines under unified evaluation settings.
+In
+our formulation, emotion perception, spatial understand-
+ing, and visual grounding jointly provide intermediate evi-
+dence for downstream planning, simulating a more realistic
+AD pipeline that couples perception, cognition, and action.
+The results clearly show that E3AD outperforms all base-
+lines across seven standard trajectory metrics. Compared
+with the strongest baseline (PTPC), our model achieves no-
+table gains of 17.01%, 18.26%, and 20.00% reductions in
+ADE, Fr´echet, and FDE, respectively, indicating more ac-
+
+
+Table 1. End-to-end performance of E3AD vs. state-of-the-art (SOTA) baselines. Best results are bold; second-best are underlined.
+Model
+ADE ↓
+Fr´echet ↓
+SSPD ↓
+DTW ↓
+FDE ↓
+PA2 ↑
+PA4 ↑
+A∗-ROL [18]
+5.63 ± 0.12
+10.22 ± 0.20
+3.06 ± 0.06
+93.35 ± 1.80
+9.34 ± 0.18
+5.45 ± 1.38
+25.13 ± 2.63
+A∗-PE (PDPC) [18]
+5.35 ± 0.13
+9.38 ± 0.22
+2.80 ± 0.07
+86.78 ± 2.28
+8.22 ± 0.21
+25.95 ± 2.66
+46.41 ± 3.03
+GoalGAN [11]
+5.89 ± 0.12
+10.86 ± 0.21
+3.09 ± 0.06
+98.75 ± 2.11
+10.08 ± 0.20
+17.32 ± 2.30
+33.82 ± 2.87
+PECNet [70]
+4.78 ± 0.10
+8.84 ± 0.19
+2.54 ± 0.05
+76.87 ± 1.75
+8.22 ± 0.17
+15.59 ± 2.20
+37.68 ± 2.94
+Y-net [39]
+5.28 ± 0.10
+10.01 ± 0.19
+2.50 ± 0.04
+85.25 ± 1.69
+8.98 ± 0.18
+2.49 ± 0.94
+30.84 ± 2.81
+TTST [39]
+5.24 ± 0.10
+9.79 ± 0.19
+2.47 ± 0.04
+84.02 ± 1.68
+8.50 ± 0.18
+13.98 ± 2.11
+37.54 ± 2.94
+CWS [39]
+4.82 ± 0.11
+9.30 ± 0.20
+2.46 ± 0.05
+78.69 ± 1.84
+8.59 ± 0.18
+3.27 ± 1.08
+34.66 ± 2.89
+TTST + CWS [39]
+4.76 ± 0.10
+8.95 ± 0.19
+2.41 ± 0.05
+76.84 ± 1.77
+8.08 ± 0.17
+17.54 ± 2.31
+40.79 ± 2.96
+PTPC [17]
+4.54 ± 0.11
+8.55 ± 0.20
+2.18 ± 0.05
+72.09 ± 1.86
+7.75 ± 0.19
+24.46 ± 2.61
+45.55 ± 3.03
+Qwen2.5-VL-72B [1]
+12.51 ± 0.28
+26.15 ± 0.52
+5.87 ± 0.14
+206.99 ± 4.80
+25.85 ± 0.55
+1.18 ± 0.42
+3.13 ± 0.60
+Qwen3-VL-8B [63]
+14.07 ± 0.30
+28.38 ± 0.58
+6.65 ± 0.16
+234.81 ± 5.20
+27.96 ± 0.60
+1.89 ± 0.50
+4.50 ± 0.70
+FSDrive-Finetuned [67]
+5.02 ± 0.12
+10.98 ± 0.24
+2.28 ± 0.06
+74.50 ± 2.10
+10.45 ± 0.22
+17.10 ± 2.40
+27.85 ± 2.80
+CAVG (+Planner) [31]
+4.88 ± 0.14
+9.23 ± 0.20
+2.20 ± 0.04
+73.51 ± 1.42
+9.23 ± 0.28
+20.10 ± 2.45
+43.25 ± 2.63
+E3AD (Ours)
+3.88 ± 0.10
+7.23 ± 0.19
+1.86 ± 0.05
+60.07 ± 1.69
+6.64 ± 0.18
+36.21 ± 0.94
+55.62 ± 0.95
+17.01% ↑
+18.26% ↑
+17.20% ↑
+16.67% ↑
+20.00% ↑
+16.71% ↑
+18.10% ↑
+Table 2. Comparison of E3AD and state-of-the-art baselines on visual grounding tasks. Best results are bold; second-best are underlined.
+Model
+Backbone
+Talk2Car
+MoCAD
+DrivePilot
+Corner-case Test sets
+Long-text
+test
+val
+test
+val
+Visual Constr.
+Multi-agent
+Ambiguous
+val
+AttnGrounder [41]
+ResNet-50
+61.32
+62.34
+64.35
+62.31
+64.57
+62.74
+64.82
+64.31
+57.25
+CMSVG [48]
+EfficientNet
+68.61
+67.66
+68.47
+68.87
+69.93
+69.39
+66.77
+67.83
+62.21
+TransVG [12]
+ResNet-101
+65.83
+68.14
+70.85
+66.52
+68.42
+68.12
+66.34
+69.25
+65.45
+CMRT [38]
+ResNet-152
+69.11
+69.42
+68.83
+69.54
+70.37
+67.12
+66.20
+62.23
+64.25
+MDERT [24]
+ResNet-101
+70.52
+66.74
+70.23
+71.35
+72.15
+68.35
+65.37
+68.38
+62.72
+VL-BERT [9]
+ResNet-101
+70.03
+71.42
+70.54
+71.47
+72.36
+70.29
+70.14
+69.84
+66.70
+RSD-LXMERT [3]
+ResNet-101
+72.64
+72.35
+71.46
+73.37
+74.52
+70.22
+71.87
+63.44
+65.80
+VLTVG [64]
+ResNet-101
+63.33
+67.14
+68.26
+65.37
+68.49
+68.51
+66.22
+70.24
+68.80
+Grounding-DINO [36]
+ViT
+68.15
+67.92
+68.48
+69.50
+70.10
+66.17
+65.85
+67.24
+63.15
+UNINEXT [62]
+ResNet-50
+70.87
+70.62
+71.34
+71.35
+73.47
+69.26
+68.78
+71.29
+65.32
+CAVG [31]
+ViT
+74.62
+72.44
+73.25
+75.52
+76.48
+68.39
+67.36
+69.45
+64.36
+Qwen2.5-VL-7B [1]
+VLM
+47.31
+48.20
+49.10
+50.06
+50.84
+45.12
+46.37
+47.05
+41.92
+Qwen2.5-VL-72B [1]
+VLM
+56.17
+57.10
+57.85
+58.92
+59.74
+53.43
+54.25
+55.17
+49.83
+Qwen3-VL-8B [63]
+VLM
+56.19
+57.25
+58.16
+59.05
+59.85
+53.55
+54.49
+55.25
+50.13
+E3AD (Ours)
+VLM
+80.12
+80.94
+79.64
+81.02
+82.56
+76.62
+77.24
+77.05
+77.86
+–
+6.86% ↑
+10.50% ↑
+8.72% ↑
+6.79% ↑
+7.36% ↑
+8.26% ↑
+6.95% ↑
+7.48% ↑
+11.63% ↑
+curate and stable trajectory forecasting. Likewise, E3AD
+improves SSPD and DTW by over 16%, reflecting better
+temporal smoothness and spatial coherence in path gener-
+ation. In planning accuracy, E3AD improves PA2/PA4 by
++16.71%/+18.10%, indicating tighter alignment between
+plans and driving goals. General-purpose VLMs (Qwen-
+VL) still struggle, and FSDrive-Finetuned trails markedly,
+with higher FDE (10.45 vs. 6.64), confirming the limita-
+tions of existing VLA models in handling command-driven
+scenarios. Overall, E3AD’s stronger fusion of command
+semantics, spatial context, and emotion yields more reliable
+and command-aligned waypoint planning.
+4.2. Sub-task Evaluation Results
+We report the performance of E3AD on key sub-tasks
+against SOTA methods. Notably, our model addresses all
+tasks concurrently within one end-to-end trained network,
+whereas other baselines are specialized for only one task.
+Visual Grounding. Table 2 reports visual grounding re-
+sults.
+E3AD surpasses the strongest baseline (CAVG)
+with absolute gains of +6.86% (Talk2Car), +10.50% /
++8.72% (MoCAD test/val), and +6.79% / +7.36% (DrivePi-
+lot test/val). This superiority is especially pronounced in
+challenging scenes. On corner-case splits (occluded, multi-
+agent, ambiguous), it improves by +8.26%, +6.95%, and
++7.48%, and on Long-text by +11.63%. Generic VLMs
+(Qwen) lag markedly across all datasets. These results indi-
+cate our emotion- and spatial-aware grounding yields more
+precise and robust localization within a unified E2E model.
+Spatial Reasoning. Table 4 illustrates that E3AD markedly
+outperforms large VLM baselines (Qwen2.5/3-VL) on tar-
+get localization and depth estimation. While even VLMs
+like Qwen2.5-VL-72B struggle with basic spatial reasoning
+(Location MAE 10.1, Depth MAE 22.68), E3AD demon-
+strates a precise, grounded understanding with an MAE of
+only 0.47 (Location) and 4.25 (Depth), respectively. This
+superiority is consistent in accuracy metrics, where E3AD
+achieves 97.7% PA2 (Location) and 53.1% PA2 (Depth), far
+above the best VLM. These results demonstrate that E3AD
+establishes a new state-of-the-art in 3D spatial perception
+and localization, significantly outperforming conventional
+visual-spatial VLMs in real-world driving scenarios.
+Emotion Recognition. Table 3 presents emotion recogni-
+tion results across valence, arousal, and dominance dimen-
+
+
+Table 3. Emotion prediction across valence, arousal, and domi-
+nance. Reported metrics are Spearman’s ρ and Kendall’s τ corre-
+lations with ground-truth VAD (↑: a higher value is better).
+Model
+Valence ↑
+Arousal ↑
+Dominance ↑
+ρ
+τ
+ρ
+τ
+ρ
+τ
+BERT [15] + Ridge
+0.78
+0.59
+0.75
+0.56
+0.74
+0.55
+RoBERTa [37] + Ridge
+0.80
+0.61
+0.77
+0.59
+0.78
+0.58
+DistilBERT [49] + Ridge
+0.82
+0.64
+0.79
+0.61
+0.79
+0.60
+Qwen2.5-7B-Instruct [1]
+0.11
+0.08
+0.02
+0.02
+0.04
+0.03
+Qwen3-Emb.-4B [69] + Ridge
+0.83
+0.64
+0.79
+0.61
+0.82
+0.63
+E3AD (ours)
+0.95
+0.84
+0.94
+0.82
+0.94
+0.81
+Table 4. Spatial reasoning results on Talk2Car vs. VLM baselines.
+Model
+T2C
+Target Loc. Est.
+Target Depth Est.
+IoU50
+MAE ↓
+PA2
+PA4
+MAE ↓
+PA2
+PA4
+Qwen2.5-VL-7B [1]
+40.23
+3.49
+39.5
+71.1
+22.92
+1.3
+4.2
+Qwen2.5-VL-72B [1]
+51.42
+10.1
+38.5
+77.9
+22.68
+1.5
+4.5
+Qwen3-VL-8B [63]
+52.68
+3.71
+32.8
+71.5
+18.89
+13.7
+26.5
+E3AD (Ours)
+79.32
+0.47
+97.7
+98.8
+4.25
+53.1
+71.2
+sions. Since VAD represents relative emotional magnitudes,
+we adopt Spearman’s rank correlation (ρ) and Kendall’s
+rank correlation coefficient (τ) as evaluation metrics to as-
+sess the monotonic relationship between model predictions
+and labels. The Ridge regressor obtains command embed-
+dings from language models and applies ridge regression
+to predict continuous VAD values, serving as a lightweight
+emotion estimator.
+E3AD achieves the highest correla-
+tion with human annotations, reaching 0.95/0.84 (ρ, τ)
+for valence, 0.94/0.82 for arousal, and 0.94/0.81 for dom-
+inance. In contrast, Qwen2.5-7B and Qwen3-4B exhibit
+near-random correlation levels, revealing limited sensitivity
+to emotion cues. These results show that E3AD effectively
+models the continuous emotion space of human emotions,
+capturing valence (positive-negative sentiment), arousal (in-
+tensity), and dominance (sense of control), enabling human-
+centric planning and verbal feedback for passengers.
+4.3. Ablation Study
+Table 5 summarizes module contributions. Removing the
+egocentric pathway causes the largest VG drop (↓7.0% IoU
+on Talk2Car; ↓6.6% on Vision-Constraint), confirming its
+role in first-person grounding that aligns linguistic refer-
+ences with observed targets. Excluding the allocentric map
+weakens global reasoning by removing complementary spa-
+tial semantics and scene topology. The Emotion Model-
+ing shows the greatest benefit on ambiguous and long-text
+commands (↑4.5%/↑4.8%), enhancing the model’s sensitiv-
+ity to nuanced linguistic cues and emotionally rich expres-
+sions. DPO gives moderate gains by refining multimodal
+alignment. For waypoint planning (Table 6), the allocentric
+map is critical: removal degrades trajectories (ADE/FDE
+(↑10.0%/↑10.1%)), indicating the value of global priors for
+spatial awareness and route consistency.
+The egocentric
+pathway anchors local motion cues; Emotion Modeling and
+DPO further improve emotion consistency.
+As in Fig. 4, DPO raises Spearman correlations for
+Table 5. Ablation study of E3AD’s core components on visual
+grounding performance on the Talk2Car (T2C) benchmark, vision
+constraint (Constr.), ambiguous (Ambg.), and long-context com-
+mand (Long) test sets. Components: Egocentric pathway (Ego.),
+Allocentric pathway (Allo.), DPO, and Emotion Modeling (Emo.).
+Ego.
+Allo.
+Emo.
+DPO
+T2C ↑
+Constr. ↑
+Ambg. ↑
+Long ↑
+✗
+✓
+✓
+✓
+74.48
+71.60
+72.24
+72.47
+✓
+✗
+✓
+✓
+76.48
+73.92
+74.65
+74.76
+✓
+✓
+✗
+✓
+78.78
+74.41
+73.57
+74.12
+✓
+✓
+✓
+✗
+79.55
+75.58
+77.09
+76.44
+✓
+✓
+✓
+✓
+80.12
+76.62
+77.05
+77.86
+Table 6. Ablation of core designs in E3AD on waypoint planning.
+Ego.
+Allo.
+Emo.
+DPO
+ADE ↓
+SSPD ↓
+Fr´echet ↓
+FDE ↓
+✗
+✓
+✓
+✓
+4.12
+2.06
+7.61
+7.02
+✓
+✗
+✓
+✓
+4.27
+2.15
+7.86
+7.31
+✓
+✓
+✗
+✓
+3.93
+1.91
+7.36
+6.80
+✓
+✓
+✓
+✗
+3.96
+1.89
+7.31
+6.86
+✓
+✓
+✓
+✓
+3.88
+1.86
+7.23
+6.64
+Figure 4. DPO’s effect on emotion-trajectory consistency.
+straightness/sinuosity and stabilizes turn smoothness and
+angular variation, yielding geometrically coherent, behav-
+iorally consistent paths.
+Higher arousal corresponds to
+straighter, smoother motion; lower arousal to more cau-
+tious, curved motion. Overall, DPO strengthens emotion-
+trajectory consistency even when numeric gains are modest.
+4.4. Case Study
+Fig. 6 illustrates how E3AD integrates emotion understand-
+ing with spatial reasoning to produce end-to-end behav-
+ior. The VAD plot showcases that the Emotion Modeling
+component captures the linguistic shift from a neutral com-
+mand to its cautious variant: the neutral command maps
+to (0.60, 0.39, 0.45), while adding the qualifier “Be more
+cautious” shifts the VAD state to (0.60, 0.49, 0.51), increas-
+ing Arousal and Dominance. Conditioned on the neutral
+VAD, E3AD plans a standard lane-change maneuver; con-
+ditioned on the cautious VAD, the DPO-aligned policy in-
+stead avoids the lane change altogether. The generated tex-
+tual feedback is also conditioned on emotion state ˆe: the
+EmoThink block infers a cautious, slightly anxious passen-
+ger and produces a reassuring explanation. Taken together
+with the geometric statistics in Fig. 4, these results indi-
+cate that emotion supervision affects not only language but
+also motion geometry. At fixed intent, higher arousal steers
+E3AD toward straighter paths with less lateral oscillation
+and earlier hazard avoidance, while lower arousal produces
+slower approaches with larger safety margins. Thus, the
+
+
+Command: Be careful! The car in front is turning, change lanes now!
+Command: Pull up next to that second traffic cone.
+(b) Multi-agent Scene. E3AD: Accurate grounding with well-aligned 
+waypoint planning. FSDrive-FT: Off-target grounding with risky track.
+(a) Emotion-Rich Command Scene. W/ Emo.: Action matches 
+command urgency. W/o Emo.: Hesitates and changes lanes late.
+E3AD (w/o Emo.)
+E3AD
+FSDrive-FT
+E3AD
+Command: Park in one of the spaces near that black suv on the right.
+(c) Ambiguous Command: E3AD: Safe and map-feasible parking plan.
+FSDrive-FT: Violates map boundaries and drives into non-drivable regions.
+FSDrive-FT
+E3AD
+Wrong 
+Target
+Accurate 
+Grounding
+Timely 
+Lane Change
+Delayed 
+Response
+Map-violating 
+Trajectories
+Physical-feasible 
+Waypoint
+Map Violating
+Feasible
+Figure 5. Qualitative comparison between E3AD and FSDrive-FT in emotion-rich (a), multi-agent (b), and ambiguous (c) scenes.
+Emotional Command: Be more cautious 
+and get closer to the car in front of me!
+Original Command: 
+Get closer to the car in front of me.
+E3AD Reasoning (Emotional) 
+Arousal++
+Dominance++
+Original Command
+VAD: (0.63, 0.38, 0.44)
+VAD: (0.62, 0.48, 0.51)
+Emotional Command
+E3AD Reasoning (Original)
+Original
+Emotional
+Avoid Changing Lanes
+<EmoThink> Estimated VAD: (0.60, 0.49, 0.51), 
+The user is feeling cautious and slightly 
+anxious. </EmoThink>
+<EmoThink> Estimated VAD: (0.60, 0.39, 0.45), 
+The user is expressing a neutral and moderately
+positive sentiment. </EmoThink>
+OK, I'm on my way to the car in front of you.
+No worries! I‘ll be extra careful to get close to 
+the car in front safely as possible.
+E3AD Feedback (Emotional) 
+E3AD Feedback (Original)
+Emotional Command
+Original Command
+Target
+Ego
+Original
+Emotional
+Figure 6. Case study for the impact of different emotional com-
+mands (neutral vs. cautious) on E3AD’s end-to-end performance.
+VAD vector serves as a continuous control signal that se-
+lects among behaviorally distinct yet physically valid plans,
+rather than as a binary switch or style token.
+4.5. Qualitative Analysis
+Fig. 5 showcases qualitative comparisons between E3AD
+and FSDrive-FT [67] across three challenging scenes. In
+the emotion-rich command scene (Panel (a)), E3AD lever-
+ages its continuous VAD-based emotion modeling to infer
+the passenger’s heightened urgency and produces a timely
+lane-change response. In contrast, the variant without emo-
+tion modeling hesitates and reacts too late. In the multi-
+agent scene (Panel (b)), where objects are partially oc-
+cluded and visual cues are ambiguous, E3AD integrates al-
+locentric topology with egocentric evidence through spatial
+reasoning, enabling accurate target grounding and a safe,
+well-aligned trajectory. FSDrive-FT fails to parse the com-
+plex scene structure, resulting in off-target grounding and
+unsafe plans.
+In the ambiguous command scene (panel
+(c)), E3AD resolves linguistic ambiguity by combining lan-
+guage tone with spatial context, producing a feasible, map-
+consistent parking path. In contrast, FSDrive-FT crosses
+map boundaries into non-drivable regions. Overall, this il-
+lustrates how emotion-aware language understanding and
+dual-frame spatial reasoning enable E3AD to deliver more
+interpretable and human-aligned grounding and planning.
+See Appendix C for more qualitative results of E3AD.
+Figure 7. User study on perceived compliance, emotion, safety,
+and preference. (Left) E3AD consistently achieves high Likert
+scores across all age groups. (Right) Comparison of Rank-1 votes,
+E3AD dominates in most dimensions, outperforming all baselines.
+4.6. User Study
+To evaluate the real-world utility of E3AD, we conduct
+a user study with 217 participants.
+Participants viewed
+anonymized clips from five systems and ranked them on
+Command Compliance, Emotion Alignment, Safety, Com-
+fort, and Overall Preference. As shown in Fig. 7, E3AD
+obtains the highest mean scores and most Rank-1 votes
+on most dimensions, indicating a clear preference over the
+baselines.
+Beyond absolute scores, participants consis-
+tently prefer trajectories that match the command’s emo-
+tional tone, maintain correct grounding, and stay physically
+feasible. Systems without emotion modeling (FSDrive-FT,
+generic VLMs) are often seen as hesitant or unsafe, whereas
+E3AD’s emotion-aware grounding and map-feasible plan-
+ning are judged more confident and trustworthy, highlight-
+ing the value of emotion cues in the end-to-end AD.
+5. Conclusion and Future Work
+This work extends E2E AD from purely rational control
+to emotion-aware grounding and planning. We introduce
+OD-E2E AD and propose E3AD, a VLA framework that
+couples continuous VAD-based emotion modeling, dual-
+pathway spatial reasoning, and consistency-oriented train-
+ing. Experiments on four real-world benchmarks show con-
+sistent improvements in visual grounding, trajectory qual-
+ity, and continuous emotion estimation over strong base-
+lines. In future work, we plan to incorporate more human
+preference feedback, richer multimodal emotion signals be-
+yond language, and closed-loop evaluation in high-fidelity
+simulators to further enhance the reliability and acceptance
+of emotion-aware autonomous driving systems.
+
+
+Acknowledgements
+This work was supported in part by the Natural Sciences
+and Engineering Research Council (NSERC) of Canada,
+and part by the Research Services and Knowledge Trans-
+fer Office, University of Macau [SRG2023-00037-IOTSC,
+MYRG-GRG2024-00284-IOTSC], in part by the State Key
+Lab of Intelligent Transportation System [2024-B001].
+References
+[1] Shuai Bai,
+Keqin Chen,
+Xuejing Liu,
+Jialin Wang,
+et al.
+Qwen2.5-vl technical report.
+arXiv preprint
+arXiv:2502.13923, 2025. 3, 6, 7
+[2] Neil Burgess. Spatial memory: how egocentric and allocen-
+tric combine. Trends in cognitive sciences, 10(12):551–557,
+2006. 4
+[3] Hou Pong Chan, Mingxi Guo, and Cheng-Zhong Xu.
+Grounding commands for autonomous vehicles via layer fu-
+sion with region-specific dynamic layer attention. In 2022
+IEEE/RSJ International Conference on Intelligent Robots
+and Systems (IROS), pages 12464–12470. IEEE, 2022. 6
+[4] Jielin Chen, Xuefen Lin, Weifeng Ma, Yuchen Wang, and
+Wei Tang. Eeg-based emotion recognition for road accidents
+in a simulated driving environment. Biomedical signal pro-
+cessing and control, 87:105411, 2024. 2
+[5] Li Chen, Penghao Wu, Kashyap Chitta, Bernhard Jaeger, An-
+dreas Geiger, and Hongyang Li.
+End-to-end autonomous
+driving: Challenges and frontiers.
+IEEE TPAMI, 46(12):
+10164–10183, 2024. 1
+[6] Xingtong Chen, Xia Wang, Cong Fang, Le Fang, et al.
+Emotion-aware design in automobiles: Embracing technol-
+ogy advancements to enhance human-vehicle interaction. In
+Proceedings of the 2025 CHI Conference on Human Factors
+in Computing Systems, pages 1–18, 2025. 1
+[7] Roddy Cowie, Ellen Douglas-Cowie, et al. Emotion recogni-
+tion in human-computer interaction. IEEE Signal processing
+magazine, 18(1):32–80, 2001. 2
+[8] Can Cui, Yunsheng Ma, Xu Cao, Wenqian Ye, Yang Zhou,
+Kaizhao Liang, Jintai Chen, Juanwu Lu, Zichong Yang,
+Kuei-Da Liao, et al.
+A survey on multimodal large lan-
+guage models for autonomous driving. In Proceedings of
+the IEEE/CVF WACV, pages 958–979, 2024. 2
+[9] Hang Dai, Shujie Luo, Yong Ding, and Ling Shao. Com-
+mands for autonomous vehicles by progressively stacking
+visual-linguistic representations.
+In ECCV, pages 27–32.
+Springer, 2020. 6
+[10] Dorottya Demszky, Dana Movshovitz-Attias, Jeongwoo Ko,
+Alan Cowen, Gaurav Nemade, and Sujith Ravi.
+Goemo-
+tions: A dataset of fine-grained emotions. In Proceedings
+of the 58th annual meeting of the association for computa-
+tional linguistics, pages 4040–4054, 2020. 4
+[11] Patrick Dendorfer, Aljosa Osep, and Laura Leal-Taix´e. Goal-
+gan: Multimodal trajectory prediction based on goal position
+estimation. In Proceedings of the Asian Conference on Com-
+puter Vision, 2020. 6
+[12] Jiajun Deng, Zhengyuan Yang, Tianlang Chen, Wengang
+Zhou, and Houqiang Li. Transvg: End-to-end visual ground-
+ing with transformers.
+In Proceedings of the IEEE/CVF
+ICCV, pages 1769–1779, 2021. 6
+[13] Thierry Deruyttere, Simon Vandenhende, Dusan Grujicic,
+Luc Van Gool, and Marie Francine Moens. Talk2car: Taking
+control of your self-driving car. In Proceedings of the 2019
+conference on empirical methods in natural language pro-
+cessing and the 9th international joint conference on natural
+language processing (EMNLP-IJCNLP), pages 2088–2098,
+2019. 5
+[14] Thierry Deruyttere, Dusan Grujicic, Matthew B Blaschko,
+and Marie-Francine Moens. Talk2car: Predicting physical
+trajectories for natural language commands. IEEE Access,
+10:123809–123834, 2022. 5
+[15] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina
+Toutanova. Bert: Pre-training of deep bidirectional trans-
+formers for language understanding. In Proceedings of the
+2019 conference of the North American chapter of the asso-
+ciation for computational linguistics: human language tech-
+nologies, volume 1 (long and short papers), pages 4171–
+4186, 2019. 7
+[16] Marvin Gaertner, Daniel Sauter, Hermann Baumgartl, Thilo
+Rieg, and Ricardo Buettner. Multi-class emotion recognition
+within the valence-arousal-dominance space using eeg. In
+AMCIS, 2021. 2
+[17] Dusan Grujicic, Thierry Deruyttere, Marie-Francine Moens,
+and Matthew B Blaschko. Predicting physical world destina-
+tions for commands given to self-driving cars. In Proceed-
+ings of the AAAI Conference on Artificial Intelligence, pages
+715–725, 2022. 5, 6
+[18] Peter E Hart, Nils J Nilsson, and Bertram Raphael. A formal
+basis for the heuristic determination of minimum cost paths.
+IEEE transactions on Systems Science and Cybernetics, 4
+(2):100–107, 1968. 6
+[19] Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-
+Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen.
+Lora: Low-rank adaptation of large language models.
+In
+ICLR, 2022. 5
+[20] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, et al.
+Planning-oriented autonomous driving.
+In
+Proceedings of the IEEE/CVF CVPR, pages 17853–17862,
+2023. 1
+[21] Xiaosong Jia, Penghao Wu, Li Chen, Jiangwei Xie, Con-
+ghui He, Junchi Yan, and Hongyang Li. Think twice be-
+fore driving: Towards scalable decoders for end-to-end au-
+tonomous driving. In Proceedings of the IEEE/CVF CVPR,
+pages 21983–21994, 2023. 1
+[22] Bo Jiang, Shaoyu Chen, Bencheng Liao, Xingyu Zhang,
+Wei Yin, Qian Zhang, Chang Huang, Wenyu Liu, and Xing-
+gang Wang. Senna: Bridging large vision-language mod-
+els and end-to-end autonomous driving.
+arXiv preprint
+arXiv:2410.22313, 2024. 2
+[23] Sicong Jiang, Zilin Huang, Kangan Qian, Ziang Luo, Tianze
+Zhu, Yang Zhong, Yihong Tang, Menglin Kong, Yunlong
+Wang, Siwen Jiao, et al.
+A survey on vision-language-
+
+
+action models for autonomous driving. In Proceedings of
+the IEEE/CVF ICCV, pages 4524–4536, 2025. 2
+[24] Aishwarya Kamath, Mannat Singh, Yann LeCun, Gabriel
+Synnaeve, Ishan Misra, and Nicolas Carion.
+Mdetr-
+modulated detection for end-to-end multi-modal understand-
+ing. In Proceedings of the IEEE/CVF ICCV, pages 1780–
+1790, 2021. 6
+[25] Seungji Lee, Taejun Lee, Taeyang Yang, Changrak Yoon,
+and Sung-Phil Kim. Detection of drivers’ anxiety invoked by
+driving situations using multimodal biosignals. Processes, 8
+(2):155, 2020. 2
+[26] Wenbo Li, Guofa Li, Ruichen Tan, Cong Wang, Zemin Sun,
+Ying Li, Gang Guo, Dongpu Cao, and Keqiang Li. Review
+and perspectives on human emotion for connected automated
+vehicles. Automotive Innovation, 7(1):4–44, 2024. 2
+[27] Yingyan Li, Shuyao Shang, Weisong Liu, Bing Zhan,
+Haochen Wang, Yuqi Wang, Yuntao Chen, Xiaoman Wang,
+Yasong An, Chufeng Tang, et al. Drivevla-w0: World mod-
+els amplify data scaling law in autonomous driving. arXiv
+preprint arXiv:2510.12796, 2025. 1
+[28] Yue Li, Meng Tian, Zhenyu Lin, Jiangtong Zhu, Dechang
+Zhu, Haiqiang Liu, Yueyi Zhang, Zhiwei Xiong, and Xinhai
+Zhao. Fine-grained evaluation of large vision-language mod-
+els in autonomous driving. In Proceedings of the IEEE/CVF
+ICCV, pages 9431–9442, 2025. 2
+[29] Zhenning Li, Zhiyong Cui, Haicheng Liao, John Ash, Guo-
+hui Zhang, Chengzhong Xu, and Yinhai Wang.
+Steering
+the future: Redefining intelligent transportation systems with
+foundation models. Chain, 1(1):46–53, 2024. 1, 2
+[30] Yuheng Liang, Zheyu Wang, Feng Liu, Mingzhou Liu, and
+Yu Yao. Mamba-va: A mamba-based approach for contin-
+uous emotion recognition in valence-arousal space. In Pro-
+ceedings of the CVPR, pages 5651–5656, 2025. 2
+[31] Haicheng Liao, Huanming Shen, Zhenning Li, Chengyue
+Wang, Guofa Li, Yiming Bie, and Chengzhong Xu. Gpt-
+4 enhanced multimodal grounding for autonomous driving:
+Leveraging cross-modal attention with large language mod-
+els. Communications in Transportation Research, 4:100116,
+2024. 2, 3, 5, 6
+[32] Haicheng Liao, Hanlin Kong, Bonan Wang, Chengyue
+Wang, Wang Ye, Zhengbing He, Chengzhong Xu, and Zhen-
+ning Li.
+Cot-drive: Efficient motion forecasting for au-
+tonomous driving with llms and chain-of-thought prompting.
+IEEE Transactions on Artificial Intelligence, 2025. 2
+[33] Haicheng Liao, Zhenning Li, Guohui Zhang, Keqiang Li,
+and Chengzhong Xu. Toward human-like trajectory predic-
+tion for autonomous driving: A behavior-centric approach.
+Transportation Science, 2025. 1
+[34] Haicheng Liao, Huanming Shen, Bonan Wang, Yongkang
+Li, Yihong Tang, Chengyue Wang, Dingyi Zhuang, Kehua
+Chen, Hai Yang, Chengzhong Xu, et al. Think before you
+drive: World model-inspired multimodal grounding for au-
+tonomous vehicles. arXiv preprint arXiv:2512.03454, 2025.
+5
+[35] Pei Liu, Qingtian Ning, Xinyan Lu, Haipeng Liu, Weil-
+iang Ma, Dangen She, Peng Jia, Xianpeng Lang, and Jun
+Ma.
+Omnireason:
+A temporal-guided vision-language-
+action framework for autonomous driving. arXiv preprint
+arXiv:2509.00789, 2025. 2
+[36] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao
+Zhang, Jie Yang, Chunyuan Li, Jianwei Yang, Hang Su, Jun
+Zhu, et al. Grounding dino: Marrying dino with grounded
+pre-training for open-set object detection.
+arXiv preprint
+arXiv:2303.05499, 2023. 6
+[37] Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar
+Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettle-
+moyer, and Veselin Stoyanov. Roberta: A robustly optimized
+bert pretraining approach. arXiv preprint arXiv:1907.11692,
+2019. 7
+[38] Shujie Luo, Hang Dai, Ling Shao, and Yong Ding. C4av:
+learning cross-modal representations from transformers. In
+ECCV, pages 33–38. Springer, 2020. 6
+[39] Karttikeya Mangalam, Yang An, Harshayu Girase, and Jiten-
+dra Malik. From goals, waypoints & paths to long term hu-
+man trajectory forecasting. In Proceedings of the IEEE/CVF
+ICCV, pages 15233–15242, 2021. 6
+[40] Gerald Matthews, Lisa Dorn, and A Ian Glendon. Person-
+ality correlates of driver stress. Personality and Individual
+Differences, 12(6):535–549, 1991. 4
+[41] Vivek Mittal. Attngrounder: Talking to cars with attention.
+In ECCV, pages 62–73. Springer, 2020. 6
+[42] Luntian Mou, Yiyuan Zhao, Chao Zhou, Bahareh Nakisa,
+Mohammad Naim Rastgoo, Lei Ma, Tiejun Huang, Baocai
+Yin, Ramesh Jain, and Wen Gao.
+Driver emotion recog-
+nition with a hybrid attentional multimodal fusion frame-
+work.
+IEEE Transactions on Affective Computing, 14(4):
+2970–2981, 2023. 2
+[43] Tong Nie, Yuewen Mei, Yihong Tang, Junlin He, Jie Sun,
+Haotian Shi, Wei Ma, and Jian Sun. Steerable adversarial
+scenario generation through test-time preference alignment.
+arXiv preprint arXiv:2509.20102, 2025. 1
+[44] Chenbin Pan, Burhaneddin Yaman, Tommaso Nesti, Abhirup
+Mallik, Alessandro G Allievi, Senem Velipasalar, and Liu
+Ren. Vlp: Vision language planning for autonomous driv-
+ing. In Proceedings of the IEEE/CVF CVPR, pages 14760–
+14769, 2024. 2
+[45] Aditya Prakash, Kashyap Chitta, and Andreas Geiger. Multi-
+modal fusion transformer for end-to-end autonomous driv-
+ing. In Proceedings of the IEEE/CVF CVPR, pages 7077–
+7087, 2021. 1
+[46] Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-
+pher D Manning, Stefano Ermon, and Chelsea Finn. Direct
+preference optimization: Your language model is secretly a
+reward model. Nips, 36:53728–53741, 2023. 5
+[47] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski.
+Simlingo: Vision-only closed-loop autonomous driving with
+language-action alignment.
+In Proceedings of the CVPR,
+pages 11993–12003, 2025. 2
+[48] Nivedita Rufus, Unni Krishnan R Nair, K Madhava Krishna,
+and Vineet Gandhi.
+Cosine meets softmax: A tough-to-
+beat baseline for visual grounding. In ECCV, pages 39–50.
+Springer, 2020. 6
+[49] Victor Sanh,
+Lysandre Debut,
+Julien Chaumond,
+and
+Thomas Wolf. Distilbert, a distilled version of bert: smaller,
+faster, cheaper and lighter. arXiv preprint, 2019. 7
+
+
+[50] Ranjan Sapkota, Yang Cao, Konstantinos I Roumeliotis,
+and Manoj Karkee. Vision-language-action models: Con-
+cepts, progress, applications and challenges. arXiv preprint
+arXiv:2505.04769, 2025. 2
+[51] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song,
+Steven L Waslander, Yu Liu, and Hongsheng Li. Lmdrive:
+Closed-loop end-to-end driving with large language mod-
+els. In Proceedings of the IEEE/CVF CVPR, pages 15120–
+15130, 2024. 2
+[52] Jacopo Sini, Antonio Costantino Marceddu, Massimo Vi-
+olante, and Riccardo Dess`ı.
+Passengers’ emotions recog-
+nition to improve social acceptance of autonomous driving
+vehicles. In Progresses in Artificial Intelligence and Neural
+Systems, pages 25–32. Springer, 2020. 2
+[53] Yihong Tang and Wei Ma.
+Intent:
+Trajectory predic-
+tion framework with intention-guided contrastive clustering.
+IEEE Open Journal of Intelligent Transportation Systems,
+2026. 2
+[54] Yihong Tang, Zhaokai Wang, Ao Qu, Yihao Yan, Zhaofeng
+Wu, Dingyi Zhuang, Jushi Kai, Kebing Hou, Xiaotong Guo,
+Jinhua Zhao, et al. Itinera: Integrating spatial optimization
+with large language models for open-domain urban itinerary
+planning. In Proceedings of the 2024 Conference on Em-
+pirical Methods in Natural Language Processing: Industry
+Track, pages 1413–1432, 2024. 2
+[55] Yihong Tang, Ao Qu, Zhaokai Wang, Dingyi Zhuang,
+Zhaofeng Wu, Wei Ma, Shenhao Wang, Yunhan Zheng,
+Zhan Zhao, and Jinhua Zhao.
+Sparkle: Mastering basic
+spatial capabilities in vision language models elicits gener-
+alization to spatial reasoning. In Findings of the Association
+for Computational Linguistics: EMNLP 2025, pages 4083–
+4103, 2025. 2
+[56] Yihong Tang, Zhan Zhao, Weipeng Deng, Shuyu Lei, Yue-
+bing Liang, and Zhenliang Ma.
+Routekg: A knowledge
+graph-based framework for route prediction on road net-
+works. IEEE TITS, 2025. 2
+[57] Amy Beth Warriner, Victor Kuperman, and Marc Brysbaert.
+Norms of valence, arousal, and dominance for 13,915 en-
+glish lemmas.
+Behavior research methods, 45(4):1191–
+1207, 2013. 4
+[58] Guoliang Xiang, Song Yao, Xianhui Wu, Hanwen Deng,
+Guojie Wang, Yu Liu, Fan Li, and Yong Peng. Driver multi-
+task emotion recognition network based on multi-modal fa-
+cial video analysis. Pattern Recognition, 161:111241, 2025.
+2
+[59] Huafei Xiao, Wenbo Li, Guanzhong Zeng, Yingzhang Wu,
+Jiyong Xue, Juncheng Zhang, Chengmou Li, and Gang Guo.
+On-road driver emotion recognition using facial expression.
+Applied Sciences, 12(2):807, 2022. 2
+[60] Shuo Xing, Chengyuan Qian, Yuping Wang, Hongyuan Hua,
+Kexin Tian, Yang Zhou, and Zhengzhong Tu. Openemma:
+Open-source multimodal model for end-to-end autonomous
+driving.
+In Proceedings of the WACV, pages 1001–1009,
+2025. 2
+[61] Zhenhua Xu, Yujia Zhang, Enze Xie, Zhen Zhao, Yong Guo,
+Kwan-Yee K Wong, Zhenguo Li, and Hengshuang Zhao.
+Drivegpt4: Interpretable end-to-end autonomous driving via
+large language model. IEEE RAL, 2024. 2
+[62] Bin Yan, Yi Jiang, Jiannan Wu, Dong Wang, Ping Luo, Ze-
+huan Yuan, and Huchuan Lu.
+Universal instance percep-
+tion as object discovery and retrieval. In Proceedings of the
+IEEE/CVF CVPR, pages 15325–15336, 2023. 6
+[63] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,
+Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen
+Huang, Chenxu Lv, et al. Qwen3 technical report. arXiv
+preprint arXiv:2505.09388, 2025. 6, 7
+[64] Li Yang, Yan Xu, Chunfeng Yuan, Wei Liu, Bing Li, and
+Weiming Hu.
+Improving visual grounding with visual-
+linguistic verification and iterative reasoning. In proceedings
+of the IEEE/CVF CVPR, pages 9499–9508, 2022. 6
+[65] Yi Yang, Qingwen Zhang, Ci Li, Daniel Sim˜oes Marta,
+Nazre Batool, and John Folkesson.
+Human-centric au-
+tonomous systems with llms for user command reasoning. In
+Proceedings of the IEEE/CVF WACV, pages 988–994, 2024.
+2
+[66] Zhenjie Yang,
+Yilin Chai,
+Xiaosong Jia,
+Qifeng Li,
+Yuqian Shao, Xuekai Zhu, Haisheng Su, and Junchi Yan.
+Drivemoe:
+Mixture-of-experts for vision-language-action
+model in end-to-end autonomous driving.
+arXiv preprint
+arXiv:2505.16278, 2025. 1
+[67] Shuang Zeng, Xinyuan Chang, Mengwei Xie, Xinran Liu,
+Yifan Bai, Zheng Pan, Mu Xu, and Xing Wei. Futuresight-
+drive: Thinking visually with spatio-temporal cot for au-
+tonomous driving. arXiv preprint arXiv:2505.17685, 2025.
+2, 6, 8
+[68] Sebastian Zepf, Javier Hernandez, Alexander Schmitt, Wolf-
+gang Minker, and Rosalind W Picard. Driver emotion recog-
+nition for intelligent vehicles: A survey. ACM Computing
+Surveys (CSUR), 53(3):1–30, 2020. 1
+[69] Yanzhao Zhang, Mingxin Li, Dingkun Long, Xin Zhang,
+Huan Lin, Baosong Yang, Pengjun Xie, An Yang, Dayiheng
+Liu, Junyang Lin, et al. Qwen3 embedding: Advancing text
+embedding and reranking through foundation models. arXiv
+preprint arXiv:2506.05176, 2025. 7
+[70] He Zhao and Richard P Wildes. Where are you heading?
+dynamic trajectory prediction with expert goal examples. In
+IEEE/CVF ICCV, pages 7629–7638, 2021. 6
+[71] Jingyuan Zhao, Yuyan Wu, Rui Deng, Susu Xu, Jinpeng
+Gao, and Andrew Burke. A survey of autonomous driving
+from a deep learning perspective. ACM Computing Surveys,
+57(10):1–60, 2025. 1
+[72] Yuze Zhao, Jintao Huang, Jinghan Hu, Daoze Zhang,
+Zeyinzi Jiang, Zhikai Wu, Baole Ai, Ang Wang, Wen-
+meng Zhou, and Yingda Chen.
+Swift:
+A scalable
+lightweight infrastructure for fine-tuning.
+arXiv preprint
+arXiv:2408.05517, 2024. 5
+[73] Xingcheng Zhou, Xuyuan Han, Feng Yang, Yunpu Ma,
+and Alois C Knoll. Opendrivevla: Towards end-to-end au-
+tonomous driving with large vision language action model.
+arXiv preprint arXiv:2503.23463, 2025. 2
+[74] Zewei Zhou, Tianhui Cai, Seth Z Zhao, Yun Zhang, Zhiyu
+Huang, Bolei Zhou, and Jiaqi Ma.
+Autovla: A vision-
+language-action model for end-to-end autonomous driving
+with adaptive reasoning and reinforcement fine-tuning. In
+The Thirty-ninth Nips, 2025. 2

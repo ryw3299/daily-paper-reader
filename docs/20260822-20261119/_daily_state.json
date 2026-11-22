@@ -398,6 +398,10 @@
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 6.0,
@@ -590,6 +594,10 @@
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 6.0,
@@ -882,6 +890,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 6.0,

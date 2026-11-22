@@ -1,0 +1,1590 @@
+From Human Intention to Action Prediction: Intention-Driven
+End-to-End Autonomous Driving
+Huan Zheng1*, Yucheng Zhou1*, Tianyi Yan1*, Jiayi Su1, Hongjun Chen1, Dubing Chen1,
+Xingtai Gui1, Wencheng Han1, Runzhou Tao2, Zhongying Qiu2, Jianfei Yang2, Jianbing Shen1†
+1SKL-IOTSC, CIS, University of Macau
+2Zhejiang ZEEKR Automobile Research & Development Co., Ltd.
+Abstract
+While end-to-end autonomous driving has
+achieved remarkable progress in geometric con-
+trol, current systems remain constrained by a
+command-following paradigm that relies on
+simple navigational instructions. Transition-
+ing to genuinely intelligent agents requires the
+capability to interpret and fulfill high-level, ab-
+stract human intentions. However, this advance-
+ment is hindered by the lack of dedicated bench-
+marks and semantic-aware evaluation metrics.
+In this paper, we formally define the task
+of Intention-Driven End-to-End Autonomous
+Driving and present Intention-Drive, a com-
+prehensive benchmark designed to bridge this
+gap. We construct a large-scale dataset featur-
+ing complex natural language intentions paired
+with high-fidelity sensor data. To overcome
+the limitations of conventional trajectory-based
+metrics, we introduce the Imagined Future
+Alignment (IFA), a novel evaluation protocol
+leveraging generative world models to assess
+the semantic fulfillment of human goals beyond
+mere geometric accuracy. Furthermore, we ex-
+plore the solution space by proposing two dis-
+tinct paradigms: an end-to-end vision-language
+planner and a hierarchical agent-based frame-
+work.
+The experiments reveal a critical di-
+chotomy where existing models exhibit satisfac-
+tory driving stability but struggle significantly
+with intention fulfillment. Notably, the pro-
+posed frameworks demonstrate superior align-
+ment with human intentions.
+1
+Introduction
+End-to-end autonomous driving (E2E AD) has re-
+cently gained significant traction, promising to
+overcome the limitations of traditional modular
+pipelines by learning complex driving policies di-
+rectly from data (Chen et al., 2024a; Mao et al.,
+2023b; Shao et al., 2024a; Wu et al., 2025). This
+approach has led to remarkable progress in vehicle
+*Equal Contribution.
+†Corresponding Author.
+control and navigation (Hu et al., 2023; Fu et al.,
+2025; Ma et al., 2024b). However, as illustrated
+in Figure 1(a), these systems predominantly op-
+erate at a basic intelligence level. They function
+as mere command-followers that execute simple
+navigational instructions such as “turn left”, “turn
+right”, or “go straight”, rather than as intelligent
+agents capable of interpreting human goals (Hu
+et al., 2023). This fundamental limitation prevents
+current systems from achieving genuinely intelli-
+gent autonomy, which requires a paradigm shift
+from merely executing steering commands to un-
+derstanding and fulfilling high-level, abstract hu-
+man intentions. The leap from a command-follower
+to an intention-fulfiller represents a critical mile-
+stone in E2E AD intelligence, yet this transition is
+currently hindered by a significant gap.
+The distinction between command-following
+and intention-fulfilling becomes apparent when ex-
+amining complex real-world scenarios. As shown
+in Figure 1(b), a human driver can readily interpret
+and act upon an instruction like “parked next to
+the building on the right side of the road”. This
+requires not just geometric path planning but also
+comprehensive scene understanding, spatial rea-
+soning, and semantic interpretation. In contrast,
+as presented in Figure 1(c), conventional E2E AD
+systems operate on a fundamentally different archi-
+tectural principle, processing simple steering com-
+mands and scene perception to generate trajectories
+without the comprehension of the driver’s underly-
+ing goal (Hwang et al., 2024; Pan et al., 2024; Liu
+et al., 2025). The desired paradigm, as shown in
+Figure 1(d), would function as an intention-fulfiller,
+directly taking high-level human intention as input
+and requiring a comprehensive understanding that
+fuses intention recognition with scene perception
+to generate appropriate driving actions.
+Recent research attempts to incorporate Large
+Language Models (LLMs) into autonomous driv-
+ing frameworks, leveraging their semantic under-
+1
+arXiv:2512.12302v2  [cs.CV]  7 Jan 2026
+
+
+Expected Trajectory
+Human Driver
+Fulfill Human Intention
+Level of 
+Intelligence
+Navigation 
+Information
+Human 
+Intention
+Turn Left
+Turn Right
+Go Straight
+Steering 
+Command
+Trajectory
+Human 
+Intention
+Trajectory
+(d) Intention-Driven
+E2E AD
+(c) Conventional 
+E2E AD
+E2E 
+Model
+(b) An E2E AD Case Fulfilling Human Intention
+(a) A Comparison of Intelligence Levels
+Parked next to the 
+building on the 
+right side of the road.
+Intelligent
+More Intelligent
+E2E 
+Model
+Trajectory 
+Prediction
+Intention 
+Recognition
+Trajectory 
+Prediction
+Scene 
+Perception
+Comprehensive 
+Understanding
+Scene 
+Perception
+Conventional E2E AD
+Intention-driven E2E AD
+Figure 1: Conceptual illustration of the shift from conventional to intention-driven end-to-end autonomous driving. (a)
+A comparison of intelligence levels, highlighting the leap from executing low-level navigational commands to understanding
+high-level, abstract human intentions. (b) An example scenario where the autonomous vehicle must interpret and fulfill the
+complex intention, which requires reasoning beyond simple steering command. (c) The architecture of a conventional end-to-end
+autonomous driving system, which acts as a command-follower by translating low-level steering commands and scene perception
+into a trajectory. (d) Our proposed paradigm for an intention-driven system, which functions as an intention-fulfiller.
+standing capabilities (Han et al., 2025; Sima et al.,
+2024; Yuan et al., 2024; Yang et al., 2023, 2025b,a).
+However, a critical issue has emerged: when these
+models undergo task-specific training using fixed,
+limited sets of query templates rather than diverse
+natural instructions, their ability to interpret human
+intentions degrades (Li et al., 2025a; Fu et al., 2025;
+Zeng et al., 2025). Although built upon LLMs that
+possess strong language understanding capabilities,
+these models become overly specialized for trajec-
+tory prediction at the expense of semantic fidelity,
+ultimately failing to accurately interpret complex
+human instructions like those shown in Figure 1(b).
+This phenomenon represents a significant obstacle
+in the development of intention-aware AD systems.
+The field is further hampered by the absence of
+standardized evaluation frameworks that can prop-
+erly measure a system’s ability to understand and
+fulfill human intentions. Current evaluation met-
+rics (Xu et al., 2024; Hu et al., 2023; Dauner et al.,
+2024) focus primarily on the geometric accuracy of
+trajectory prediction, which fails to capture whether
+the vehicle has actually satisfied the human’s un-
+derlying goal. Without appropriate benchmarks
+to quantify this crucial capability, progress toward
+intention-driven autonomous driving remains un-
+measurable and therefore difficult to achieve. This
+critical gap has persisted despite the increasing so-
+phistication of E2E AD systems.
+To address these fundamental challenges, we for-
+mulate the task of intention-driven end-to-end au-
+tonomous driving. We further introduce Intention-
+Drive, the first comprehensive benchmark specifi-
+cally designed to evaluate an AD system’s ability
+to translate high-level human intentions into safe
+and precise driving actions. Using this benchmark,
+we develop and evaluate two distinct methodologi-
+cal frameworks to tackle the intention-driven task.
+Through extensive experiments, we analyze the
+capability of current state-of-the-art models, re-
+vealing a critical dichotomy between basic driving
+competency and intention understanding.
+The key contributions of this work are fourfold:
+• We formally define Intention-Driven End-to-End
+Autonomous Driving, a new problem setting that
+requires models to ground high-level, abstract
+human intentions into driving trajectories.
+• We introduce Intention-Drive, the first compre-
+hensive benchmark for this task, featuring a large-
+scale dataset with natural language intentions and
+a novel evaluation protocol based on Imagined
+Future Alignment (IFA), which assesses semantic
+goal fulfillment beyond geometric accuracy.
+• We present two baseline frameworks: an end-to-
+end vision-language planner that directly maps
+inputs to trajectories, and a hierarchical agent-
+based framework that decomposes intention un-
+derstanding and vehicle action.
+• Our experiments uncover a fundamental discon-
+nect between geometric driving competence and
+semantic intention in existing models, while our
+approach achieves substantially improved align-
+ment with human intentions.
+2
+Related Work
+End-to-end (E2E) autonomous driving replaces the
+traditional modular pipeline with a single, jointly
+optimized model that maps sensor inputs directly
+to driving commands or trajectories (Chen et al.,
+2024a; Zhang et al., 2025c). Early approaches es-
+tablished strong baselines by unifying perception,
+2
+
+
+prediction, and planning (Hu et al., 2023; Jiang
+et al., 2023), while subsequent works incorporated
+uncertainty modeling (Chen et al., 2024b) and gen-
+erative paradigms such as diffusion models (Zheng
+et al., 2024; Liao et al., 2025). Despite encouraging
+open-loop results, E2E systems often struggle in in-
+teractive closed-loop settings, exhibiting brittleness
+and suboptimal behaviors (Jia et al., 2024; Fu et al.,
+2025). To address these limitations, recent stud-
+ies increasingly explore Vision-Language-Action
+(VLA) models to enhance robustness and high-
+level decision-making (Li et al., 2025a; Zhou et al.,
+2025a; Chen et al., 2025). VLA models integrate
+multi-modal perception, language understanding,
+and action generation, enabling agents to interpret
+high-level instructions and execute grounded be-
+haviors (Ma et al., 2024a; Driess et al., 2023). In au-
+tonomous driving, prior work emphasizes human-
+like cognitive structures and explicit reasoning for
+improved interpretability and control (Wang et al.,
+2025; Lu et al., 2025), including Chain-of-Thought
+reasoning (Yuan et al., 2025; Li et al., 2025a) and
+policy optimization via RL or DPO (Jiang et al.,
+2025; Fang et al., 2025). Recent advances further
+incorporate active perception to reduce uncertainty
+during decision-making (Zheng et al., 2025). A full
+version is provided in Appendix A.
+3
+Intention-Drive Benchmark
+3.1
+Task Definition
+We formally define the task of intention-driven end-
+to-end autonomous driving. The primary objective
+is to generate a safe, feasible, and contextually ap-
+propriate driving trajectory that semantically satis-
+fies a human intention. This task requires an agent
+to move beyond simple navigational command fol-
+lowing and instead perform complex reasoning that
+grounds linguistic concepts.
+Formally, let the state of the environment at
+timestep t be represented by a set of sensor obser-
+vations Ot, consisting solely of multi-view camera
+images {I1
+t , . . . , IN
+t }. Given a history of observa-
+tions over a time horizon H, denoted as Ot−H:t,
+and a high-level human intention articulated as a
+natural language instruction Ilang, the goal is to
+learn a policy π that predicts a future driving tra-
+jectory Tt+1:t+K. The trajectory consists of K
+waypoints in the bird’s-eye-view (BEV) coordinate
+frame, Tt+1:t+K = {pt+1, . . . , pt+K}, where each
+waypoint is defined as pk = (xk, yk). The policy
+is parameterized by θ and can be expressed as:
+Tt+1:t+K = π(Ot−H:t, Ilang|θ).
+(1)
+Specifically, the input is defined as a tuple
+(Ot−H:t, Ilang), where Ot−H:t represents a se-
+quence of visual data capturing the history of the
+scene, and Ilang denotes a free-form natural lan-
+guage string describing human intention. Based on
+these inputs, the model predicts the output future
+trajectory Tt+1:t+K for the ego-vehicle, which is
+formalized as a sequence of K 2D waypoints.
+This task presents several fundamental chal-
+lenges that distinguish it from conventional end-to-
+end driving. ❶It demands robust semantic ground-
+ing, requiring the model to associate abstract lin-
+guistic concepts with their corresponding physical
+entities and spatial relationships in the 3D world.
+❷It necessitates sophisticated compositional rea-
+soning to deconstruct complex instructions into a
+sequence of executable driving maneuvers. ❸Eval-
+uating success cannot rely solely on geometric met-
+rics to a ground-truth trajectory, as multiple distinct
+paths could validly fulfill the same intention.
+3.2
+Data Construction
+Existing datasets (Dauner et al., 2024; Jia et al.,
+2024; Caesar et al., 2019) primarily focus on trajec-
+tory prediction from navigational commands and
+sensor data, lacking the rich and abstract language
+that characterizes human intentions. To bridge this
+gap, we introduce Intention-Drive, a benchmark
+specifically designed for intention-driven end-to-
+end autonomous driving.
+The creation of the Intention-Drive dataset fol-
+lows a multi-stage pipeline designed to generate
+realistic and diverse intention-action pairs. Our
+process leverages the OpenScene dataset (Con-
+tributors, 2023) and employs advanced Large Lan-
+guage Models (LLMs) for language annotation.
+The pipeline consists of the following key steps:
+Foundational Scenario Curation. The construc-
+tion of our benchmark commences with the rig-
+orous curation of driving scenarios sourced from
+the large-scale OpenScene dataset (Contributors,
+2023; Sima et al., 2023). From this corpus, we
+strategically select and filter a subset of scenarios,
+comprising 18,765 scenes for training and 1,959
+for evaluation. For each scenario, we extract a tem-
+poral sequence of sensor observations paired with
+the ego-vehicle’s future trajectory.
+Hierarchical Dataset Construction. We devised
+a hierarchical annotation strategy powered by an
+3
+
+
+(a) Low-Level Atomic Instruction Generation
+(b) High-Level Human Intention Generation
+Large Vision-Language Model (LVLM)
+ "Timestamp": 0,
+ "Atomic Instruction": "Straight",
+ "Speed Status": "Accelerate", 
+ "Timestamp": 1,
+ "Atomic Instruction": "Straight",
+ "Speed Status": "Accelerate", 
+ "Timestamp": 2,
+Atomic 
+Instructions
+The following are 
+the predicted atomic 
+instructions for the 
+input video: 
+LVLM
+Careful, traffic's stopping 
+up ahead—watch the cones.
+Human Intention
+ ……,
+"Timestamp": 38,
+ "Atomic Instruction": "Straight",
+ "Speed Status": " Decelerate", 
+"Timestamp": 39,
+ "Atomic Instruction": "Stop",
+ "Speed Status": "Decelerate", 
+Inputs for Generating Human Intentions
+Video Sequences
+The Atomic Instructions
+Inputs for Generating Atomic Instructions
+1. Straight
+2. Turn Left
+3. Turn Right
+4. U-turn Left
+5. U-turn Right
+6. Reverse Left
+7. Reverse Right
+8. Reverse
+9. Change Lane Left
+10. Change Lane Right
+11. Stop
+Speed Dictionary
+1. Accelerate
+2. Decelerate
+3. Maintain Speed
+Video Sequences
+Time
+Action Dictionary
+Ego Status
+1. Ego Location
+2. Driving Command
+3. Speed Information
+Prompt for Generating Atomic Instructions
+You are an expert Autonomous Driving Systems 
+Engineer and a professional Data Annotator. Your 
+mission is to meticulously analyze a sequence of 
+vehicle state data points and camera images, ……
+Prompt for Generating Driver Actions
+You are generating a driving instruction that sounds 
+exactly like a human speaking to another driver ……
+Figure 2: The pipeline of hierarchical dataset construction. We utilize Large Vision-Language Models (LVLMs) to annotate
+scenarios across three abstraction levels. (a) Low-Level Atomic Instruction Generation infers fine-grained motion primitives
+from vehicle states and video sequences. (b) High-Level Human Intention Generation produces natural, context-aware human
+intentions by reasoning over the visual scene and vehicle dynamics.
+advanced Large Vision-Language Model (LVLM).
+Specifically, we employ GPT-5.2 as the core an-
+notation engine, leveraging its state-of-the-art ca-
+pabilities in multimodal reasoning and semantic
+alignment to parse complex driving scenarios. This
+process synthesizes two distinct levels of linguistic
+instructions for each driving scenario, as illustrated
+in Figure 2. The detailed pipeline for obtaining
+these instructions is described as follows:
+• Low-Level Atomic Instructions: We first define
+the most granular, standardized driving primi-
+tives representing the fundamental actions of the
+ego vehicle. For each timestamp, a VLM is em-
+ployed to infer the primary maneuver from a
+predefined vocabulary of atomic actions, such
+as Straight, Turn Left, Change Lane Right,
+and Stop. Concurrently, a speed status is as-
+signed, reflecting the vehicle’s instantaneous
+speed profile. This initial layer ensures a pre-
+cise and unambiguous representation of the vehi-
+cle’s movement at the most basic level, forming
+the foundational understanding for subsequent
+high-level generations.
+• High-Level Human Intentions: Next, leveraging
+the comprehensive understanding derived from
+low-level atomic instructions, alongside the sen-
+sor inputs, these instructions capture natural lan-
+guage utterances from a passenger’s perspective.
+These represent abstract goals or observations
+that require a higher degree of contextual reason-
+ing and semantic interpretation. This high level
+focuses on mirroring the intuitive way humans
+communicate driving intentions, often blending
+direct commands with observations or warnings.
+Data Verification and Refinement. To ensure an-
+notation quality, we implement a rigorous verifica-
+tion pipeline where the VLM evaluates the logical
+coherence and semantic alignment between instruc-
+tion levels. Any identified discrepancies trigger a
+human-in-the-loop refinement process for manual
+correction to guarantee the reliability.
+3.3
+Evaluation Protocol
+To rigorously assess autonomous agents, we pro-
+pose a comprehensive evaluation framework that
+decouples basic driving competency from high-
+level intention fulfillment. This protocol integrates
+a standardized metric for driving quality (following
+(Hu et al., 2023; Caesar et al., 2019)) with a novel
+generative approach for semantic verification.
+3.3.1
+Geometric Metrics
+Before an agent can fulfill complex intentions, it
+must ensure basic driving safety and geometric sta-
+bility. We employ two standard metrics to evaluate
+this fundamental capability:
+Average Displacement Error (ADE): This metric
+measures the geometric fidelity of the predicted tra-
+jectory. It is calculated as the average L2 distance
+between the predicted waypoints and the ground
+truth trajectory over the time horizon. While a low
+ADE indicates stable motion generation akin to the
+human demonstration, it is insufficient alone for
+intention evaluation, as multiple distinct paths may
+validly fulfill the same abstract intention.
+Collision Rate (CR): This serves as a hard safety
+constraint. It is defined as the percentage of test
+scenarios where the ego-vehicle collides with any
+obstacles or road boundaries. A collision represents
+a critical failure of the driving system.
+3.3.2
+Imagined Future Alignment
+While the geometric metrics ensure kinematic
+safety, it remains blind to the semantic nuances
+of human intention. To bridge this gap, we intro-
+duce Imagined Future Alignment (IFA), a novel
+evaluation paradigm that leverages a generative
+world model to explicitly reason about the future
+consequences of planned actions.
+4
+
+
+Conditional Future Hallucination. Instead of
+evaluating abstract trajectory coordinates, we map
+the agent’s plan back into the visual domain. We
+employ a pre-trained generative world model (Gao
+et al., 2024), denoted as W, which serves as a neu-
+ral simulator. Given the current visual observation
+sequence Ot and the agent’s predicted trajectory
+Tpred, the world model hallucinates a photo-realistic
+future video clip ˆVfuture:
+ˆVfuture = W(Ot, Tpred).
+(2)
+This process effectively translates the numerical
+driving plan into a perceptible visual narrative, en-
+abling a more grounded semantic evaluation.
+Dual-Aspect Semantic Reasoning. We utilize a
+VLM as a Semantic Judge to verify the alignment
+between the hallucinated future ˆVfuture and the high-
+level human intention Ilang. To capture both the
+execution quality and the final outcome, we decom-
+pose the evaluation into two distinct scores:
+Process Fidelity Score (Sproc ∈[0, 1]): This con-
+tinuous metric measures the semantic consistency
+of the driving behavior throughout the entire video
+duration. It reflects how well the agent’s driving
+style, speed, and interaction patterns match the de-
+scriptive aspects of the intention.
+Goal Completion Score (Sgoal ∈{0, 1}): This bi-
+nary metric assesses the success of the final state.
+The Judge examines the end of the hallucinated
+sequence to determine if the core objective (e.g.,
+reaching a specific destination, parking in the cor-
+rect slot) has been definitively achieved.
+IFA Calculation. The final IFA score for a given
+scenario is computed as the product of the goal
+completion and the process fidelity. This design
+ensures that a scenario is only considered valid if
+the goal is achieved, while the score magnitude re-
+wards precise adherence to behavioral instructions:
+IFA = Sgoal × Sproc
+(3)
+By integrating the world model, IFA transcends
+traditional geometric metrics, providing a verifi-
+able and interpretable measure of how well an au-
+tonomous agent understands and reasons about the
+future in the context of human commands.
+4
+Method
+To systematically address the challenges of in-
+terpreting and executing high-level human in-
+tentions, we explore the solution space through
+two distinct methodological paradigms. We first
+introduce a unified end-to-end framework that
+leverages a Large Vision-Language Model to di-
+rectly regress driving trajectories from multi-modal
+visual-linguistic inputs. Subsequently, we present a
+hierarchical agent-based framework that decouples
+the task into semantic command generation and
+kinematic execution, explicitly bridging the gap
+between abstract intention and control.
+4.1
+End-to-End Framework
+To systematically evaluate the proposed Intention-
+Drive benchmark, we propose a strong end-to-
+end baseline. Unlike traditional E2E models that
+rely on simple steering commands, the intention-
+fulfilling task demands a model capable of deep se-
+mantic grounding, mapping abstract linguistic con-
+cepts to specific visual features and geometric ac-
+tions. To this end, we adopt InternVL3.0-2B (Zhu
+et al., 2025) as our foundational architecture. The
+overall pipeline is illustrated in Figure 3(a)-(b).
+Visual-Linguistic Encoding.
+Perceiving fine-
+grained scene details is a prerequisite for under-
+standing complex human intentions. The proposed
+E2E framework utilizes a Vision Transformer (ViT)
+as the visual encoder Φvis to process the sequence
+of visual observations O1:t. To preserve spatial
+fidelity while adapting to the LLM’s input space,
+the extracted features undergo a Pixel Unshuffle
+operation followed by an MLP projector. Formally,
+the visual tokens Zvis are obtained as:
+Zvis = MLP(PixelUnshuffle(Φvis(Ot−H:t))).
+(4)
+Simultaneously, the high-level human intention
+Ilang is processed by a text tokenizer to yield the
+linguistic tokens:
+Zlang = Tokenizer(Ilang).
+(5)
+These visual and textual tokens are concatenated
+to form a unified multimodal input sequence Zin =
+[Zvis, Zlang], projecting the driving scene and user
+intention into a shared embedding space.
+LLM-Based Reasoning.
+The core decision-
+making module is powered by Qwen2.5 (Bai et al.,
+2025), a SoTA LLM parameterized by ΘE2E. By
+initializing with weights from ReCogDrive (Li
+et al., 2025a), the model inherits a preliminary un-
+derstanding of driving physics.
+Trajectory Generation. We formulate the plan-
+ning problem as an auto-regressive token gener-
+ation task. Instead of regressing numerical val-
+5
+
+
+Image 
+Encoder
+Front-View Image
+Human Intention
+Qwen2.5
+Slow down, there's a truck 
+pulling out by the crosswalk.
+Here is the planning trajectory 
+[PT, (-2.65, -0.84, 0.00), …].
+Predicted Trajectory
+Time
+Video Sequences
+Slow down, there 
+is a truck pulling…
+Human Intention
+InternVL3.0
+(b) Processing of the 
+Subsequent Frames
+Predicted Trajectory
+Chat Message
+Current 
+Frame
+Front 
+View 
+Time
+Video Sequences
+Slow down, there 
+is a truck pulling…
+Human Intention
+Front 
+View 
+VLM
+Chat Message
+Steering Command
+Multi-View Images
+Ego Status
+E2E Model
+Steering Command
+(d) Steering Command 
+Execution
+Predicted Trajectory
+Here is the planning 
+trajectory [PT, (4.55, 
+0.02, 0.01), …].
+Steering Command of 
+Timestamp t: turn right.
+The Frame of Timestamp t
+Text Tokenizer
+(a) Processing of the 
+First Frame 
+(c) Steering Command 
+Generation
+End-to-End Framework
+Agent-based Framework
+Figure 3: Overview of the proposed methodological frameworks. Top: The End-to-End Framework ((a)-(b)) employs
+InternVL3.0 to fuse visual encodings with high-level natural language intentions, directly regressing driving trajectories via a
+unified LLM backbone. Bottom: The Agent-Based Framework ((c)-(d)) adopts a hierarchical structure to bridge the semantic
+gap. A VLM first acts as a reasoning agent to translate abstract intentions into discrete steering commands, which subsequently
+condition a conventional E2E AD model for execution.
+ues directly, the model predicts the future trajec-
+tory Tt+1:t+K in a textual format. The trajectory
+is serialized into a sequence of coordinate tokens
+S = (s1, s2, . . . , sM), structured as “Here is the
+planning trajectory [PT, (x1, y1), . . . , (xK, yK)]”.
+Mathematically, the model maximizes the like-
+lihood of the target token sequence S given the
+multimodal inputs. The joint probability is factor-
+ized into a product of conditional probabilities:
+P(S|Ot−H:t, Ilang; ΘE2E)
+=
+M
+Y
+i=1
+P(si|s<i, Zvis, Zlang; ΘE2E),
+(6)
+where s<i denotes the history of generated tokens.
+During inference, the generated text sequence S is
+parsed to extract the waypoints {pt+1, . . . , pt+K}
+in the BEV coordinate system, constituting the final
+executable trajectory Tt+1:t+K.
+4.2
+Agent-Based Framework
+Distinct from the architecture described above, the
+agent-based framework seeks to repurpose estab-
+lished conventional E2E models for the intention-
+driven paradigm. Since these models act primar-
+ily as command-followers conditioned on simple
+navigation signals, we introduce a hierarchical de-
+composition to bridge the semantic gap between
+abstract language and vehicle control. As illus-
+trated in Figure 3(c)-(d), this framework factorizes
+the complex reasoning process into two sequential
+phases: Command Generation via a VLM agent,
+and Trajectory Prediction via a standard planner.
+Command Generation.
+The objective of this
+phase is to translate the abstract human intention
+Ilang into a standardized steering command that
+acts as a deterministic interface for the downstream
+planner. We define a discrete action space C, in-
+cluding “turn left”, “turn right” and “forwrad”.
+We employ a Vision-Language Model (VLM)
+as the reasoning agent to bridge the gap.
+The
+VLM processes the sequence of visual observa-
+tions Ot−H:t and the natural language intention
+Ilang to infer the optimal command ct:
+ct = arg max
+c∈C
+P(c|Ot−H:t, Ilang; θagent),
+(7)
+where θagent represents the parameters of the reason-
+ing agent. By explicitly predicting ct, the system
+resolves the semantic ambiguity of the high-level
+intention before kinematic planning begins.
+Trajectory Prediction. In the second phase, we
+leverage an off-the-shelf conventional E2E driving
+model, denoted as πE2E. Unlike the end-to-end
+framework that directly regresses coordinates from
+language embeddings, this module operates in the
+traditional command-conditional mode.
+Receiving the command ct generated by the
+agent, along with the sensory context Ot−H:t, the
+model generates the future trajectory Tt+1:t+K:
+Tt+1:t+K = πE2E(Ot−H:t, ct|ϕdrive),
+(8)
+6
+
+
+Method
+Geometric Metrics
+Intention
+ADE (m)
+Coll. (%)
+IFA (%)
+General LLM
+GPT 5.2
+1.78
+0.53
+23.3
+Gemini 3 Flash
+2.14
+0.70
+14.2
+Gemini 3 Pro
+1.58
+0.42
+26.8
+Agent-based framework
+GPT5+RD
+1.46
+0.41
+23.3
+Gemini 3 Pro+RD
+1.46
+0.34
+24.5
+End-to-end framework
+InternVL3.0-2B
+0.70
+0.26
+33.7
+InternVL3.0-2B*
+0.72
+0.25
+35.6
+Table 1: Main results on Intention-Drive. * denotes fine-
+tuning initialized with weights of ReCogDrive.
+where ϕdrive represents the pre-trained weights of
+the driving backbone.
+Mathematically, this agent-based approach fac-
+torizes the complex distribution of intention-driven
+trajectories into a chain of reasoning and execution:
+P(T|O, Ilang) ≈
+X
+c∈C
+P(T|O, c)
+|
+{z
+}
+Execution
+· P(c|O, Ilang)
+|
+{z
+}
+Reasoning
+.
+(9)
+This factorization allows us to combine the ad-
+vanced semantic reasoning capabilities of VLMs
+with the trajectory generation of established
+E2E models, effectively transforming them from
+command-followers to intention-fulfillers.
+5
+Experiments
+5.1
+Implementation Details
+We utilize InternVL3.0-2B (Zhu et al., 2025), ini-
+tializing it with the pre-trained weights from the
+first stage of ReCogDrive (Li et al., 2025a). The
+model is fine-tuned using the AdamW optimizer
+with a learning rate of 2×10−5 and a weight decay
+of 0.05. We employ a cosine learning rate sched-
+uler with a warmup ratio of 0.03. The training
+is conducted for 1 epoch with a total batch size
+of 4 distributed across 4 GPUs. To process high-
+resolution driving scenes, we utilize a dynamic im-
+age size strategy with a base resolution of 448×448
+and a maximum of 16 dynamic patches. For pa-
+rameter efficiency, we apply Low-Rank Adaptation
+(LoRA) with a rank of r = 32 to both the vision
+backbone and the LLM. The training process is
+optimized using DeepSpeed with BF16 precision
+and gradient checkpointing.
+5.2
+Main Results
+We evaluate all models on the Intention-Drive
+benchmark. Table 1 presents the quantitative re-
+Method
+ADE (m)
+Coll. (%)
+1s
+2s
+3s
+1s
+2s
+3s
+General LLM
+GPT 5.2
+0.97
+1.75
+2.61
+0.19
+0.43
+0.99
+Gemini 3 Flash
+1.10
+2.08
+3.24
+0.23
+0.66
+1.22
+Gemini 3 Pro
+0.51
+1.41
+2.83
+0.19
+0.35
+0.71
+Agent-based framework
+GPT5+RD
+0.24
+1.22
+2.92
+0.13
+0.32
+0.77
+Gemini 3 Pro+RD
+0.24
+1.22
+2.92
+0.09
+0.29
+0.65
+End-to-end framework
+InternVL3.0-2B
+0.29
+0.65
+1.16
+0.15
+0.17
+0.46
+InternVL3.0-2B*
+0.26
+0.70
+1.17
+0.14
+0.17
+0.45
+Table 2: Performance analysis across diverse time ranges.
+* denotes fine-tuning initialized with weights of ReCogDrive.
+sults, revealing a critical dichotomy between driv-
+ing competency and intention understanding.
+Safety and Geometric Stability. As evidenced by
+the geometric metrics in Table 1, General LLMs
+struggle to generate kinematically feasible trajec-
+tories solely from visual-linguistic inputs. Mod-
+els such as Gemini 3 Flash and GPT 5.2 exhibit
+high ADE of 2.14m and 1.78m, respectively, along
+with elevated collision rates. This indicates that
+while LLMs possess strong semantic reasoning,
+they lack the spatial grounding required to adhere
+to the physical constraints of driving scenes, often
+hallucinating unsafe paths. The agent-based frame-
+works improve stability slightly by decoupling rea-
+soning from execution, yet they still lag behind the
+integrated approach. In contrast, the end-to-end
+framework demonstrates superior driving stability.
+The InternVL3.0-2B model achieves a remarkable
+ADE of 0.70m and a collision rate of 0.26%, re-
+ducing the trajectory error by approximately 55%
+compared to the best-performing General LLM.
+This confirms that end-to-end training effectively
+aligns high-level linguistic concepts with precise,
+physically grounded control policies.
+Intention Fulfillment Gap. Crucially, geometric
+precision does not guarantee semantic alignment
+with human goals. The proposed IFA metric high-
+lights this disparity. Although agent-based frame-
+works leverage the reasoning power of LLMs, their
+performance plateaus at an IFA of roughly 24%.
+This limitation stems from the information bottle-
+neck inherent in the hierarchical design: compress-
+ing complex, abstract intentions into discrete steer-
+ing commands results in a significant loss of seman-
+tic nuance. Conversely, the end-to-end framework
+establishes a direct mapping from inputs to driving
+trajectories, preserving the rich semantic informa-
+tion embedded in the human intentions. Conse-
+quently, the InternVL3.0-2B model achieves an
+7
+
+
+Figure 4: Performance analysis for InternVL3.0-2B*. (a) Analysis of planning performance across varying video sequence
+lengths. (b) Performance analysis of Intention lengths. (c) Performance analysis across different traffic participants.
+IFA of 33.7%, which further improves to 35.6%
+when initialized with weights from ReCogDrive.
+This result empirically validates our hypothesis
+that a unified, intention-driven paradigm is essen-
+tial for bridging the gap between understanding a
+command and accurately fulfilling it in complex
+real-world scenarios.
+5.3
+Analysis of Time Range
+We investigate the temporal stability of the gener-
+ated trajectories by decomposing the planning per-
+formance across prediction horizons of 1, 2, and 3
+seconds, as shown in Table 2. While error accumu-
+lation is inevitable over longer durations due to in-
+creasing environmental uncertainty, the fine-tuned
+InternVL3.0-2B exhibits significantly superior ro-
+bustness, maintaining a low ADE of 1.16m at the
+3-second horizon. In contrast, other frameworks
+suffer from severe spatial drift, with greater errors.
+This demonstrates that our end-to-end fine-tuning
+strategy effectively grounds abstract intentions into
+precise, temporally consistent trajectory.
+5.4
+Analysis of Video Length
+We study the impact on planning performance by
+categorizing test scenarios based on video sequence
+length, as illustrated in Figure 4(a). The results indi-
+cate that the model achieves superior performance
+on longer video sequences, as evidenced by the
+decreasing ADE. We attribute this improvement to
+the stabilization of planning over time: while the
+initial phase suffers from kinematic uncertainty, ex-
+tended sequences provide richer temporal context,
+allowing the model to rectify early deviations and
+generate more consistent trajectories.
+5.5
+Analysis of Intention Length
+To evaluate the model’s robustness to linguistic
+complexity, we analyze the planning performance
+across different intention lengths, as illustrated in
+Figure 4(b). The results demonstrate that the model
+maintains a stable performance with the ADE fluc-
+tuating narrowly between 0.66m and 0.69m, re-
+gardless of the token count. This indicates that
+our framework effectively captures the semantic
+essence of high-level intentions, handling both con-
+cise commands and elaborate descriptions without
+significant performance degradation.
+5.6
+Analysis of Traffic Participants
+To evaluate the model’s sensitivity to specific se-
+mantic concepts, we categorize the validation sce-
+narios based on the traffic participants explicitly
+referenced within the provided human intention.
+As illustrated in Figure 4(c), the model exhibits the
+lowest ADE when the intention involves dynamic
+agents such as “Vehicle” and “Pedestrian”, benefit-
+ing from their visual saliency and predictable kine-
+matics. In contrast, a performance drop is observed
+for intentions citing static regulatory elements like
+“Traffic Sign” and “Traffic Light”, suggesting that
+grounding abstract linguistic instructions to small-
+scale, stationary visual cues requires more fine-
+grained reasoning than large objects.
+6
+Conclusion
+This paper formalizes the transition in end-to-end
+autonomous driving from a command-following
+paradigm to an intention-driven intelligence level
+capable of fulfilling abstract human goals. To sup-
+port this new task, we introduce the Intention-Drive
+benchmark, comprising a large-scale dataset and a
+generative evaluation protocol termed imagined fu-
+ture alignment to assess semantic goal fulfillment.
+We explore the solution space by proposing two
+distinct methodological paradigms: an end-to-end
+vision-language planner for direct trajectory predic-
+tion and a hierarchical agent-based framework that
+decouples intention reasoning from command exe-
+cution. The experiments reveal a significant perfor-
+mance gap in existing models between driving sta-
+bility and intention fulfillment, while demonstrat-
+8
+
+
+ing that our proposed frameworks achieve superior
+alignment with complex human instructions.
+References
+Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wen-
+bin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie
+Wang, Jun Tang, and 1 others. 2025. Qwen2. 5-vl
+technical report. arXiv preprint arXiv:2502.13923.
+Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh
+Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan,
+Yu Pan, Giancarlo Baldan, and Oscar Beijbom. 2019.
+nuscenes: A multimodal dataset for autonomous driv-
+ing. arXiv preprint arXiv:1903.11027.
+Wei Cao, Marcel Hallgarten, Tianyu Li, Daniel Dauner,
+Xunjiang Gu, Caojun Wang, Yakov Miron, Marco
+Aiello, Hongyang Li, Igor Gilitschenski, and 1 others.
+2025. Pseudo-simulation for autonomous driving.
+arXiv preprint arXiv:2506.04218.
+Li Chen, Penghao Wu, Kashyap Chitta, Bernhard Jaeger,
+Andreas Geiger, and Hongyang Li. 2024a. End-to-
+end autonomous driving: Challenges and frontiers.
+IEEE Transactions on Pattern Analysis and Machine
+Intelligence.
+Shaoyu Chen, Bo Jiang, Hao Gao, Bencheng Liao, Qing
+Xu, Qian Zhang, Chang Huang, Wenyu Liu, and
+Xinggang Wang. 2024b. Vadv2: End-to-end vector-
+ized autonomous driving via probabilistic planning.
+arXiv preprint arXiv:2402.13243.
+Yuntao Chen, Yuqi Wang, and Zhaoxiang Zhang. 2025.
+Drivinggpt: Unifying driving world modeling and
+planning with multi-modal autoregressive transform-
+ers. In Proceedings of the IEEE/CVF International
+Conference on Computer Vision.
+OpenScene Contributors. 2023.
+Openscene:
+The
+largest up-to-date 3d occupancy prediction bench-
+mark in autonomous driving.
+https://github.
+com/OpenDriveLab/OpenScene.
+Yaodong Cui, Shucheng Huang, Jiaming Zhong, Zhenan
+Liu, Yutong Wang, Chen Sun, Bai Li, Xiao Wang,
+and Amir Khajepour. 2023. Drivellm: Charting the
+path toward full autonomous driving with large lan-
+guage models. IEEE Transactions on Intelligent Ve-
+hicles.
+Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo
+Weng, Zhiyu Huang, Zetong Yang, Hongyang Li,
+Igor Gilitschenski, Boris Ivanovic, Marco Pavone,
+Andreas Geiger, and Kashyap Chitta. 2024. Navsim:
+Data-driven non-reactive autonomous vehicle sim-
+ulation and benchmarking. In Advances in Neural
+Information Processing Systems (NeurIPS).
+Alexey Dosovitskiy, German Ros, Felipe Codevilla, An-
+tonio Lopez, and Vladlen Koltun. 2017. Carla: An
+open urban driving simulator. In Conference on robot
+learning.
+Danny Driess, Fei Xia, Mehdi SM Sajjadi, Corey
+Lynch, Aakanksha Chowdhery, Ayzaan Wahid,
+Jonathan Tompson, Quan Vuong, Tianhe Yu, Wen-
+long Huang, and 1 others. 2023. Palm-e: An em-
+bodied multimodal language model. arXiv preprint
+arXiv:2303.03378.
+Shiyu Fang, Yiming Cui, Haoyang Liang, Chen Lv,
+Peng Hang, and Jian Sun. 2025. Corevla: A dual-
+stage end-to-end autonomous driving framework for
+long-tail scenarios via collect-and-refine.
+arXiv
+preprint arXiv:2509.15968.
+Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jian-
+feng Cui, Dingkang Liang, Chong Zhang, Dingyuan
+Zhang, Hongwei Xie, Bing Wang, and Xiang Bai.
+2025. Orion: A holistic end-to-end autonomous driv-
+ing framework by vision-language instructed action
+generation. arXiv preprint arXiv:2503.19755.
+Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta,
+Yihang Qiu, Andreas Geiger, Jun Zhang, and
+Hongyang Li. 2024. Vista: A generalizable driving
+world model with high fidelity and versatile control-
+lability. Advances in Neural Information Processing
+Systems, 37:91560–91596.
+Wencheng Han, Dongqian Guo, Cheng-Zhong Xu, and
+Jianbing Shen. 2025. Dme-driver: Integrating hu-
+man decision logic and 3d scene perception in au-
+tonomous driving. In Proceedings of the AAAI Con-
+ference on Artificial Intelligence.
+Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao
+Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei
+Lin, Wenhai Wang, and 1 others. 2023. Planning-
+oriented autonomous driving. In Proceedings of the
+IEEE/CVF conference on computer vision and pat-
+tern recognition.
+Jyh-Jing Hwang, Runsheng Xu, Hubert Lin, Wei-Chih
+Hung, Jingwei Ji, Kristy Choi, Di Huang, Tong
+He, Paul Covington, Benjamin Sapp, and 1 others.
+2024. Emma: End-to-end multimodal model for au-
+tonomous driving. arXiv preprint arXiv:2410.23262.
+Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang,
+and Junchi Yan. 2024. Bench2drive: Towards multi-
+ability benchmarking of closed-loop end-to-end au-
+tonomous driving. Advances in Neural Information
+Processing Systems.
+Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie
+Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang
+Huang, and Xinggang Wang. 2023. Vad: Vectorized
+scene representation for efficient autonomous driv-
+ing. In Proceedings of the IEEE/CVF International
+Conference on Computer Vision.
+Bo Jiang, Shaoyu Chen, Qian Zhang, Wenyu Liu, and
+Xinggang Wang. 2025.
+Alphadrive: Unleashing
+the power of vlms in autonomous driving via rein-
+forcement learning and reasoning. arXiv preprint
+arXiv:2503.07608.
+9
+
+
+Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li,
+Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen,
+Haiyang Sun, Bing Wang, and 1 others. 2025a.
+Recogdrive: A reinforced cognitive framework for
+end-to-end autonomous driving.
+arXiv preprint
+arXiv:2506.08052.
+Yue Li, Meng Tian, Dechang Zhu, Jiangtong Zhu,
+Zhenyu Lin, Zhiwei Xiong, and Xinhai Zhao. 2025b.
+Drive-r1: Bridging reasoning and planning in vlms
+for autonomous driving with reinforcement learning.
+arXiv preprint arXiv:2506.18234.
+Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang,
+Cheng Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li,
+Ying Zhang, Qian Zhang, and 1 others. 2025. Diffu-
+siondrive: Truncated diffusion model for end-to-end
+autonomous driving. In Proceedings of the Computer
+Vision and Pattern Recognition Conference.
+Haochen Liu, Zhiyu Huang, Wenhui Huang, Haohan
+Yang, Xiaoyu Mo, and Chen Lv. 2025.
+Hybrid-
+prediction integrated planning for autonomous driv-
+ing.
+IEEE Transactions on Pattern Analysis and
+Machine Intelligence.
+Yuhang Lu, Jiadong Tu, Yuexin Ma, and Xinge Zhu.
+2025. Real-ad: Towards human-like reasoning in
+end-to-end autonomous driving. In Proceedings of
+the IEEE/CVF International Conference on Com-
+puter Vision.
+Yuechen Luo, Fang Li, Shaoqing Xu, Zhiyi Lai, Lei
+Yang, Qimao Chen, Ziang Luo, Zixun Xie, Shengyin
+Jiang, Jiaxin Liu, and 1 others. 2025. Adathinkdrive:
+Adaptive thinking via reinforcement learning for au-
+tonomous driving. arXiv preprint arXiv:2509.13769.
+Yueen Ma, Zixing Song, Yuzheng Zhuang, Jianye Hao,
+and Irwin King. 2024a. A survey on vision-language-
+action models for embodied ai.
+arXiv preprint
+arXiv:2405.14093.
+Yunsheng Ma, Xu Cao, Wenqian Ye, Can Cui, Kai Mei,
+and Ziran Wang. 2024b. Learning autonomous driv-
+ing tasks via human feedbacks with large language
+models. In Findings of the Association for Computa-
+tional Linguistics: EMNLP 2024.
+Jiageng Mao, Yuxi Qian, Junjie Ye, Hang Zhao, and
+Yue Wang. 2023a. Gpt-driver: Learning to drive with
+gpt. arXiv preprint arXiv:2310.01415.
+Jiageng Mao, Junjie Ye, Yuxi Qian, Marco Pavone, and
+Yue Wang. 2023b. A language agent for autonomous
+driving. arXiv preprint arXiv:2311.10813.
+Mona Mirzaie and Bodo Rosenhahn. 2025.
+Inter-
+pretable decision-making for end-to-end autonomous
+driving. In Proceedings of the IEEE/CVF Interna-
+tional Conference on Computer Vision.
+Chenbin Pan, Burhaneddin Yaman, Tommaso Nesti,
+Abhirup Mallik, Alessandro G Allievi, Senem Veli-
+pasalar, and Liu Ren. 2024. Vlp: Vision language
+planning for autonomous driving. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition.
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-
+pher D Manning, Stefano Ermon, and Chelsea Finn.
+2023. Direct preference optimization: Your language
+model is secretly a reward model. Advances in neural
+information processing systems.
+Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song,
+Steven L Waslander, Yu Liu, and Hongsheng Li.
+2024a. Lmdrive: Closed-loop end-to-end driving
+with large language models. In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu,
+Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan
+Zhang, YK Li, Yang Wu, and 1 others. 2024b.
+Deepseekmath: Pushing the limits of mathematical
+reasoning in open language models. arXiv preprint
+arXiv:2402.03300.
+Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen,
+Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping
+Luo, Andreas Geiger, and Hongyang Li. 2024. Driv-
+elm: Driving with graph visual question answering.
+In European conference on computer vision.
+Chonghao Sima, Wenwen Tong, Tai Wang, Li Chen,
+Silei Wu, Hanming Deng, Yi Gu, Lewei Lu, Ping
+Luo, Dahua Lin, and Hongyang Li. 2023. Scene as
+occupancy.
+Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang,
+Haoran Wu, and Sifa Zheng. 2025. Sparsedrive: End-
+to-end autonomous driving via sparse scene represen-
+tation. In 2025 IEEE International Conference on
+Robotics and Automation (ICRA).
+Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang
+Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, Xian-
+peng Lang, and Hang Zhao. 2024. Drivevlm: The
+convergence of autonomous driving and large vision-
+language models. arXiv preprint arXiv:2402.12289.
+Zhennan Wang, Jianing Teng, Canqun Xiang, Kangliang
+Chen, Xing Pan, Lu Deng, and Weihao Gu. 2025.
+Cogad: Cognitive-hierarchy guided end-to-end au-
+tonomous driving. arXiv preprint arXiv:2505.21581.
+Yaozu Wu, Dongyuan Li, Yankai Chen, Renhe Jiang,
+Henry Peng Zou, Wei-Chieh Huang, Yangning Li,
+Liancheng Fang, Zhen Wang, and Philip S Yu. 2025.
+Multi-agent autonomous driving systems with large
+language models: A survey of recent advances, re-
+sources, and future directions. Findings of the Asso-
+ciation for Computational Linguistics: EMNLP.
+Yichen Xie, Runsheng Xu, Tong He, Jyh-Jing Hwang,
+Katie Luo, Jingwei Ji, Hubert Lin, Letian Chen, Yiren
+Lu, Zhaoqi Leng, and 1 others. 2025. S4-driver:
+Scalable self-supervised driving multimodal large
+language model with spatio-temporal visual represen-
+tation. In Proceedings of the Computer Vision and
+Pattern Recognition Conference.
+10
+
+
+Chengkai Xu, Jiaqi Liu, Shiyu Fang, Yiming Cui, Dong
+Chen, Peng Hang, and Jian Sun. 2025. Tell-drive:
+Enhancing autonomous driving with teacher llm-
+guided deep reinforcement learning. arXiv preprint
+arXiv:2502.01387.
+Zhenhua Xu, Yujia Zhang, Enze Xie, Zhen Zhao, Yong
+Guo, Kwan-Yee K Wong, Zhenguo Li, and Heng-
+shuang Zhao. 2024. Drivegpt4: Interpretable end-to-
+end autonomous driving via large language model.
+IEEE Robotics and Automation Letters.
+Tianyi Yan, Wencheng Han, Xia Zhou, Xueyang Zhang,
+Kun Zhan, Cheng-zhong Xu, and Jianbing Shen.
+2025. Rlgf: Reinforcement learning with geometric
+feedback for autonomous driving video generation.
+arXiv preprint arXiv:2509.16500.
+Kairui Yang, Zihao Guo, Gengjie Lin, Haotian Dong,
+Zhao Huang, Yipeng Wu, Die Zuo, Jibin Peng,
+Ziyuan Zhong, Xin Wang, and 1 others. 2025a.
+Trajectory-llm: A language-based data generator
+for trajectory prediction in autonomous driving. In
+The Thirteenth International Conference on Learning
+Representations.
+Zhenjie Yang, Yilin Chai, Xiaosong Jia, Qifeng
+Li, Yuqian Shao, Xuekai Zhu, Haisheng Su, and
+Junchi Yan. 2025b. Drivemoe: Mixture-of-experts
+for vision-language-action model in end-to-end au-
+tonomous driving. arXiv preprint arXiv:2505.16278.
+Zhenjie Yang, Xiaosong Jia, Hongyang Li, and Junchi
+Yan. 2023. Llm4drive: A survey of large language
+models for autonomous driving.
+arXiv preprint
+arXiv:2311.01043.
+Jianhao Yuan, Shuyang Sun, Daniel Omeiza, Bo Zhao,
+Paul Newman, Lars Kunze, and Matthew Gadd.
+2024. Rag-driver: Generalisable driving explana-
+tions with retrieval-augmented in-context learning in
+multi-modal large language model. arXiv preprint
+arXiv:2402.10828.
+Zhenlong Yuan, Jing Tang, Jinguo Luo, Rui Chen,
+Chengxuan Qian, Lei Sun, Xiangxiang Chu, Yujun
+Cai, Dapeng Zhang, and Shuo Li. 2025. Autodrive-
+r2: Incentivizing reasoning and self-reflection ca-
+pacity for vla model in autonomous driving. arXiv
+preprint arXiv:2509.01944.
+Shuang Zeng, Xinyuan Chang, Mengwei Xie, Xinran
+Liu, Yifan Bai, Zheng Pan, Mu Xu, Xing Wei, and
+Ning Guo. 2025. Futuresightdrive: Thinking visu-
+ally with spatio-temporal cot for autonomous driving.
+arXiv preprint arXiv:2505.17685.
+Jiawei Zhang, Xuan Yang, Taiqi Wang, Yu Yao, Alek-
+sandr Petiushko, and Bo Li. 2025a.
+Safeauto:
+Knowledge-enhanced safe autonomous driving with
+multimodal foundation models.
+arXiv preprint
+arXiv:2503.00211.
+Ruifei Zhang,
+Junlin Xie,
+Wei Zhang,
+Weikai
+Chen, Xiao Tan, Xiang Wan, and Guanbin Li.
+2025b. Adadrive: Self-adaptive slow-fast system
+for language-grounded autonomous driving. In Pro-
+ceedings of the IEEE/CVF International Conference
+on Computer Vision.
+Ruifei Zhang, Wei Zhang, Xiao Tan, Sibei Yang, Xiang
+Wan, Xiaonan Luo, and Guanbin Li. 2025c. Vldrive:
+Vision-augmented lightweight mllms for efficient
+language-grounded autonomous driving. In Proceed-
+ings of the IEEE/CVF International Conference on
+Computer Vision.
+Songyan Zhang, Wenhui Huang, Zhan Chen, Chua Ji-
+ahao Collister, Qihang Huang, and Chen Lv. 2025d.
+Openread: Reinforced open-ended reasoing for end-
+to-end autonomous driving with llm-as-critic. arXiv
+preprint arXiv:2512.01830.
+Weicheng Zheng, Xiaofei Mao, Nanfei Ye, Pengxiang
+Li, Kun Zhan, Xianpeng Lang, and Hang Zhao. 2025.
+Driveagent-r1: Advancing vlm-based autonomous
+driving with active perception and hybrid thinking.
+arXiv preprint arXiv:2507.20879.
+Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming
+Zhang, and Long Chen. 2024. Genad: Generative
+end-to-end autonomous driving. In European Con-
+ference on Computer Vision.
+Xingcheng Zhou, Xuyuan Han, Feng Yang, Yunpu
+Ma, and Alois C Knoll. 2025a. Opendrivevla: To-
+wards end-to-end autonomous driving with large
+vision language action model.
+arXiv preprint
+arXiv:2503.23463.
+Zewei Zhou, Tianhui Cai, Seth Z Zhao, Yun Zhang,
+Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. 2025b.
+Autovla: A vision-language-action model for end-
+to-end autonomous driving with adaptive reason-
+ing and reinforcement fine-tuning. arXiv preprint
+arXiv:2506.13757.
+Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu,
+Shenglong Ye, Lixin Gu, Hao Tian, Yuchen Duan,
+Weijie Su, Jie Shao, and 1 others. 2025. Internvl3:
+Exploring advanced training and test-time recipes
+for open-source multimodal models. arXiv preprint
+arXiv:2504.10479.
+11
+
+
+A
+Related Work
+A.1
+End-to-end Autonomous Driving
+End-to-end (E2E) autonomous driving has emerged
+as a dominant paradigm, aiming to replace the tra-
+ditional modular pipeline of perception, prediction,
+and planning with a single, jointly optimized neural
+network (Chen et al., 2024b,a; Zhang et al., 2025a;
+Xie et al., 2025; Zhang et al., 2025c; Mirzaie and
+Rosenhahn, 2025). This approach directly maps
+raw sensor inputs, such as images and LiDAR point
+clouds, to driving commands or future trajectories,
+thereby minimizing error accumulation across cas-
+caded modules. Pioneering works in this domain
+have demonstrated the efficacy of integrating mul-
+tiple intermediate tasks into a unified, planning-
+oriented framework (Chen et al., 2024a; Sun et al.,
+2025; Yan et al., 2025). For instance, UniAD (Hu
+et al., 2023) and VAD (Jiang et al., 2023) estab-
+lished strong baselines by holistically modeling the
+driving scene and formulating the entire system as
+a planning-centric problem. These methods show-
+case impressive performance by leveraging shared
+representations across perception and prediction to
+benefit the final planning output. However, deter-
+ministic trajectory regression fails to capture the
+inherent uncertainty and multi-modal nature of real-
+world driving scenarios. To address this, recent
+efforts have shifted towards modeling a distribu-
+tion over possible future actions. VADv2 (Chen
+et al., 2024b) introduced probabilistic planning by
+predicting a probability distribution over a set of
+actions and sampling from it to control the ve-
+hicle. Concurrently, a new paradigm employing
+generative models has gained traction. Methods
+like GenAD (Zheng et al., 2024) and Diffusion-
+Drive (Liao et al., 2025) leverage the power of
+diffusion models to generate diverse and plausible
+multi-modal trajectories, better reflecting the com-
+plex decision-making process of human drivers.
+Despite promising results on open-loop bench-
+marks, where models predict trajectories on prere-
+corded logs, a significant performance gap often
+exists when these systems are deployed in inter-
+active, closed-loop simulations. As highlighted
+by recent studies (Jia et al., 2024; Cao et al.,
+2025), many E2E models tend to overfit to the
+ego-vehicle’s status in the training data, leading to
+suboptimal or unsafe behaviors in dynamic, reac-
+tive environments (Fu et al., 2025). While some
+works adopt closed-loop evaluation in simulators
+like CARLA (Dosovitskiy et al., 2017), their per-
+formance often reveals the brittleness of models
+trained primarily for open-loop metrics. This dis-
+crepancy underscores the critical need for devel-
+oping E2E frameworks that are not only accurate
+in offline evaluation but also robust and reliable in
+realistic, interactive driving scenarios. To address
+these limitations, several recent approaches have
+successfully employed Vision-Language-Action
+(VLA) models, demonstrating strong closed-loop
+performance in autonomous driving systems (Fu
+et al., 2025; Li et al., 2025a; Zhou et al., 2025a;
+Chen et al., 2025).
+A.2
+Vision-Language-Action Model
+Vision-Language-Action (VLA) models represent a
+paradigm shift in creating intelligent agents, aiming
+to bridge the gap between multi-modal perception,
+natural language understanding, and physical ac-
+tion generation in the real world (Ma et al., 2024a;
+Zhou et al., 2025b; Li et al., 2025b). Originating
+from the field of robotics, VLAs are designed to in-
+terpret high-level instructions and execute them by
+generating a sequence of low-level actions, making
+them a natural architectural choice for intention-
+driven autonomous driving (Driess et al., 2023;
+Tian et al., 2024; Mao et al., 2023a; Zhang et al.,
+2025b,d; Cui et al., 2023). These models move be-
+yond passive scene description and towards active
+interaction, which is critical for fulfilling complex
+human intentions in dynamic environments like
+driving.
+In the context of autonomous driving, a signif-
+icant body of work aims to emulate human-like
+cognitive structures to make decision-making more
+robust and interpretable (Xu et al., 2025). For in-
+stance, models like CogAD (Wang et al., 2025)
+and ReAL-AD (Lu et al., 2025) explicitly design
+hierarchical frameworks inspired by cognitive psy-
+chology, breaking down the planning process from
+high-level intention or strategy to fine-grained tra-
+jectory execution. This structured approach is often
+enhanced by sophisticated reasoning mechanisms.
+AutoDrive-R2 (Yuan et al., 2025) incorporates a
+chain-of-thought process with self-reflection, while
+ReCogDrive (Li et al., 2025a) integrates a cogni-
+tive VLM with a diffusion planner to address the
+modality mismatch between discrete language com-
+mands and continuous driving actions. To move
+beyond the limitations of simple imitation learning
+from static datasets, reinforcement learning (RL)
+has emerged as a key technique for policy refine-
+ment. AlphaDrive (Jiang et al., 2025) leverages
+12
+
+
+10-19 frames
+20-29 frames
+40-41 frames
+30-39 frames
+10-24 frames
+40-41 frames
+25-39 frames
+30.4%
+20.7%
+12.9%
+36.0%
+1-7 words
+8-9 words
+12-21 words
+10-11 words
+1-7 words
+8-9 words
+12-21 words
+10-11 words
+30.4%
+20.7%
+12.9%
+36.0%
+31.3%
+22.4%
+14.7%
+31.6%
+9.0%
+5.2%
+85.8%
+7.3%
+6.1%
+86.6%
+Number of Frames
+(a) Video Length Analysis.
+(b) Word Cloud of Human Intentions.
+(c) Complexity Analysis of Human Intentions.
+Figure 5: Statistical analysis of the Intention-Drive benchmark. (a) Distribution of video frame counts, ensuring coverage of
+diverse temporal horizons. (b) Word cloud of human intentions illustrating semantic richness. (c) Distribution of instruction
+lengths, highlighting the linguistic complexity with a significant portion of long, detailed intentions.
+Group Relative Policy Optimization (GRPO) (Shao
+et al., 2024b) with planning-oriented rewards to
+significantly boost performance. Similarly, Ada-
+ThinkDrive (Luo et al., 2025) employs RL to train
+an agent that can adaptively switch between “fast”
+direct prediction and “slow” deliberative reasoning
+based on scene complexity. Other approaches focus
+on learning from more nuanced human feedback;
+CoReVLA (Fang et al., 2025), for example, uses
+Direct Preference Optimization (DPO) (Rafailov
+et al., 2023) to refine its model from sparse human
+takeover data in long-tail scenarios. Pushing the
+frontier even further, DriveAgent-R1 (Zheng et al.,
+2025) pioneers the concept of active perception,
+where the agent can proactively use vision tools to
+seek out additional information to resolve uncer-
+tainty, representing a paradigm shift from passive
+observation to active, grounded decision-making.
+B
+Dataset Analysis
+To better understand the challenges posed by
+Intention-Drive, we provide a comprehensive sta-
+tistical analysis of the dataset characteristics, as
+illustrated in Figure 5. The analysis focuses on
+three key dimensions: temporal diversity, semantic
+richness, and linguistic complexity.
+Temporal Diversity. Figure 5(a) presents the distri-
+bution of video sequence lengths across the training
+and test sets. The dataset covers a broad range of
+temporal horizons, reflecting the variable duration
+of real-world driving maneuvers. The distribution
+indicates that the dataset is not limited to short-term
+reactions but includes extended sequences that re-
+quire the agent to maintain temporal consistency
+over longer periods.
+Semantic Richness. Unlike traditional datasets
+restricted to steering commands, our dataset em-
+phasizes the behavioral and interactive aspects of
+driving. The word cloud in Figure 5(b) highlights
+high-frequency keywords such as “slow”, “careful”,
+“traffic”, “wait”, and “pedestrian”. The prominence
+of these terms underscores the shift from command-
+following to intention-fulfillment.
+Linguistic Complexity. Figure 5(c) analyzes the
+complexity of human intentions based on instruc-
+tion length. Unlike conventional datasets domi-
+nated by short phrases, our benchmark features a
+substantial distribution of long-form instructions.
+Specifically, instructions exceeding 7 words consti-
+tute the majority. This linguistic richness necessi-
+tates strong language grounding capabilities, as the
+E2E AD model must parse the sentence to extract
+the destination, behavioral modifiers, and safety
+constraints embedded in the driver’s intention.
+C
+Case Study
+To qualitatively validate the effectiveness of our
+framework and the proposed Imagined Future
+Alignment (IFA) protocol, we present a visualiza-
+tion of the generative evaluation process in Figure
+6. This figure demonstrates how the pre-trained
+generative world model "hallucinates" the future
+consequences of the agent’s predicted trajectory,
+enabling a direct semantic comparison against the
+ground truth (Real Future) and the user’s high-level
+instruction. We select two scenarios to illustrate
+the model’s capability in handling safety-critical
+constraints and specific navigational goals.
+In the left panel, the user issues a complex,
+safety-oriented command: Wait, the light’s still
+red and that car’s cutting across — hold on. This
+instruction requires the agent to prioritize immedi-
+ate safety over progress and recognize the dynamic
+hazard. The visualized "Fake Future" confirms that
+the agent successfully generated a stationary trajec-
+tory. Crucially, because the trajectory was correct,
+the world model renders the crossing vehicle pass-
+ing safely in front of the ego-vehicle, mirroring the
+dynamics observed in the "Real Future." The Se-
+mantic Judge (VLM) evaluating this hallucinated
+13
+
+
+Figure 6: Case study for InternVL3.0-2B*. We display the historical context, the ground truth future (Real Future), and the
+hallucinated future (Fake Future) generated by the world model conditioned on our agent’s predicted trajectory. The comparison
+highlights that the generated "Fake Future" successfully reflects the semantic constraints of the human instructions—such as
+holding for a cutting vehicle (left) or identifying a specific valet entrance (right)—thereby verifying the semantic consistency of
+the planned action beyond simple geometric metrics.
+clip can thus verify that the "hold on" condition
+was met, resulting in a high Score.
+Conversely, the right panel depicts a goal-
+oriented scenario where the driver instructs: Turn
+right into the valet and watch for pedestrians. The
+challenge here lies in grounding the semantic en-
+tity "valet" to the correct spatial location rather
+than a generic road intersection. The "Fake Fu-
+ture" visualization shows the perspective shifting
+smoothly into the specific driveway, closely align-
+ing with the visual cues in the ground truth video.
+This demonstrates that the agent’s planned trajec-
+tory effectively guided the world model to render
+the correct destination. These visualizations high-
+light that our Intention-Driven framework does not
+merely regress coordinates but semantically fulfills
+the human’s underlying intent, which is faithfully
+captured and verified by the IFA protocol.
+14

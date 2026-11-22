@@ -194,6 +194,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 7.0,
@@ -221,7 +225,7 @@
       "paper_id": "2605.01507v3",
       "route": "20251120-20261119/2605.01507v3",
       "title": "MILD: Mediator Agentic System with Bidirectional Perception and Multi-Layered Alignment for Human-Vehicle Collaboration",
-      "section": "quick",
+      "section": "deep",
       "tags": [
         {
           "kind": "query",
@@ -230,6 +234,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 7.0,
@@ -314,6 +322,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 7.0,

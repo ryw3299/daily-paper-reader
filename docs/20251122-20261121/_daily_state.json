@@ -1,7 +1,7 @@
 {
   "date": "20251122-20261121",
   "date_label": "2025-11-22 ～ 2026-11-21",
-  "generated_at": "2026-11-22T12:42:13.223746+00:00",
+  "generated_at": "2026-11-22T15:15:50.095026+00:00",
   "recommend_exists": true,
   "run_count": 1,
   "papers": [
@@ -14,6 +14,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 9.0,
@@ -30,6 +34,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 8.0,
@@ -38,14 +46,50 @@
       "updated_at": "2026-11-22T11:33:31.115624+00:00"
     },
     {
-      "paper_id": "2609.21109v1",
-      "route": "20251122-20261121/2609.21109v1",
-      "title": "Talk to Me, Jarvis: An Open-Source Edge-Deployable Voice Assistant Framework for Autonomous Racecars",
+      "paper_id": "2609.38028v1",
+      "route": "20251122-20261121/2609.38028v1",
+      "title": "doPlan: A Variable-Horizon Dataset for Multi-Stage Language-Conditioned Planning in Autonomous Driving",
       "section": "quick",
       "tags": [
         {
           "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向车内智能体的多阶段语言条件驾驶规划数据集与评测，属车内智能体专题的长时程意图规划资源。",
+      "first_seen_at": "2026-11-22T15:15:49.599739+00:00",
+      "updated_at": "2026-11-22T15:15:49.599739+00:00"
+    },
+    {
+      "paper_id": "2601.12142v3",
+      "route": "20251122-20261121/2601.12142v3",
+      "title": "Listen, Look, Drive: Coupling Audio Instructions for User-aware VLA-based Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向车载智能体的用户感知VLA驾驶，以音频指令与情绪线索实现在线意图注入。",
+      "first_seen_at": "2026-11-22T15:15:49.434842+00:00",
+      "updated_at": "2026-11-22T15:15:49.434842+00:00"
+    },
+    {
+      "paper_id": "2609.21109v1",
+      "route": "20251122-20261121/2609.21109v1",
+      "title": "Talk to Me, Jarvis: An Open-Source Edge-Deployable Voice Assistant Framework for Autonomous Racecars",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 7.0,
@@ -62,6 +106,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 7.0,
@@ -78,12 +126,128 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 7.0,
       "evidence": "面向车载AI智能体专题，探索LLM驱动模块化自动驾驶决策与对话交互。",
       "first_seen_at": "2026-11-22T11:33:31.154942+00:00",
       "updated_at": "2026-11-22T11:33:31.154942+00:00"
+    },
+    {
+      "paper_id": "2610.16634v1",
+      "route": "20251122-20261121/2610.16634v1",
+      "title": "Language2Drive: Do Vision-Language-Action Models Really Follow the Instructions in Autonomous Driving?",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-22T15:15:50.095026+00:00",
+      "updated_at": "2026-11-22T15:15:50.095026+00:00"
+    },
+    {
+      "paper_id": "2606.29115v1",
+      "route": "20251122-20261121/2606.29115v1",
+      "title": "When Stopping Fails: Rethinking Minimal Risk Conditions through Human-Interactive Autonomous Driving for Safe Transportation Systems",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载智能体专题，分析AV停车回退与人类交互失败，提出交互式自主方向，属邻近参考。",
+      "first_seen_at": "2026-11-22T15:15:49.987341+00:00",
+      "updated_at": "2026-11-22T15:15:49.987341+00:00"
+    },
+    {
+      "paper_id": "2606.15315v3",
+      "route": "20251122-20261121/2606.15315v3",
+      "title": "ChatPlanner: A Large Language Model Framework for Personalized Public Transit Routing",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载智能体的个性化公交路径规划，涉及LLM偏好理解与路径优化结合。",
+      "first_seen_at": "2026-11-22T15:15:49.942804+00:00",
+      "updated_at": "2026-11-22T15:15:49.942804+00:00"
+    },
+    {
+      "paper_id": "2606.10974v1",
+      "route": "20251122-20261121/2606.10974v1",
+      "title": "Language-Driven Cost Optimization for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载智能体，用语言交互调优自动驾驶代价函数，属专题相关探索。",
+      "first_seen_at": "2026-11-22T15:15:49.898216+00:00",
+      "updated_at": "2026-11-22T15:15:49.898216+00:00"
+    },
+    {
+      "paper_id": "2602.04184v1",
+      "route": "20251122-20261121/2602.04184v1",
+      "title": "Natural Language Instructions for Scene-Responsive Human-in-the-Loop Motion Planning in Autonomous Driving using Vision-Language-Action Models",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载智能体的自然语言指令条件化运动规划，属真实场景可复现基线探索。",
+      "first_seen_at": "2026-11-22T15:15:49.730645+00:00",
+      "updated_at": "2026-11-22T15:15:49.730645+00:00"
+    },
+    {
+      "paper_id": "2512.12302v2",
+      "route": "20251122-20261121/2512.12302v2",
+      "title": "From Human Intention to Action Prediction: Intention-Driven End-to-End Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载智能体的人本意图理解与执行，属意图驱动自动驾驶专题的基础基准与评估工作。",
+      "first_seen_at": "2026-11-22T15:15:49.686619+00:00",
+      "updated_at": "2026-11-22T15:15:49.686619+00:00"
+    },
+    {
+      "paper_id": "2512.04733v3",
+      "route": "20251122-20261121/2512.04733v3",
+      "title": "E3AD: An Emotion-Aware Vision-Language-Action Model for Human-Centric End-to-End Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载智能体专题，探索情绪感知VLA用于开放域语言指令下的端到端自动驾驶。",
+      "first_seen_at": "2026-11-22T15:15:49.643005+00:00",
+      "updated_at": "2026-11-22T15:15:49.643005+00:00"
     },
     {
       "paper_id": "2604.08031v1",
@@ -94,6 +258,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 6.0,
@@ -110,6 +278,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 6.0,
@@ -126,6 +298,10 @@
         {
           "kind": "query",
           "label": "car-ai-agent"
+        },
+        {
+          "kind": "query",
+          "label": "in-car-agent"
         }
       ],
       "score": 6.0,
