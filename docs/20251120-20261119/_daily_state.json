@@ -190,10 +190,14 @@
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
         }
       ],
       "score": 7.0,
-      "evidence": "",
+      "evidence": "面向车载AI智能体，用LLM解析自然语言偏好并映射为Apollo规划参数，实现个性化换道。",
       "first_seen_at": "2026-11-20T13:43:08.796808+00:00",
       "updated_at": "2026-11-20T13:43:08.796808+00:00"
     },
@@ -222,10 +226,14 @@
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
         }
       ],
       "score": 7.0,
-      "evidence": "",
+      "evidence": "面向人车协同的驾驶智能体系统，属车载AI代理专题。",
       "first_seen_at": "2026-11-20T13:43:08.758645+00:00",
       "updated_at": "2026-11-20T13:43:08.758645+00:00"
     },
@@ -366,6 +374,10 @@
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
         }
       ],
       "score": 6.0,

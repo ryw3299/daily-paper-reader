@@ -1,0 +1,137 @@
+{
+  "date": "20251122-20261121",
+  "date_label": "2025-11-22 ～ 2026-11-21",
+  "generated_at": "2026-11-22T11:33:31.468364+00:00",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2603.23840v1",
+      "route": "20251122-20261121/2603.23840v1",
+      "title": "VehicleMemBench: An Executable Benchmark for Multi-User Long-Term Memory in In-Vehicle Agents",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 9.0,
+      "evidence": "面向车载智能体多用户长期记忆评测，属车载AI智能体专题的基础基准工作。",
+      "first_seen_at": "2026-11-22T11:33:31.019169+00:00",
+      "updated_at": "2026-11-22T11:33:31.019169+00:00"
+    },
+    {
+      "paper_id": "2611.19474v1",
+      "route": "20251122-20261121/2611.19474v1",
+      "title": "Towards Informed Autonomy Design: Understanding the Interplay of Function Characteristics and Autonomy Preferences in Automotive Agents",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "面向车载智能体自主性设计，探讨功能特征与自主偏好关系，属car-ai-agent专题。",
+      "first_seen_at": "2026-11-22T11:33:31.115624+00:00",
+      "updated_at": "2026-11-22T11:33:31.115624+00:00"
+    },
+    {
+      "paper_id": "2609.21109v1",
+      "route": "20251122-20261121/2609.21109v1",
+      "title": "Talk to Me, Jarvis: An Open-Source Edge-Deployable Voice Assistant Framework for Autonomous Racecars",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向自主赛车边缘部署的离线语音指令框架，与车端AI智能体专题相关。",
+      "first_seen_at": "2026-11-22T11:33:31.291434+00:00",
+      "updated_at": "2026-11-22T11:33:31.291434+00:00"
+    },
+    {
+      "paper_id": "2607.16181v1",
+      "route": "20251122-20261121/2607.16181v1",
+      "title": "Vision-Language Assistant for Emotional Reactions to Risky Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向车载AI智能体专题，探索风险驾驶场景下视觉感知与情绪化语言回应的结合。",
+      "first_seen_at": "2026-11-22T11:33:31.251567+00:00",
+      "updated_at": "2026-11-22T11:33:31.251567+00:00"
+    },
+    {
+      "paper_id": "2601.05806v1",
+      "route": "20251122-20261121/2601.05806v1",
+      "title": "Modular Autonomy with Conversational Interaction: An LLM-driven Framework for Decision Making in Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "面向车载AI智能体专题，探索LLM驱动模块化自动驾驶决策与对话交互。",
+      "first_seen_at": "2026-11-22T11:33:31.154942+00:00",
+      "updated_at": "2026-11-22T11:33:31.154942+00:00"
+    },
+    {
+      "paper_id": "2609.32604v1",
+      "route": "20251122-20261121/2609.32604v1",
+      "title": "When the Environment Becomes the Interface: Multisensory Environmental Interfaces for Human-AI Interaction in Autonomous Vehicles",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "",
+      "first_seen_at": "2026-11-22T11:33:31.468364+00:00",
+      "updated_at": "2026-11-22T11:33:31.468364+00:00"
+    },
+    {
+      "paper_id": "2606.20640v1",
+      "route": "20251122-20261121/2606.20640v1",
+      "title": "An LLM-Explainable DRL Framework for Passenger-Directed Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载AI智能体专题，探索强化学习驾驶决策与大语言模型解释结合的乘客导向方案。",
+      "first_seen_at": "2026-11-22T11:33:31.370876+00:00",
+      "updated_at": "2026-11-22T11:33:31.370876+00:00"
+    },
+    {
+      "paper_id": "2603.22120v2",
+      "route": "20251122-20261121/2603.22120v2",
+      "title": "StreamingClaw Technical Report",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向车载与具身场景的流式视频理解智能体框架，与车AI智能体专题相关。",
+      "first_seen_at": "2026-11-22T11:33:31.330897+00:00",
+      "updated_at": "2026-11-22T11:33:31.330897+00:00"
+    }
+  ]
+}

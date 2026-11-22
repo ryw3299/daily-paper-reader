@@ -873,15 +873,19 @@
       "paper_id": "2609.09476v2",
       "route": "20260822-20261119/2609.09476v2",
       "title": "From Fixed Keys to Readable Schemas: Small Language Models for Vehicle Agent Function Calls",
-      "section": "quick",
+      "section": "deep",
       "tags": [
         {
           "kind": "query",
           "label": "kg-rag-agent"
+        },
+        {
+          "kind": "query",
+          "label": "car-ai-agent"
         }
       ],
       "score": 6.0,
-      "evidence": "",
+      "evidence": "面向车载AI智能体的函数调用研究，对比小模型函数呈现方式与泛化能力。",
       "first_seen_at": "2026-11-20T12:43:41.440662+00:00",
       "updated_at": "2026-11-20T12:43:41.440662+00:00"
     },
