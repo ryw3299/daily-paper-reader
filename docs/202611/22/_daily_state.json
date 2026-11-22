@@ -1,0 +1,41 @@
+{
+  "date": "20261122",
+  "date_label": "",
+  "generated_at": "2026-11-22 00:04:13 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.25474v1",
+      "route": "202611/22/2611.25474v1-turingpai-a-foundation-for-on-device-physical-ai",
+      "title": "TuringPAI: A Foundation for On-Device Physical AI",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向端侧部署的视觉语言模型，含自动驾驶专用模型",
+      "first_seen_at": "2026-11-22 00:04:13 UTC",
+      "updated_at": "2026-11-22 00:04:13 UTC"
+    },
+    {
+      "paper_id": "2611.26062v1",
+      "route": "202611/22/2611.26062v1-gensparql-a-generative-extension-of-sparql-for-incomplete-knowledge-graphs",
+      "title": "GenSPARQL: A Generative Extension of SPARQL for Incomplete Knowledge Graphs",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "用大模型生成绑定扩展SPARQL以查询不完整知识图谱，相关于知识图谱查询与LLM增强方法",
+      "first_seen_at": "2026-11-22 00:04:13 UTC",
+      "updated_at": "2026-11-22 00:04:13 UTC"
+    }
+  ]
+}

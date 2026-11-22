@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-12 ~ 2026-11-21</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-22</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 8 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>3 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-21 14:57:16 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-22 00:04:13 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>本期速读 8 篇论文，全部为速读、无精读，重点集中在自动驾驶的视觉-语言-动作（VLA）模型方向。最值得看的是《Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules》（7.0/10），它用符号化交通规则微调 VLA 模型；其次是两篇 6.0 分工作，分别讲以智能体为中心的 VLA 世界模型，以及 AI 研究构思的拆解方法。建议普通读者先读 7.0 分那篇，理解“规则注入”的思路，再按兴趣扫读另外两篇的摘要与实验设置。</p>
+<p>今日速读2篇均分6.0的论文，聚焦端侧物理AI基座与不完整知识图谱的生成式SPARQL扩展。最值得看的是TuringPAI如何将物理AI能力落到设备端，以及GenSPARQL如何用生成式方法补全查询短板。建议普通读者优先翻看TuringPAI的摘要与实验场景，判断是否与自身硬件或应用相关。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">8 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules">Competent Autonomous Driving Through Fine Tuning Vision Language Action Models with Symbolic Traffic Rules</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving">Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="Ground, Iterate, Trace: Decomposing AI Research Ideation">Ground, Iterate, Trace: Decomposing AI Research Ideation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="TuringPAI: A Foundation for On-Device Physical AI">TuringPAI: A Foundation for On-Device Physical AI</span></li><li><span class="dpr-home-dashboard-paper-title" title="GenSPARQL: A Generative Extension of SPARQL for Incomplete Knowledge Graphs">GenSPARQL: A Generative Extension of SPARQL for Incomplete Knowledge Graphs</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>8</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>2</strong></span></div>
 </section>
 </div>
 
