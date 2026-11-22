@@ -123,6 +123,9 @@ subscriptions:
         - keyword: vehicle intelligence platform
           keyword_cn: 车载智能平台
           query: platform supporting intelligent vehicle applications and services
+        - keyword: automotive large language model
+          keyword_cn: 汽车大语言模型
+          query: large language models tailored to automotive scenarios and vehicle-mounted deployment
       intent_queries:
         - query: How are in vehicle intelligent agents designed to interact with drivers and passengers?
           query_cn: 车载智能体如何设计以与驾驶员和乘客交互？
@@ -134,17 +137,12 @@ subscriptions:
           enabled: true
           source: manual
           note: ''
-        - query: How can automotive large models enable intelligent cockpit assistants and natural language services?
-          query_cn: 汽车大模型如何赋能智能座舱助手和自然语言服务？
+        - query: How do automotive companies build an in car AI agent powered by large models?
+          query_cn: 车企如何构建由大模型驱动的车载智能体？
           enabled: true
-          source: manual
+          source: generated
           note: ''
-        - query: What technologies support multimodal interaction and conversational agents in vehicles?
-          query_cn: 哪些技术支撑车载多模态交互和对话智能体？
-          enabled: true
-          source: manual
-          note: ''
-      updated_at: '2026-11-22T11:19:52.259Z'
+      updated_at: '2026-11-22T12:13:04.262Z'
 source_backends:
   arxiv:
     papers_table: arxiv_papers
