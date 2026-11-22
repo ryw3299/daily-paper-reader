@@ -1,5 +1,8 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
+
+* Conference Papers
+  * ICLR-ICML 2025, 2026 <!--dpr-conference:iclr-icml-2025-2026-->
 * Daily Papers
   * 2025-11-22 ～ 2026-11-21 <!--dpr-date:20251122-20261121-->
     * 精读区
