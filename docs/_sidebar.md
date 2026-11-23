@@ -4,6 +4,9 @@
 * Conference Papers
   * ICLR-ICML 2025, 2026 <!--dpr-conference:iclr-icml-2025-2026-->
 * Daily Papers
+  * 2026-10-25 ~ 2026-11-23 <!--dpr-date:20261025-20261123-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/20261025-20261123/2611.10506v1-sra-spatial-reasoning-adapter-via-evolving-social-interaction-graphs-for-trajectory-prediction" data-sidebar-item="{&quot;title&quot;: &quot;SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2611.10506v1-sra-spatial-reasoning-adapter-via-evolving-social-interaction-graphs-for-trajectory-prediction&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;self-driving&quot;}], &quot;evidence&quot;: &quot;用于多智能体轨迹预测的演化社交交互图&quot;}">SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction</a>
   * 2025-11-22 ～ 2026-11-21 <!--dpr-date:20251122-20261121-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/20251122-20261121/2603.23840v1" data-sidebar-item="{&quot;title&quot;: &quot;VehicleMemBench: An Executable Benchmark for Multi-User Long-Term Memory in In-Vehicle Agents&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2603.23840v1&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;car-ai-agent&quot;}, {&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;in-car-agent&quot;}], &quot;evidence&quot;: &quot;面向车载智能体多用户长期记忆评测，属车载AI智能体专题的基础基准工作。&quot;}">VehicleMemBench: An Executable Benchmark for Multi-User Long-Term Memory in In-Vehicle Agents</a>

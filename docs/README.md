@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-22</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-25 ~ 2026-11-23</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-22 00:04:13 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-23 05:32:10 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读2篇均分6.0的论文，聚焦端侧物理AI基座与不完整知识图谱的生成式SPARQL扩展。最值得看的是TuringPAI如何将物理AI能力落到设备端，以及GenSPARQL如何用生成式方法补全查询短板。建议普通读者优先翻看TuringPAI的摘要与实验场景，判断是否与自身硬件或应用相关。</p>
+<p>今日速读 1 篇、精读 0 篇，重点浏览了轨迹预测方向的高分论文《SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction》（8.0/10）。</p>
+<p>最值得看的是它把“演化社交交互图”与“空间推理适配器”结合来做轨迹预测，适合关注人群/智能体交互建模的读者优先阅读。</p>
+<p>下一步建议普通读者先读摘要与交互图构建部分，重点确认该方法在真实拥挤场景中的适用性与计算开销。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="TuringPAI: A Foundation for On-Device Physical AI">TuringPAI: A Foundation for On-Device Physical AI</span></li><li><span class="dpr-home-dashboard-paper-title" title="GenSPARQL: A Generative Extension of SPARQL for Incomplete Knowledge Graphs">GenSPARQL: A Generative Extension of SPARQL for Incomplete Knowledge Graphs</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction">SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">self-driving <strong>1</strong></span></div>
 </section>
 </div>
 

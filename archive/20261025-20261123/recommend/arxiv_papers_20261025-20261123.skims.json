@@ -1,0 +1,61 @@
+{
+  "mode": "skims",
+  "generated_at": "2026-11-23T05:31:44.543137+00:00",
+  "stats": {
+    "mode": "skims",
+    "forced_all_quick": true,
+    "min_score": 8.0,
+    "deep_divecandidates": 1,
+    "deep_cap": null,
+    "deep_selected": 0,
+    "quick_candidates": 1,
+    "quick_skim_target": null,
+    "quick_selected": 1
+  },
+  "deep_dive": [],
+  "quick_skim": [
+    {
+      "id": "2611.10506v1",
+      "source": "arxiv",
+      "title": "SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction",
+      "abstract": "Predicting where multiple agents will move next is fundamental to autonomous driving, robotics, and any system that must share space with people safely. Modern stochastic predictors read off inter-agent interactions once from the observed past and keep that view fixed throughout the generative rollout, so the reciprocal geometric constraints that emerge as the joint future sharpens are not re-examined. We address this gap with SRA (Spatial Reasoning Adapter), a modular graph denoiser that is integrated into existing diffusion and flow-matching predictors without redesigning their generative cores. At every reverse step, SRA reads the host's current future estimate, builds a sparse Euclidean interaction graph on the predicted trajectories, and returns a residual correction to the host's decoding path. Our adapter consists of three core components: a sparse neighborhood retrieved with a learned query-key score and a geometric bias, a future-conditioned relational feature recomputed on the evolving prediction, and uncertainty-weighted message passing where confident agents act as anchors for uncertain ones. We instantiate SRA on three structurally different hosts (LED, MID, and MoFlow) across four multi-agent benchmarks: SDD, NBA, Soccer, and Football. SRA improves ADE for every host on every dataset, with average gains of 5.8% in ADE and 7.0% in FDE. A cumulative ablation shows that the three components act as one mechanism: only together do they improve every host on every sports dataset, indicating that spatial reasoning over the model's own evolving future, weighted by how far that future can be trusted, is broadly useful across denoising architectures. Code is available at https://github.com/Jaewoo97/SRA.",
+      "authors": [
+        "Jaewoo Jeong",
+        "Seonkyu Song",
+        "Hyeonwoo Park",
+        "Jegyeong Cho",
+        "Yujin Bae",
+        "Giwon Lee",
+        "Daehee Park",
+        "Kuk-Jin Yoon"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-07T06:16:58+00:00",
+      "link": "https://arxiv.org/pdf/2611.10506v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "evolving social interaction graphs for multi-agent trajectory prediction",
+      "llm_evidence_cn": "用于多智能体轨迹预测的演化社交交互图",
+      "llm_evidence": "用于多智能体轨迹预测的演化社交交互图",
+      "canonical_evidence": "用于多智能体轨迹预测的演化社交交互图",
+      "llm_tldr_en": "SRA is a modular graph denoiser that rebuilds a sparse Euclidean interaction graph at every reverse diffusion step, refining inter-agent relations inside existing trajectory predictors.",
+      "llm_tldr_cn": "针对现有随机轨迹预测器只在观测历史中一次性读取智能体交互、生成过程中不再更新几何约束的问题，作者提出SRA空间推理适配器，在每个扩散反向步依据当前未来估计构建稀疏欧氏交互图进行推理，可即插即用地嵌入扩散与流匹配预测器。该方法在不改动生成核心的前提下增强了交互建模，为自动驾驶多智能体轨迹预测提供了可复用的图结构精化模块。",
+      "llm_tldr": "针对现有随机轨迹预测器只在观测历史中一次性读取智能体交互、生成过程中不再更新几何约束的问题，作者提出SRA空间推理适配器，在每个扩散反向步依据当前未来估计构建稀疏欧氏交互图进行推理，可即插即用地嵌入扩散与流匹配预测器。该方法在不改动生成核心的前提下增强了交互建模，为自动驾驶多智能体轨迹预测提供了可复用的图结构精化模块。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "graph-based trajectory prediction using explicit agent and lane relationship graphs",
+      "matched_requirement_id": "req-14",
+      "selection_source": "fresh_fetch"
+    }
+  ]
+}

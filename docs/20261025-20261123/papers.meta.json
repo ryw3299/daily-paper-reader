@@ -1,0 +1,24 @@
+{
+  "label": "2026-10-25 ~ 2026-11-23",
+  "date": "2026-10-25 ~ 2026-11-23",
+  "generated_at": "2026-11-23T05:32:12",
+  "count": 1,
+  "papers": [
+    {
+      "paper_id": "20261025-20261123/2611.10506v1-sra-spatial-reasoning-adapter-via-evolving-social-interaction-graphs-for-trajectory-prediction",
+      "section": "quick",
+      "title_en": "SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction",
+      "authors": "Jaewoo Jeong, Seonkyu Song, Hyeonwoo Park, Jegyeong Cho, Yujin Bae, Giwon Lee, Daehee Park, Kuk-Jin Yoon",
+      "date": "2026-11-07",
+      "pdf": "https://arxiv.org/pdf/2611.10506v1",
+      "score": "8.0",
+      "evidence": "用于多智能体轨迹预测的演化社交交互图",
+      "tldr": "现有多智能体轨迹预测器只在观测历史中读取一次交互，并在整个生成过程中保持不变，无法反映联合未来逐渐清晰时产生的几何约束。SRA 作为模块化图去噪适配器嵌入扩散与流匹配预测器，在每个反向步骤基于当前未来估计构建稀疏欧氏交互图，输出残差修正。在 LED、MID、MoFlow 三种宿主与四个数据集上，ADE 与 FDE 平均提升 5.8% 与 7.0%。消融显示三个组件必须协同才有效。",
+      "tags": "query:self-driving",
+      "abstract_en": "Predicting where multiple agents will move next is fundamental to autonomous driving, robotics, and any system that must share space with people safely. Modern stochastic predictors read off inter-agent interactions once from the observed past and keep that view fixed throughout the generative rollout, so the reciprocal geometric constraints that emerge as the joint future sharpens are not re-examined. We address this gap with SRA (Spatial Reasoning Adapter), a modular graph denoiser that is integrated into existing diffusion and flow-matching predictors without redesigning their generative cores. At every reverse step, SRA reads the host's current future estimate, builds a sparse Euclidean interaction graph on the predicted trajectories, and returns a residual correction to the host's decoding path. Our adapter consists of three core components: a sparse neighborhood retrieved with a learned query-key score and a geometric bias, a future-conditioned relational feature recomputed on the evolving prediction, and uncertainty-weighted message passing where confident agents act as anchors for uncertain ones. We instantiate SRA on three structurally different hosts (LED, MID, and MoFlow) across four multi-agent benchmarks: SDD, NBA, Soccer, and Football. SRA improves ADE for every host on every dataset, with average gains of 5.8% in ADE and 7.0% in FDE. A cumulative ablation shows that the three components act as one mechanism: only together do they improve every host on every sports dataset, indicating that spatial reasoning over the model's own evolving future, weighted by how far that future can be trusted, is broadly useful across denoising architectures. Code is available at https://github.com/Jaewoo97/SRA.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

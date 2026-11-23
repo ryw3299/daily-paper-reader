@@ -1,0 +1,25 @@
+{
+  "date": "20261025-20261123",
+  "date_label": "2026-10-25 ~ 2026-11-23",
+  "generated_at": "2026-11-23 05:32:10 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.10506v1",
+      "route": "20261025-20261123/2611.10506v1-sra-spatial-reasoning-adapter-via-evolving-social-interaction-graphs-for-trajectory-prediction",
+      "title": "SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "self-driving"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "用于多智能体轨迹预测的演化社交交互图",
+      "first_seen_at": "2026-11-23 05:32:10 UTC",
+      "updated_at": "2026-11-23 05:32:10 UTC"
+    }
+  ]
+}

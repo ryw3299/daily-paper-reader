@@ -1,10 +1,20 @@
 {
-  "generated_at": "2026-11-22T00:03:51.597334+00:00",
-  "updated_date": "20261122",
+  "generated_at": "2026-11-23T05:31:44.543913+00:00",
+  "updated_date": "20261025-20261123",
   "carryover_days": 9,
   "tag_states": {
     "kg-rag-agent": {
       "updated_date": "20261122",
+      "carryover_days": 9,
+      "items": []
+    },
+    "in-car-agent": {
+      "updated_date": "20261025-20261123",
+      "carryover_days": 9,
+      "items": []
+    },
+    "self-driving": {
+      "updated_date": "20261025-20261123",
       "carryover_days": 9,
       "items": []
     }
