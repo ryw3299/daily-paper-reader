@@ -104,7 +104,8 @@ subscriptions:
       updated_at: '2026-11-21T14:49:46.309Z'
       paused: false
     - tag: in-car-agent
-      description: 关注系统如何理解驾驶员或乘客的需求，结合当前情境决定是否追问、提醒或执行任务；覆盖任务型对话、主动交互、导航与出行服务、工具调用和车辆功能操作。
+      description: >-
+        查找使用显式图结构的车载座舱助手与交互系统。保留驾驶员或乘客需求理解、追问与主动提醒、个性化服务、导航与出行、工具调用和车辆功能操作。论文应说明知识图谱、对话状态图或任务图中的节点与关系如何支持其中至少一项能力。围绕这些图结构开展的综述、数据集、评测基准和用户研究也可纳入。
       enabled: true
       paper_sources:
         - arxiv
@@ -117,32 +118,54 @@ subscriptions:
           query: intelligent agent designed for automotive scenarios and vehicle services
         - keyword: vehicle function control
           keyword_cn: 车辆功能控制
-          query: controlling vehicle functions through natural language commands and dialogue
+          query: vehicle function operation and control through graph-based dialogue and task representations
         - keyword: in-vehicle assistant
           keyword_cn: 车载助手
           query: in-vehicle assistants that understand occupant needs and complete tasks
+        - keyword: knowledge graph
+          keyword_cn: 知识图谱
+          query: >-
+            knowledge graph representation of vehicle functions, user preferences, and contextual entities for in-car
+            assistant reasoning
+        - keyword: graph-based dialogue
+          keyword_cn: 基于图的对话
+          query: graph-based dialogue modeling for cockpit assistants with explicit nodes and relations
       intent_queries:
         - query: >-
-            Research on in vehicle assistants and interactive cockpit systems that help drivers or passengers get
-            information, use services, or operate vehicle functions. Include in car voice assistants, automotive
-            dialogue systems, multimodal interaction, and studies of any individual assistant capability, such as
-            understanding requests, providing proactive or personalized assistance, or carrying out tasks. Relevant
-            surveys, datasets, benchmarks, and user studies are also in scope.
-          query_cn: >-
-            关注帮助驾驶员或乘客在车内获取信息、使用服务或操作车辆功能的座舱助手与交互系统。涵盖车内语音助手、车载对话系统、多模态交互，也收录只研究某项助手能力的论文，例如请求理解、主动或个性化服务、任务执行。相关综述、数据集、评测基准和用户实验也可纳入。
+            Find papers that use knowledge graphs, dialogue state graphs, or task graphs to support driver and passenger
+            need understanding in in car cockpit assistants.
+          query_cn: 查找使用知识图谱、对话状态图或任务图来支持车载座舱助手中驾驶员与乘客需求理解的论文。
           enabled: true
           source: generated
           note: ''
-      updated_at: '2026-11-22T14:56:45.066Z'
+        - query: >-
+            Find in car assistant systems where explicit graph nodes and relations enable clarification questions,
+            proactive reminders, or personalized services.
+          query_cn: 查找显式图节点与关系能够支持追问、主动提醒或个性化服务的车载助手系统。
+          enabled: true
+          source: generated
+          note: ''
+        - query: >-
+            Find graph structured task planning and tool invocation methods for controlling vehicle functions and
+            supporting navigation in cockpit assistants.
+          query_cn: 查找在座舱助手中用于控制车辆功能和支持导航的图结构任务规划与工具调用方法。
+          enabled: true
+          source: generated
+          note: ''
+        - query: >-
+            Find surveys, datasets, benchmarks, and user studies on explicit graph structures for in car conversational
+            assistants.
+          query_cn: 查找关于车载对话助手显式图结构的综述、数据集、评测基准和用户研究。
+          enabled: true
+          source: generated
+          note: ''
+      updated_at: '2026-11-23T05:23:58.079Z'
     - tag: self-driving
-      description: 关注道路车辆的自动驾驶、自动化驾驶系统、相关高级驾驶辅助系统（ADAS）以及车载智能体，涵盖感知、定位建图、行为预测、决策规划、车辆控制、端到端驾驶、人机交互、安全鲁棒性及数据集仿真评测。
+      description: 查找使用显式图结构完成自动驾驶任务的研究，关注场景图、车道图、道路拓扑图和交互图如何表示交通参与者与道路要素之间的关系，并支持轨迹预测、行为决策和运动规划。
       enabled: true
       paper_sources:
         - arxiv
       keywords:
-        - keyword: automated driving system
-          keyword_cn: 自动化驾驶系统
-          query: automated driving systems for road vehicles
         - keyword: driver assistance system
           keyword_cn: 驾驶辅助系统
           query: advanced driver assistance systems and driving functions
@@ -152,32 +175,45 @@ subscriptions:
         - keyword: end-to-end driving
           keyword_cn: 端到端驾驶
           query: end-to-end learning from sensor input to driving control
+        - keyword: graph trajectory prediction
+          keyword_cn: 图轨迹预测
+          query: graph-based trajectory prediction using explicit agent and lane relationship graphs
+        - keyword: graph motion planning
+          keyword_cn: 图运动规划
+          query: graph-based motion planning using road topology and scene relationship representations
+        - keyword: graph behavior decision
+          keyword_cn: 图行为决策
+          query: graph representation supporting behavior decision making with traffic participant and road element relations
       intent_queries:
         - query: >-
-            Find research on perception, localization, behavior prediction, planning, and control for autonomous road
-            vehicles.
-          query_cn: 查找关于自动驾驶道路车辆感知、定位、行为预测、规划与控制的研究。
+            Research that uses explicit scene graphs to represent relationships between traffic participants and road
+            elements for autonomous driving tasks
+          query_cn: 研究使用显式场景图表示交通参与者与道路要素之间关系以完成自动驾驶任务
           enabled: true
-          source: manual
+          source: generated
           note: ''
         - query: >-
-            Find work on advanced driver assistance systems, automated driving functions, and in vehicle intelligent
-            agents.
-          query_cn: 查找关于高级驾驶辅助系统、自动驾驶功能与车载智能体的工作。
+            Methods using lane graphs or road topology graphs for trajectory prediction, behavior decision, and motion
+            planning in autonomous driving
+          query_cn: 使用车道图或道路拓扑图支持自动驾驶中轨迹预测、行为决策和运动规划的方法
           enabled: true
-          source: manual
+          source: generated
           note: ''
-        - query: Find studies on end to end driving architectures and human machine interaction in automated vehicles.
-          query_cn: 查找关于端到端驾驶架构与自动驾驶车辆人机交互的研究。
+        - query: >-
+            Papers that define graph nodes and edges for traffic agents and road infrastructure and evaluate how graph
+            relations affect driving task outputs
+          query_cn: 定义交通主体与道路基础设施的图节点和边，并评估图关系如何影响驾驶任务输出的论文
           enabled: true
-          source: manual
+          source: generated
           note: ''
-        - query: Find methods for safety, robustness, simulation, datasets, and evaluation of autonomous driving systems.
-          query_cn: 查找关于自动驾驶系统安全性、鲁棒性、仿真、数据集与评测的方法。
+        - query: >-
+            Graph based interaction models for autonomous driving that support trajectory prediction, decision making,
+            or motion planning
+          query_cn: 支持轨迹预测、决策或运动规划的自动驾驶图交互模型
           enabled: true
-          source: manual
+          source: generated
           note: ''
-      updated_at: '2026-11-22T15:12:53.260Z'
+      updated_at: '2026-11-23T05:25:53.306Z'
 source_backends:
   arxiv:
     papers_table: arxiv_papers
