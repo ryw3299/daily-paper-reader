@@ -2,6 +2,7 @@
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 
 * Conference Papers
+  * AAAI-ACL-CVPR-ECCV-ICML-NEURIPS 2025, 2026 <!--dpr-conference:aaai-acl-cvpr-eccv-icml-neurips-2025-2026-->
   * ICLR-ICML 2025, 2026 <!--dpr-conference:iclr-icml-2025-2026-->
 * Daily Papers
   * 2026-10-25 ~ 2026-11-23 <!--dpr-date:20261025-20261123-->
