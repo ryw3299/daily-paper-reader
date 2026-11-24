@@ -140,15 +140,15 @@ function testNormalizeSubscriptionsConvertsChineseTagToEnglishFallback() {
   assert.equal(normalized.subscriptions.intent_profiles[0].tag, 'rl');
 }
 
-async function testSaveDraftKeepsCurrentRepositoryBackend() {
+async function testSaveDraftKeepsCurrentRepositoryBackend(enabled) {
   const draft = buildBaseConfig();
-  draft.source_backends.arxiv.enabled = true;
-  draft.supabase = { enabled: true };
+  draft.source_backends.arxiv.enabled = !enabled;
+  draft.supabase = { enabled: !enabled };
 
   const current = buildBaseConfig();
-  current.source_backends.arxiv.enabled = false;
-  current.supabase = { enabled: false };
-  current.arxiv_paper_setting = { prefer_supabase_read: false };
+  current.source_backends.arxiv.enabled = enabled;
+  current.supabase = { enabled };
+  current.arxiv_paper_setting = { prefer_supabase_read: enabled };
   current.subscriptions.keyword_recall_mode = 'and';
 
   const manager = window.SubscriptionsManager;
@@ -167,12 +167,12 @@ async function testSaveDraftKeepsCurrentRepositoryBackend() {
     });
 
     await saveDraftConfig();
-    assert.equal(saved.source_backends.arxiv.enabled, false);
+    assert.equal(saved.source_backends.arxiv.enabled, enabled);
     assert.deepEqual(saved.supabase, current.supabase);
     assert.deepEqual(saved.arxiv_paper_setting, current.arxiv_paper_setting);
     assert.equal(saved.subscriptions.keyword_recall_mode, 'and');
     assert.equal(saved.subscriptions.intent_profiles[0].keywords[0].keyword, 'automated driving');
-    assert.equal(manager.getDraftConfig().source_backends.arxiv.enabled, false);
+    assert.equal(manager.getDraftConfig().source_backends.arxiv.enabled, enabled);
   } finally {
     delete window.SubscriptionsGithubToken;
   }
@@ -607,7 +607,8 @@ async function testLongRangeSelectionDispatchesAndCanCancel() {
   testNormalizeSubscriptionsAddsBiorxivBackend();
   testNormalizeSubscriptionsPreservesCustomBiorxivBackendFields();
   testNormalizeSubscriptionsConvertsChineseTagToEnglishFallback();
-  await testSaveDraftKeepsCurrentRepositoryBackend();
+  await testSaveDraftKeepsCurrentRepositoryBackend(false);
+  await testSaveDraftKeepsCurrentRepositoryBackend(true);
   await testRunProfileQuickFetchPassesProfileTagToWorkflow();
   testConferenceCurrentYearDisabledForPendingSources();
   testConferenceDefaultYearOnlySelects2025();

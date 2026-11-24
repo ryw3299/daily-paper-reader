@@ -197,19 +197,19 @@ jobs:
                   python src/maintain/aaai.py --years "$YEARS" --skip-cleanup
                   ;;
                 cvpr)
-                  python src/maintain/cvpr.py --year-end "$(echo "$YEARS" | tr ',' '\n' | sort -rn | head -1)" --year-count "$(echo "$YEARS" | tr ',' '\n' | wc -l)" --skip-cleanup
+                  python src/maintain/cvpr.py --years "$YEARS" --skip-cleanup
                   ;;
                 eccv)
-                  python src/maintain/eccv.py --year-end "$(echo "$YEARS" | tr ',' '\n' | sort -rn | head -1)" --year-count "$(echo "$YEARS" | tr ',' '\n' | wc -l)" --skip-cleanup
+                  python src/maintain/eccv.py --years "$YEARS" --skip-cleanup
                   ;;
                 ijcai)
-                  python src/maintain/ijcai.py --year-end "$(echo "$YEARS" | tr ',' '\n' | sort -rn | head -1)" --year-count "$(echo "$YEARS" | tr ',' '\n' | wc -l)" --skip-cleanup
+                  python src/maintain/ijcai.py --years "$YEARS" --skip-cleanup
                   ;;
                 acl)
-                  python src/maintain/acl.py --year-end "$(echo "$YEARS" | tr ',' '\n' | sort -rn | head -1)" --year-count "$(echo "$YEARS" | tr ',' '\n' | wc -l)" --skip-cleanup
+                  python src/maintain/acl.py --years "$YEARS" --skip-cleanup
                   ;;
                 emnlp)
-                  python src/maintain/emnlp.py --year-end "$(echo "$YEARS" | tr ',' '\n' | sort -rn | head -1)" --year-count "$(echo "$YEARS" | tr ',' '\n' | wc -l)" --skip-cleanup
+                  python src/maintain/emnlp.py --years "$YEARS" --skip-cleanup
                   ;;
                 osdi)
                   python src/maintain/osdi.py --years "$YEARS" --skip-cleanup
