@@ -11,7 +11,51 @@
 - **全链路自动化**：arXiv/会议论文抓取 → 个性化召回 → 重排 → LLM 精炼打分 → 生成可阅读日报
 - **纯前端架构**：订阅管理、密钥存储、AI 问答、Zotero 集成全在浏览器端完成
 
-## 二、整体架构分层
+## 二、定制化方向（本项目实例）
+
+本项目已定制化为**车载智能体研究工具**，聚焦：
+
+- **车载智能体（CAV）研究**：Connected & Autonomous Vehicles 相关论文
+- **图结构与智能体**：图神经网络、多智能体系统
+- **投毒攻击研究**：车载智能体投毒（Poisoning Attacks on CAVs）
+
+### 数据源配置
+
+**已纳入的会议/期刊**（按权威性）：
+
+| 层级 | 会议/期刊 | 覆盖领域 |
+|------|----------|--------|
+| 🏆 顶级 | IJCAI, ICML, ICLR, NeurIPS | AI/ML 通用 |
+| 🏆 顶级 | AAMAS | 多智能体系统 |
+| 🥈 二级 | TITS, JITS, IEEE ITS | 车载/交通系统 |
+| 🥈 二级 | NDSS, CCS | 安全/投毒 |
+| 🥉 三级 | IJCNN, AAAI | 神经网络/AI |
+
+**arXiv 分类**（优先级）：
+- `cs.AI`：人工智能
+- `cs.RO`：机器人学（车载）
+- `cs.CR`：密码学与安全（投毒攻击）
+- `cs.LG`：机器学习（图神经网络）
+
+### 数据源扩展方法
+
+若需添加新的数据源（会议/期刊），参考 `src/maintain/` 目录：
+
+```bash
+src/maintain/
+├── arxiv.py              # arXiv 维护入口
+├── conference_*.py       # 会议论文维护
+├── fetchers/             # 具体爬虫实现
+└── sync.py              # 统一向量编码 + Supabase 同步
+```
+
+新增数据源步骤：
+1. 在 `src/maintain/` 下新建 `<source>.py`（薄调度层）
+2. 实现 `src/maintain/fetchers/fetch_<source>.py`（爬虫逻辑）
+3. 复用 `sync.py` 进行向量编码和 Supabase 同步
+4. 在 GitHub Actions 中新增对应 workflow 定时触发
+
+## 三、整体架构分层
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -32,7 +76,7 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
-## 三、端到端数据流（每日运行一次）
+## 四、端到端数据流（每日运行一次）
 
 ```
 定时触发 (UTC 18:30 / 北京 02:30)
@@ -63,7 +107,7 @@
 
 **关键设计**：各 Step 间通过 `DPR_RUN_DATE` 环境变量隐式共享 archive 路径（`archive/<date_token>/{raw,filtered,rank,recommend,logs}/`），`main.py` 只设一次这个 env，各脚本顶部独立重算路径。
 
-## 四、各子系统详解
+## 五、各子系统详解
 
 ### 1. 流水线编排 `src/main.py`
 
@@ -215,14 +259,14 @@
 - `src/local_env.py`：加载 `.env` 文件
 - `src/sitecustomize.py`：自动加载 `.env`（需 `PYTHONPATH` 含 `src` 才生效）
 
-## 五、关键配置文件
+## 六、关键配置文件
 
 - **`config.yaml`**（根目录）：运行配置，含 `arxiv_paper_setting`、`supabase` 连接、`subscriptions.intent_profiles`
 - **`.env` / `.env.example`**：环境变量（API Key、Supabase 凭据等）
 - **`secret.private`**：AES-GCM 加密的密钥文件，浏览器端解密
 - **`docs/config.yaml`**：前端只读快照（CI 运行后 `cp config.yaml docs/config.yaml`）
 
-## 六、外部依赖
+## 七、外部依赖
 
 ```
 DeepSeek API ←── Step 4 精炼 + Step 6 摘要 + Step 0 查询扩充 + 前端 AI 问答
@@ -235,7 +279,7 @@ GitHub API   ←── 前端读写 config / 触发 Actions / 管理 Secrets / G
 Zotero       ←── 浏览器 Connector 抓取 citation meta
 ```
 
-## 七、值得注意的设计与已知问题
+## 八、值得注意的设计与已知问题
 
 1. **`DPR_RUN_DATE` 隐式总线**：main 设一次，各 step 各自重算路径——两者必须用同一 token，否则产物错位
 2. **向量维度硬编码 384**：SQL 列 `vector(384)` 对应 `bge-small-en-v1.5`，换模型必须同步改全部 SQL
@@ -248,7 +292,7 @@ Zotero       ←── 浏览器 Connector 抓取 citation meta
 9. **代码重复**：`init_*.py` / `fetch_*.py` 各自重实现了 `run_step/log/TODAY_STR/seen-state`，未复用 `common.py`
 10. **两个「4 分门槛」易混淆**：`llm-min-star`(4) 是 0-5 星制 rerank 门，`display-min-score`(4.0) 是 0-10 分制 DeepSeek 展示门
 
-## 八、测试
+## 九、测试
 
 - **Python 测试**：`pytest`（`pytest.ini`），~38 个测试文件覆盖大部分 Python 模块
 - **JS 测试**：6 个 `test_*.js` 覆盖前端纯函数（subscriptions、zotero、gist、llm-config）
@@ -256,7 +300,29 @@ Zotero       ←── 浏览器 Connector 抓取 citation meta
 - **覆盖较好的链路**：订阅规划、LLM 结构化输出、reranker API、各源初始化/fetch
 - **覆盖薄弱的链路**：RRF 融合逻辑、SQL/RPC、端到端编排、filter.py
 
-## 九、开发约定
+## 十、AI 助手协作规则
+
+### Claude 与 Codex 分工约定
+
+当用户明确要求「跟codex进行协作」或「跟codex协作」时，启用以下协作模式：
+
+- **Claude 角色**：Team Leader，负责制定计划、拆解任务、分配任务给 Codex、设置验收标准，以及核验 Codex 返回的证据并作出接受或拒绝决定
+- **Codex 角色**：执行者，通过 `codex:codex-rescue` subagent 完成全部具体实施，包括仓库调查、代码修改、依赖安装、测试、调试和排错
+- **决策权归属**：Claude 在该模式下仅承担 Team Leader 职责，不直接执行代码修改。**最终决策权始终在 Claude**，不被 Codex 的建议带偏，Claude 的判断是最重要的
+- **任务委派流程**：
+  1. Claude 制定调查/修复计划
+  2. 通过 Agent 工具调用 `subagent_type: "codex:codex-rescue"` 委派给 Codex
+  3. Codex 返回可核验的证据（实际命令输出、文件路径、原始报错信息）
+  4. Claude 审查结果并明确接受或拒绝；缺少证据的结论不得接受
+  5. 若结果不符合验收标准，Claude 退回并要求 Codex 返工，不自行修改代码
+
+### 验收纪律
+
+- Claude 只能依据 Codex 返回的证据审查结果，并明确接受或拒绝
+- 发现结果或方案不符合验收标准时，Claude 应退回并要求 Codex 返工，不得自行修改代码或代替 Codex 实施
+- Codex 建议仅供参考，Claude 基于项目整体情况做最终决策
+
+## 十一、开发约定
 
 ### 前端反馈入口规则
 

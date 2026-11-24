@@ -4,6 +4,15 @@ const t = api.__test;
 assert.deepEqual(t.englishGroups({ keywords: [{ keyword: 'RL', query: 'offline reinforcement learning' }] }), [['RL']]);
 assert.deepEqual(t.englishGroups({ keywords: [{ query: 'offline reinforcement learning' }] }), [['offline reinforcement learning']]);
 const config = { supabase_shared: { url: 'https://example.invalid', anon_key: 'sb_publishable_test' } };
+const alignedConfig = {
+  ...config, supabase: { enabled: true },
+  arxiv_paper_setting: { prefer_supabase_read: true },
+  source_backends: { arxiv: { enabled: true } },
+};
+assert.equal(t.backendFor(alignedConfig).endpoint, 'https://example.invalid/rest/v1/arxiv_papers');
+assert.equal(t.backendFor({ ...alignedConfig, arxiv_paper_setting: { prefer_supabase_read: false } }).endpoint,
+  t.backendFor(alignedConfig).endpoint);
+assert.throws(() => t.backendFor({ ...alignedConfig, source_backends: { arxiv: { enabled: false } } }));
 const options = { profile: { keywords: ['ATSP', 'asymmetric TSP'] }, mode: '90', asOf: '2026-09-12', config };
 let calls = [];
 function mock(values) {

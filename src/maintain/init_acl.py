@@ -15,11 +15,15 @@ except ImportError:
 
 
 SCRIPT_DIR = os.path.dirname(__file__)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 TODAY_STR = datetime.now(timezone.utc).strftime("%Y%m%d")
 DEFAULT_EMBED_BATCH_SIZE = 8
 DEFAULT_EMBED_CHUNK_SIZE = 512
 LOCAL_MAINTAIN_EMBED_BATCH_SIZE = 64
 LOCAL_MAINTAIN_EMBED_CHUNK_SIZE = 1024
+
+from common import format_years_token, resolve_target_years
 
 
 def run_step(label: str, args: list[str]) -> None:
@@ -31,6 +35,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="抓取近三年 ACL Anthology 论文并同步到 Supabase。")
     parser.add_argument("--year-end", type=int, default=datetime.now(timezone.utc).year)
     parser.add_argument("--year-count", type=int, default=3)
+    parser.add_argument("--years", type=str, default="")
     parser.add_argument("--workers", type=int, default=32)
     parser.add_argument("--date", type=str, default=TODAY_STR)
     parser.add_argument("--raw-input", type=str, default="")
@@ -75,12 +80,18 @@ def main() -> None:
         else:
             args.embed_device = "cpu"
 
+    target_years = resolve_target_years(
+        years=args.years,
+        year_end=int(args.year_end),
+        year_count=int(args.year_count),
+    )
+
     raw_path = str(args.raw_input or "").strip()
     if raw_path:
         if not os.path.isabs(raw_path):
             raw_path = os.path.abspath(os.path.join(project_root, raw_path))
     else:
-        token = f"acl-anthology-{int(args.year_end) - int(args.year_count) + 1}-{int(args.year_end)}"
+        token = f"acl-anthology-{format_years_token(target_years)}"
         raw_path = os.path.join(project_root, "archive", date_str, "raw", f"{token}.json")
 
     if not args.skip_fetch:
@@ -89,10 +100,8 @@ def main() -> None:
             os.path.join(SCRIPT_DIR, "fetchers", "fetch_acl_anthology.py"),
             "--conference",
             "ACL",
-            "--year-end",
-            str(int(args.year_end)),
-            "--year-count",
-            str(max(int(args.year_count or 1), 1)),
+            "--years",
+            ",".join(str(year) for year in target_years),
             "--workers",
             str(max(int(args.workers or 1), 1)),
             "--output",

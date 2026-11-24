@@ -20,6 +20,7 @@ SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+from maintain.common import format_years_token, resolve_target_years
 from maintain.pdf_abstract import fetch_pdf_abstract
 from maintain.conference_program import fetch_emnlp_program, program_paper_id
 
@@ -198,8 +199,9 @@ def fetch_anthology_conference(
     volume_specs: Sequence[Tuple[str, str]],
     output: str,
     workers: int = 32,
+    years: Iterable[int] | None = None,
 ) -> None:
-    years = iter_target_years(year_end, year_count)
+    years = list(years) if years is not None else iter_target_years(year_end, year_count)
     all_papers: List[Dict[str, Any]] = []
     seen_ids = set()
     log(f"[Anthology] conference={conference} years={years}")
@@ -247,7 +249,7 @@ def fetch_anthology_conference(
 
     out_path = _norm(output)
     if not out_path:
-        token = f"{conference.lower()}-anthology-{year_end - year_count + 1}-{year_end}"
+        token = f"{conference.lower()}-anthology-{format_years_token(years)}"
         out_path = os.path.join(ROOT_DIR, "archive", TODAY_STR, "raw", f"{token}.json")
     elif not os.path.isabs(out_path):
         out_path = os.path.abspath(os.path.join(ROOT_DIR, out_path))
@@ -262,6 +264,7 @@ def main() -> None:
     parser.add_argument("--conference", type=str, choices=["ACL", "EMNLP"], default="ACL")
     parser.add_argument("--year-end", type=int, default=datetime.now(timezone.utc).year)
     parser.add_argument("--year-count", type=int, default=3)
+    parser.add_argument("--years", type=str, default="")
     parser.add_argument("--workers", type=int, default=32)
     parser.add_argument("--output", type=str, default="")
     args = parser.parse_args()
@@ -275,6 +278,11 @@ def main() -> None:
         conference=conference,
         year_end=args.year_end,
         year_count=args.year_count,
+        years=resolve_target_years(
+            years=args.years,
+            year_end=args.year_end,
+            year_count=args.year_count,
+        ),
         volume_specs=volume_specs,
         output=args.output,
         workers=args.workers,

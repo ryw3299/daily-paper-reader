@@ -18,6 +18,8 @@ SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+from maintain.common import resolve_target_years
+
 SCRIPT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
 TODAY_STR = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -301,11 +303,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="抓取 AAAI 官方 OJS proceedings 论文（accepted only）。")
     parser.add_argument("--year-end", type=int, default=datetime.now(timezone.utc).year)
     parser.add_argument("--year-count", type=int, default=3)
+    parser.add_argument("--years", type=str, default="")
     parser.add_argument("--workers", type=int, default=12)
     parser.add_argument("--output", type=str, default="")
     args = parser.parse_args()
 
-    years = build_target_years(args.year_end, args.year_count)
+    years = resolve_target_years(
+        years=args.years,
+        year_end=args.year_end,
+        year_count=args.year_count,
+    )
     log(f"[AAAI] start years={years}")
     rows = fetch_aaai_ojs_papers(years=years, workers=args.workers)
     out_path = save_output(rows, args.output)
