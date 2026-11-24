@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   maintain_supabase:
-    if: github.repository == 'ziwenhahaha/daily-paper-reader' || github.repository == '5-xj/daily-paper-reader' || vars.DPR_MAINTAIN_OWN_SUPABASE == 'true'
+    if: github.repository == 'ziwenhahaha/daily-paper-reader' || github.repository == '5-xj/daily-paper-reader' || github.repository == 'ryw3299/daily-paper-reader' || vars.DPR_MAINTAIN_OWN_SUPABASE == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
