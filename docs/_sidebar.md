@@ -4,6 +4,7 @@
 * Conference Papers
   * AAAI-ACL-CVPR-ECCV-ICML-NEURIPS 2025, 2026 <!--dpr-conference:aaai-acl-cvpr-eccv-icml-neurips-2025-2026-->
   * ICLR-ICML 2025, 2026 <!--dpr-conference:iclr-icml-2025-2026-->
+  * ICLR-ICML 2026, 2024 <!--dpr-conference:iclr-icml-2026-2024-->
 * Daily Papers
   * 2026-10-25 ~ 2026-11-23 <!--dpr-date:20261025-20261123-->
     * 速读区
