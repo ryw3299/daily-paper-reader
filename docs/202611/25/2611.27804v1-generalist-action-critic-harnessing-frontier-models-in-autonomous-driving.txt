@@ -1,0 +1,2802 @@
+Generalist Action Critic: Harnessing Frontier Models in Autonomous Driving
+Yun Yan1,∗
+Shizhi Hu2,∗
+Zhichao Li2
+Yang Guan2,†
+Shiqi Liu2
+Jiaxin Gao2
+Xiangteng Zhang2
+Wenbo Ding3
+Jiuhua Zhao3
+Hui Guo3
+Xintao Yan1
+Keqiang Li2
+Shengbo Eben Li2,†
+1University of Hong Kong
+2School of Vehicle and Mobility & College of AI, Tsinghua University
+3SAIC Intelligent Technology (Shanghai) Co., Ltd.
+https://yanyunn.github.io/GAC/
+VLM
+(d) GAC (Ours)
+Harness
+Planner
+Images
+Language
+(a) E2E Planner
+Images
+Unified Planning Architecture
+Perception
+Prediction
+Planning
+(b) VLA as Planner
+Images
+Language
+Action Head
+Trajectory
+Trajectory
+World Model
+(c) WAM as Planner
+Images
+Future Head
+Future
+Action Head
+Trajectory
+Trajectory
+Frontier Model
+HUGSIM
+HD-Score
+0
+25
+50
+DrivoR + GAC
+43.2
+DriveZero
+39.4
+DrivoR
+35.7
+UniAD
+32.7
+VAD
+13.4
+HUGSIM-160
+HD-Score
+25
+35
+45
+39.27
+37.42
+27.58
+40.92
+41.62
+36.43
+Original
++ GAC
+PDMS
+30
+50
+70
+59.20
+47.56
+37.55
+65.20
+57.61
+50.02
+Original
++ GAC
+NAVSIM (Failed)
+NC
+0
+50
+100
+1
+33.51
+72.34
+2
+50.23
+73.52
+3
+67.28
+85.21
+DAC
+1
+65.96
+79.26
+2
+48.40
+69.86
+3
+31.24
+56.19
+TTC
+1
+34.57
+68.09
+2
+47.49
+69.86
+3
+63.40
+75.60
+1
+iDriveVLA
+2
+DrivoR
+3
+DiffusionDrive
++GAC
+Figure 1. Autonomous driving paradigms and GAC results. Left: Driving paradigms. (a) Planning-oriented end-to-end (E2E) driving,
+exemplified by UniAD [1], unifies perception, prediction, and planning. (b) Vision-language-action (VLA) models integrate multimodal
+reasoning with action prediction. (c) World-action models (WAMs) couple predictive world representations with planning. (d) Generalist
+Action Critic (GAC) combines general-purpose frontier models with specialized driving planners through inference-time cooperation. Right:
+Performance comparisons. The first panel compares average HD-Score on the full HUGSIM benchmark, where DrivoR + GAC achieves
+the highest score among the compared methods. The remaining panels compare Original and + GAC on HUGSIM-160 (HD-Score and
+PDMS) and the NAVSIM v1 Failed groups (NC, DAC, and TTC).
+Abstract
+Frontier models have demonstrated remarkable general-
+purpose reasoning capabilities, opening new possibilities
+for intelligent decision making in the physical world. In au-
+tonomous driving, many recent approaches seek to leverage
+these capabilities through additional adaptation for action
+output, particularly in scenarios where existing models un-
+derperform. We introduce Generalist Action Critic (GAC), a
+zero-shot framework that combines frontier models’ general-
+purpose reasoning with the planning competence of spe-
+cialized driving models through an inference-time harness.
+In GAC, specialized planners generate multiple candidate
+trajectories and make an initial selection, while a frozen
+frontier model serves as an action critic that assesses the
+selected trajectory against scene evidence and either retains
+*These authors contributed equally.
+†Corresponding authors.
+it or reselects from the available candidates. The harness
+combines camera images with spatial overlays, provides
+driving context and reasoning principles through textual in-
+structions, and regulates the information available at each
+stage to support trajectory assessment and reselection. On
+HUGSIM, GAC raises DrivoR’s HD-Score to 43.2, achiev-
+ing state-of-the-art performance among methods trained
+without additional simulation data. GAC also consistently
+improves closed-loop driving safety across three planners,
+with relative HD-Score gains of up to 32.1%. Experiments
+on NAVSIM v1 further reveal how GAC improves planning
+performance by correcting up to 52.13% of eligible unsafe
+trajectory selections while introducing new failures in only
+0.67% of originally high-quality selections. These results
+demonstrate the potential of harnessing frontier models to
+improve driving safety through inference-time cooperation
+with specialized planners.
+1
+arXiv:2611.27804v1  [cs.RO]  20 Nov 2026
+
+
+1. Introduction
+Recent advances in artificial intelligence have significantly
+expanded the capabilities of general-purpose models. From
+language understanding and generation to multimodal rea-
+soning, complex problem solving, and tool use, frontier mod-
+els are breaking traditional boundaries in the range of tasks
+that general-purpose AI can perform [2, 3]. This progress
+has now reached the physical world, with recent studies
+demonstrating GPT-6 Astra’s strong spatial reasoning and
+decision-making capabilities in robotic manipulation, navi-
+gation, and other embodied AI tasks [4, 5].
+Autonomous driving is a representative domain of embod-
+ied AI, requiring systems to connect scene understanding
+with driving decisions and vehicle control [1, 6–8]. Ex-
+isting approaches organize these capabilities through dif-
+ferent architectures, including planning-oriented end-to-end
+(E2E) [1, 9–11], vision-language-action (VLA) [12–15], and
+world–action models (WAM) [16, 17], as illustrated in Fig-
+ure 1. Despite their different architectures, these paradigms
+have largely advanced through task-specific training and
+adaptation. As frontier models continue to advance, a key
+question is how to directly leverage their general-purpose
+reasoning capabilities to improve driving decisions.
+Multi-candidate planning provides a concrete setting for
+exploring this question. The inherently multimodal nature of
+driving behavior has motivated a growing shift from predict-
+ing a single trajectory toward generating multiple candidate
+trajectories [18, 19]. Effective candidate selection is there-
+fore essential to realizing the full potential of multimodal
+planning. Yet existing planners do not always select the best
+available trajectories, leaving a gap between candidate gen-
+eration and selection [20]. Frontier models’ strong spatial
+reasoning offers a promising way to address this gap.
+To this end, we introduce Generalist Action Critic
+(GAC), a new paradigm for autonomous driving that com-
+bines general-purpose frontier models with specialized driv-
+ing planners through inference-time cooperation. Rather
+than adapting frontier models for driving action output, GAC
+directly employs them as action critics to assess and improve
+the decisions of specialized driving systems. In this work,
+we instantiate GAC for multi-candidate trajectory planning,
+where the critic evaluates the planner’s initial selection and
+reselects from the available candidates when needed. Ef-
+fective trajectory assessment requires understanding how
+candidate trajectories interact with the surrounding environ-
+ment and determining whether they are safe and appropriate
+for the driving situation. We therefore develop an evidence-
+grounded inference harness that integrates layered visual
+representations with a structured reasoning context to sup-
+port selective decision revision. We envision GAC as a step
+toward a new generation of autonomous driving paradigms,
+where advances in general-purpose intelligence and special-
+ized planning can jointly shape future driving systems.
+Our main contributions are summarized as follows:
+• We introduce Generalist Action Critic (GAC), a new
+paradigm for autonomous driving that enables zero-shot,
+inference-time cooperation between general-purpose fron-
+tier models and specialized driving planners.
+• We develop an evidence-grounded inference harness that
+integrates layered visual representations, a structured rea-
+soning context, and selective decision revision to support
+trajectory evaluation based on scene evidence.
+• We demonstrate GAC’s effectiveness across three driving
+planners on HUGSIM and NAVSIM v1. GAC improves
+HD-Score by up to 32.1%, increases DrivoR’s HD-Score
+to 43.2 on the full HUGSIM benchmark, and recovers up
+to 52.13% of eligible zero-score failures.
+2. Related Work
+General-purpose models for embodied reasoning.
+Re-
+search on embodied intelligence has explored how general-
+purpose models can support reasoning and decision making
+in the physical world. Early work connected language mod-
+els with executable robot skills, environmental feedback,
+spatial representations, and visual annotations for action
+selection [21–24]. In autonomous driving, language and
+vision-language models have been used for driving deci-
+sions, reasoning-assisted planning, and cooperation with
+conventional planning systems [25–27]. However, earlier
+models faced limitations in spatial reasoning and reliable
+physical execution, constraining their roles in complex em-
+bodied tasks [28, 29]. Recent advances in frontier models,
+particularly GPT-6 Astra, have demonstrated stronger capa-
+bilities in robotic manipulation and expanded their roles in
+direct action generation and cooperation with learned poli-
+cies [4, 30]. Frontier models have also been evaluated in
+closed-loop driving [31]. These advances motivate our ex-
+ploration of frontier models as action critics for evaluating
+and improving driving decisions.
+Data-driven autonomous driving.
+Learning-based ap-
+proaches have explored diverse architectures for driving per-
+ception, planning, and control [6–9, 32]. UniAD [1] exem-
+plifies a unified, planning-oriented end-to-end architecture
+that integrates perception, prediction, and planning. Subse-
+quent studies have advanced scene representations, planning
+efficiency, and the interaction between prediction and plan-
+ning [10, 33, 34]. Vision-language approaches incorporate
+pretrained multimodal knowledge and reasoning into driving,
+supporting scene understanding, language-guided control,
+and trajectory planning [12, 13, 15, 35, 36]. World-model-
+based approaches connect predictive world representations
+with action planning, allowing predicted scene dynamics
+to inform driving decisions [16, 17, 37–39]. GAC builds
+on these architectures by introducing a new paradigm for
+inference-time cooperation between frontier models and spe-
+2
+
+
+Candidates & Scores
+Specialized planner 
+Stage 1 · Assess original selection
+Stage 2 · Reselect existing candidates
+Final selection 
+Accept / Reject
+Logical
+Reasoning
+World
+Understanding
+Autonomous
+Agency
+E2E
+VLA
+WAM
+Historical Front
+Current Front
+Layered Front-left
+Layered Front
+Layered Front-right
+Original
+Scene
+Spatial
+Anchor
+Trajectory
+Occupancy
+Original
+Scene
+Evidence-grounded Harness
+Layered Visual Representations
+Image 
+Metadata
+Response 
+Schemas
+Assessment 
+Result
+(Stage2)
+Decision 
+Guidelines
+Planner 
+Output
+Structured Reasoning Context
+Selective Decision Revision
+Planner
+Frontier Model
+Ego & Route 
+Context
+Figure 2. Overview of Generalist Action Critic (GAC). A specialized planner generates candidate trajectories and provides its original
+selection. An evidence-grounded inference harness integrates layered visual representations and a structured reasoning context to support a
+frontier model serving as the action critic. Through selective decision revision, the critic assesses the original selection, retaining it upon
+acceptance and reselecting from the same candidate set upon rejection.
+cialized driving planners.
+Multimodal planning and trajectory selection.
+Earlier
+planning approaches primarily predicted a single ego tra-
+jectory, while recent methods increasingly model multiple
+possible driving behaviors to capture the multimodal nature
+of driving [18, 40–42]. Candidate sets are constructed using
+predefined trajectory vocabularies [40], scene-conditioned
+proposals [42, 43], and generative trajectory models [11, 44].
+Selecting the trajectory to execute is therefore a criti-
+cal component of multimodal planning. Hydra-MDP and
+DrivoR learn to predict simulation-derived planning scores
+for candidate evaluation [18, 42]. GTRS improves the gener-
+alization of learned trajectory scoring by training on a dense
+trajectory vocabulary with trajectory dropout [19]. More re-
+cently, iDriveVLA identifies the gap between candidate qual-
+ity and selection performance, introducing a safety-aware
+scorer and a trained modulator that adjusts criterion weights
+using frozen VLM features [20]. GAC instead leverages
+frontier models’ general-purpose reasoning for trajectory
+assessment and reselection without additional training.
+3. Generalist Action Critic
+3.1. Framework
+The Generalist Action Critic (GAC) framework consists of
+three components: a specialized driving planner, an evidence-
+grounded inference harness, and a general-purpose frontier
+model serving as the action critic, as illustrated in Figure 2.
+Given a driving scene, the planner generates and scores K
+candidate trajectories C = {τ0, . . . , τK−1} and selects τb,
+where b denotes the original selection index. These outputs
+are passed to the harness through a common trajectory in-
+terface that supports different planning architectures. The
+harness integrates layered visual representations with a struc-
+tured reasoning context, providing shared visual input I and
+stage-specific textual inputs T1 and T2 to the action critic F.
+The critic performs selective decision revision by assessing
+the original selection and, upon rejection, reselecting from
+the existing candidates. Both the planner and the frontier
+model remain frozen.
+Each candidate trajectory is represented by eight time-
+indexed poses over a 4-second horizon:
+τi =
+
+(xt
+i, yt
+i, ψt
+i)
+	
+t∈{0.5,1.0,...,4.0} s .
+(1)
+Here, xt
+i, yt
+i denote forward and leftward positions in metres
+in a fixed ego coordinate frame at the current time, and ψt
+i
+denotes heading relative to the current ego orientation in
+radians. The initial pose (0, 0, 0) at t = 0 is separate from
+these future samples.
+3.2. Layered Visual Representations
+Trajectories are expressed in ego coordinates, whereas actors
+and road boundaries are observed through camera images.
+To bridge this gap, we develop layered visual representa-
+tions that combine spatiotemporal scene context V , spatial
+3
+
+
+Spatial Anchor (A)
+𝒛
+𝒚
+𝒐
+𝒙
+Future Occupancy (O)
+t=0
+t=4.0s
+O
+A
+V
+Compose(V, A, O)
+Project & Align
+(a) Geometric construction
+History (−1.5 s)
+Current (0 s)
+Front + A + O
+Left + A + O
+Right + A + O
+(b) Five-image input
+Figure 3. Layered visual representations for the action critic. (a) Spatial anchors and vehicle footprints are projected into camera views with
+lens distortion accounted for. (b) The five-image input consists of historical and current front views and three annotated current views. The
+overlays combine spatial anchors (A) with the original candidate’s future vehicle occupancy (O).
+anchor projection A, and future occupancy projection O, as
+illustrated in Figure 3. Together, these layers provide visual
+evidence of the driving scene, metric spatial references, and
+the projected vehicle occupancy along candidate motion.
+Spatiotemporal scene context (V ).
+Temporal context
+helps the critic infer nearby actor motion, while multiple
+viewpoints reveal surrounding road geometry and actors dur-
+ing turns. We use current front, front-left, and front-right
+camera images, together with a historical front image from
+1.5 seconds earlier. The critic interprets changes between
+the historical and current front images alongside ego motion
+to infer qualitative motion trends. The five-image input is
+I =
+h
+Ih
+F, IF, eIF, eIL, eIR
+i
+,
+(2)
+where F, L, and R denote the front, front-left, and front-right
+cameras, respectively. The superscript h denotes the histor-
+ical front image, and the tilde indicates images augmented
+with spatial anchors A and future occupancy O. The histori-
+cal and current front images preserve scene details without
+annotation overlays, while the three annotated views relate
+the candidate’s projected occupancy to surrounding actors
+and road boundaries.
+Spatial anchor projection (A).
+Perspective makes image
+distance a poor proxy for metric clearance. We therefore
+construct spatial anchors as a metric grid on an assumed flat
+ground plane in the same fixed ego coordinate frame as the
+candidate trajectories. The anchors cover an 80 m × 80 m
+region at 5-metre intervals, providing metric references for
+estimating distances and lateral clearance while limiting
+dense markings near the horizon.
+We project these anchors into the front, front-left, and
+front-right camera views using calibrated camera intrinsics
+and extrinsics. The projection also includes the theoretical
+horizon, corresponding to viewing rays parallel to the as-
+sumed ground plane. Calibrated lens-distortion matching
+aligns the projected annotations with the raw camera images
+when necessary.
+Future occupancy projection (O).
+Candidate trajectories
+describe the motion of a vehicle reference point, while as-
+sessing potential collisions and road-boundary violations
+requires considering the full vehicle footprint. We therefore
+construct the union of vehicle footprints along the planner’s
+originally selected trajectory τb. The vehicle footprint is
+represented by B = [−ℓr, ℓf] × [−w/2, w/2], where ℓr and
+ℓf are the distances from the trajectory reference point to
+the rear and front edges, and w is the vehicle width. The
+resulting swept occupancy is defined as
+U =
+[
+t∈{0,0.02,...,4.0} s
+
+R(ψt
+b)p + qt
+b : p ∈B
+	
+.
+(3)
+Here, R(ψ) is a two-dimensional rotation matrix, and qt
+b =
+(xt
+b, yt
+b)⊤denotes the reference-point position in the fixed
+current ego frame. Positions and unwrapped headings are
+linearly interpolated from the initial pose and eight future
+samples to obtain poses at 0.02-second intervals.
+We project the resulting footprint union U into the camera
+images using the same calibrated mapping as the spatial an-
+chors, as illustrated in Figure 3(b). Lens-distortion matching
+resamples only the annotation layers, preserving the original
+camera images. Further implementation details are provided
+in Appendix A.
+3.3. Structured Reasoning Context
+The harness constructs a structured reasoning context for
+each stage by organizing candidate trajectories, ego state,
+navigation information, image metadata, decision guidelines,
+and response requirements as textual inputs. The reselec-
+tion stage additionally receives the assessment result from
+the first stage. These stage-specific contexts are defined as
+follows:
+T1 =
+ G1, P1, E, M, S1
+
+,
+T2 =
+ G2, P2, E, M, S2, R
+
+.
+(4)
+4
+
+
+Table 1. Closed-loop performance on the full HUGSIM benchmark (345 scenarios) without additional simulation training data. E/M/H/X
+denote Easy/Medium/Hard/Extreme. Bold and underlined values indicate the best and second-best results per column, respectively.
+Method
+RC↑
+HD-Score↑
+E
+M
+H
+X
+Avg.
+E
+M
+H
+X
+Avg.
+LTF [45]
+67.8
+35.1
+26.2
+40.5
+38.9
+58.9
+18.0
+9.8
+25.9
+23.7
+VAD [10]
+51.3
+31.1
+25.3
+26.5
+31.4
+36.3
+9.5
+8.0
+11.5
+13.4
+UniAD [1]
+78.4
+60.5
+33.6
+17.8
+45.9
+64.9
+45.8
+20.6
+6.6
+32.7
+GigaPixel [46]
+78.6
+60.7
+32.7
+35.4
+50.1
+67.4
+51.9
+19.1
+21.6
+38.5
+DriveZero [47]
+85.5
+63.7
+31.7
+43.3
+53.9
+78.5
+47.2
+16.0
+28.7
+39.4
+DrivoR [42]
+80.9
+50.5
+33.8
+47.1
+49.8
+73.3
+34.6
+18.8
+32.5
+35.7
+DrivoR + GAC
+82.8
+63.4
+35.8
+46.1
+55.0
+75.8
+50.3
+24.1
+33.5
+43.2
+Here, subscripts 1 and 2 denote the assessment and res-
+election stages, respectively. G1 and G2 denote the cor-
+responding decision guidelines. The candidate inputs are
+P1 = ({τb}, b) and P2 = (C, b), containing the original
+selection and the full candidate set, respectively, together
+with the original selection index b. The shared context E
+supplies ego pose, velocity, acceleration, and route intent,
+while image metadata M identify camera views, observation
+times, and annotations. The response schema S1 specifies an
+acceptance decision and its supporting reason, while S2 spec-
+ifies a selected candidate index and a comparative reason.
+The assessment result R = (a, r1) contains the acceptance
+decision and its reason.
+Decision guidelines (G1, G2).
+The guidelines establish
+shared conventions for coordinate frames, timestamps, ego
+state, route information, and image annotations. They also
+specify the evaluation metrics and their aggregation into
+an overall driving score. Building on these definitions and
+conventions, we specify three shared reasoning principles:
+(1) Spatiotemporal reasoning. The guidelines require rea-
+soning about the ego vehicle’s position relative to actors
+and road boundaries over time, considering its full foot-
+print. For potential conflicts with other actors, the critic
+combines time-indexed candidate poses with historical
+and current observations to assess whether the ego vehi-
+cle and other actors may occupy overlapping regions at
+the same time.
+(2) Evidence and uncertainty. The guidelines require ex-
+plicit evidence for every decision, including acceptance.
+Justifications must explain the expected consequences of
+candidate motion based on scene observations and spec-
+ify their location and approximate timing where relevant.
+These explanations must distinguish observed evidence
+from assumptions about future behavior and explicitly
+acknowledge uncertainty when it affects the judgment.
+(3) Performance tradeoffs. The guidelines require the critic
+to weigh safety, progress, and comfort when evaluating
+candidate motion, while accounting for traffic rules. Im-
+provements in one aspect must be considered alongside
+potential costs in others. Lower speed or shorter travel
+distance alone does not establish better performance.
+Both stages share these reasoning principles but require dif-
+ferent justifications. Assessment (G1) requires evidence that
+supports acceptance or substantiates a specific concern war-
+ranting rejection. Reselection (G2) requires comparative
+evidence explaining why the final candidate is preferred.
+3.4. Selective Decision Revision
+GAC performs selective decision revision using layered vi-
+sual representations and a structured reasoning context. The
+critic first assesses the planner’s original selection and com-
+pares alternative candidates only upon rejection. Each stage
+uses its own model context with complete instructions.
+In the first stage, the critic evaluates the planner’s selected
+trajectory τb based on the driving context and decision guide-
+lines. Given the shared visual input I and assessment input
+T1, the critic returns an acceptance decision a ∈{0, 1} and
+a supporting reason r1:
+(a, r1) = F(I, T1).
+(5)
+Here, a = 1 indicates acceptance, while a = 0 triggers
+reselection. If accepted, the planner’s original trajectory is
+retained without further candidate comparison.
+Upon rejection, the critic uses T2 and the shared visual
+input I to reassess the concern identified by r1 and com-
+pare candidates in the full set C based on expected driving
+performance. The visual input remains unchanged, with its
+overlays depicting the planner’s original selection τb. The
+critic returns the preferred candidate index j and a compara-
+tive reason r2:
+(j, r2) = F(I, T2),
+j ∈{0, . . . , K −1}.
+(6)
+The original trajectory remains eligible for reselection and
+may be selected again if the initial concern is unsupported or
+no alternative offers better expected performance. The final
+trajectory is determined by
+τc =
+(
+τb,
+a = 1,
+τj,
+a = 0.
+(7)
+5
+
+
+Table 2. Closed-loop results for three planners on HUGSIM-160. Shading marks GAC; purple values show score changes from Original.
+Method
+NC↑
+DAC↑
+TTC↑
+Comfort↑
+PDMS↑
+RC↑
+HD-Score↑
+iDriveVLA [20]
+66.02
+95.36
+60.86
+98.26
+59.20
+48.86
+39.27
++ GAC
+71.57 +5.55
+95.47 +0.11
+67.28 +6.42
+96.90 −1.36
+65.20 +6.00
+48.92 +0.06
+40.92 +1.65
+DrivoR [42]
+54.36
+95.96
+48.48
+93.80
+47.56
+51.40
+37.42
++ GAC
+64.47 +10.11
+96.20 +0.24
+58.78 +10.30
+93.07 −0.73
+57.61 +10.05
+52.90 +1.50
+41.62 +4.20
+DiffusionDrive [11]
+46.26
+93.30
+39.74
+90.53
+37.55
+42.32
+27.58
++ GAC
+59.43 +13.17
+94.84 +1.54
+51.99 +12.25
+90.27 −0.26
+50.02 +12.47
+48.31 +5.99
+36.43 +8.85
+Easy
+Medium
+Hard
+Extreme
+0
+25
+50
+75
+100
+Score
+iDriveVLA
+Easy
+Medium
+Hard
+Extreme
+DrivoR
+Easy
+Medium
+Hard
+Extreme
+DiffusionDrive
+HD-Score: Original
+HD-Score: GAC
+NC: Original
+NC: GAC
+Figure 4. Closed-loop performance across four difficulty levels on HUGSIM-160, with 40 scenarios per level drawn from four data sources.
+Bars show HD-Score and lines show NC, with Original and GAC shown in blue and purple, respectively.
+Table 3. Effect of assessment frequency on HUGSIM-64. GAC
+performs assessment at 1 or 2 Hz, while all planners operate at 4 Hz.
+Purple values indicate changes relative to Original.
+Method
+PDMS↑
+RC↑
+HD-Score↑
+iDriveVLA [20]
+57.58
+51.92
+40.78
++ GAC (1 Hz)
+60.68 +3.10
+51.99 +0.07
+41.59 +0.81
++ GAC (2 Hz)
+62.81 +5.23
+51.73 −0.19
+42.15 +1.37
+DrivoR [42]
+49.36
+52.25
+37.99
++ GAC (1 Hz)
+53.67 +4.31
+54.21 +1.96
+41.04 +3.05
++ GAC (2 Hz)
+59.54 +10.18 55.17 +2.92
+43.53 +5.54
+DiffusionDrive [11]
+36.20
+43.06
+26.46
++ GAC (1 Hz)
+47.26 +11.06 46.11 +3.05
+33.00 +6.54
++ GAC (2 Hz)
+50.49 +14.29 49.26 +6.20
+36.69 +10.23
+4. Experiments
+4.1. Experimental Setup
+Planners and frontier model.
+We evaluate GAC with
+iDriveVLA, DrivoR, and DiffusionDrive [11, 20, 42], which
+generate 64, 64, and 20 candidate trajectories, respectively.
+Each planner is paired with GPT-6 Astra [2] at maximum
+reasoning effort. Original denotes the planner’s native se-
+lection, while GAC assesses and reselects from the same
+candidate set. Candidate evaluation scores and privileged
+evaluator information are withheld from the critic.
+Closed-loop
+evaluation.
+We
+evaluate
+GAC
+on
+HUGSIM [48], using its 345-scenario evaluation set
+for comparison with existing methods. To enable cross-
+planner evaluation while keeping frontier-model usage
+costs manageable, we use HUGSIM-160, a balanced set
+of 160 HUGSIM scenarios with ten scenarios from each
+combination of four data sources (KITTI-360, nuScenes,
+PandaSet, and Waymo) and four difficulty levels (Easy,
+Medium, Hard, and Extreme).
+For each planner, Original and GAC share the same check-
+points, sensor adaptations, controllers, and simulation set-
+tings. Planning runs at 4 Hz, with GAC assessment at 2 Hz
+unless otherwise specified. The simulator waits for critic
+decisions before advancing.
+Open-loop evaluation.
+We export candidate trajectories
+for all 12,146 scenes in the NAVSIM v1 navtest split [49].
+Based on the original selection’s PDMS, we divide scenes
+into Failed (PDMS = 0), Intermediate (0 < PDMS <
+90), and High-quality (PDMS ≥90). The Failed group
+includes zero-score selections with at least one positive-score
+alternative, comprising 188, 219, and 541 eligible scenes
+for iDriveVLA, DrivoR, and DiffusionDrive, respectively.
+For the Intermediate and High-quality groups, we sample
+100 distinct scenes three times per planner and average the
+results across the three samples.
+6
+
+
+Table 4. Open-loop performance on NAVSIM v1. Failed includes all eligible zero-score scenes, while Intermediate and High-quality results
+are averaged across three sampled sets per planner. Purple values show PDMS changes from Original.
+Method
+Failed
+Intermediate
+High-quality
+NC↑
+DAC↑
+TTC↑
+PDMS↑
+NC↑
+DAC↑
+TTC↑
+PDMS↑
+NC↑
+DAC↑
+TTC↑
+PDMS↑
+iDriveVLA [20]
+33.51
+65.96
+34.57
+0.00
+99.33
+100.00
+75.00
+78.02
+100.00
+100.00
+100.00
+98.41
++ GAC
+72.34
+79.26
+68.09
+47.41 +47.41
+99.67
+99.33
+87.00
+81.56 +3.54
+99.67
+100.00
+99.00
+96.22 −2.19
+DrivoR [42]
+50.23
+48.40
+47.49
+0.00
+99.50
+100.00
+85.33
+80.82
+100.00
+100.00
+100.00
+97.94
++ GAC
+73.52
+69.86
+69.86
+40.36 +40.36
+99.83
+98.67
+90.33
+81.22 +0.40
+99.67
+99.00
+99.67
+95.10 −2.84
+DiffusionDrive [11]
+67.28
+31.24
+63.40
+0.00
+99.67
+100.00
+83.67
+81.31
+100.00
+100.00
+100.00
+96.60
++ GAC
+85.21
+56.19
+75.60
+36.26 +36.26
+99.67
+98.67
+89.67
+81.94 +0.63
+100.00
+99.67
+99.33
+95.14 −1.46
+Evaluation metrics.
+We follow the official HUGSIM
+and NAVSIM v1 evaluation protocols. Both benchmarks
+use the PDM Score (PDMS), which combines a collision-
+related metric (NC), drivable area compliance (DAC), time-
+to-collision within bound (TTC), and comfort (C), with NC
+and DAC serving as multiplicative factors. NAVSIM ad-
+ditionally includes ego progress (EP). On HUGSIM, route
+completion (RC) measures progress along the prescribed
+route, and HD-Score is the product of RC and the mean
+PDMS over an episode. For the NAVSIM ablations, we addi-
+tionally report the per-instance NC × DAC score to quantify
+collision avoidance and drivable-area compliance jointly. All
+component scores are normalized to [0, 1], and reported re-
+sults are scaled to 0–100, with higher values indicating better
+performance. Additional evaluation details are provided in
+Appendix B.
+4.2. Closed-Loop Evaluation
+Overall performance.
+We evaluate DrivoR with GAC on
+the full HUGSIM benchmark. As shown in Table 1, GAC im-
+proves DrivoR’s HD-Score from 35.7 to 43.2 (+21.0%) and
+RC from 49.8 to 55.0, achieving state-of-the-art performance
+among the compared methods trained without additional sim-
+ulation data.
+Cross-planner performance.
+We further evaluate GAC
+across three planners on HUGSIM-160, as shown in Table 2.
+GAC consistently improves NC and TTC across all three
+planners, demonstrating improved driving safety alongside
+gains in PDMS and HD-Score. DiffusionDrive achieves the
+largest relative HD-Score gain of 32.1%. These improve-
+ments are accompanied by stable or higher RC. Notably,
+GAC further improves iDriveVLA despite its existing safety-
+aware scoring mechanism.
+Performance across difficulty levels.
+Figure 4 shows that
+GAC improves HD-Score and NC across all four difficulty
+levels for all three planners. The largest HD-Score gains
+occur in Medium scenarios for each planner. The smaller
+gains in Easy and Extreme scenarios may reflect the strong
+baseline performance in Easy scenarios and the persistent
+difficulty of completing routes in Extreme scenarios. We
+provide detailed breakdowns in Appendix C.
+Assessment frequency.
+We evaluate GAC at 1 Hz and
+2 Hz on HUGSIM-64, a balanced subset of HUGSIM-160
+containing four scenarios per source–difficulty combination.
+Planning remains fixed at 4 Hz. As shown in Table 3, both
+assessment frequencies improve PDMS and HD-Score over
+native selection across all three planners, with 2 Hz yielding
+larger gains in both metrics.
+4.3. Open-Loop Selection Analysis
+Closed-loop evaluation measures driving performance over
+complete episodes, while open-loop evaluation examines
+individual trajectory selections. We analyze failure recovery
+and decision preservation on NAVSIM v1.
+Failure recovery.
+Table 4 presents the results across the
+three groups. In the Failed groups, GAC improves NC, DAC,
+and TTC across all three planners, recovering 42.51–52.13%
+of eligible zero-score selections. Mean PDMS increases
+from zero to 36.26–47.41, demonstrating that improved tra-
+jectory selection can recover decisions that originally failed
+safety-related evaluation.
+Improvement and preservation.
+Beyond recovering
+failed selections, GAC also improves mean PDMS across
+all three planners in the Intermediate groups, with consistent
+gains in TTC. For High-quality selections, NC, DAC, and
+TTC remain at or above 99.00, while only six new zero-score
+failures occur among 900 evaluated instances, yielding an
+overall new failure rate of 0.67%. Mean PDMS decreases
+by 1.46–2.84 points, largely due to reduced ego progress,
+reflecting more conservative trajectory selection. Further
+analysis of the safety-degradation cases shows that violations
+first occur after 1 s of the four-second evaluation horizon.
+In closed-loop evaluation, GAC reassesses selections every
+0.5 s using updated observations, allowing decisions to be
+revised before such risks materialize. Further analyses are
+provided in Appendix D.
+7
+
+
+Original
++ GAC
+3 s
+3 m
+4 s
+3 m
+(a) Open-loop recovery
+Original
++ GAC
+(b) Closed-loop driving
+Figure 5. Qualitative comparisons on NAVSIM v1 and HUGSIM. (a) Open-loop recovery at a pedestrian crossing (left) and a narrow bend
+(right). Camera views (top) and bird’s-eye views (BEVs, bottom) visualize the trajectories selected by Original and GAC. Markers and
+footprints indicate t = 3 s on the left and t = 4 s on the right. BEVs are used only for analysis and are not provided to the critic. (b)
+Closed-loop comparisons at nearby ego positions, with ribbons showing projected full vehicle footprints. Red and green denote Original and
+GAC, respectively. All trajectories span four seconds.
+4.4. Ablation Studies
+We examine the contributions of selective decision revi-
+sion and its visual and contextual inputs using matched
+iDriveVLA candidate sets on NAVSIM.
+Workflow ablations.
+Table 5(a) compares GAC with three
+alternative workflows. Uniform retains GAC’s assessment
+decisions and samples uniformly from the candidate set upon
+rejection. Direct selects from all candidates without prior
+assessment, while Select then review evaluates a newly se-
+lected candidate against the original choice. GAC substan-
+tially outperforms Uniform on Failed-group PDMS, demon-
+strating the importance of evidence-based candidate compar-
+ison. Although Direct achieves higher Failed-group PDMS,
+GAC better preserves the safety of High-quality selections,
+achieving an NC×DAC score of 99.00 versus 91.00. When
+both methods are evaluated on the same 54 failed cases
+identified by GAC’s assessment stage, GAC recovers 50
+compared with 44 under Direct, demonstrating the benefit
+of assessment-guided reselection. Select then review also
+yields lower PDMS than GAC in both groups.
+Input ablations.
+Table 5(b) examines the contributions of
+reasoning principles and geometric overlays. Failed-group
+PDMS drops from 49.26 to 29.22 without reasoning prin-
+ciples and to 27.42 without geometric overlays. Geometric
+overlays also help preserve the safety of High-quality selec-
+tions, improving NC×DAC from 97.00 to 99.00. Ablation
+details are provided in Appendix E.
+4.5. Qualitative Analysis
+Figure 5(a) illustrates open-loop recovery. GAC selects a
+trajectory that delays the right turn to reduce a potential
+Table 5. Workflow and input ablations on matched iDriveVLA sets.
+(a) Uniform samples a candidate uniformly after rejection, with
+results reported as exact expectations. Post reviews the selected
+candidate against the original selection. Bold and underlined values
+indicate the best and second-best results per column within each
+subtable, respectively.
+(a) Workflow ablations
+Failed
+High-quality
+Assess
+Select
+NC×DAC↑PDMS↑NC×DAC↑PDMS↑
+✓
+Uniform
+25.70
+22.55
+98.78
+95.90
+✓
+65.59
+61.15
+91.00
+87.94
+Post
+✓
+48.39
+43.46
+93.00
+90.65
+✓
+✓
+53.76
+49.26
+99.00
+95.95
+(b) Input ablations
+Failed
+High-quality
+Overlays
+Principles
+NC×DAC↑PDMS↑NC×DAC↑PDMS↑
+✓
+32.26
+29.22
+99.00
+96.87
+✓
+30.11
+27.42
+97.00
+93.82
+✓
+✓
+53.76
+49.26
+99.00
+95.95
+pedestrian conflict at 2.5–3.5 s. On the narrow bend, the orig-
+inal trajectory’s projected footprint extends beyond the curb,
+so GAC selects a candidate with greater clearance. PDMS
+increases from zero to 95.10 and 100, respectively. Fig-
+ure 5(b) shows closed-loop driving behavior. With DrivoR
+(top), GAC reduces the closing speed before passing the
+vehicle ahead. With DiffusionDrive (bottom), it selects an
+alternative that stays farther right to maintain clearance from
+a front-facing vehicle. In both closed-loop cases, Original
+collides, whereas GAC completes the route. See Appendix F
+for additional examples.
+8
+
+
+5. Conclusion
+We introduce Generalist Action Critic (GAC), a new
+paradigm for zero-shot, inference-time cooperation between
+frontier models and specialized driving planners. Through
+an evidence-grounded inference harness, GAC integrates
+layered visual representations and a structured reasoning
+context to support selective decision revision. Closed-loop
+experiments on HUGSIM demonstrate consistent improve-
+ments in driving safety and overall performance across three
+planners. GAC also enables DrivoR to achieve the high-
+est HD-Score among the compared methods on the full
+HUGSIM benchmark. On NAVSIM v1, GAC recovers up
+to 52.13% of eligible zero-score failures. Ablation studies
+further validate the effectiveness of GAC’s key components.
+Together, these findings demonstrate that frontier-model rea-
+soning can complement specialized driving planners through
+inference-time cooperation to improve driving safety.
+Acknowledgments
+This study is supported by the National Natural Science
+Foundation of China (Grant Nos. 92582205 and 52602738),
+the Shanghai Automotive Industry Science and Technol-
+ogy Development Foundation, and the Tsinghua Univer-
+sity (State Key Laboratory of Intelligent Green Vehicle and
+Mobility)–Xiaomi EV Technology Co., Ltd Joint Research
+Center for Autonomous Driving Safety and Intelligence.
+References
+[1] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng Dai, Yu
+Qiao, and Hongyang Li. Planning-oriented autonomous driv-
+ing. In IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition, pages 17853–17862, 2023. 1, 2, 5
+[2] OpenAI. GPT-6 Astra System Card. Technical report, Ope-
+nAI, 2026. 2, 6, 12
+[3] Anthropic. Claude Fable 5.1 and Mythos 5.1 System Card.
+Technical report, Anthropic, 2026. 2
+[4] Wenbo Zhang, Kaixuan Wang, Yutao Ouyang, Xiaoyu Huang,
+Liyang Li, Kailun Su, Weiyang Jin, Wenhao Chai, Haotian
+Liang, Zhiyang Dou, Yue Chen, and Tianxing Chen. An
+unexpected robot policy: Early evaluations of gpt-6 astra on
+robodojo and beyond. arXiv preprint arXiv:2609.24170, 2026.
+2
+[5] Guangzhao Dai, Qianru Sun, Qi Wu, and Bin Zhu. Gpt-6-
+astra lights up embodied navigation: Evaluation in zero-shot
+vision-and-language navigation in continuous environments.
+arXiv preprint arXiv:2609.29861, 2026. 2
+[6] Penghao Wu, Xiaosong Jia, Li Chen, Junchi Yan, Hongyang
+Li, and Yu Qiao. Trajectory-guided control prediction for
+end-to-end autonomous driving: A simple yet strong baseline.
+In Advances in Neural Information Processing Systems, 2022.
+2
+[7] Yang Guan, Yangang Ren, Qi Sun, Shengbo Eben Li, Haitong
+Ma, Jingliang Duan, Yifan Dai, and Bo Cheng. Integrated de-
+cision and control: Toward interpretable and computationally
+efficient driving intelligence. IEEE Transactions on Cyber-
+netics, 53(2):859–873, 2023.
+[8] Yang Guan, Liye Tang, Yao Lyu, Shengbo Eben Li, Yu-
+jie Yang, Kehua Sheng, Bo Zhang, Lei He, and Keqiang
+Li. Enhanced integrated decision and control for high-level
+automated vehicles and its experiment verification. IEEE
+Transactions on Automation Science and Engineering, 23:
+11578–11595, 2026. 2
+[9] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi
+Yan, and Dacheng Tao. ST-P3: End-to-end vision-based
+autonomous driving via spatial-temporal feature learning. In
+European Conference on Computer Vision, pages 533–549.
+Springer, 2022. 2
+[10] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie
+Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang,
+and Xinggang Wang. VAD: Vectorized scene representation
+for efficient autonomous driving. In IEEE/CVF International
+Conference on Computer Vision, pages 8340–8350, 2023. 2,
+5
+[11] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng
+Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang,
+Qian Zhang, and Xinggang Wang. DiffusionDrive: Trun-
+cated diffusion model for end-to-end autonomous driving.
+In IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 12037–12047, 2025. 2, 3, 6, 7, 14
+[12] Jyh-Jing Hwang, Runsheng Xu, Hubert Lin, Wei-Chih Hung,
+Jingwei Ji, Kristy Choi, Di Huang, Tong He, Paul Covington,
+Benjamin Sapp, Yin Zhou, James Guo, Dragomir Anguelov,
+and Mingxing Tan. EMMA: End-to-end multimodal model
+for autonomous driving. Transactions on Machine Learning
+Research, 2025. 2
+[13] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski.
+SimLingo: Vision-only closed-loop autonomous driving with
+language-action alignment. In IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, pages 11993–
+12003, 2025. 2
+[14] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu
+Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun,
+Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu
+Liu, and Xinggang Wang. ReCogDrive: A reinforced cog-
+nitive framework for end-to-end autonomous driving.
+In
+International Conference on Learning Representations, pages
+157518–157556, 2026.
+[15] NVIDIA, Yan Wang, Wenjie Luo, Junjie Bai, Yulong Cao,
+Tong Che, Ke Chen, Yuxiao Chen, Jenna Diamond, Yifan
+Ding, Wenhao Ding, Liang Feng, Greg Heinrich, Jack Huang,
+Peter Karkus, Boyi Li, Pinyi Li, Tsung-Yi Lin, Dongran Liu,
+Ming-Yu Liu, Langechuan Liu, Zhijian Liu, Jason Lu, Yunxi-
+ang Mao, Pavlo Molchanov, Lindsey Pavao, Zhenghao Peng,
+Mike Ranzinger, Ed Schmerling, Shida Shen, Yunfei Shi,
+Sarah Tariq, Ran Tian, Tilman Wekel, Xinshuo Weng, Tian-
+jun Xiao, Eric Yang, Xiaodong Yang, Yurong You, Xiaohui
+Zeng, Wenyuan Zhang, Boris Ivanovic, and Marco Pavone.
+Alpamayo-r1: Bridging reasoning and action prediction for
+9
+
+
+generalizable autonomous driving in the long tail. arXiv
+preprint arXiv:2511.00088, 2026. 2
+[16] Yupeng Zheng, Pengxuan Yang, Zebin Xing, Qichao Zhang,
+Yuhang Zheng, Yinfeng Gao, Pengfei Li, Teng Zhang,
+Zhongpu Xia, Peng Jia, XianPeng Lang, and Dongbin Zhao.
+World4Drive: End-to-end autonomous driving via intention-
+aware physical latent world model. In IEEE/CVF Interna-
+tional Conference on Computer Vision, pages 28632–28642,
+2025. 2
+[17] Yang Zhou, Xiaofeng Wang, Hao Shao, Letian Wang,
+Guosheng Zhao, Jiangnan Shao, Jiagang Zhu, Tingdong
+Yu, Zheng Zhu, Guan Huang, and Steven L. Waslander.
+DriveDreamer-Policy: A geometry-grounded world-action
+model for unified generation and planning. In Advances in
+Neural Information Processing Systems, 2026. 2
+[18] Zhenxin Li, Kailin Li, Shihao Wang, Shiyi Lan, Zhiding
+Yu, Yishen Ji, Zhiqi Li, Ziyue Zhu, Jan Kautz, Zuxuan Wu,
+Yu-Gang Jiang, and Jose M. Alvarez. Hydra-MDP: End-to-
+end multimodal planning with multi-target Hydra-Distillation.
+arXiv preprint arXiv:2406.06978, 2024. 2, 3
+[19] Zhenxin Li, Wenhao Yao, Zi Wang, Xinglong Sun, Joshua
+Chen, Nadine Chang, Maying Shen, Zuxuan Wu, Shiyi
+Lan, and José M. Álvarez.
+Generalized trajectory scor-
+ing for end-to-end multimodal planning.
+arXiv preprint
+arXiv:2506.06664, 2025. 2, 3
+[20] Zeyu He, Shiqi Liu, Ke Chen, Yun Yan, Jinzi Wu, Dianqiao
+Lei, Sirui Wang, ShuRui Peng, Tao Chen, Zhuo Huang, Yu
+Wu, Yadong Shao, Zhichao Li, Ke Sun, Yang Guan, Ke-
+qiang Li, and Shengbo Eben Li.
+Evaluation Is All You
+Need for Multi-Modal Autonomous Driving. arXiv preprint
+arXiv:2609.30818, 2026. 2, 3, 6, 7, 14
+[21] Brian Ichter, Anthony Brohan, Yevgen Chebotar, Chelsea
+Finn, Karol Hausman, Alexander Herzog, Daniel Ho, Julian
+Ibarz, Alex Irpan, Eric Jang, Ryan Julian, Dmitry Kalash-
+nikov, Sergey Levine, Yao Lu, Carolina Parada, Kanishka
+Rao, Pierre Sermanet, Alexander T Toshev, Vincent Van-
+houcke, Fei Xia, Ted Xiao, Peng Xu, Mengyuan Yan, Noah
+Brown, Michael Ahn, Omar Cortes, Nicolas Sievers, Clay-
+ton Tan, Sichun Xu, Diego Reyes, Jarek Rettinghouse, Jor-
+nell Quiambao, Peter Pastor, Linda Luu, Kuang-Huei Lee,
+Yuheng Kuang, Sally Jesmonth, Nikhil J. Joshi, Kyle Jeffrey,
+Rosario Jauregui Ruano, Jasmine Hsu, Keerthana Gopalakr-
+ishnan, Byron David, Andy Zeng, and Chuyuan Kelly Fu. Do
+as i can, not as i say: Grounding language in robotic affor-
+dances. In Conference on Robot Learning, pages 287–318.
+PMLR, 2023. 2
+[22] Wenlong Huang, Fei Xia, Ted Xiao, Harris Chan, Jacky Liang,
+Pete Florence, Andy Zeng, Jonathan Tompson, Igor Mor-
+datch, Yevgen Chebotar, Pierre Sermanet, Tomas Jackson,
+Noah Brown, Linda Luu, Sergey Levine, Karol Hausman,
+and Brian Ichter. Inner Monologue: Embodied reasoning
+through planning with language models. In Conference on
+Robot Learning, pages 1769–1782. PMLR, 2023.
+[23] Wenlong Huang, Chen Wang, Ruohan Zhang, Yunzhu Li,
+Jiajun Wu, and Li Fei-Fei. VoxPoser: Composable 3D value
+maps for robotic manipulation with language models. In Con-
+ference on Robot Learning, pages 540–562. PMLR, 2023.
+[24] Soroush Nasiriany, Fei Xia, Wenhao Yu, Ted Xiao, Jacky
+Liang, Ishita Dasgupta, Annie Xie, Danny Driess, Ayzaan
+Wahid, Zhuo Xu, Quan Vuong, Tingnan Zhang, Tsang-
+Wei Edward Lee, Kuang-Huei Lee, Peng Xu, Sean Kir-
+mani, Yuke Zhu, Andy Zeng, Karol Hausman, Nicolas Heess,
+Chelsea Finn, Sergey Levine, and Brian Ichter. PIVOT: Itera-
+tive visual prompting elicits actionable knowledge for VLMs.
+In International Conference on Machine Learning, pages
+37321–37341. PMLR, 2024. 2
+[25] Licheng Wen, Daocheng Fu, Xin Li, Xinyu Cai, Tao Ma,
+Pinlong Cai, Min Dou, Botian Shi, Liang He, and Yu Qiao.
+Dilu: A knowledge-driven approach to autonomous driving
+with large language models. In International Conference on
+Learning Representations, pages 34503–34522, 2024. 2
+[26] S P Sharan, Francesco Pittaluga, Vijay Kumar B G, and
+Manmohan Chandraker. Llm-assist: Enhancing closed-loop
+planning with language-based reasoning.
+arXiv preprint
+arXiv:2401.00125, 2023.
+[27] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang,
+Zhiyong Zhao, Kun Zhan, Peng Jia, XianPeng Lang, and
+Hang Zhao. Drivevlm: The convergence of autonomous
+driving and large vision-language models. In Conference on
+Robot Learning, pages 4698–4726. PMLR, 2025. 2
+[28] Boyuan Chen, Zhuo Xu, Sean Kirmani, Brian Ichter, Dorsa
+Sadigh, Leonidas Guibas, and Fei Xia. SpatialVLM: En-
+dowing vision-language models with spatial reasoning capa-
+bilities. In IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pages 14455–14465, 2024. 2
+[29] Rui Yang, Hanyang Chen, Junyu Zhang, Mark Zhao, Cheng
+Qian, Kangrui Wang, Qineng Wang, Teja Venkat Koripella,
+Marziyeh Movahedi, Manling Li, Heng Ji, Huan Zhang, and
+Tong Zhang. EmbodiedBench: Comprehensive benchmarking
+multi-modal large language models for vision-driven embod-
+ied agents. In International Conference on Machine Learning,
+pages 70576–70631. PMLR, 2025. 2
+[30] Jiayi Su, Yixin Zheng, Mi Yan, Li Yi, Zhizheng Zhang, and
+He Wang. GPT 6 Astra as an embodied policy. Technical
+report, 2026. 2
+[31] Aditya Ramabadran, Simon Mahns, and Tobias Gessler. Driv-
+ingbench: Frontier language models driving a real car through
+a cone course. Online report, 2026. 2
+[32] Hao Shao, Letian Wang, Ruobing Chen, Hongsheng Li, and
+Yu Liu. Safety-enhanced autonomous driving using inter-
+pretable sensor fusion transformer. In Conference on Robot
+Learning, pages 726–737. PMLR, 2023. 2
+[33] Xinshuo Weng, Boris Ivanovic, Yan Wang, Yue Wang, and
+Marco Pavone. PARA-Drive: Parallelized architecture for
+real-time autonomous driving. In IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 15449–
+15458, 2024. 2
+[34] Zhili Chen, Maosheng Ye, Shuangjie Xu, Tongyi Cao, and
+Qifeng Chen. PPAD: Iterative interactions of prediction and
+planning for end-to-end autonomous driving. In European
+Conference on Computer Vision, pages 239–256. Springer,
+2025. 2
+[35] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song, Steven L.
+Waslander, Yu Liu, and Hongsheng Li. LMDrive: Closed-
+loop end-to-end driving with large language models.
+In
+10
+
+
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 15120–15130, 2024. 2
+[36] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen,
+Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo,
+Andreas Geiger, and Hongyang Li. DriveLM: Driving with
+graph visual question answering. In European Conference on
+Computer Vision, pages 256–274. Springer, 2025. 2
+[37] Xiangteng Zhang, Yang Guan, Bo Zhang, Hongyang Li, Ya-
+Qin Zhang, and Shengbo Eben Li. On the identifiability of
+controlled world models. arXiv preprint arXiv:2607.22430,
+2026. 2
+[38] Linbo Wang, Yupeng Zheng, Qiang Chen, Shiwei Li, Yichen
+Zhang, Zebin Xing, Qichao Zhang, Xiang Li, Deheng Qian,
+Pengxuan Yang, Yihang Dong, Ce Hao, Xiaoqing Ye, Junyu
+Han, Yifeng Pan, and Dongbin Zhao. Latent-wam: Latent
+world action modeling for end-to-end autonomous driving. In
+ACM International Conference on Multimedia, 2026.
+[39] Xiangteng Zhang, Haoyuan Liu, Yang Guan, Jingliang Duan,
+Yao Lyu, Tao Zhang, Shuai Zhang, Kehua Sheng, Bo Zhang,
+and Shengbo Eben Li. World Action Critic (WAC) model:
+Joint foresight and criticism for policy learning.
+arXiv
+preprint arXiv:2610.22825, 2026. 2
+[40] Bo Jiang, Shaoyu Chen, Hao Gao, Bencheng Liao, Qian
+Zhang, Wenyu Liu, and Xinggang Wang. VADv2: End-to-
+end vectorized autonomous driving via probabilistic planning.
+In International Conference on Learning Representations,
+2026. 3
+[41] Yang Guan, Liming Xiao, Bai Huang, Guangyuan Yu, Xiao
+Li, Naizheng Wang, Jingliang Duan, and Shengbo Eben Li.
+Beyond rule-based systems: Generalized nudge decision-
+making for autonomous robo-delivery via multi-task trans-
+former learning. Transportation Research Part C: Emerging
+Technologies, 194:105998, 2027.
+[42] Ellington Kirby, Alexandre Boulch, Yihong Xu, Yuan Yin,
+Gilles Puy, Éloi Zablocki, Andrei Bursuc, Spyros Gidaris,
+Renaud Marlet, Florent Bartoccioni, Anh-Quan Cao, Nermin
+Samet, Tuan-Hung VU, and Matthieu Cord. Driving on reg-
+isters. In IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, 2026. 3, 5, 6, 7, 14
+[43] Ke Guo, Haochen Liu, Xiaojun Wu, Jia Pan, and Chen Lv.
+ipad: Iterative proposal-centric end-to-end autonomous driv-
+ing. IEEE Robotics and Automation Letters, 11(10):11142–
+11149, 2026. 3
+[44] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming Zhang,
+and Long Chen. GenAD: Generative end-to-end autonomous
+driving. In European Conference on Computer Vision, pages
+87–104. Springer, 2025. 3
+[45] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao
+Yu, Katrin Renz, and Andreas Geiger. Transfuser: Imitation
+with transformer-based sensor fusion for autonomous driv-
+ing. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 45(11):12878–12895, 2023. 5
+[46] Luke Rowe, Roger Girgis, Rodrigue de Schaetzen, Daphne
+Cornelisse, Alaap Grandhi, Felix Heide, Eugene Vinitsky,
+Christopher Pal, and Liam Paull. Scaling self-play for end-to-
+end driving. arXiv preprint arXiv:2606.19641, 2026. 5
+[47] Hao He, Chengcheng Hu, Zirun Su, Heng Zhang, Haisong
+Liu, Jinke Li, Haochen Tian, Zhenwei Shen, Hongyang Li,
+Zhichao Li, Yunchen Yang, Bochao Huang, Siyu Zhang,
+Kuangye Chen, Xiongjie Zhang, Wentao Dai, Hengchen Dai,
+Siyuan Liu, Zehao Huang, and Naiyan Wang. Drivezero:
+End-to-end driving beyond human demonstrations. arXiv
+preprint arXiv:2609.06055, 2026. 5, 14
+[48] Hongyu Zhou, Longzhong Lin, Jiabao Wang, Yichong Lu,
+Dongfeng Bai, Bingbing Liu, Yue Wang, Andreas Geiger, and
+Yiyi Liao. HUGSIM: A real-time, photo-realistic and closed-
+loop simulator for autonomous driving. IEEE Transactions on
+Pattern Analysis and Machine Intelligence, 48(4):4673–4691,
+2026. 6, 14, 15
+[49] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng,
+Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski,
+Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap
+Chitta. Navsim: Data-driven non-reactive autonomous ve-
+hicle simulation and benchmarking. In Advances in Neural
+Information Processing Systems, pages 28706–28719. Curran
+Associates, Inc., 2024. 6, 15
+[50] Duane C. Brown. Decentering distortion of lenses. Pho-
+togrammetric Engineering, 32(3):444–462, 1966. 12
+11
+
+
+Appendix Contents
+A. Implementation Details
+. . . . . . . . . . . . . . . .
+12
+A.1.
+Geometric Projection and Rendering . . . . . . .
+12
+A.2.
+Critic Context and Response Formats
+. . . . . .
+12
+B. Experimental Details . . . . . . . . . . . . . . . . . .
+14
+B.1.
+Checkpoints and Benchmark Adaptations
+. . . .
+14
+B.2.
+Scenario Selection and Evaluation Protocols . . .
+14
+B.3.
+Scoring Formulas and Aggregation . . . . . . . .
+15
+C. Additional Closed-Loop Results . . . . . . . . . . . .
+15
+C.1.
+Detailed Results by Data Source and Difficulty
+.
+15
+C.2.
+Component Scores by Assessment Frequency . .
+15
+D. Open-Loop Analysis . . . . . . . . . . . . . . . . . .
+15
+D.1.
+Detailed Results and Sampling Variability . . . .
+15
+D.2.
+Assessment and Reselection Analysis
+. . . . . .
+15
+D.3.
+Temporal Analysis of Safety Degradation
+. . . .
+15
+E. Ablation Details
+. . . . . . . . . . . . . . . . . . . .
+17
+E.1.
+Workflow Ablations
+. . . . . . . . . . . . . . .
+17
+E.2.
+Input Ablations . . . . . . . . . . . . . . . . . .
+17
+F.
+Qualitative Analysis . . . . . . . . . . . . . . . . . .
+17
+F.1.
+Visual Evidence and Critic Reasoning . . . . . .
+17
+F.2.
+Closed-Loop Driving . . . . . . . . . . . . . . .
+17
+F.3.
+Open-Loop Recovery . . . . . . . . . . . . . . .
+17
+A. Implementation Details
+A.1. Geometric Projection and Rendering
+At t = 0, the ego coordinate frame is centered at the tra-
+jectory reference point, with the x-axis pointing forward
+and the y-axis pointing left. Candidate trajectories, spatial
+anchors, and future occupancy are all expressed in this fixed
+frame. We assume a flat ground plane at z = 0.
+Spatial anchors.
+We construct an axis-aligned grid extend-
+ing from −40 to 40 m along both ego axes, with grid lines
+spaced 5 m apart. The resulting grid contains 16 × 16 cells,
+each measuring 5 m × 5 m.
+Vehicle footprint union.
+For the planner’s originally se-
+lected trajectory τb, we construct the vehicle’s occupied
+region over the prediction horizon. The vehicle’s ground
+footprint is represented as a filled rectangle defined relative
+to the trajectory reference point:
+B = [−ℓr, ℓf] × [−w/2, w/2] ⊂R2,
+(8)
+where ℓr and ℓf are the distances from the reference point
+to the rear and front edges of the vehicle, respectively, and
+w is the vehicle width.
+At time t, the candidate’s reference-point position qt
+b =
+(xt
+b, yt
+b)⊤and heading ψt
+b define the transformation of a
+vehicle-local point p = (x, y)⊤∈B into the fixed ego
+frame:
+ϕt(p) = R(ψt
+b)p + qt
+b,
+(9)
+where R(ψ) is the two-dimensional rotation matrix for head-
+ing ψ. The original trajectory consists of eight future poses
+at 0.5-second intervals up to 4 seconds, together with the
+initial pose (0, 0, 0) at t = 0.
+We linearly interpolate
+positions and unwrapped headings at the sampling times
+T = {0, 0.02, . . . , 4.0} s. The footprint union is defined as
+U =
+[
+t∈T
+{ϕt(p) : p ∈B}.
+(10)
+The resulting occupancy layer is rendered in pink and cor-
+responds to the originally selected trajectory in both critic
+stages.
+Camera projection.
+Let v ∈{F, L, R} denote the front,
+front-left, and front-right cameras. We project the spatial
+anchors and vehicle footprint union into each camera view
+using the calibrated ego-to-camera rotation Rv and transla-
+tion tv. Projection follows a zero-skew pinhole model with
+intrinsic matrix Kv, focal lengths fx,v, fy,v, and principal
+point (cx,v, cy,v). The intrinsics are scaled to the resolution
+of the raw camera images. Only points with positive camera
+depth Zv > 0 are projected, yielding ideal pixel coordinates
+(ux, uy).
+Theoretical horizon.
+The theoretical horizon is the van-
+ishing line of the ground plane, corresponding to viewing
+rays parallel to the ground. Let nv = (nx,v, ny,v, nz,v)⊤=
+Rv(0, 0, 1)⊤denote the ground normal in camera coordi-
+nates. For ny,v̸ = 0, the vertical coordinate of the horizon at
+horizontal pixel coordinate ux is
+uy = cy,v −fy,v
+ny,v
+nx,v
+fx,v
+(ux −cx,v) + nz,v
+
+.
+(11)
+The resulting horizon is a straight line in the ideal image.
+We render its visible portion as a red dashed line on the
+annotation canvas.
+Rendering and compositing.
+Anchor segments and ve-
+hicle footprints are first clipped against a near plane. The
+resulting geometry is then projected into the ideal image
+and rendered alongside the theoretical horizon on annota-
+tion layers. To match the lens distortion of the raw camera
+images, we use a calibrated five-parameter Brown–Conrady
+model [50] where required. The annotation canvases are
+enlarged beyond the image boundaries to accommodate the
+displacement of projected geometry caused by distortion.
+The shifted canvas origins are accounted for in the princi-
+pal points and inverse-sampling coordinates. We then use
+inverse mapping to resample the annotations into the raw
+image coordinates and composite them onto the original cam-
+era images without undistorting or geometrically resampling
+those images.
+A.2. Critic Context and Response Formats
+Each critic stage runs in a fresh Codex context using GPT-6
+Astra [2] with maximum reasoning effort. Each call receives
+12
+
+
+Shared inputs
+Each stage independently receives these fields and the same five image attachments. The overlays depict the original candidate b in both
+stages.
+time_seconds
+[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+current_ego
+Current pose, velocity, acceleration, and navigation fields
+scorer_top1
+{candidate: b}
+camera_geometry_mode
+Configured projection and distortion-matching mode
+image_manifest
+Ordered image metadata, including annotation and reuse information
+image_order
+Historical front, current front, annotated front, annotated front-left, annotated front-right
+image_time_reference
+t = 0: current frame; negative times: past observations
+Shared reasoning principles
+(1) Spatiotemporal reasoning. Consider the full vehicle footprint, including its front, rear, and corners. Use timed candidate poses and
+current and historical observations to assess road-boundary violations and potential conflicts with other actors at compatible times.
+(2) Evidence and uncertainty. Ground every decision, including acceptance, in scene evidence. Distinguish observations from
+assumptions about future behavior, and qualify uncertainty when it affects the assessment or candidate comparison.
+(3) Performance tradeoffs. Evaluate safety, progress, and comfort jointly while accounting for applicable road rules. Consider
+insufficient progress and abnormal or aggressive motion alongside potential collision and drivable-area risks.
+Stage I: Assessment
+Stage II: Reselection
+Instruction summary
+Instruction summary
+Assess the single supplied candidate b under the expected-PDMS
+objective and applicable road-rule constraints. Accept when the
+observations and timed motion support execution without a spe-
+cific material PDMS issue or applicable road-rule conflict, and
+explain the supporting evidence. Reject when they support a
+specific consequential risk or rule conflict; identify the actor,
+boundary, or behavior, affected motion and approximate time,
+and expected consequence. Do not claim comparison with unseen
+alternatives. Return only the assessment JSON.
+Compare all K candidates, including the original b, under the
+expected-PDMS objective and applicable road-rule constraints.
+Reassess the earlier concern using the observations and timed
+poses, treating it as a risk hypothesis rather than a confirmed
+failure. Weigh risk reduction against losses in progress, route
+consistency, or comfort, and explain the decisive comparative
+evidence. If b is retained, justify that choice. If no candidate
+satisfies the supported constraints, choose the one that best limits
+conflict and safety risk and explain the limitation. Do not treat
+slower or shorter motion alone as evidence of a better choice.
+Return only the reselection JSON.
+Stage-specific input (sketch)
+Stage-specific input (sketch)
+stage:
+assess
+task:
+assess_scorer_candidate
+candidates: one record for b
+{candidate: b, poses: ⟨8 × 3 array⟩}
+response_schema: assessment format below
+stage:
+reselect
+task:
+select_candidate
+candidates: all K records with original IDs
+{candidate: ID, poses: ⟨8 × 3 array⟩}
+response_schema: reselection format below
+previous_stage_answer:
+{accept:
+false, reason: ⟨assessment reason⟩}
+Response format
+Response format
+accept: ⟨Boolean⟩
+reason: ⟨text⟩
+images_viewed: ⟨Boolean⟩
+candidate: ⟨supplied ID⟩
+reason: ⟨text⟩
+images_viewed: ⟨Boolean⟩
+Figure 6. Critic context and response formats for GAC on NAVSIM v1. Each stage independently receives the shared inputs and
+reasoning principles, together with stage-specific instructions and candidate inputs. Instructions are summarized, and angle brackets denote
+placeholders.
+complete stage instructions, a JSON-serialized scene pay-
+load, image attachments, and the corresponding response
+schema, without inheriting conversation or image memory
+from the other stage. Figure 6 summarizes the request struc-
+ture and response formats. The same structure is used for
+HUGSIM, with adaptations to its coordinate conventions,
+13
+
+
+evaluation metrics, and camera geometry.
+Images and metadata.
+The five attachments consist of
+a historical front image captured 1.5 seconds earlier, the
+current front image, and annotated current front, front-left,
+and front-right images. Both stages receive the same images,
+with the annotated views combining spatial anchors A and
+the original candidate’s occupancy O. The accompanying
+metadata specify the viewpoints, observation times, geomet-
+ric annotations, candidate identifiers, and camera projection
+conventions.
+Candidate inputs and selection.
+Candidate trajectories
+are supplied as time-indexed [x, y, ψ] poses using the coor-
+dinate conventions of each benchmark. Assessment receives
+only the originally selected trajectory τb, while reselection
+receives the complete candidate set C together with the pre-
+vious assessment decision and reason. The candidate count
+is 64 for iDriveVLA and DrivoR and 20 for DiffusionDrive.
+The original selection is determined by the planner’s candi-
+date scores, with ties resolved by candidate index. The critic
+does not receive the planners’ full ranking-score vectors,
+official evaluation labels, or ground-truth information.
+Response validation and execution.
+Each valid response
+contains exactly the fields shown in Figure 6. Assessment
+requires a Boolean acceptance decision, while reselection
+requires a candidate identifier from the supplied set. Both
+stages require a nonempty reason and a self-reported confir-
+mation of image inspection. The reselection reason explains
+how the earlier concern is addressed and, when the original
+candidate b is retained, justifies that choice. A validated
+acceptance returns b immediately, while a validated rejection
+triggers reselection, whose selected candidate determines
+the final choice.
+B. Experimental Details
+B.1. Checkpoints and Benchmark Adaptations
+We use an unreleased iDriveVLA checkpoint [20], the
+publicly released DrivoR NAVSIM v1 checkpoint without
+SimScale [42], and the publicly released DiffusionDrive
+NAVSIM checkpoint [11]. All three planners use front,
+front-left, and front-right images together with ego state.
+iDriveVLA and DrivoR additionally use rear-view images,
+while DiffusionDrive uses LiDAR. For candidate selection,
+iDriveVLA and DrivoR use learned planning-quality scores,
+and DiffusionDrive uses classification scores. The critic
+uses a consistent five-image configuration across planners,
+together with stage-specific candidate information.
+For
+NAVSIM, candidate trajectories are exported before critic
+evaluation and reused across selection methods. Diffusion-
+Drive uses fixed per-scene randomness during candidate
+generation.
+Sensor and geometry adaptation.
+For NAVSIM, vehicle
+footprints use the nuPlan Pacifica dimensions in the rear-axle
+frame, with ℓf = 4.049 m, ℓr = 1.127 m, and w = 2.297 m.
+For HUGSIM, we use the ground projection of the vehicle
+center as the reference point for candidate poses, spatial an-
+chors, and vehicle footprints, with camera calibration defined
+consistently in the same frame. The footprint dimensions
+are obtained from scene metadata, with ℓf = ℓr = L/2,
+where L and w denote vehicle length and width. HUGSIM
+uses a pinhole camera model for image rendering, allowing
+geometric annotations to be projected directly without lens-
+distortion matching. For DiffusionDrive on HUGSIM, we
+generate a synthetic point cloud from rendered depth, using
+the same adaptation for Original and GAC.
+B.2. Scenario Selection and Evaluation Protocols
+HUGSIM scenarios and execution.
+For the full bench-
+mark comparison, we evaluate DrivoR + GAC with
+assessment at 2 Hz on the 345-scenario pre-challenge
+HUGSIM [48] evaluation set used by DrivoR [42]. The
+set contains 48 Easy, 127 Medium, 86 Hard, and 84 Extreme
+scenarios. We compare GAC with previously published re-
+sults from DriveZero [47] and DrivoR [42] under the same
+evaluation protocol, with overall scores averaged equally
+across all 345 scenarios.
+For cross-planner evaluation, we construct HUGSIM-160
+by randomly sampling 10 scenarios from each combination
+of four data sources (KITTI-360, nuScenes, PandaSet, and
+Waymo) and four difficulty levels (Easy, Medium, Hard,
+and Extreme). All three planners are evaluated on the same
+scenarios, with GAC and Original compared under identical
+settings. GAC assessment runs at 2 Hz on HUGSIM-160. We
+further construct HUGSIM-64 by randomly sampling four
+scenarios from each data source and difficulty combination
+within HUGSIM-160. This subset is evaluated at both 1 Hz
+and 2 Hz to compare critic assessment frequencies.
+The simulator and planner operate at 4 Hz, with GAC
+reviewing the planner’s selection every two planning steps
+at 2 Hz or every four steps at 1 Hz. At each planning up-
+date, the planner generates new candidates from the current
+observations, and only the initial segment of the selected tra-
+jectory is executed. The planner’s original selection is used
+at steps without critic assessment, and the simulator waits
+for the critic response when assessment is triggered. All fre-
+quencies refer to simulation time, with simulator and planner
+random seeds fixed at zero. Missing historical observations
+are explicitly indicated in the image attachments.
+NAVSIM scenarios.
+The Failed group includes original
+selections with zero PDMS and at least one positive-score al-
+ternative. All 188, 219, and 541 eligible scenes are included
+for iDriveVLA, DrivoR, and DiffusionDrive, respectively.
+The Intermediate and High-quality groups are defined by
+original PDMS scores in (0, 90) and [90, 100], respectively.
+14
+
+
+For each planner, we independently sample three sets of
+100 distinct scenes from each of the Intermediate and High-
+quality groups. Scenes may appear in multiple sets, and each
+occurrence is included in the reported statistics.
+B.3. Scoring Formulas and Aggregation
+HUGSIM.
+HUGSIM [48] evaluates no collision (NC),
+drivable area compliance (DAC), time to collision within
+bound (TTC), comfort (C), and route completion (RC). On
+the native 0–1 scale, the score at evaluated planning step t in
+scenario s is
+qs,t = NCs,t · DACs,t
+5 TTCs,t + 2 Cs,t
+7
+.
+(12)
+The episode PDMS and HD-Score are
+¯qs = 1
+Ts
+Ts
+X
+t=1
+qs,t,
+hs = ¯qs · RCs,
+(13)
+where Ts is the number of evaluated planning steps and RCs
+measures route completion over the episode. NC, DAC, TTC,
+and C are averaged over evaluated planning steps within each
+episode and then equally across episodes, while episode
+PDMS, RC, and HD-Score are averaged equally across sce-
+narios. All reported scores are scaled to 0–100.
+NAVSIM.
+We use the official NAVSIM v1 PDMS [49],
+which combines no at-fault collision (NC), drivable area com-
+pliance (DAC), ego progress (EP), time to collision (TTC),
+and comfort (C). On the reported 0–100 scale, the score is
+q = 100 NC · DAC 5 EP + 5 TTC + 2 C
+12
+.
+(14)
+PDMS is computed for each evaluated instance before av-
+eraging. The reported NC × DAC score is obtained by
+multiplying the two component scores within each instance
+before averaging and scaling to 0–100. TTC and EP are
+averaged over all evaluated instances, including those with
+zero final PDMS.
+C. Additional Closed-Loop Results
+C.1. Detailed Results by Data Source and Difficulty
+Tables 6 and 7 report results on HUGSIM-160 by data source
+and difficulty, with 40 scenarios per group. Across all three
+planners, GAC consistently improves NC and TTC in every
+data source and difficulty group, alongside gains in mean
+PDMS and HD-Score. Medium scenarios yield the largest
+absolute HD-Score gains for all three planners. DAC im-
+provements are less consistent, which may reflect the diffi-
+culty of precise drivable-area boundary assessment. In some
+Hard and Extreme groups, higher PDMS is accompanied by
+modest reductions in route completion, while HD-Score still
+improves.
+iDriveVLA
+DrivoR
+DiffusionDrive
+0%
+20%
+40%
+60%
+Selections entering reselection
+59.0
+56.6
+55.3
+25.7
+24.0
+24.0
+Failed
+High-quality
++130.0%
++135.9%
++130.3%
+Figure 7. Stage I rejection rates for Failed and High-quality selec-
+tions on NAVSIM v1. Point labels show the percentages passed to
+Stage II. Arrows indicate the relative increase in rejection rate from
+High-quality to Failed for each planner.
+C.2. Component Scores by Assessment Frequency
+Table 8 reports NC, DAC, TTC, and comfort on HUGSIM-
+64, complementing the PDMS, RC, and HD-Score results
+in Table 3. Increasing the critic assessment frequency from
+1 Hz to 2 Hz improves NC and TTC across all three planners,
+alongside the gains in PDMS and HD-Score.
+D. Open-Loop Analysis
+D.1. Detailed Results and Sampling Variability
+Table 9 reports mean scores and twice the sample standard
+deviation of the three set-level means for the Intermediate
+and High-quality groups. Among the 300 High-quality eval-
+uation entries per planner, GAC introduces one new zero-
+score failure for iDriveVLA, four for DrivoR, and one for
+DiffusionDrive. Comfort scores are 100 for both Original
+and GAC across all planners and groups and are therefore
+omitted from the table.
+D.2. Assessment and Reselection Analysis
+Figure 7 summarizes Stage I rejection rates for the Failed
+and High-quality groups. Assessment triggers reselection for
+55.27–59.04% of Failed selections, compared with 24.00–
+25.67% of High-quality selections, representing a relative
+increase of up to 136% over the High-quality group. Among
+the Failed selections rejected in Stage I, GAC recovers
+88.29%, 78.23%, and 76.92% for iDriveVLA, DrivoR, and
+DiffusionDrive, respectively, demonstrating strong recovery
+performance on identified failures.
+D.3. Temporal Analysis of Safety Degradation
+Among the 1,800 Intermediate and High-quality evaluation
+entries, 260 show a decrease in PDMS after GAC selection.
+In 234 cases (90.0%), only EP decreases, suggesting that
+15
+
+
+Table 6. Closed-loop performance by data source on HUGSIM-160. Each source contains 40 scenarios. Shading marks GAC; purple values
+show score changes from Original.
+Data source
+Method
+NC↑
+DAC↑
+TTC↑
+Comfort↑
+PDMS↑
+RC↑
+HD-Score↑
+KITTI-360
+iDriveVLA
+57.63
+84.96
+53.80
+97.58
+46.75
+30.53
+23.87
++ GAC
+61.92 +4.29
+85.05 +0.09
+59.41 +5.61
+96.01 −1.57
+51.43 +4.68
+30.75 +0.22
+25.28 +1.41
+DrivoR
+45.54
+84.39
+41.00
+92.49
+36.28
+35.55
+24.91
++ GAC
+55.27 +9.73
+85.39 +1.00
+51.69 +10.69
+92.55 +0.06
+46.34 +10.06
+36.59 +1.04
+28.27 +3.36
+DiffusionDrive
+30.35
+79.90
+24.61
+96.80
+18.44
+17.42
+6.63
++ GAC
+41.29 +10.94
+84.56 +4.66
+34.13 +9.52
+92.78 −4.02
+29.27 +10.83
+22.41 +4.99
+12.98 +6.35
+nuScenes
+iDriveVLA
+73.20
+99.81
+68.09
+98.65
+68.89
+60.59
+48.63
++ GAC
+77.97 +4.77
+100.00 +0.19
+71.29 +3.20
+98.57 −0.08
+72.62 +3.73
+59.93 −0.66
+49.68 +1.05
+DrivoR
+60.31
+100.00
+53.60
+94.90
+54.22
+56.98
+43.39
++ GAC
+68.21 +7.90
+100.00 +0.00
+61.73 +8.13
+93.73 −1.17
+62.12 +7.90
+58.90 +1.92
+47.01 +3.62
+DiffusionDrive
+60.70
+98.02
+54.13
+89.90
+52.71
+53.02
+37.77
++ GAC
+72.74 +12.04
+97.82 −0.20
+63.40 +9.27
+91.54 +1.64
+63.18 +10.47
+62.33 +9.31
+48.76 +10.99
+PandaSet
+iDriveVLA
+64.80
+99.82
+57.66
+98.81
+58.93
+58.03
+46.45
++ GAC
+72.54 +7.74
+99.82 +0.00
+68.83 +11.17
+96.44 −2.37
+68.26 +9.33
+56.76 −1.27
+47.62 +1.17
+DrivoR
+52.89
+100.00
+46.33
+93.10
+46.73
+60.36
+41.59
++ GAC
+63.33 +10.44
+100.00 +0.00
+56.80 +10.47
+92.55 −0.55
+57.21 +10.48
+60.37 +0.01
+46.08 +4.49
+DiffusionDrive
+50.76
+99.80
+45.18
+85.17
+44.68
+57.47
+38.96
++ GAC
+64.22 +13.46
+99.96 +0.16
+57.83 +12.65
+86.74 +1.57
+56.62 +11.94
+59.44 +1.97
+46.71 +7.75
+Waymo
+iDriveVLA
+68.45
+96.85
+63.89
+98.01
+62.24
+46.30
+38.14
++ GAC
+73.86 +5.41
+97.01 +0.16
+69.61 +5.72
+96.60 −1.41
+68.48 +6.24
+48.23 +1.93
+41.09 +2.95
+DrivoR
+58.72
+99.44
+52.99
+94.73
+53.01
+52.69
+39.78
++ GAC
+71.07 +12.35
+99.43 −0.01
+64.88 +11.89
+93.45 −1.28
+64.78 +11.77
+55.75 +3.06
+45.12 +5.34
+DiffusionDrive
+43.24
+95.48
+35.05
+90.24
+34.37
+41.38
+26.99
++ GAC
+59.48 +16.24
+97.03 +1.55
+52.60 +17.55
+90.02 −0.22
+50.99 +16.62
+49.07 +7.69
+37.28 +10.29
+Table 7. Closed-loop performance by difficulty on HUGSIM-160. Each difficulty level contains 40 scenarios. Shading marks GAC; purple
+values show score changes from Original.
+Difficulty
+Method
+NC↑
+DAC↑
+TTC↑
+Comfort↑
+PDMS↑
+RC↑
+HD-Score↑
+Easy
+iDriveVLA
+93.18
+96.86
+90.25
+99.34
+87.86
+87.54
+78.32
++ GAC
+93.77 +0.59
+97.04 +0.18
+91.23 +0.98
+99.32 −0.02
+88.78 +0.92
+88.42 +0.88
+79.85 +1.53
+DrivoR
+91.60
+98.44
+89.36
+93.66
+86.91
+89.91
+80.78
++ GAC
+92.49 +0.89
+98.57 +0.13
+90.31 +0.95
+94.36 +0.70
+88.28 +1.37
+91.42 +1.51
+83.15 +2.37
+DiffusionDrive
+83.72
+97.05
+80.92
+92.98
+77.54
+78.50
+68.65
++ GAC
+86.87 +3.15
+98.01 +0.96
+85.08 +4.16
+92.84 −0.14
+81.58 +4.04
+85.34 +6.84
+75.42 +6.77
+Medium
+iDriveVLA
+82.20
+93.19
+79.78
+99.34
+76.15
+50.04
+43.59
++ GAC
+85.76 +3.56
+94.02 +0.83
+84.06 +4.28
+99.29 −0.05
+80.90 +4.75
+52.34 +2.30
+46.32 +2.73
+DrivoR
+49.52
+94.33
+43.03
+93.09
+42.54
+46.96
+29.47
++ GAC
+68.36 +18.84
+95.87 +1.54
+61.38 +18.35
+93.06 −0.03
+61.25 +18.71
+52.70 +5.74
+38.60 +9.13
+DiffusionDrive
+37.83
+90.06
+29.18
+91.45
+28.27
+34.79
+17.70
++ GAC
+64.34 +26.51
+92.45 +2.39
+53.45 +24.27
+92.13 +0.68
+52.69 +24.42
+48.31 +13.52
+35.95 +18.25
+Hard
+iDriveVLA
+58.24
+95.53
+49.56
+97.72
+48.39
+33.01
+23.79
++ GAC
+66.90 +8.66
+95.00 −0.53
+62.33 +12.77
+94.87 −2.85
+59.06 +10.67
+31.31 −1.70
+25.09 +1.30
+DrivoR
+44.79
+95.86
+36.88
+93.37
+35.98
+38.56
+24.88
++ GAC
+56.65 +11.86
+95.85 −0.01
+49.64 +12.76
+92.27 −1.10
+47.82 +11.84
+36.84 −1.72
+27.19 +2.31
+DiffusionDrive
+35.42
+91.59
+26.78
+87.35
+23.16
+27.85
+11.84
++ GAC
+54.51 +19.09
+93.87 +2.28
+44.54 +17.76
+87.56 +0.21
+40.92 +17.76
+33.86 +6.01
+21.93 +10.09
+Extreme
+iDriveVLA
+30.47
+95.88
+23.85
+96.64
+24.40
+24.86
+11.39
++ GAC
+39.86 +9.39
+95.82 −0.06
+31.51 +7.66
+94.13 −2.51
+32.05 +7.65
+23.61 −1.25
+12.41 +1.02
+DrivoR
+31.55
+95.21
+24.65
+95.10
+24.81
+30.15
+14.53
++ GAC
+40.38 +8.83
+94.53 −0.68
+33.78 +9.13
+92.61 −2.49
+33.10 +8.29
+30.65 +0.50
+17.53 +3.00
+DiffusionDrive
+28.09
+94.51
+22.08
+90.33
+21.24
+28.16
+12.15
++ GAC
+32.01 +3.92
+95.05 +0.54
+24.88 +2.80
+88.54 −1.79
+24.89 +3.65
+25.74 −2.42
+12.42 +0.27
+16
+
+
+Table 8. Component scores by assessment frequency on HUGSIM-
+64. GAC performs assessment at 1 or 2 Hz, while all planners
+operate at 4 Hz. Purple values show score changes from Original.
+Method
+NC↑
+DAC↑
+TTC↑
+Comf.↑
+iDriveVLA
+62.79
+96.29
+57.34
+98.19
++ GAC (1 Hz) 65.96 +3.17
+96.46 +0.17 60.71 +3.37
+97.39 −0.80
++ GAC (2 Hz) 67.63 +4.84
+96.56 +0.27 63.15 +5.81
+96.90 −1.29
+DrivoR
+55.01
+96.07
+49.82
+94.68
++ GAC (1 Hz) 59.75 +4.74
+95.74 −0.33 54.57 +4.75
+93.99 −0.69
++ GAC (2 Hz) 65.15 +10.14 96.40 +0.33 60.44 +10.62 93.39 −1.29
+DiffusionDrive 43.52
+93.68
+37.54
+91.33
++ GAC (1 Hz) 54.51 +10.99 94.76 +1.08 49.23 +11.69 90.28 −1.05
++ GAC (2 Hz) 57.97 +14.45 94.86 +1.18 52.12 +14.58 91.69 +0.36
+most performance reductions are associated with reduced
+progress rather than safety-related degradation. We further
+examine the remaining 26 cases with declines in NC, DAC,
+or TTC, including 15 Intermediate and 11 High-quality en-
+tries. We replay the original and GAC-selected trajectories
+using the NAVSIM evaluator, confirm that their scores match
+the original evaluations, and examine when safety-related
+violations first occur along the four-second trajectories. All
+26 GAC-selected trajectories retain full NC, DAC, and TTC
+scores through the first second, with the first violations de-
+tected at 1.7–4.0 seconds for Intermediate entries and 2.0–3.9
+seconds for High-quality entries. In the 2 Hz closed-loop
+configuration, GAC reassesses planner selections every 0.5
+seconds using updated observations, enabling decisions to
+be updated before the full trajectory is executed.
+E. Ablation Details
+E.1. Workflow Ablations
+Original uses the planner’s original selection without critic
+intervention. Direct bypasses assessment and selects from
+all 64 candidates in a single call. It retains the reasoning
+principles and five-image configuration, including spatial
+anchors but excluding the original candidate’s footprint over-
+lays, explicit original-selection information, and assessment
+feedback. Select then review first selects a candidate inde-
+pendently and then compares it with the planner’s original
+selection to determine the final choice between the two. This
+variant preserves the reasoning principles, spatial anchors,
+and original candidate’s footprint overlays.
+Uniform retains GAC’s recorded assessment decisions
+and accepted selections, replacing only the reselection strat-
+egy after rejection. It selects from all 64 candidates with
+equal probability, including the original candidate, without
+additional reselection model calls.
+We compute the expected PDMS of Uniform analytically.
+For each scene s, let a(s) = 1 indicate acceptance and
+a(s) = 0 rejection, with qb(s) denoting the original selec-
+tion’s PDMS and qi(s) the score of candidate i among Ks
+candidates. The expected final score is
+E[qU(s)] = a(s)qb(s) +
+ 1 −a(s)
+ 1
+Ks
+Ks−1
+X
+i=0
+qi(s). (15)
+Averaging these expectations across the evaluated scenes
+gives the exact expected mean PDMS.
+E.2. Input Ablations
+The ablation without reasoning principles retains the field
+definitions, coordinate and image conventions, evaluation
+definitions, and response schemas. The ablation without ge-
+ometric overlays removes spatial anchors and projected vehi-
+cle footprints from the images while retaining the reasoning
+principles. Both configurations preserve GAC’s assessment
+and conditional reselection procedure.
+F. Qualitative Analysis
+BEVs, candidate-set plots, and evaluator scores are used
+only for analysis and are not supplied to the critic.
+F.1. Visual Evidence and Critic Reasoning
+Figure 8 presents two DrivoR examples from our NAVSIM
+v1 evaluation, illustrating rejection followed by reselection
+and acceptance without reselection. In Figure 8(a), the de-
+creasing distance to the lead truck and the original trajec-
+tory’s forward extent indicate a potential rear-end collision
+risk. GAC selects a trajectory with greater stopping mar-
+gin while maintaining forward progress, improving PDMS
+from 0 to 96.04. In Figure 8(b), the critic identifies no clear
+conflict with the departing minivan or pedestrians near the
+curb and retains the original selection, preserving a PDMS
+of 100.
+F.2. Closed-Loop Driving
+Additional qualitative examples of closed-loop driving on
+HUGSIM are provided in Figure 9, illustrating how GAC
+improves driving behavior through trajectory selection in
+scenarios involving braking, lateral clearance, and turning.
+F.3. Open-Loop Recovery
+Additional qualitative examples of failure recovery on
+NAVSIM v1 are provided in Figure 10, illustrating how
+GAC improves collision avoidance and drivable-area com-
+pliance through trajectory reselection across diverse driving
+scenarios.
+17
+
+
+Table 9. Open-loop performance on the Intermediate and High-quality groups of NAVSIM v1. Values are means over three sampled sets per
+planner and group. Subscripts indicate ± twice the sample standard deviation of the three set-level means.
+Planner
+Group
+Selection
+NC↑
+DAC↑
+TTC↑
+EP↑
+NC×DAC↑
+PDMS↑
+iDriveVLA
+Intermediate
+Original
+99.33±1.53
+100.00±0.00
+75.00±7.21
+72.94±2.16
+99.33±1.53
+78.02±2.55
+GAC
+99.67±1.15
+99.33±1.15
+87.00±5.29
+69.80±2.66
+99.00±0.00
+81.56±1.35
+High-quality
+Original
+100.00±0.00
+100.00±0.00
+100.00±0.00
+96.19±1.39
+100.00±0.00
+98.41±0.58
+GAC
+99.67±1.15
+100.00±0.00
+99.00±0.00
+92.07±1.34
+99.67±1.15
+96.22±0.68
+DrivoR
+Intermediate
+Original
+99.50±0.00
+100.00±0.00
+85.33±9.45
+69.18±3.16
+99.50±0.00
+80.82±2.72
+GAC
+99.83±0.58
+98.67±3.06
+90.33±3.06
+66.60±2.45
+98.50±3.00
+81.22±2.03
+High-quality
+Original
+100.00±0.00
+100.00±0.00
+100.00±0.00
+95.06±1.27
+100.00±0.00
+97.94±0.53
+GAC
+99.67±1.15
+99.00±2.00
+99.67±1.15
+90.44±3.08
+98.67±1.15
+95.10±1.22
+DiffusionDrive
+Intermediate
+Original
+99.67±1.15
+100.00±0.00
+83.67±4.62
+71.86±1.36
+99.67±1.15
+81.31±1.20
+GAC
+99.67±1.15
+98.67±2.31
+89.67±4.62
+69.24±1.22
+98.33±1.15
+81.94±2.09
+High-quality
+Original
+100.00±0.00
+100.00±0.00
+100.00±0.00
+91.84±0.57
+100.00±0.00
+96.60±0.24
+GAC
+100.00±0.00
+99.67±1.15
+99.33±1.15
+89.48±0.55
+99.67±1.15
+95.14±0.33
+(a) Rejection and reselection
+Historical front (t = −1.5 s)
+Current front with overlays
+Candidates and final selection
+0
+10
+20
+30
+Forward (m)
+−5
+0
+5
+Left (m)
+43
+4
+Original (4)
++ GAC (43)
+Assessment: reject candidate 4
+By approximately 3–4 s, ego’s front reaches the lead truck’s current
+rear region while still moving. The closing gap across the front
+observations and illuminated rear lamps support slow or stopping
+motion. If the truck stops or remains stopped, this creates rear-end
+collision and TTC risk; sufficient continued movement is uncertain.
+Outcome: candidate 4 →43; PDMS 0 →96.04.
+Reselection: select candidate 43
+43 brakes progressively, reaching 11.93 m at 2 s and 15.70 m at 4 s,
+advancing only 0.245 m in the final half-second. The closing gap
+and illuminated truck lamps support the earlier stopping concern,
+although future truck motion remains uncertain. Compared with 4,
+it leaves about 4 m more late front clearance and reduces TTC
+exposure. It preserves more progress than 37 or 62, while 42 and
+farther-reaching alternatives offer less stopping margin for modest
+additional progress.
+(b) Acceptance
+Historical front (t = −1.5 s)
+Current front with overlays
+Candidates and final selection
+0
+5
+10
+15
+Forward (m)
+0
+3
+6
+Left (m)
+51 retained
+Original = + GAC (51)
+Assessment: accept candidate 51
+The candidate accelerates gently from rest and bends left consistently with navigation, keeping its full footprint on the driveway through 4
+seconds. The lead minivan is moving away; curbside pedestrians show no clear crossing conflict. No specific issue was identified that would
+materially reduce PDMS or conflict with an applicable road rule.
+Outcome: candidate 51 retained; no reselection; PDMS 100 →100.
+Figure 8. Assessment and reselection examples from DrivoR on NAVSIM v1. The left and middle panels show historical and annotated
+current front views supplied to the critic. Overlays depict the original candidate. The right panel shows all 64 candidates in the ego frame,
+with original and final selections highlighted and dots marking 4 s endpoints. The text reproduces the critic’s recorded reasons verbatim.
+18
+
+
+−10
+−5
+0
+5
+10
+Right (m)
+−5
+0
+5
+10
+15
+Forward (m)
+Original
+4 s
+4 s
+Front-left
+Front
+Front-right
+(c) iDriveVLA: supplied left-turn command (Waymo, Medium; t = 1.0 s)
+−10
+−5
+0
+5
+10
+Right (m)
+0
+5
+10
+15
+Forward (m)
+4 s
+4 s
+Original
+Front-left
+Front
+Front-right
+(a) DiffusionDrive: recovery from the sidewalk corridor (Waymo, Medium; t = 44.5 s)
+−30
+−20
+−10
+0
+10
+20
+30
+Right (m)
+0
+10
+20
+30
+40
+50
+Forward (m)
+4 s
+4 s
+Original
+Front-left
+Front
+Front-right
+(b) iDriveVLA: braking before a STOP-controlled crossing (PandaSet, Easy; t = 7.5 s)
+−10
+0
+10
+Right (m)
+0
+5
+10
+15
+20
+25
+30
+Forward (m)
+4 s
+4 s
+Original
+Front-left
+Front
+Front-right
+(d) DiffusionDrive: lateral clearance from a lead SUV (nuScenes, Hard; t = 48.5 s)
+Original
+Original
+Original
+Original
++ GAC
++ GAC
++ GAC
++ GAC
++ GAC
++ GAC
++ GAC
++ GAC
+Figure 9. Qualitative comparisons of Original and GAC in closed-loop driving on HUGSIM. Each case presents front-left, front, front-right,
+and BEV views, with Original above GAC. The red paths indicate trajectories selected by Original, while the green paths indicate those
+selected by GAC. All trajectories span a four-second horizon.
+19
+
+
+Original
+Ego: 4 s
+Ego: 3 s
+Ego: 4 s
+Ego: 4 s
+Ego: 4 s
+Ego: 3 s
+Ego: 4 s
+Ego: 4 s
+Ego: 4 s
+5 m
+5 m
+10 m
+3 m
+3 m
+5 m
+5 m
+Ego: 4 s
+5 m
+Ego: 4 s
+5 m
+(a) DrivoR: Construction zone
+PDMS 0 →100
+(b) iDriveVLA: Zebra crossing
+PDMS 0 →100
+(c) iDriveVLA: Oncoming sedan
+PDMS 0 →100
+(d) DrivoR: Curbside truck
+PDMS 0 →100
+(e) DiffusionDrive: Raised separator
+PDMS 0 →91.67
+(f) DiffusionDrive: Fountain base
+PDMS 0 →100
+(g) DrivoR: Parked van (right turn)
+PDMS 0 →100
+(h) DrivoR: Splitter island
+PDMS 0 →100
+(i) DrivoR: Parked van (left turn)
+PDMS 0 →92.93
++ GAC
+Figure 10. Qualitative examples of open-loop failure recovery with GAC on NAVSIM v1. Each panel pairs a current front view with a BEV
+and reports the Original and GAC scores. Images and actor positions correspond to t = 0, while trajectories span four seconds. Dots and
+ego footprints mark t = 3 s in (b) and (f), and t = 4 s otherwise. Scale bars are in metres.
+20

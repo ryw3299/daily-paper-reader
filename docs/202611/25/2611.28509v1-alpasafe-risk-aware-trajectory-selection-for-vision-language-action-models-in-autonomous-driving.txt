@@ -1,0 +1,959 @@
+This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be
+accessible.
+AlpaSafe: Risk-Aware Trajectory Selection for
+Vision-Language-Action Models
+in Autonomous Driving
+Qiren Wang, Mingyu Guo, and Weisong Shi
+Connected and Autonomous Research Laboratory
+University of Delaware, Newark, USA
+{qirenw, myuguo, weisong}@udel.edu
+Abstract—Reasoning-based
+driving
+vision-language-action
+(VLA)
+models
+propose
+multiple
+candidate
+trajectories
+at
+each decision, yet only one is executed. Standard evaluation
+scores the best candidate, assuming an oracle selector that
+deployment lacks, and leaves the risk of the executed candidate
+unexamined. Existing online evaluators typically close this gap
+with a purpose-trained scene or world model, often rolling
+out each candidate through it at inference time. We introduce
+AlpaSafe, a risk-aware trajectory selector that reuses the scene
+representation a frozen driving VLA computes while proposing
+its candidates. AlpaSafe reads the last hidden token of the
+VLA’s prompt prefill. A lightweight head, trained on the closed-
+loop simulation outcomes of the candidates, fuses this token
+with each candidate trajectory and predicts a relative score
+and collision/offroad logits. A fixed rule removes candidates
+dominated on the two risk logits and selects the highest-scoring
+candidate among those remaining, adding neither rollouts nor
+VLA training. Experiments on 525 AlpaSim scenes show that
+AlpaSafe outperforms Alpamayo’s default first-sample rule
+and uniform random selection in selected regret and top-1
+agreement, and reduces the collision-at-fault or offroad rate
+from 6.41% and 6.10% to 4.93%. The selector has 1.7M
+parameters and takes 0.75 ms per decision.
+Index Terms—Autonomous driving, closed-loop evaluation,
+risk-aware planning, trajectory selection, vision-language-action
+models
+I. INTRODUCTION
+Reasoning-based vision-language-action (VLA) models are
+increasingly used as end-to-end planners for autonomous driv-
+ing [1–3]. Given a scene and a driving prompt, these models
+can generate multiple plausible trajectory candidates rather
+than committing to a single future. This creates a trajectory se-
+lection problem, because only one candidate can be executed.
+Proposal-based driving systems therefore learn trajectory scor-
+ers or selectors to rank the generated candidates [4]. Best-
+of-K metrics such as minADE@K, however, select the best
+candidate in hindsight and thus mainly measure whether the
+generated set contains a good trajectory. At deployment, the
+system must instead determine which candidate is most likely
+to produce the best closed-loop outcome before any candidate
+is executed.
+Existing online trajectory evaluators commonly address
+this problem through explicit imagination. WoTE [5], for
+example, conditions a BEV world model on each candidate,
+predicts candidate-specific future BEV states, and evaluates
+the trajectory from those imagined outcomes. This makes
+future consequences explicit, but it requires a purpose-trained
+world model and additional candidate-conditioned prediction
+at inference time. Yet a large reasoning-based VLA has already
+integrated the observed scene, driving intent, and interaction
+context while generating its candidate trajectories. It remains
+unknown whether the hidden representation produced during
+this process contains enough scene-specific information to
+evaluate the candidates without explicitly predicting their
+futures.
+To answer this question, we introduce AlpaSafe (Fig. 1),
+a risk-aware trajectory selector for reasoning-based driving
+VLAs. AlpaSafe captures the final-layer hidden states of the
+frozen VLA’s prompt prefill during the same forward pass
+that generates the candidates and reads only the last token,
+a byproduct of generation that requires no additional VLA
+computation. A lightweight head then scores each candidate
+against this token and filters the candidates on predicted
+collision and offroad risk.
+To isolate selection quality, we hold the candidate pool and
+its official closed-loop outcome labels from the AlpaSim simu-
+lator fixed across methods, and learned-selector predictions are
+out of fold at the scene level. Matched ablations that replace
+the last token with a zero token or with the full prefill sequence
+test whether the reused representation matters, and uncertainty
+is reported with paired scene-bootstrap intervals. The selector
+has 1.7M parameters and runs its full selection path in 0.75 ms
+per eight-candidate decision on one GPU, whereas one closed-
+loop candidate rollout in the same simulator takes about 111 s.
+The main contributions of this work are summarized as
+follows:
+• We propose AlpaSafe, a risk-aware trajectory selection
+framework for reasoning-based driving VLAs that reuses
+the last prompt-prefill hidden token of the frozen gener-
+ator, captured in the same forward pass that produces
+the candidates, and requires neither VLA training nor
+inference-time rollouts.
+• We design a risk-aware selector head, a lightweight
+action-conditioned module that scores each candidate
+trajectory with a relative outcome score and colli-
+sion/offroad risk logits, removes the candidates domi-
+1
+arXiv:2611.28509v1  [cs.RO]  21 Nov 2026
+
+
+✗
+✗
+✓
+(a) Frozen Alpamayo-1.5 VLA (10B) — one forward pass, no fine-tuning
+(b) Risk-aware selector head — 1.7M params, shared
+(c) Fixed selection rule
+4 cameras × 4 frames
++ ego history, text prompt
+Cosmos-Reason
+VLM
+reasoning backbone
+flow-matching
+trajectory decoder
+action expert
+10 m
+K=8 candidates τ1, … ,τ8
+prefill hidden states H
+3,086 tokens × 4,096
+h=H[−1]
+∈ℝ4096
+last prefill token
+τi
+h
+trajectory
+encoder
+shared trunk
+scene reader
+K,V←h
+cross-attention
+fusion (×1)
+residual add
+Q
+K,V
+offroad
+oi
+collision
+ci
+score
+si
+selection heads
+training-only heads (unused by the rule)
+group mean ̂mg · future (64×2) · progress
+τ1
+τ6
+dominated
+safer
+offroad oi
+collision ci
+survivors Fg
+τ1
+τ2
+τ3
+τ4
+τ5
+τ6
+τ7
+τ8
+sî
+τ=τargmax
+i∈Fg si
+execute
+❄
+❄
+Fig. 1. AlpaSafe overview. (a) One forward pass of the frozen Alpamayo-1.5 generator yields the K=8 candidate trajectories and the prompt-prefill hidden
+states H; the selector reads only the last token h = H[−1]. (b) The selector head encodes each candidate, fuses it with h through one cross-attention block
+with a residual connection, and outputs a bounded relative score si and collision/offroad logits (ci, oi); the group-mean, future-trajectory, and progress heads
+supervise training only. (c) Candidates dominated on the two risk logits are removed, and the highest si among the survivors is executed. Camera frames,
+candidates, scores, and logits are recorded data from one decision group of the evaluation pool (LASTTOKEN).
+nated on the two risk logits, and selects the highest-
+scoring trajectory among those remaining.
+• Experimental results on AlpaSim scenes demonstrate that
+AlpaSafe outperforms Alpamayo’s default first-sample
+rule and uniform random selection in selected regret
+and top-1 agreement, and reduces the collision-at-fault
+or offroad rate from 6.41% and 6.10% to 4.93%, at only
+0.75 ms per decision.
+II. RELATED WORK
+Driving scenes often admit several valid maneuvers, mo-
+tivating candidate-based formulations that preserve multiple
+plausible trajectories rather than regress a single averaged
+future [6, 7]. End-to-end planners encode the current observa-
+tion using BEV, vectorized, or object-level scene representa-
+tions [8–11], while driving foundation models combine vision-
+language features with generative trajectory decoders [1–
+3, 12]. Once multiple ego trajectories are generated, however,
+planning becomes a selection problem.
+One family of methods scores each candidate directly
+from its geometry and the current scene, without predict-
+ing a candidate-conditioned future at inference time. Early
+neural motion planners learn costs over sampled feasible
+trajectories [13]; subsequent approaches distill metric-specific
+teachers or learn generalized trajectory values and metric sub-
+scores [4, 14–17]. TOAD further treats a learned scorer as the
+objective for test-time trajectory optimization [18]. A central
+distinction among these methods is the scene evidence exposed
+to the scorer. DrivoR uses multi-camera register tokens shared
+by its generation and scoring decoders, while recent studies
+show that intermediate VLA states can support downstream
+driving decisions and trajectory refinement [19–21]. AlpaSafe
+adopts this representation-reuse setting, combining every can-
+didate with a shared representation extracted from a frozen
+driving VLA and learning a per-trajectory score.
+A second family evaluates a candidate only after construct-
+ing evidence about its possible consequences. PDM rolls out
+kinematic proposals against simplified agent forecasts and
+ranks them using hand-designed rules [22]. DTPP replaces
+this fixed evaluation with jointly learned ego-conditioned pre-
+diction and context-aware cost evaluation for tree-structured
+policy candidates [23]. Several world-model methods construct
+richer candidate-conditioned futures: WoTE predicts dense
+future BEV states, SafeDrive represents safety-critical future
+entities in a sparse world, and World4Drive uses an intention-
+aware latent world model to support multimodal trajectory
+selection [5, 24, 25]. Foundation-model approaches instead
+employ a generative VLM reward model or a VLA critic to
+evaluate and refine proposed trajectories [26, 27].
+The principal distinction is therefore whether selection
+requires constructing a candidate-conditioned future world at
+decision time, not whether future prediction is used as a train-
+ing signal. WPT removes the inference-time cost by distilling
+world-model guidance into a lightweight policy and discarding
+the world model at deployment [28]. AlpaSafe uses conse-
+quence supervision to train a per-trajectory scorer and event-
+risk heads rather than the trajectory-generation policy: each
+candidate is evaluated directly against the frozen VLA scene
+representation, and no candidate-conditioned future world is
+predicted at inference time.
+III. METHODOLOGY
+Fig. 1 gives an overview of AlpaSafe: one forward pass of
+the frozen VLA yields both the K candidate trajectories and
+the prefill hidden states, and the selector pairs the last token
+of those states with each candidate.
+A. Problem Setting
+We work in AlpaSim, a high-fidelity closed-loop driv-
+ing simulator in the tradition of public closed-loop bench-
+2
+
+
+marks [29–31], whose official scene score y ∈[0, 1] aggre-
+gates safety, compliance, and progress into a single scalar
+per rollout. Each scene contributes three decision groups at
+staggered decision times. For each group, the frozen 10B-
+parameter generator Alpamayo-1.5, a reasoning VLM coupled
+to a trajectory decoder (Fig. 1a), samples K=8 candidate
+trajectories from one prompt prefill. Every candidate is then
+executed in closed loop and receives its own official score,
+giving 24 scoring rollouts per scene. In our data the official
+score equals zero when collision-at-fault or offroad occurs and
+otherwise equals the simulator’s progress_score. Each
+rollout also carries separate collision-at-fault and offroad event
+labels.
+Given a group g with candidates τ1, . . . , τK and scores
+y(τk), a selector π commits to ˆτ = π(g). We evaluate two
+primary quantities: selected regret, regret(g) = maxk y(τk)−
+y(ˆτ), the selected candidate’s gap from the oracle outcome,
+for which lower is better, and tie-aware top-1 agreement,
+1[ y(ˆτ) ≥maxk y(τk) −ϵ ] with ϵ = 10−6, for which higher
+is better. Both are averaged over the groups of a scene and
+then equally over scenes (scene-macro mean).
+B. Same-Prefill Representation Extraction
+A representation-reuse claim is confounded if the repre-
+sentation could come from a different forward pass than the
+candidates, for example a different context window, differ-
+ent preprocessing, or a silently re-run prefill. We eliminate
+this by construction. A capture hook inside the production
+predict() path records the final transformer layer’s post-
+normalization hidden states of the prompt prefill, H
+∈
+R3086×4096, during the same call that samples the K can-
+didates (Fig. 2); the prefill length is the same for every
+group. An exactly-one-prefill assertion makes a second prefill
+in the call fail the capture rather than silently substitute
+context. The scene vector used at deployment is the last
+row, h = H[−1] ∈R4096. Capture-time SHA-256 hashes of
+both tensors establish bit-exact provenance, with h ≡H[−1]
+verified for every group, and every downstream artifact, from
+training tables to locked predictions and analysis records,
+carries these hashes forward. Candidates and representation
+are therefore co-produced, and the closed-loop scores remain
+linked to the corresponding candidates.
+C. Risk-Aware Selector Head
+The AlpaSafe head has 1,708,871 trainable parameters and
+scores each candidate independently; the frozen VLA receives
+no gradients (Fig. 1). There is no cross-candidate attention, so
+scores are K-invariant and permutation-equivariant by con-
+struction. We verify that off-diagonal cross-candidate gradients
+are exactly zero and that scores are bit-identical whether a
+candidate is scored alone or in a batch. Fig. 3 expands panel
+(b) of Fig. 1. We compare three scene-input variants of this
+head: LASTTOKEN, the proposed selector, reads only h; FULL
+reads all rows of H; and NULL reads a zero vector. All widths
+below were fixed before any evaluation-pool training and are
+shared by the three variants. Throughout, vectors are columns,
+camera tokens (4 cameras × 4 frames)
+ego history
+text prompt
+L=3,086 prefill tokens
+frozen Alpamayo-1.5 VLA (10B)
+— one production predict( ) call
+Cosmos-Reason
+VLM
+prompt prefill
+K=8 sampled CoC
+reasoning rollouts
+one KV cache each
+flow-matching
+action expert
+trajectory decoder
+prefill hidden states H
+final layer, 3,086×4,096
+h=H[−1]∈ℝ4096
+last prefill token
+the only representation
+the selector reads
+10 m
+K=8 candidates τ1, … ,τ8
+64 waypoints ⋅ 6.4 s each
+❄
+Fig. 2. Same-prefill representation extraction. One production predict()
+call per decision group runs one prompt prefill (camera, ego-history, and text
+tokens) through the frozen generator and yields two products of that forward
+pass: the K=8 candidates, decoded by the flow-matching action expert from
+K sampled chain-of-causation (CoC) reasoning traces, and the final-layer
+hidden states H of the 3,086-token prefill. The selector consumes only the
+last row h = H[−1]. The candidates shown are the recorded outputs of the
+decision group in Fig. 1.
+τi
+ℝ64×2
+h
+ℝ4096
+waypoint
+tokenizer
+Linear
++ pos. emb.
+factorized
+projector
+LN · Linear
+GELU · Linear
+[q0;e0;x1:64]
+ℝ66×128
+M
+M∈ℝT×192
+Transformer
+encoder ×3
+pre-norm, 4 heads
+d=128
+key / value
+projection
+LN · Linear
+cross-attention
+fusion
+LN · Linear
+Multi-head attention
+Feed-forward
+Linear
+zi
+K,V
+δĩ
+zi =zi +δi ∈ℝ128
+offroad
+Linear
+oi
+collision
+Linear
+ci
+score
+Linear · tanh
+si
+selection heads
+Fig. 3. Expanded view of the selector head, panel (b) of Fig. 1. Blue marks
+the products of the frozen generator (τi, h); the other blocks are trained:
+yellow runs per candidate, red is the scene reader, computed once per group,
+and green marks the heads read by the rule of panel (c). The scene memory
+M has one row for LASTTOKEN and 3,086 rows for FULL, and ⊕denotes
+a residual add.
+a token sequence is a matrix with one token per row, LN
+denotes layer normalization, and every linear map carries a
+bias that we omit from the notation.
+a) Trajectory encoder: A candidate τi consists of 64
+normalized waypoints τi,t ∈R2. Each waypoint is embedded
+by a shared linear map with a learned positional embedding,
+a learned read-out token q0 and a constant placeholder token
+e0 are prepended, and the 66 tokens are encoded jointly:
+xi,t = Wtok τi,t + epos
+t
+,
+t = 1, . . . , 64,
+[ zi; · ; Zi ] = Enc
+ [ q0; e0; xi,1; . . . ; xi,64 ]
+
+.
+(1)
+Here Enc is three pre-norm Transformer encoder layers (4
+heads, width 128, feed-forward 256, GELU, dropout 0.1)
+3
+
+
+followed by a final LayerNorm. Its output at the read-out
+position is the candidate latent zi ∈R128, its outputs at the
+64 waypoint positions are the waypoint states Zi ∈R64×128,
+and its output at the placeholder position is discarded. The
+placeholder receives a fixed vector in place of a scene token,
+so the encoder is scene-free and the scene reaches a candidate
+only through the fusion block.
+b) Scene reader: Once per group, the scene input is
+projected to a memory through a width-64 bottleneck. Let
+h1, . . . , hT ∈R4096 be the visible rows of H: the single row
+h for LASTTOKEN (T=1), all T=3,086 rows for FULL, and
+one zero row for NULL. Then
+mt = Wup GELU
+ Wdn LN(ht)
+
+,
+t = 1, . . . , T,
+(2)
+with Wdn ∈R64×4096 and Wup ∈R192×64, and the rows mt
+form the memory M = [ m1; . . . ; mT ] ∈RT ×192.
+c) Fusion: A single pre-norm cross-attention block with
+residual connections lets each candidate query the memory,
+and the result is added back to the candidate’s encoder states:
+ui = Win zi,
+u′
+i = ui + MHA
+ LN(ui), LN(M)
+
+,
+δi = Wout
+ u′
+i + FFN(LN(u′
+i))
+
+,
+˜zi = zi + δi,
+˜Zi = Zi + 1 δ⊤
+i .
+(3)
+Here Win ∈R192×128 lifts the latent to the reader width,
+MHA(a, B) is six-head scaled dot-product attention (head
+width 32) of a query a over the rows of B with linear query,
+key, value, and output projections, FFN is a 192 →384 →
+192 GELU network, and Wout ∈R128×192 maps back to
+δi ∈R128. The all-ones vector 1 ∈R64 adds δi to every
+waypoint state. For LASTTOKEN the memory has one row, so
+the attention weights are identically one and the block reduces
+to adding one projection of h to every candidate query ui,
+followed by the residual FFN; the same graph over T=3,086
+rows is the FULL ablation, which keeps the variants parameter-
+matched.
+d) Output heads: The three selection-path heads are
+linear in the fused latent,
+ˆri = w⊤
+r ˜zi,
+ci = w⊤
+c ˜zi,
+oi = w⊤
+o ˜zi,
+(4)
+giving the per-candidate score residual ˆri, whose head is
+zero-initialized, and the collision and offroad logits ci and
+oi. Three further outputs are used only during training: the
+progress ˆpi = w⊤
+p ˜zi, the future correction ∆i = ˜ZiW ⊤
+fut ∈
+R64×2 from the waypoint states, and the group mean ˆmg =
+w⊤
+m tanh
+ Wgrp LN(¯h)
+
+from the mean ¯h =
+1
+T
+P
+t ht of the
+visible rows (¯h = h for LASTTOKEN), which never sees a
+candidate. The parameters split into 0.94M for the trajectory
+encoder (0.53M of them in the placeholder token’s adapter),
+0.63M for the scene reader and fusion block, 0.14M for the
+group-mean branch, and 774 for the five linear output heads.
+e) Score decomposition and selection rule: The official
+score mixes the group’s overall difficulty with each candidate’s
+relative quality, so we decompose the score prediction as
+ˆyi = ˆmg + si,
+si = S tanh
+ ˆri/S
+
+,
+(5)
+where ˆmg is the group-mean prediction, si is the bounded
+candidate-relative score obtained from the residual ˆri, and
+the bound S=0.67, frozen from development-set residual
+statistics, keeps the residual inside the empirically observed
+spread. Candidate j dominates i when cj ≤ci and oj ≤oi,
+with at least one strict inequality. Let Fg contain the candidates
+not dominated by another candidate in the group. The selection
+rule is
+i⋆= arg max
+i∈Fg
+si,
+(6)
+with exact score ties resolved by the smallest candidate index,
+and the selected trajectory is ˆτ = τi⋆. Fg is never empty,
+so exactly one candidate is selected without a fallback. The
+rule compares raw logits, uses no risk threshold or fusion
+weight, and ignores the group-mean offset, which is constant
+within a group. The risk heads are trained with weighted
+binary cross-entropy, so their sigmoid outputs are not treated
+as calibrated probabilities, and non-dominance is a comparison
+among predicted risks, not an absolute safety guarantee. The
+same rule is applied to all three variants.
+D. Training Objective
+The three variants are trained with the same objective. For
+a group g, write yi = y(τi) for the official score of candidate
+i and ¯yg =
+1
+K
+P
+i yi for the group mean. The objective is a
+fixed weighted sum of seven terms,
+L = 1.0 Lrank + 0.5 Lcentered + 0.1 Lgroup-mean
++ 0.25 Lfuture + 0.1 Lprogress
++ 0.1 Lcollision + 0.1 Loffroad,
+(7)
+whose coefficients, target scales, and checkpoint rule were
+fixed on the development set before any evaluation-pool train-
+ing. Regression terms use the SmoothL1 loss ρβ(d) = d2/(2β)
+for |d| < β and |d| −β/2 otherwise.
+a) Score terms: The first three terms supervise the de-
+composed score of (5). Lrank is a margin-weighted pairwise
+logistic loss on the bounded relative scores si. Let P be
+the candidate pairs (i, j) of the groups in a mini-batch with
+|yi −yj| > 10−6; exact ties are excluded. Then
+Lrank =
+X
+(i,j)∈P
+˜wij softplus
+ −sgn(yi −yj) (si −sj)
+
+, (8)
+with ˜wij = |yi −yj|/ P
+P |yi −yj|, so pairs with a large
+outcome gap dominate and any per-group offset cancels.
+Ranking alone leaves the scale of si free, so Lcentered =
+1
+K
+P
+i ρβc
+ si−(yi−¯yg)
+
+regresses si onto the group-centered
+official score, and Lgroup-mean = ρβm( ˆmg −¯yg) supervises
+the candidate-independent group-mean head, so that between-
+group difficulty is absorbed by ˆmg rather than by si. The
+4
+
+
+knees match the empirical scale of each target: βc = 0.075 is
+the mean within-group standard deviation of the official score
+and βm = 0.243 its between-group standard deviation. Typical
+errors then fall in the linear regime of ρβ, so the per-candidate
+gradients of Lrank and Lcentered have matched magnitude at ini-
+tialization and the coefficients in (7) approximate the realized
+gradient ratios; with the default β = 1 the realized rank-to-
+centered ratio would be more than ten times the stated 2:1.
+b) Future, progress, and risk terms: The last four terms
+supervise the heads of Section III-C from the executed rollout
+of each candidate. The future head predicts a 64×2 correction
+∆i to the planned waypoints, and Lfuture is the elementwise ρ1
+between τi + ∆i and the executed ego positions over the 64
+simulation steps after the decision, in the ego frame at decision
+time, averaged over the valid steps of the K candidates.
+Lprogress = 1
+K
+P
+i ρ1(ˆpi −pi) regresses the simulator’s clipped
+relative route progress pi ∈[0, 1] of the rollout. Lcollision
+and Loffroad are binary cross-entropy with logits on the per-
+candidate collision-at-fault and offroad labels, with the positive
+class weighted by nneg/npos of the fold’s training candidates
+(about 43 and 24, as 289 and 496 of the 12,600 rollouts are
+positive).
+c) Optimization: Each variant is trained with AdamW
+(learning rate 3 × 10−4, weight decay 10−4) and gradient
+clipping at 1.0, two groups per mini-batch with four-step
+gradient accumulation, for at most 100 epochs with patience
+20. Pairs in (8) are pooled across the groups of a mini-batch;
+every other term is averaged over them. The checkpoint is
+chosen on the inner-validation split only: among the epochs
+whose pairwise ranking accuracy is within 0.01 of the running
+best, the one with the lowest selected regret is kept, with ties
+broken by lower best-versus-second inversion rate, higher top-
+1 agreement, higher best-versus-rest pairwise accuracy, and the
+earlier epoch; early stopping uses the same key.
+E. Evaluation Protocol
+Training and evaluation use five-fold cross-validation with
+one scene-level partition shared by all learned selectors;
+each fold has 357 training, 63 inner-validation, and 105
+test scenes. Every scene is scored by the model that held
+it out. The selection rule in (6) was adopted after earlier
+outcome analyses on these scenes. It is applied to the stored
+out-of-fold relative scores and collision/offroad logits, with
+model weights and predictions unchanged. The common-pool
+comparison is therefore exploratory rather than an independent
+confirmatory test. Uncertainty estimates use a paired scene
+percentile bootstrap with 10,000 resamples that keeps all
+groups of a sampled scene together. The 95% intervals are
+pointwise, without multiple-comparison correction, and we
+call a difference supported when its interval excludes zero.
+IV. EXPERIMENTS
+A. Experimental Setup
+Every selection rule and learned ablation is compared on the
+same evaluation pool of 525 scenes, 1,575 decision groups,
+and 12,600 scored candidates, with identical candidates and
+TABLE I
+RESULTS ON ALL 525 SCENES AND 1,575 GROUPS, WITH K=8. SCORE IS
+THE SELECTED CANDIDATE’S TRUE OFFICIAL SCORE, AND ALL VALUES
+ARE SCENE-MACRO MEANS.
+Selector
+Regret ↓Top-1 ↑Score ↑
+Alpamayo default
+0.0611
+0.239
+0.5635
+Uniform random
+0.0586
+0.238
+0.5660
+LASTTOKEN (ours)
+0.0512
+0.348
+0.5734
+LT−
+Default
+LT−
+Random
+LT−
+Null
+Full−
+LT
+Full−
+Null
+-0.020
+-0.015
+-0.010
+-0.005
+0.000
+0.005
+Δ regret (↓ better)
+-0.0099
+-0.0074
+-0.0023
+-0.0018
+-0.0041
+Fig. 4.
+Paired regret differences on 525 shared scenes. Bars show mean
+differences and whiskers show 95% scene-bootstrap intervals. Blue bars with
+a solid outline mark intervals excluding zero, all favoring the first-named rule;
+gray bars with a dashed outline mark intervals including zero. Negative values
+favor the first-named rule. LT denotes LASTTOKEN.
+LT−
+Default
+LT−
+Random
+LT−
+Null
+Full−
+LT
+Full−
+Null
+-0.04
+0.00
+0.04
+0.08
+0.12
+0.16
+Δ top-1 (↑ better)
++0.1084
++0.1094
++0.0032
++0.0112
++0.0144
+Fig. 5. Paired top-1 differences on the same 525 scenes. Positive values favor
+the first-named rule; other conventions follow Fig. 4.
+official outcome labels. A separate 122-scene development set
+was used for architecture and objective design, and a further
+35-scene reserve remains sealed and unused.
+We report selected regret, tie-aware top-1 agreement, mean
+official score, and event rates at K=8. The event rates are the
+collision rate, the offroad rate, and the either-event rate, the
+scene-macro proportions of selections that end in collision-at-
+fault, in offroad, or in either. The statistical unit is the scene
+(n=525), not the group or the candidate. Rollouts that end
+in collision or offroad are valid zero-score outcomes and are
+retained.
+5
+
+
+LastToken (ours)
+candidate 3, official score 0.849, no recorded event
+Alpamayo default
+candidate 0, official score 0.000, at-fault collision
+Uniform random
+candidate 7, official score 0.000, at-fault collision
+Fig. 6. Recorded outcomes for one evaluation-pool decision group, 3.8 s after the decision. Each panel shows the top-down view with metric summary above
+the front camera. Orange (light gray in grayscale print) marks the executed trajectory and green (mid gray) the navigation route and, in the top-down view,
+the recorded human drive. LASTTOKEN selects the only one of the eight candidates without a recorded safety failure. The groups in Figs. 6 to 8 were chosen
+retrospectively for camera legibility and show individual selections, not average performance.
+LastToken (ours)
+candidate 6, official score 0.602, no recorded event
+Full
+candidate 5, official score 0.580, no recorded event
+Null
+candidate 1, official score 0.000, at-fault collision
+Fig. 7. Recorded outcomes for the scene-information ablation, 6.1 s after the decision, with conventions as in Fig. 6. NULL has selected the only colliding
+candidate of its group, whereas LASTTOKEN and FULL selected event-free candidates.
+B. Comparison with Default and Random Selection
+Default executes candidate index zero, as in the reference
+Alpamayo driver. Uniform random selects among the same
+eight candidates with a fixed pseudo-random draw per group,
+repeated three times. The three draws select from the same
+cached candidates and are not independently sampled test
+sets; we average their metrics within each scene before scene-
+level aggregation. Table I reports the three selection rules.
+LASTTOKEN lowers regret by 0.0099 relative to default and
+by 0.0074 relative to random, and raises top-1 agreement by
+0.11 relative to each. All four differences are supported; Figs. 4
+and 5 show them with 95% scene-bootstrap intervals, together
+with the ablation differences discussed below. This comparison
+measures selection from fixed candidates with cached closed-
+loop labels; it does not evaluate repeated online replanning
+under the learned selector. Fig. 6 shows one group from
+this pool in which LASTTOKEN executes the only candidate
+without a recorded safety failure, while the default and random
+selections each end in an at-fault collision.
+C. Safety Outcomes
+The either-event rate is 4.93% for LASTTOKEN, 6.41%
+for default, and 6.10% for random. The differences, −1.48
+6
+
+
+LastToken (ours)
+candidate 2, official score 0.656, no recorded event
+Full
+candidate 7, official score 0.000, off-road
+Null
+candidate 1, official score 0.000, off-road
+Fig. 8. Recorded outcomes for the last-token versus full-sequence comparison, 5.2 s after the decision, with conventions as in Fig. 6. The candidates selected
+by FULL and NULL have left the road, whereas the LASTTOKEN selection has not.
+TABLE II
+MATCHED SCENE-INPUT ABLATIONS, WITH SCENES, GROUPS, AND
+COLUMNS AS IN TABLE I. ONLY THE SCENE INPUT DIFFERS: THE LAST
+TOKEN FOR LASTTOKEN, ONE ZERO TOKEN FOR NULL, AND ALL 3,086
+TOKENS FOR FULL.
+Selector
+Regret ↓Top-1 ↑Score ↑
+LASTTOKEN (ours)
+0.0512
+0.348
+0.5734
+NULL
+0.0536
+0.345
+0.5710
+FULL
+0.0494
+0.359
+0.5752
+percentage points versus default and −1.16 points versus
+random, are both supported. LASTTOKEN’s separate collision
+and offroad rates are 1.57% and 3.37%; taken separately,
+the collision decrease versus default and the offroad decrease
+versus random are not supported.
+Official-score optimization and event-rate minimization are
+different objectives even though an event zeros the official
+score. Filtering can remove a candidate with a higher relative
+score, so event rates must be read together with regret and
+official score. Across all LASTTOKEN selections, the mean
+retained-set size is 2.212 of the eight candidates, and no final-
+score ties occur.
+D. Matched Ablations: Scene Information
+Table II reports the three matched selectors. NULL replaces
+the scene representation by one zero token and is other-
+wise identical to LASTTOKEN, so the comparison isolates
+the scene information available to the selector. LASTTOKEN
+minus NULL gives regret −0.0023 and top-1 +0.003; neither
+difference is supported (Figs. 4 and 5). The event rates do
+differ: with the last token, the collision rate is lower by 0.66
+percentage points and the either-event rate by 0.72 points, and
+both differences are supported. Fig. 7 shows a group in which
+TABLE III
+COST OF ONE EIGHT-CANDIDATE DECISION: CLOSED-LOOP SIMULATION
+OF EVERY CANDIDATE VERSUS THE LASTTOKEN SELECTION PATH. BOTH
+COLUMNS WERE MEASURED ON THE SAME NVIDIA RTX PRO 6000
+GPU. SIMULATION ENTRIES USE THE MEDIAN OF 24 CANDIDATE
+ROLLOUTS (104.5 S) PLUS OFFICIAL SCORING (6.8 S); THE SELECTOR
+ENTRY IS THE MEDIAN OVER 315 HELD-OUT GROUPS. A ROLLOUT
+CANNOT BE SPLIT ACROSS GPUS, SO ONE ROLLOUT BOUNDS THE
+SIMULATION LATENCY FROM BELOW.
+Simulation
+LASTTOKEN
+Work per decision
+8 rollouts + scoring
+1 forward + filter
+Time, one worker
+≈891 s
+0.75 ms
+Floor, unlimited GPUs
+≈111 s
+0.75 ms
+NULL selects the only colliding candidate of the eight while
+LASTTOKEN and FULL select event-free candidates.
+E. Last Token versus Full Sequence
+FULL reads all 3,086 prefill tokens and LASTTOKEN only
+the final one. FULL minus LASTTOKEN gives regret −0.0018
+and top-1 +0.011; neither difference is supported, and the
+intervals do not establish equivalence either. FULL has a higher
+collision rate, by 0.57 percentage points (supported), whereas
+the either-event difference of +0.42 points is not supported.
+The remaining comparison in Figs. 4 and 5, FULL minus
+NULL, gives regret −0.0041 and top-1 +0.014; only the regret
+difference is supported. Fig. 8 shows a group in which the
+candidates selected by FULL and NULL leave the road while
+LASTTOKEN selects an event-free candidate.
+F. Deployment Cost
+Table III compares the measured cost of one LASTTOKEN
+decision with the cost of evaluating the same eight candidates
+by closed-loop simulation. The complete selection path, from
+7
+
+
+trajectory normalization through the forward pass, the two-
+risk filter, and the argmax, takes 0.75 ms per eight-candidate
+group on one GPU, with a tail latency of 0.77 ms, and 4.53 ms
+on one CPU thread, and it reproduces the frozen predictions
+and selections exactly. Its scene input is one 4096-dimensional
+vector, compared with 3086 × 4096 values for FULL at the
+same parameter count. Simulating the same eight candidates
+takes about 891 s serially, and even with unlimited parallel
+hardware its latency stays above one rollout, about 111 s.
+This is a cost comparison, not an equivalence of quality:
+the simulator returns the executed outcome and the selector
+a learned prediction. It excludes candidate generation and
+the capture of h, and the simulation timings come from our
+offline acquisition pipeline rather than an optimized production
+simulator.
+V. CONCLUSION
+We presented AlpaSafe, a risk-aware trajectory selector
+that reads the last hidden token of a frozen driving VLA’s
+prompt prefill, filters candidates on predicted collision and
+offroad risk, and adds neither VLA training nor inference-
+time rollouts. On a fixed pool of 525 scenes with eight
+candidates per group, it obtains lower selected regret, higher
+top-1 agreement, and a lower collision-at-fault or offroad rate
+than both Alpamayo’s default first-sample rule and uniform
+random selection. Matched ablations on the same pool show
+that a scene-blind input raises the event rate, whereas reading
+the full prefill sequence instead of its last token yields no
+supported gain in regret or top-1 agreement.
+The selection rule was adopted on previously evaluated
+scenes, and the comparisons rely on pointwise intervals with-
+out multiple-comparison correction, so the results are ex-
+ploratory rather than confirmatory. Risk filtering can sacrifice
+official-score performance, and non-dominated predictions do
+not guarantee safety. The results also rest on cached closed-
+loop outcomes of fixed candidates and do not cover repeated
+online replanning. In future work, we will evaluate the selector
+under online replanning and explore whether the last-token
+representation, paired with a candidate trajectory, can seed a
+rollout in the style of a world model.
+REFERENCES
+[1] X. Tian et al., “DriveVLM: The convergence of autonomous driving and
+large vision-language models,” in CoRL, vol. 270, 2025, pp. 4698–4726.
+[2] J.-J. Hwang et al., “EMMA: End-to-end multimodal model for au-
+tonomous driving,” arXiv preprint arXiv:2410.23262, 2024.
+[3] NVIDIA et al., “Alpamayo-R1: Bridging reasoning and action prediction
+for generalizable autonomous driving in the long tail,” arXiv preprint
+arXiv:2511.00088, 2025.
+[4] E. Kirby et al., “Driving on registers,” in CVPR, 2026, pp. 32 058–
+32 069.
+[5] Y. Li, Y. Wang, Y. Liu, J. He, L. Fan, and Z. Zhang, “End-to-end driving
+with online trajectory evaluation via BEV world model,” in ICCV, 2025,
+pp. 27 137–27 146.
+[6] Y. Chai, B. Sapp, M. Bansal, and D. Anguelov, “MultiPath: Multiple
+probabilistic anchor trajectory hypotheses for behavior prediction,” in
+CoRL, vol. 100, 2020, pp. 86–99.
+[7] T. Phan-Minh, E. C. Grigore, F. A. Boulton, O. Beijbom, and E. M.
+Wolff, “CoverNet: Multimodal behavior prediction using trajectory sets,”
+in CVPR, 2020, pp. 14 062–14 071.
+[8] Y. Hu et al., “Planning-oriented autonomous driving,” in CVPR, 2023,
+pp. 17 853–17 862.
+[9] B. Jiang et al., “VAD: Vectorized scene representation for efficient
+autonomous driving,” in ICCV, 2023, pp. 8340–8350.
+[10] S. Chen et al., “VADv2: End-to-end vectorized autonomous driving via
+probabilistic planning,” arXiv preprint arXiv:2402.13243, 2024.
+[11] K. Renz, K. Chitta, O.-B. Mercea, A. S. Koepke, Z. Akata, and
+A. Geiger, “PlanT: Explainable planning transformers via object-level
+representations,” in CoRL, vol. 205, 2023, pp. 459–470.
+[12] H. Shao et al., “LMDrive: Closed-loop end-to-end driving with large
+language models,” in CVPR, 2024, pp. 15 120–15 130.
+[13] W. Zeng, S. Wang, R. Liao, Y. Chen, B. Yang, and R. Urtasun, “End-
+to-end interpretable neural motion planner,” in CVPR, 2019, pp. 8660–
+8669.
+[14] Z. Li et al., “Hydra-MDP: End-to-end multimodal planning with multi-
+target hydra-distillation,” arXiv preprint arXiv:2406.06978, 2024.
+[15] ——, “Generalized trajectory scoring for end-to-end multimodal plan-
+ning,” arXiv preprint arXiv:2506.06664, 2025.
+[16] W. Yao et al., “DriveSuprim: Towards precise trajectory selection for
+end-to-end planning,” in AAAI, vol. 40, no. 14, 2026, pp. 11 910–11 918.
+[17] S. Ang, Y. Yang, C. Chen, and Y. Wang, “CLOVER: Closed-loop value
+estimation and ranking for end-to-end autonomous driving planning,”
+arXiv preprint arXiv:2605.15120, 2026.
+[18] Y. Xu et al., “Test-time trajectory optimization for autonomous driving,”
+arXiv preprint arXiv:2606.07170, 2026.
+[19] G. Ling, L. Yang, H. Yang, and Z. Huang, “BLUE: Toward better
+language use in efficient vision-language-action models for autonomous
+driving,” arXiv preprint arXiv:2606.08684, 2026.
+[20] H. Babu, B. Coors, C. Lang, H. Berkemeyer, T. Asfour, and S. Foell,
+“Depth-wise probing and pruning of the planning token in a driving
+vision-language-action model,” arXiv preprint arXiv:2608.07361, 2026,
+accepted at the 6th DriveX Workshop, ECCV 2026.
+[21] C. Yang et al., “LWDrive: Layer-wise world-model-guided vision-
+language model planning for autonomous driving,” arXiv preprint
+arXiv:2606.29879, 2026.
+[22] D. Dauner, M. Hallgarten, A. Geiger, and K. Chitta, “Parting with
+misconceptions about learning-based vehicle motion planning,” in CoRL,
+vol. 229, 2023, pp. 1268–1281.
+[23] Z. Huang, P. Karkus, B. Ivanovic, Y. Chen, M. Pavone, and C. Lv,
+“DTPP: Differentiable joint conditional prediction and cost evaluation
+for tree policy planning in autonomous driving,” in ICRA, 2024, pp.
+6806–6812.
+[24] J. Kim, J. Oh, S. Yu, H. Shin, D. Kwak, and J. W. Choi, “SafeDrive:
+Fine-grained safety reasoning for end-to-end driving in a sparse world,”
+in CVPR, 2026, arXiv:2602.18887.
+[25] Y. Zheng et al., “World4Drive: End-to-end autonomous driving via
+intention-aware physical latent world model,” in ICCV, 2025, pp.
+28 632–28 642.
+[26] Q. Chen et al., “DriveReward: A comprehensive dataset and generative
+vision-language reward model for autonomous driving,” arXiv preprint
+arXiv:2606.08525, 2026.
+[27] L. Yang, J. Huang, Z. Huang, S. Liu, and H. Yang, “Judge, then drive: A
+critic-centric vision language action framework for autonomous driving,”
+arXiv preprint arXiv:2604.27366, 2026.
+[28] G. Jiang et al., “WPT: World-to-policy transfer via online world model
+distillation,” in CVPR, 2026, pp. 17 842–17 852.
+[29] H. Caesar et al., “nuPlan: A closed-loop ML-based planning benchmark
+for autonomous vehicles,” arXiv preprint arXiv:2106.11810, 2021.
+[30] D. Dauner et al., “NAVSIM: Data-driven non-reactive autonomous
+vehicle simulation and benchmarking,” in NeurIPS, vol. 37, 2024, pp.
+28 706–28 719.
+[31] X. Jia, Z. Yang, Q. Li, Z. Zhang, and J. Yan, “Bench2drive: Towards
+multi-ability benchmarking of closed-loop end-to-end autonomous driv-
+ing,” in NeurIPS, vol. 37, 2024, pp. 819–844.
+8

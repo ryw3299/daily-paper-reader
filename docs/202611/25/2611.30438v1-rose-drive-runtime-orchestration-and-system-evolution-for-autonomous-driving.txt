@@ -1,0 +1,2516 @@
+ROSE-Drive: Runtime Orchestration and System Evolution
+for Autonomous Driving
+Qihang Huang1
+Zhidong Wang1
+Zirui Li1
+YuJie Yan1
+Jingsong Liang1
+Shiyu Fang2
+Collister Chua1
+Zhan Chen1
+Chen Lv1*
+1Nanyang Technological University
+2Tongji University
+(a) Orchestration & evolution
+Model-centric
+Observations
+Driving model
+World
+Actions
+Optimize the model
+System-centric
+ROSE-Drive
+Runtime orchestration
+Select / Compose / Schedule
+Observations
+World
+Actions
+Calls
+Results
+Harnessed capabilities
+Frozen models
+Skills
+Tools
+Optimize the system
+SimLingo
+89.1
+TransFuser++
+90.0
+AutoMoT
+92.7
+67.3
+67.3
+75.5
+SimLingo
+92.0
+BridgeDrive
+96.5
+AutoMoT
+89.0
+67.2
+85.0
+64.0
+0
+20
+40
+60
+Model
+Stage 1
+Stage 2
+Stage 3
+25
+36
+44
+52
+(b) Driving performance
+Model
++ ROSE-Drive
+Bench2Drive v0.0.3
+SR (%)
+Fail2Drive
+SR (%)
+Longest6 transfer
+DS
+Figure 1. System orchestration and accumulated gains. (a) ROSE-Drive selects, combines, and schedules models, skills, and tools.
+System evolution refines skill implementations and coordination without retraining the driving model or VLM. (b) Success-rate gains on
+Bench2Drive v0.0.3 and Fail2Drive, and stage-wise driving scores on Longest6 with AutoMoT fixed.
+Abstract
+End-to-end driving models have made substantial progress,
+yet reliable closed-loop driving in complex traffic remains
+challenging. Beyond improving individual models, system-
+level orchestration offers a complementary approach by coor-
+dinating driving capabilities and computation. We introduce
+ROSE-Drive (Runtime Orchestration and System Evolution),
+a model-agnostic framework that jointly orchestrates driving
+execution and computation. It coordinates frozen driving
+models with driving skills, perception tools, and feedback
+controllers. A distilled vision–language model (VLM) pro-
+poses driving tasks and scene relations. Shared physical
+state and persistent tasks support capability composition,
+task continuity, and adaptive scheduling. The orchestra-
+tor combines model and skill outputs across control chan-
+*Corresponding author.
+nels, maintains task responsibility through handover, and
+uses execution feedback to select controllers, reuse valid
+motion references, and schedule model inference. Offline
+revisions use execution records to refine skills and their coor-
+dination through a stable task interface. Successive system
+stages inherit these revisions while model, perception, and
+VLM weights remain fixed. Evaluations with four driving
+models on Bench2Drive v0.0.3, Bench2Drive v0.0.4, and
+Fail2Drive show accumulated capability and transfer before
+target-benchmark revision. On held-out Longest6, driving
+score (DS) rises from 25 to 52 for AutoMoT and from 22 to
+47 for SimLingo across system stages, while both systems
+skip new model inference on over 71% of control steps.
+1
+arXiv:2611.30438v1  [cs.RO]  23 Nov 2026
+
+
+1. Introduction
+End-to-end driving policies have made substantial progress
+across diverse traffic scenarios [6, 14, 17, 22, 31]. Beyond
+improving individual policies, a complementary direction is
+to coordinate their use with driving skills, perception tools,
+and feedback controllers at the system level. A runtime har-
+ness exposes these capabilities through common interfaces.
+System-level orchestration determines how their contribu-
+tions are combined and when new computation is needed.
+The central difficulty is coordinating these choices
+throughout an ongoing maneuver. A skill can regulate speed
+while retaining a compatible model path. When the model
+supplies both motion channels, persistent tracking error can
+trigger a controller change. A navigation change can prompt
+a new model call. The maneuver may also need to continue
+after the latest scene assessment no longer requests it. These
+decisions require task state that persists across changing
+observations and capability outputs.
+We introduce ROSE-Drive, a model-agnostic framework
+that jointly orchestrates driving execution and computation
+(Fig. 1). A distilled vision–language model (VLM) proposes
+driving tasks and scene relations. The orchestrator binds
+these proposals to observed objects and road regions to form
+task requests. Shared physical state and persistent tasks
+guide capability composition, task continuity, and adaptive
+scheduling. These mechanisms determine which outputs to
+combine, how to maintain responsibility through a maneuver,
+and when computation is needed.
+A shared task interface also supports cumulative improve-
+ment. Skills address physical requirements that recur across
+benchmarks, including traffic-interaction timing and obsta-
+cle clearance. Current geometry and motion determine each
+task’s constraints, allowing the same implementation to han-
+dle different objects and layouts. The VLM’s relation vocab-
+ulary and skill families stay fixed as execution records guide
+offline improvements to skill implementations and orchestra-
+tion rules. Successive system versions, called stages, inherit
+these improvements.
+We study four frozen models across Bench2Drive v0.0.3,
+v0.0.4, and Fail2Drive, including transfer before target-
+specific revision. Longest6 is reserved for evaluating frozen
+systems throughout this process. AutoMoT’s driving score
+(DS) progresses from 25 alone to 36, 44, and 52 across sys-
+tem stages, while SimLingo progresses from 22 to 36, 39,
+and 47. Both systems skip model inference on over 71% of
+Longest6 control steps. Our contributions are:
+• Model-Agnostic Runtime Framework. We introduce a
+unified architecture that connects frozen driving models,
+skills, perception tools, and feedback controllers through
+shared physical state and a common task interface. Model
+adapters preserve each model’s inputs and outputs while
+making it available to the same runtime.
+• Coordinated Execution and Scheduling. The orchestra-
+tor combines model and skill outputs across control chan-
+nels while persistent tasks maintain responsibility through
+handover. The same task state and execution feedback
+guide controller selection, motion-reference reuse, and
+model inference, coupling capability composition, task
+continuity, and adaptive scheduling.
+• System Evolution and Transfer. A stable task interface
+supports offline refinement of shared skills and orches-
+tration rules with model, perception, and VLM weights
+fixed. Successive versions inherit these changes and trans-
+fer across benchmarks and driving models.
+2. Related Work
+Driving Models and Hybrid Planning.
+End-to-end poli-
+cies integrate perception and planning [14, 20, 40]. Gen-
+erative and vision–language models expand their driving
+behavior [16, 17, 22, 24, 31, 33], while temporal and closed-
+loop learning further improve these policies [4, 34]. Hybrid
+systems combine learned and structured components. PDM-
+Hybrid combines rule-based planning with learned long-term
+waypoint corrections [8], and DriveVLM-Dual couples se-
+mantic reasoning with planning [35]. AsyncDriver and Au-
+toMoT decouple reasoning from motion prediction [5, 17].
+ROSE-Drive builds on frozen driving models and coordi-
+nates their use with skills and controllers during execution.
+Driving Agents.
+Driving agents use language reasoning
+and external capabilities to guide driving decisions. Agent-
+Driver, DiLu, and LeapAD incorporate tools and experience
+into this process [26, 28, 39]. DrivingAgent designs and
+validates modules and trains an online scheduling agent [41].
+The concurrent AutoAgent0 runtime verifies nominal trajec-
+tories against refined scene context and generates recovery
+proposals when none is admitted [23]. Argus supplies tem-
+porary mitigation trajectories [36]. These two runtimes in-
+tervene through motion proposals. ROSE-Drive coordinates
+model and skill contributions within a maneuver. The model
+can supply steering while a skill supplies speed, and the
+task retains responsibility through handover. Our execution
+comparisons examine this cooperation, task continuity, and
+adaptive scheduling (Sec. 4.4).
+Embodied Agent Harnesses.
+Robot execution has long
+used behavior trees to organize task control flow [7]
+and runtime-assurance architectures to supervise controller
+switching [27]. Agent harnesses connect semantic reason-
+ing to physical execution through shared context, callable
+capabilities, and execution contracts [25, 37]. Harness VLA
+exposes a frozen VLA as a contact-rich primitive alongside
+analytic primitives [42], while RoboHarness uses execution
+memory to route subtasks among heterogeneous policies and
+prepare compatible handoffs [15]. DynaHarness, Harness-
+2
+
+
+System-level orchestration
+Information extraction
+Observations
+Key scene
+information
+Scene context
+Shared physical state
+v
+d
+Ego
+x
+y
+Position (x, y)
+Speed / direction
+Gap distance d
+Route corridor
+Occupied space
+Orchestrator
+Qwen3-VL-2B
+Tasks & scene relations (every 5 steps)
+Capability composition
+Task continuity
+Adaptive scheduling
+Persistent tasks: status · responsibility · validity
+Perception harness
+Decision harness
+Control harness
+Call / return
+Scene perception
+Validity checks
+Identity / age
+LiDAR geometry
+Obstacles, tracks
+Driving model
+(on demand)
+Skill library
+Reference reuse
+Cruise / follow
+Feedback
+controller
+Learned
+controller
+Per-step execution
+Action composition + safety filter
+Offline evolution
+Execution records
+System revision
+Skills + coordination
+Test revised behavior
+Recheck prior behavior
+Accepted updates
+Online
+Offline
+Driving environment
+Roads & traffic
+Sensor views
+Ego motion + interactions
+Observations + execution feedback
+Figure 2. ROSE-Drive system architecture. Capability composition selects and combines outputs. Task continuity maintains responsibility
+through execution and handover. Adaptive scheduling determines when to run the driving model and reuse motion references. The VLM
+proposes driving tasks and scene relations every five control steps, while the orchestrator updates task state at every step. The three harnesses
+expose perception tools, models, skills, and controllers. The safety filter checks the resulting commands. Solid and brown dashed arrows
+denote online execution and offline revision.
+PAI, RoboFoundry, and Code-Only-as-Policy (COAP) revise
+reusable execution capabilities or programs [9, 13, 21, 38].
+ROSE-Drive coordinates simultaneous contributions on nav-
+igation, lateral, and longitudinal channels, using persistent
+task state to select controllers and schedule model inference
+(Appendices A and C). Its fixed relation vocabulary and
+shared skill contracts allow improved implementations and
+coordination rules to carry across system versions.
+3. ROSE-Drive
+ROSE-Drive coordinates driving capabilities through shared
+physical state and persistent tasks (Fig. 2). Shared physical
+state Et records tracked objects, geometry, motion, observa-
+tion times, and validity. Perception, decision, and control
+harnesses expose capabilities to the orchestrator, while skill
+contracts define when and how each skill participates in a
+task.
+3.1. Task State and Model Interface
+Capability composition uses navigation, lateral, and longitu-
+dinal channels W = {nav, lat, lon}. The navigation channel
+adjusts model inputs. Lateral and longitudinal outputs are na-
+tive commands or motion references (target paths or speeds
+for tracking). Adapters preserve each model’s observations
+and output conventions.
+A task maintains a driving requirement as the scene
+changes, while a skill supplies its execution logic. Task
+τi = (bi, ϕi, Wi) stores scene bindings bi, status ϕi, and
+required channels Wi ⊆W. A binding links the task to
+observed entities or road regions.
+Channel ownership αt(c) identifies the task responsible
+for output selection and recovery, with 0 denoting no owner.
+Output source st(c) identifies whose output is applied, with
+0 denoting the driving model and i the skill instance serving
+τi. Each channel uses one source, and unowned channels
+default to the model. A task can retain ownership while
+using compatible model output. Controller kt executes the
+selected output, and at requests model inference. Validity
+3
+
+
+Algorithm 1 Runtime orchestration loop
+Require: Frozen model and VLM, skill contracts
+Persistent state: tasks, motion references, applied commands
+1: for each control step t do
+2:
+Update shared physical state, task progress, and feedback
+3:
+for each task already in a model trial do
+4:
+Review applied commands and resulting motion
+5:
+if trial accepted: release task ownership
+6:
+else if rejected: resume skill execution or recovery
+7:
+else retain ownership and continue the trial
+8:
+if new VLM proposals: bind and update task requests
+9:
+Admit tasks with available channels (Eq. 2)
+10:
+if a task owns navigation: apply valid updates
+11:
+Check motion references and skill plans
+12:
+Identify model outputs needed for execution or handover
+13:
+if new model output is required (Eq. 5) then
+14:
+Run the model and refresh cached references
+15:
+else
+16:
+Retain valid references, skill plans, or a required hold
+17:
+Generate skill outputs for the updated task state
+18:
+for each Active task requesting handover do
+19:
+if completion or readiness fails: retain ownership
+20:
+else if trial required: start trial with ownership
+21:
+else return channels under the skill contract
+22:
+Select compatible model and skill outputs per channel
+23:
+Select the tracking controller using execution feedback
+24:
+Track references and forward selected native commands
+25:
+Apply safety filter and execute the composed command
+26:
+Retain task state and the command actually applied
+checks test scene bindings and motion references against
+current observations.
+Algorithm 1 shows how execution feedback updates tasks,
+determines model calls, and guides channel selection and
+handover within each control step.
+3.2. VLM Proposals and Shared Physical State
+The perception harness maintains Et by associating detec-
+tions, tracks, and occupancy. It checks whether observations
+are current and sufficient for the task. Shared scene bindings
+keep task selection, motion generation, and execution checks
+tied to the same interaction.
+Geometric rules generate candidate scene relations Ct. A
+distilled Qwen3-VL-2B evaluates them to propose driving
+tasks and scene relations Rt. The orchestrator binds these
+proposals to observed objects and road regions, forms task
+requests, and checks skill applicability and channel availabil-
+ity before admission. Ongoing tasks continue according to
+execution feedback even without new VLM proposals.
+The VLM is trained open-loop using PDM-Lite expert
+contexts and teacher-reviewed relation labels, then frozen
+throughout system evolution and evaluation. VLM infer-
+ence is scheduled asynchronously every five control steps,
+while the driving model is queried on demand. Appendix A
+Table 1. Skill library. Five VLM relation families map to four
+reusable skill families.
+Relation
+Requirement
+Skill family
+Traffic interaction
+Timing and speed
+Traffic interaction
+Obstacle passage
+Clearance, timing,
+and lane return
+Obstacle passage
+Emergency yielding Emergency priority
+Rule compliance
+Traffic rule
+Signal / STOP rules
+Rule compliance
+Route guidance
+Navigation targets
+Route guidance
+describes training and scheduling. Appendix B details the
+shared physical state.
+3.3. Skill Library
+Four skill families address recurring physical requirements
+(Table 1). Observed objects and road regions determine each
+task’s geometry and motion constraints. Five VLM relation
+families identify these requirements, with emergency yield-
+ing and traffic rules handled by the same rule-compliance
+family.
+Traffic interaction plans departure timing and speed under
+predicted traffic occupancy along an available path, includ-
+ing a model path. Crossings and merges share this space–
+time planner, with geometry, traffic motion, and conflict
+type determining its constraints. Obstacle passage plans
+a path around obstructions and back to the lane, with tim-
+ing constrained by tracked traffic. Obstacle extent and free
+road boundaries determine clearance. Different obstructions
+change these constraints while reusing the same skill imple-
+mentation. Rule compliance maintains traffic obligations
+and task progress across observations (Appendix C).
+The skill instance serving task τi exposes a contract
+Ki = (Ωi, Wi, κi, di, hi),
+(1)
+specifying applicability, required channels, output genera-
+tion, completion, and handover readiness. Route guidance
+adjusts navigation inputs so the model can generate the re-
+quired motion. The common contract lets each skill retain
+its own solver (Appendix C). Revisions can refine these con-
+ditions and implementations while preserving the VLM’s
+relation vocabulary and the contract structure.
+3.4. Capability Composition
+A task receives its required channels when its scene bind-
+ings are valid, the skill is applicable, and the channels are
+available:
+admit(i) = valid(bi) ∧Ωi(Et, bi)
+∧
+^
+c∈Wi
+[αt(c) ∈{0, i}].
+(2)
+4
+
+
+Channels are allocated together and are not taken from their
+current owner. Tasks using disjoint channel sets can coex-
+ist. An active task can change its required set as execution
+progresses.
+A traffic-interaction task can retain a compatible model
+path while its skill regulates speed. Selection respects current
+task ownership, output validity, and compatibility across
+channels:
+˜zc
+t = zst(c),c
+t
+,
+ut = G(Execkt(˜zt, xt), Et) ,
+(3)
+where c ∈{lat, lon}, zs,c
+t
+is a reference or native command,
+and ˜zt collects the selected outputs. Execkt tracks selected
+references using ego state xt and forwards native commands
+on their selected channels. Controller selection respects
+channel ownership and reference validity. During model-
+reference tracking, persistent lateral, heading, or speed error
+can trigger a switch from a feedback controller (PID) to a
+frozen learned controller. Sustained low tracking error re-
+stores feedback control. Safety filter G checks the composed
+command. The command actually applied and subsequent
+observations supply execution feedback (Appendix C). Ta-
+ble 2 illustrates capability composition and reference reuse
+during a merge.
+3.5. Task Continuity and Handover
+Task completion di and handover readiness hi serve different
+purposes. Completion checks whether the task has fulfilled
+its requirement. Readiness checks whether the model can
+continue from the resulting physical state using valid outputs.
+A task is Active during waiting, execution, and handover
+checks, Monitor during a model trial, and Idle after termi-
+nation. A task can return channels before terminating. A
+pending request has not acquired channels.
+For traffic interaction, handover readiness starts a moni-
+tored model trial. The output source switches to the model
+while the task retains ownership:
+st(c) = 0,
+αt(c) = i,
+c ∈Wi.
+(4)
+Trials that began in earlier steps are reviewed using the com-
+mands actually applied and the resulting motion. Forward
+motion or waiting justified by current traffic permits release
+of task ownership. The task retains responsibility during
+the trial and can resume control if the model cannot con-
+tinue. This review precedes new output generation. Other
+skill contracts can return channels without a trial. Figure 3
+illustrates task continuity and handover. Appendix D details
+the handover conditions.
+3.6. Adaptive Scheduling
+Task state and execution feedback determine model infer-
+ence. Between calls, controllers track valid references and
+adjust cruising or following from current observations. In-
+ference can be skipped when a required hold (ηhold
+t
+), valid
+Table 2. Capability composition within a persistent task. During
+a merge, model steering and skill speed coexist while the task re-
+mains active. After release, a cached model path supports feedback
+control without new model inference.
+Time (s) Task status Lateral / longitudinal
+Model call
+4.45
+Active
+Model steering / skill speed
+Yes
+10.05
+Active
+Model steering / skill speed
+Yes
+14.05
+Idle
+Cached path / speed tracking
+No
+model reference (ηreuse
+t
+), or executable skill plan (ηplan
+t
+) sup-
+plies the required outputs. With ηrefresh
+t
+indicating a required
+model call,
+at = ηrefresh
+t
+∨¬(ηhold
+t
+∨ηreuse
+t
+∨ηplan
+t
+).
+(5)
+at = 1 runs the model and updates its cached references.
+Navigation changes, departure after a traffic-rule stop, in-
+valid motion references, and safety-filter requests set ηrefresh
+t
+.
+Pending handover also sets it when fresh model output is
+required. The orchestrator then checks handover readiness
+using valid outputs and retains task responsibility if the con-
+ditions are unmet. Tracking and safety checks continue be-
+tween model calls. Appendix A gives the reference validity
+checks.
+3.7. System Evolution
+The relation vocabulary, skill contracts, and control chan-
+nels form a stable task interface. Across stages, the VLM
+proposes the same types of driving tasks and scene relations,
+while execution records guide offline revisions to skill imple-
+mentations and orchestration rules. Crossings and merges,
+for example, share a traffic-interaction planner whose con-
+straints are instantiated from each task’s current geometry
+and motion. Improvements to this shared implementation
+can therefore be reused by both, and later stages inherit them
+through the same interface.
+Revisions also refine the construction of shared physi-
+cal state, controller selection, reference reuse, and model
+inference. Coding agents analyze records, implement revi-
+sions, and check execution. Model, perception, and VLM
+weights remain fixed across stages. Frozen-stage evaluations
+assess their transfer across benchmarks and driving models
+(Appendix E).
+4. Experiments
+We evaluate driving performance across models and bench-
+marks, test whether successive system improvements trans-
+fer, and examine the contributions of capability composition,
+task continuity, and adaptive scheduling.
+5
+
+
+(a) Obstacle passage: keep the task active until lane return is complete
+Scene
+VLM proposal
+Task state
+Output
+Wait
+Obstacle passage
+Awaiting a gap
+Skill: wait for traffic
+Pass
+Obstacle passage
+Passing the obstacle
+Skill: pass obstacle
+Return
+No new proposal
+Returning to lane
+Skill: finish lane return
+Resume
+No new proposal
+Return complete
+Model: resume motion
+(b) Traffic interaction: capability composition and handover
+Scene
+VLM proposal
+Task state
+Output
+Wait
+Traffic interaction
+Awaiting a gap
+Skill: wait for gap
+Join
+Traffic interaction
+Joining the stream
+Model steering + skill speed
+Check handover
+No new proposal
+Handover deferred
+Model steering + skill speed
+Resume
+Traffic rule
+Model restored
+Model + rule check
+Figure 3. Capability composition and task continuity in execution. Vertical arrows link observations, VLM proposals, task state, and
+applied outputs. Horizontal arrows carry task state across updates. (a) The orchestrator completes lane return after the obstacle-passage
+proposal disappears. (b) Model steering and skill speed remain combined while handover is deferred. After handover readiness checks and a
+monitored model trial, the task releases ownership. Ochre cards highlight active tasks without new VLM proposals.
+Table 3. Model and system performance on Bench2Drive v0.0.3.
+AutoMoT uses our route evaluations. SimLingo and TransFuser++
+scores follow the Bench2Drive leaderboard [1]. Blue superscripts
+show gains over the model alone. † marks privileged data-collection
+experts using ground-truth scene state [1].
+Model / system
+DS ↑
+SR (%) ↑
+SimLingo
+85.07
+67.27
++ ROSE-Drive
+95.20 +10.13
+89.09 +21.82
+TransFuser++
+84.21
+67.27
++ ROSE-Drive
+96.09 +11.88
+90.00 +22.73
+AutoMoT
+89.68
+75.45
++ ROSE-Drive
+97.71 +8.03
+92.73 +17.28
+PDM-Lite†
+97.02
+92.27
+Think2Drive†
+91.85
+85.41
+4.1. Experimental Setup
+Bench2Drive v0.0.3 [19] and v0.0.4 [3] each contain 220
+routes across the same 44 interaction types. Version v0.0.4
+Table 4. Model and system performance on Bench2Drive v0.0.4.
+SimLingo and the LEAD expert follow the release [3]. AutoMoT
+and TransFuser++ are our evaluations. Blue superscripts show
+gains over the model alone. † marks a privileged expert using
+ground-truth scene state [29].
+Model / system
+DS ↑
+SR (%) ↑
+SimLingo
+86.55
+70.45
++ ROSE-Drive
+94.89 +8.34
+87.73 +17.28
+TransFuser++
+86.52
+70.00
++ ROSE-Drive
+94.27 +7.75
+86.36 +16.36
+AutoMoT
+84.32
+66.36
++ ROSE-Drive
+97.66 +13.34
+93.18 +26.82
+LEAD expert†
+95.59
+87.28
+introduces a new route set. Fail2Drive adds 17 long-tail
+types and 30 assets through 100 Base–Gen route pairs test-
+ing appearance, layout, behavior, and robustness shifts [11].
+Longest6 contains 36 routes [2] reserved for evaluating
+frozen systems. We report driving score (DS), success rate
+6
+
+
+(SR), their harmonic mean (HM) on Fail2Drive, and route
+completion (RC) on Longest6.
+We use one execution architecture across all reported
+benchmarks and develop successive system stages with Au-
+toMoT. Bench2Drive v0.0.3 yields Stage 1, v0.0.4 Stage 2,
+and Fail2Drive Stage 3. Stage 2 also includes closed-loop
+runs on CARLA training routes. Stages inherit revised skills
+and coordination rules through the same task interface (Ap-
+pendix E). Driving-model and perception weights remain
+fixed, and the VLM is frozen after open-loop training. Sim-
+Lingo [31], TransFuser++ [18, 43], and BridgeDrive [24]
+connect through model adapters.
+Development combines corner cases that challenge the
+driving model or current system with regression routes used
+to check that model performance is preserved. Routes ex-
+cluded from development form the held-out set (Appendix E).
+Benchmark tables aggregate both sets. Transfer tests freeze
+Stage 1 before v0.0.4 revision and Stage 2 before Fail2Drive
+revision. Appendix G details baseline sources.
+AutoMoT, TransFuser++, and BridgeDrive already use
+TransFuser-family camera–LiDAR perception with detec-
+tion and BEV-semantic heads. BridgeDrive uses the LEAD-
+trained TFv6 variant [24, 29]. Shared physical state is built
+from frozen PDM-Lite-trained TransFuser++ perception,
+reusing AutoMoT’s and TransFuser++’s existing weights.
+SimLingo retains camera-only model inputs and addition-
+ally receives this camera–LiDAR module at system level.
+Appendix A details the configurations. CARLA [10] runs
+synchronously.
+4.2. Closed-Loop Driving Performance
+ROSE-Drive reaches 97.71 DS on Bench2Drive v0.0.3 and
+97.66 on v0.0.4 with AutoMoT (Tables 3 and 4). Each
+benchmark uses one system across all 44 interaction types,
+with tasks selected from current observations through the
+shared interface.
+Reuse across models.
+Using the same runtime through
+model adapters, SimLingo and TransFuser++ exceed 94 DS
+on both Bench2Drive versions. Gains range from 7.75 to
+13.34 DS across the three models.
+Fail2Drive.
+Stage 3 extends the inherited system to
+Fail2Drive’s long-tail conditions, reaching 87.4 DS with
+AutoMoT, 87.3 with SimLingo, and 90.3 with BridgeDrive
+(Table 5). Appendix G reports Base/Gen results and baseline
+sources.
+On held-out routes, where AutoMoT alone already
+reaches 97.63 DS on v0.0.3, ROSE-Drive maintains 97.91
+and raises DS from 87.16 to 98.43 on v0.0.4 and from 79.46
+to 91.75 on Fail2Drive (Appendix E).
+Table 5. Model and system performance on Fail2Drive. DS, SR
+(%), and HM are averaged over splits. Blue superscripts show gains
+over the model alone. Appendix G gives split results and baseline
+sources.
+Model / system
+DS ↑
+SR ↑
+HM ↑
+AutoMoT
+74.8
+64.0
+68.9
++ ROSE-Drive
+87.4 +12.6 89.0 +25.0
+88.2 +19.3
+SimLingo
+77.2
+67.2
+71.6
++ ROSE-Drive
+87.3 +10.1 92.0 +24.8
+89.6 +18.0
+BridgeDrive
+86.8
+85.0
+85.8
++ ROSE-Drive
+90.3 +3.5
+96.5 +11.5
+93.3 +7.5
+Table 6. Transfer of frozen system stages. Stage 1 transfers to all
+220 Bench2Drive v0.0.4 routes and Stage 2 to Fail2Drive. Model
+baselines follow Tables 4 and 5.
+DS ↑
+SR (%) ↑
+Model
+Alone + ROSE-Drive Alone + ROSE-Drive
+Stage 1 →Bench2Drive v0.0.4
+AutoMoT
+84.3
+95.1
+66.4
+88.6
+SimLingo
+86.6
+92.7
+70.5
+83.2
+Stage 2 →Fail2Drive
+AutoMoT
+74.8
+81.3
+64.0
+82.0
+SimLingo
+77.2
+80.9
+67.2
+80.0
+4.3. System Evolution and Transfer
+Before any v0.0.4 revision, Stage 1 transfers the v0.0.3 sys-
+tem to the new route set. Across all 220 routes, AutoMoT
+DS rises from 84.3 to 95.1 and SimLingo from 86.6 to 92.7
+(Table 6). This tests reuse across new layouts within the
+same 44 interaction types. Stage 2 transfers the expanded
+system to Fail2Drive, raising AutoMoT from 74.8 to 81.3
+DS and from 64.0% to 82.0% SR. SimLingo’s SR rises from
+67.2% to 80.0%. With SimLingo, the system constructed
+using AutoMoT also transfers across models through an
+adapter.
+On Longest6, AutoMoT progresses from 25 DS alone to
+36, 44, and 52 across Stages 1–3, while SimLingo progresses
+from 22 to 36, 39, and 47 (Fig. 4 and Appendix E). Each
+system retains its sensor configuration and driving model,
+perception, and VLM checkpoints across these stages. Sim-
+Lingo’s progression from 36 to 39 to 47 demonstrates accu-
+mulated skill and orchestration capability with the driving
+model and shared perception fixed. Final RC reaches 91%
+and 84%, respectively, from 70% for each model alone.
+4.4. Execution Architecture Comparisons
+We compare the final Stage 3 system on 62 Bench2Drive
+v0.0.3 routes, comprising one route per interaction type and
+18 additional high-interaction routes where AutoMoT per-
+7
+
+
+Model
+Stage
+1
+Stage
+2
+Stage
+3
+20
+40
+60
+80
+100
+25
+36
+44
+52
+70
+71
+83
+91
+AutoMoT
+Model
+Stage
+1
+Stage
+2
+Stage
+3
+22
+36
+39
+47
+70
+73
+80
+84
+SimLingo
+DS
+RC (%)
+Figure 4. Frozen-stage transfer to Longest6. Both driving models
+remain fixed across Stages 1–3. Solid lines show DS and dashed
+lines show RC (%). Longest6 is excluded from system revision.
+Table 7. Execution architecture comparisons on 62 Bench2Drive
+v0.0.3 routes, with one run per configuration. Fixed-schedule up-
+dates cover model inference, perception, and orchestration.
+Configuration
+DS ↑SR (%) ↑
+Full ROSE-Drive
+99.77
+96.77
+AutoMoT alone
+83.72
+62.90
+AutoMoT + perception & safety
+86.97
+66.13
+Decision-tree task selection
+92.11
+80.65
+Rule-based model replacement
+71.83
+43.55
+Whole-vehicle skill takeover
+84.47
+66.13
+Model-controlled cruising/following
+95.68
+88.71
+Direct handover
+95.20
+88.71
+Fixed-schedule updates
+94.75
+85.48
+forms poorly. AutoMoT alone scores 83.72 DS on these
+routes (Table 7). Appendix F details the variants.
+The full system succeeds on 60 routes, versus 39 for
+the model and 41 with perception and safety alone. Task
+execution expands the range of interactions the system can
+complete beyond safety filtering. Replacing VLM judgments
+with PDM-Lite-trained decision trees reduces successes to
+50, showing the contribution of the VLM to task selection.
+Rule-based model replacement uses bounded best-first
+search over kinematic motion primitives, guided by per-
+ceived drivable space and navigation. With the same percep-
+tion, skills, and controllers, it yields 71.83 DS and 27 suc-
+cesses. This comparison shows the contribution of learned
+motion generation within the shared execution architecture.
+Whole-vehicle skill takeover tests capability composition
+by assigning all three channels to an engaged skill. The same
+rule-based planner supplies missing motion references, and
+the model resumes outside takeover. This yields 84.47 DS
+and 41 successes, versus 99.77 DS and 60 successes when
+model and skill outputs are combined across channels. On
+the 18 high-interaction routes, success rises from 9 to 18.
+Model-controlled cruising/following uses model infer-
+ence in place of the local cruising and following controller
+Table 8. Agent latency on RTX 5090. Times in ms include VLM
+inference. SimLingo uses chain-of-thought reasoning.
+Method
+Median ↓Mean ↓p90 ↓
+SimLingo
+521.3
+539.0
+660
++ ROSE-Drive
+103.2
+280.9
+840
+AutoMoT
+171.3
+138.9
+180
++ ROSE-Drive
+107.2
+155.2
+340
+Table 9. Model inference utilization on Longest6. Percentage of
+control steps over complete runs.
+Model inference
+AutoMoT SimLingo
+Model inference skipped
+71.5
+71.3
+New model inference
+28.5
+28.7
+and yields 55 successes. Direct handover removes handover
+readiness checks and the monitored model trial, also suc-
+ceeding on 55 routes. The variants incur five and four vehicle
+collisions, respectively, versus zero for the full system.
+Figure 3 illustrates how tasks guide execution.
+The
+obstacle-passage task completes lane return after its VLM
+proposal disappears. During traffic interaction, model steer-
+ing remains combined with skill speed until motion and
+traffic conditions support handover. The task retains respon-
+sibility through the model trial until observed continuation
+is accepted.
+Fixed-schedule updates query the model on three of every
+ten control steps and update perception and orchestration on
+a fixed 67% of steps. Skill and controller implementations
+remain unchanged, with feedback and safety checks at every
+step. This variant reaches 94.75 DS and 85.48% SR. The full
+system combines per-step state updates with task-dependent
+model calls, gaining 5.02 DS and seven successful routes
+over this fixed schedule.
+4.5. Adaptive Scheduling and Agent Latency
+We measure agent latency, including VLM inference, by re-
+playing preprocessed Longest6 inputs on an RTX 5090 out-
+side CARLA with common Longest6 execution-path weights
+(Appendix F).
+ROSE-Drive lowers SimLingo’s median latency by 80.2%
+and mean from 539.0 to 280.9 ms (Table 8). AutoMoT’s
+median falls from 171.3 to 107.2 ms, while its mean rises
+from 138.9 to 155.2 ms. The additional cost of periodic
+VLM updates contributes to the higher p90.
+Across complete Longest6 runs, model inference is
+skipped on 71.5% of steps with AutoMoT and 71.3% with
+SimLingo (Table 9). Task updates and feedback control
+continue using current observations, while valid motion ref-
+erences and skill outputs allow execution to proceed between
+model calls.
+8
+
+
+Limitations.
+Evaluation covers four models in simulation.
+Periodic VLM updates produce a latency tail. Real-world
+deployment requires further evaluation.
+5. Conclusion
+ROSE-Drive coordinates frozen driving models, skills, and
+tools through shared physical state and persistent tasks. Joint
+orchestration of execution and inference improves closed-
+loop driving. A stable task interface supports capability
+accumulation, demonstrated by frozen-stage transfer across
+benchmarks and driving models.
+LLM Usage Statement
+Codex (gpt-6-sol) and Claude Opus 5.5 assisted system im-
+plementation, analysis of execution records, code revision,
+and running evaluations. GPT-6 reviewed VLM supervi-
+sion labels. Claude and GPT also assisted with manuscript
+editing.
+References
+[1] Autonomous Vision Group.
+Bench2Drive leaderboard.
+https : / / github . com / autonomousvision /
+Bench2Drive- Leaderboard, 2026.
+Bench2Drive
+v0.0.3, accessed November 17, 2026.
+[2] Autonomous Vision Group.
+CARLA Garage: Longest6
+v2 evaluation protocol. Leaderboard 2 branch. https://
+github.com/autonomousvision/carla_garage,
+2026. README, Longest6 v2; accessed October 17, 2026.
+[3] Bench2Drive Contributors. Bench2Drive v0.0.4: Evalua-
+tion set, results, and data updates.
+Official release docu-
+mentation. https://github.com/Thinklab-SJTU/
+Bench2Drive/blob/0.0.4/docs/v004_update.
+md, 2026. Accessed October 17, 2026.
+[4] Keyu Chen, Nanfei Ye, Yida Wang, Wenchao Sun, Danqi
+Zhao, Hao Cheng, and Sifa Zheng. CRAFT: Counterfactual-
+to-interactive reinforcement fine-tuning for driving policies.
+arXiv preprint arXiv:2605.04470, 2026.
+[5] Yuan Chen, Zi-han Ding, Ziqin Wang, Yan Wang, Lijun
+Zhang, and Si Liu. Asynchronous large language model
+enhanced planner for autonomous driving. In Proceedings of
+the European Conference on Computer Vision, 2024.
+[6] Zhan Chen, Songyan Zhang, Wenhui Huang, Zirui Li, Zhi-
+dong Wang, Qihang Huang, Shiyu Fang, and Chen Lv. IN-
+TERACT: Learning interaction-aware world dynamics from
+driving videos for autonomous driving.
+arXiv preprint
+arXiv:2611.02526, 2026.
+[7] Michele Colledanchise and Petter Ögren. Behavior Trees in
+Robotics and AI: An Introduction. CRC Press, 2018.
+[8] Daniel Dauner, Marcel Hallgarten, Andreas Geiger, and
+Kashyap Chitta. Parting with misconceptions about learning-
+based vehicle motion planning. In Proceedings of the 7th
+Conference on Robot Learning, pages 1268–1281, 2023.
+[9] Haoyuan Deng, Jiebin Liu, Tengxiao Zhang, Langning Yan,
+Hongye Cao, and Ziwei Wang. DynaHarness: A dynamic
+physical harness for self-evolving robot agents. arXiv preprint
+arXiv:2609.40306, 2026.
+[10] Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio
+Lopez, and Vladlen Koltun. CARLA: An open urban driving
+simulator. In Proceedings of the 1st Annual Conference on
+Robot Learning, pages 1–16, 2017.
+[11] Simon Gerstenecker, Andreas Geiger, and Katrin Renz.
+Fail2Drive: Benchmarking closed-loop driving generalization.
+arXiv preprint arXiv:2604.08535, 2026.
+[12] Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-
+Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen.
+LoRA: Low-rank adaptation of large language models. In
+International Conference on Learning Representations, 2022.
+[13] Kairui Hu, Siyuan Hu, Fangzhou Hong, Zhaoxi Chen,
+and Ziwei Liu.
+Embodied Turing machines:
+Stateful
+code for robot recursive self-improvement. arXiv preprint
+arXiv:2610.12369, 2026.
+[14] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng Dai, Yu
+Qiao, and Hongyang Li. Planning-oriented autonomous driv-
+ing. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition, pages 17853–17862,
+2023.
+[15] Jinbang Huang, Zhiyuan Li, Yuanzhao Hu, Ran Qi, Yixin
+Xiao, Mark Coates, Tongtong Cao, Zhanguang Zhang, and
+Yingxue Zhang. RoboHarness: Memory-driven orchestration
+of heterogeneous robot policies for long-horizon planning.
+arXiv preprint arXiv:2607.18060, 2026.
+[16] Qihang Huang, Wenhui Huang, Collister Chua, Shiyu Fang,
+Zhan Chen, Songyan Zhang, Zhidong Wang, Daiying Tian,
+and Chen Lv.
+OccWAM: Occupancy world-action mod-
+els with joint scene-to-ego flow matching. arXiv preprint
+arXiv:2610.17688, 2026.
+[17] Wenhui Huang, Songyan Zhang, Qihang Huang, Zhidong
+Wang, Zhiqi Mao, Collister Chua, Zhan Chen, Long Chen,
+and Chen Lv. AutoMoT: A unified vision-language-action
+model with asynchronous mixture-of-transformers for end-to-
+end autonomous driving. arXiv preprint arXiv:2603.14851,
+2026.
+[18] Bernhard Jaeger, Kashyap Chitta, and Andreas Geiger. Hid-
+den biases of end-to-end driving models. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision,
+pages 8240–8249, 2023.
+[19] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and
+Junchi Yan. Bench2Drive: Towards multi-ability benchmark-
+ing of closed-loop end-to-end autonomous driving. In Ad-
+vances in Neural Information Processing Systems, 2024.
+[20] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan.
+DriveTransformer: Unified transformer for scalable end-to-
+end autonomous driving. In International Conference on
+Learning Representations, 2025.
+[21] Jingsong Liang, Shuhao Liao, Shizhe Zhang, Diyuan Hou,
+Yuxin Cai, Xinjian Deng, Chengyang He, Wenhui Huang,
+Runjia Tan, Zhidong Wang, Lan Yu, Xuesong Tian, Guil-
+laume Sartoretti, Jie Luo, Yao Mu, Wenjun Wu, Wanhua
+Li, and Chen Lv.
+RoboFoundry: System-as-policy evo-
+9
+
+
+lution for self-learning embodied agents.
+arXiv preprint
+arXiv:2609.32862, 2026.
+[22] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng
+Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang,
+Qian Zhang, and Xinggang Wang. DiffusionDrive: Truncated
+diffusion model for end-to-end autonomous driving. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 12037–12047, 2025.
+[23] Jiageng Liu, Seth Z. Zhao, Zewei Zhou, Alejandro Huerta,
+Aidan Bayer-Calvert, Yuxin Bao, Haotian Lin, Robert
+Spataru, Zijun Cui, Yining Hong, Bolei Zhou, and Jiaqi Ma.
+AutoAgent0: An agentic runtime for safe closed-loop driving.
+arXiv preprint arXiv:2610.18866, 2026.
+[24] Shu Liu, Wenlin Chen, Weihao Li, Zheng Wang, Lijin Yang,
+Jianing Huang, Yipin Zhang, Zhongzhan Huang, Ze Cheng,
+and Hao Yang. BridgeDrive: Diffusion bridge policy for
+closed-loop trajectory planning in autonomous driving. In
+International Conference on Learning Representations, 2026.
+[25] Yang Liu, Weixing Chen, Xinshuai Song, Tao Pu, Siwen
+Mo, Yongjie Bai, Zihao Chen, Qianran Sun, Liruo Zhong,
+Ying Shen, and Liang Lin. PhyAgentOS: A self-evolving
+operating system for embodied agents with decoupled cog-
+nitive planning and physical execution.
+arXiv preprint
+arXiv:2607.16636, 2026.
+[26] Jiageng Mao, Junjie Ye, Yuxi Qian, Marco Pavone, and Yue
+Wang. A language agent for autonomous driving. In Confer-
+ence on Language Modeling, 2024.
+[27] Usama Mehmood, Sanaz Sheikhi, Stanley Bak, Scott A.
+Smolka, and Scott D. Stoller. The black-box simplex ar-
+chitecture for runtime assurance of autonomous CPS. In
+NASA Formal Methods, pages 231–250. Springer, 2022.
+[28] Jianbiao Mei, Yukai Ma, Xuemeng Yang, Licheng Wen,
+Xinyu Cai, Xin Li, Daocheng Fu, Bo Zhang, Pinlong Cai,
+Min Dou, Botian Shi, Liang He, Yong Liu, and Yu Qiao. Con-
+tinuously learning, adapting, and improving: A dual-process
+approach to autonomous driving. In Advances in Neural
+Information Processing Systems, 2024.
+[29] Long Nguyen, Micha Fauth, Bernhard Jaeger, Daniel Dauner,
+Maximilian Igl, Andreas Geiger, and Kashyap Chitta. LEAD:
+Minimizing learner–expert asymmetry in end-to-end driving.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, 2026.
+[30] Qwen Team.
+Qwen3-VL-2B-Instruct.
+Model card.
+https://huggingface.co/Qwen/Qwen3-VL-2B-
+Instruct, 2025. Accessed October 17, 2026.
+[31] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski.
+SimLingo: Vision-only closed-loop autonomous driving with
+language-action alignment. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 11993–12003, 2025.
+[32] Shai Shalev-Shwartz, Shaked Shammah, and Amnon Shashua.
+On a formal model of safe and scalable self-driving cars.
+arXiv preprint arXiv:1708.06374, 2017.
+[33] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song, Steven L.
+Waslander, Yu Liu, and Hongsheng Li. LMDrive: Closed-
+loop end-to-end driving with large language models. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 15120–15130, 2024.
+[34] Ziying Song, Caiyan Jia, Lin Liu, Hongyu Pan, Yongchang
+Zhang, Junming Wang, Xingyu Zhang, Shaoqing Xu, Lei
+Yang, and Yadan Luo. Don’t shake the wheel: Momentum-
+aware planning in end-to-end autonomous driving. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, 2025.
+[35] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang,
+Zhiyong Zhao, Kun Zhan, Peng Jia, XianPeng Lang, and
+Hang Zhao. DriveVLM: The convergence of autonomous
+driving and large vision-language models. In Proceedings
+of the 8th Conference on Robot Learning, pages 4698–4726,
+2025.
+[36] Dingji Wang, You Lu, Bihuan Chen, Shuo Hao, Haowen
+Jiang, Yifan Tian, and Xin Peng. Argus: Resilience-oriented
+safety assurance framework for end-to-end ADSs. arXiv
+preprint arXiv:2511.09032, 2025.
+[37] Qi Wang, Tianyi Wang, Chengyang Li, Shikun Ban, Yurun
+Chen, Yizhong Ge, Jason Qin, Chengtai Li, and Wentao Zhu.
+Towards the harness of embodied agents. arXiv preprint
+arXiv:2608.11246, 2026.
+[38] Xin Wang, Wenhao Wu, Menghao Zhang, Zhi Wang, Kun
+Shao, Jian Luan, Yang Li, Qing Li, Shangding Gu, Huichi
+Zhou, Shuqing Shi, Fei Ni, Shuo Lu, Weicheng Meng, Kang
+Li, Jin Wu, Kang Zhao, Shangmin Guo, Gen Li, Yongqiang
+Tang, Zhizhong Zhang, Yuan Xie, and Heng Qu. Harnes-
+sPAI: An evolving harness for physical AI. arXiv preprint
+arXiv:2609.29166, 2026.
+[39] Licheng Wen, Daocheng Fu, Xin Li, Xinyu Cai, Tao Ma,
+Pinlong Cai, Min Dou, Botian Shi, Liang He, and Yu Qiao.
+DiLu: A knowledge-driven approach to autonomous driving
+with large language models. In International Conference on
+Learning Representations, 2024.
+[40] Penghao Wu, Xiaosong Jia, Li Chen, Junchi Yan, Hongyang
+Li, and Yu Qiao. Trajectory-guided control prediction for
+end-to-end autonomous driving: A simple yet strong baseline.
+In Advances in Neural Information Processing Systems, 2022.
+[41] Zhongyu Xia, Wenhao Chen, Yongtao Wang, and Ming-
+Hsuan Yang.
+DrivingAgent:
+Design and scheduling
+agents for autonomous driving systems.
+arXiv preprint
+arXiv:2606.12236, 2026.
+[42] Yixian Zhang, Huanming Zhang, Feng Gao, Xiao Li, Zhi-
+hao Liu, Yi Nie, Chunyang Zhu, Jiaxing Qiu, Yuchen Yan,
+Jiyuan Liu, Wenhao Tang, Jiaji Rao, Zhengru Fang, Changxu
+Wei, Yu Wang, Wenbo Ding, and Chao Yu. Harness VLA:
+Steering frozen VLAs into reliable manipulation primitives
+via memory-guided agents. arXiv preprint arXiv:2607.08448,
+2026.
+[43] Julian Zimmerlin, Jens Beißwenger, Bernhard Jaeger, An-
+dreas Geiger, and Kashyap Chitta. Hidden biases of end-
+to-end driving datasets. arXiv preprint arXiv:2412.09602,
+2024.
+10
+
+
+Supplementary Material
+This supplement provides implementation details (Ap-
+pendix A), shared physical state and VLM outputs (B), skill
+contracts (C), handover conditions (D), system evolution
+(E), execution analysis and measurement protocols (F), and
+benchmark results and baseline sources (G).
+A. Implementation and VLM Inputs
+Model adapters preserve each driving model’s sensor, coor-
+dinate, navigation, and output conventions.
+A.1. Perception Reuse and Model Inputs
+AutoMoT, TransFuser++, and the evaluated BridgeDrive all
+use TransFuser-family perception with object detection and
+BEV-semantic outputs. AutoMoT’s native model uses frozen
+TransFuser++ camera–LiDAR features. The perception har-
+ness applies detection and BEV-semantic heads from the
+same pretrained checkpoint to these features. This check-
+point also belongs to the TransFuser++ model’s pretrained
+ensemble, and its adapter uses the same camera and LiDAR
+configuration. Tracking and occupancy processing turn pre-
+dictions and point clouds into shared physical state.
+BridgeDrive uses the LEAD adaptation with a TFv6
+TransFuser backbone, a CenterNet detection head, and a
+BEV-semantic decoder [24, 29]. Its native inputs include
+cameras, LiDAR, and radar. The adapter preserves these
+inputs and the frozen TFv6 model. The common PDM-Lite-
+trained TransFuser++ module supplies shared physical state
+to the harness through detection and BEV-semantic outputs.
+All detectors retain their pretrained weights.
+SimLingo retains its visual encoder and camera-only
+model inputs, while its complete system additionally uses the
+common camera–LiDAR module. For each model, sensor
+configuration and learned checkpoints remain fixed across
+Stages 1–3, so comparisons between these stages evaluate
+system revisions with the same learned perception.
+A.2. VLM Inputs and Update Schedule
+The runtime uses three update schedules. A local VLM
+query is launched in the background every five control steps.
+Reference validity, control demand, and handover checks
+determine when to call the driving model. The orchestrator
+updates tasks and channel allocation at every control step,
+using new VLM proposals when available. Proposals retain
+their observation timestamps, allowing the interface to reject
+stale proposals while continuing admitted tasks from current
+shared physical state. Each control step advances 0.05 s
+of simulation time. The distilled VLM supplies the online
+proposals.
+The VLM is Qwen3-VL-2B [30] adapted with LoRA [12].
+Its inputs combine front-view images at simulation-time off-
+sets of −1.5, −1.0, −0.5, 0 seconds, a compact description
+of shared physical state, and perception-derived relation
+candidates. The orchestrator maintains active-task state sep-
+arately. An empty proposal requests no new task, while an
+active task continues according to its execution conditions.
+The LoRA adapter uses rank 64, scaling factor 128, and
+dropout 0.05 on the language model’s attention and feed-
+forward projections. The four front-view frames are resized
+to 512 × 256 pixels.
+Appendix F describes the wall-clock latency measure-
+ment protocol.
+A.3. VLM Training
+The VLM is trained with cross-entropy averaged over answer
+tokens, with prompt tokens masked from the loss. Relation
+and auxiliary visual-question-answering examples receive
+weights of 1.0 and 0.5, respectively.
+We first adapt Qwen3-VL-2B to driving using PDM-Lite
+contexts [43] and SimLingo training question-answer pairs,
+then train its LoRA adapter on relation labels. Relation train-
+ing samples from a dataset of 116,903 examples, including
+4,000 auxiliary question-answer pairs from the SimLingo
+training split. Training runs for 1,200 optimizer updates with
+an effective batch size of 16. AdamW uses learning rate
+5 × 10−5, zero weight decay, a 60-step linear warmup, and
+cosine decay. Open-loop training is completed during initial
+system construction, and the VLM remains fixed across all
+reported stages.
+A.4. Teacher-Reviewed Relations
+VLM training labels are constructed from expert driving
+clips and yielding episodes. Rules use annotated future
+scene evolution to propose candidate relations, and GPT-6
+reviews every candidate. During initial system construction,
+development records of scenes requiring skill intervention
+inform the teacher prompts. The teacher receives scene im-
+ages, a description of shared physical state, and numbered
+candidates. It can confirm or reject a candidate, correct its
+scene bindings, or mark the available observations as insuffi-
+cient. Confirmed candidates and candidates with corrected
+bindings become training labels. Future scene annotations
+are used only to construct offline labels.
+Each target relation identifies its family, subject, counter-
+part, region, and task.
+A.5. Control Between Model Calls
+At each control step, the runtime tracks the selected refer-
+ences or forwards native commands on their assigned chan-
+nels. Cached references expire after ten control steps and can
+be invalidated earlier by scene, task, or navigation changes.
+11
+
+
+Reuse during cruising and following requires current per-
+ception and compatible task state. A required hold includes
+an observed red-light wait or an admitted skill’s waiting
+command. A navigation change, departure after a traffic-
+rule stop, invalid motion reference, or safety-filter request
+triggers new model inference. Pending handover can also
+require fresh model output for the readiness check, with
+ownership still governed by the skill’s handover conditions.
+Tracking errors request new model inference when the cur-
+rent reference fails validity checks. With a valid reference,
+controller selection can instead address sustained tracking
+error (Appendix C). These conditions implement the main
+paper’s inference rule.
+For reference tracking, the system projects the rear axle
+onto the supplied path and checks lateral and heading error,
+path continuity, and remaining extent. Let v be current speed,
+tr the response allowance, b the braking deceleration, and
+d0 the clearance margin. The required stopping distance is
+dsupport = vtr + v2
+2b + d0.
+(S1)
+Both the observed corridor and the remaining path must
+provide this distance, and the path must extend through the
+tracking lookahead. Failing any of these checks requests
+a fresh model plan. Following additionally bounds target
+speed using the lead vehicle’s observed motion and available
+stopping distance. Reference reuse therefore depends on
+current geometry and traffic as well as reference age.
+B. Shared Physical State and VLM Outputs
+B.1. Perception and Tracked Scene State
+Frozen TransFuser++ perception processes onboard obser-
+vations. Task state and shared physical state guide addi-
+tional checks of ambiguous detections. Temporal tracking
+and LiDAR geometry supply motion and observed surfaces,
+including LiDAR tracks beyond the spatial extent of the
+TransFuser++ BEV window. These observations are stored
+with object identities, geometry, timestamps, and validity, so
+VLM proposals, skill conditions, and continuation checks
+refer to the same interaction.
+B.2. State Representation
+Each element of shared physical state Et is stored as a record
+e = (ν, t, σ, tobs, texp, f, p, J ),
+(S2)
+where ν is the value, t its type, σ its validity state, tobs the
+observation time, texp its expiry information, f the coordi-
+nate frame, p the producer, and J links to the supporting
+observations. Modules assess freshness from these observa-
+tions and their timestamps. A recently delivered estimate
+may still describe an old observation. Table S1 defines the
+record validity states.
+Table S1. Physical-state record validity. Record validity deter-
+mines whether an observation supports a task or transition. Task
+conditions additionally check the required physical constraints.
+Record validity
+Interpretation
+OK
+Available and usable under the producer’s
+validity conditions.
+UNKNOWN
+The observation does not establish the required
+fact.
+STALE
+The supporting observation is no longer
+current.
+INCONSISTENT Required observations or scene bindings
+conflict.
+UNSUPPORTED
+The requested quantity or relation is outside
+the producer’s supported interface.
+Moving-object records combine geometry and motion
+estimates. Traffic streams group tracked vehicles by their ob-
+served paths and motion, recording spacing and membership
+as individual vehicles enter or leave the interaction. Static
+obstruction surfaces are represented separately from mov-
+ing road users. Unknown occupancy remains distinct from
+observed clearance.
+Conflict regions and traversal corridors use observed ge-
+ometry and the original task route. Temporary navigation
+guidance changes the model input while preserving the corri-
+dor that defines the task. Coordinates are transformed using
+the corresponding observation frame and time. Admission
+and release require resolved coordinates and sufficiently cur-
+rent evidence.
+B.3. Relation Vocabulary
+VLM proposals describe driving tasks through scene rela-
+tions. Each relation specifies a family, subject, counterpart,
+region, and requested task. The counterpart is the interacting
+object or traffic stream. Entity bindings resolve against the
+shared physical state. The five relation families and their
+execution requirements are defined in the main paper’s Skill
+Library subsection. Each family describes a driving require-
+ment independently of the skill implementation.
+Table S2 details the four skill families and representa-
+tive implementations. Emergency yielding and traffic-rule
+obligations share rule compliance. Different compatible im-
+plementations can fulfill a relation, and one skill can serve
+several related tasks. A proposal can instantiate a task once
+its scene bindings resolve to observations and the skill appli-
+cability and channel-allocation checks pass.
+12
+
+
+Table S2. Skill families and representative implementations.
+Channels follow the main paper’s notation. Each task requests the
+channels required by its maneuver. The arrow denotes a change
+during execution.
+Skill family
+Channels
+Implementation
+Traffic
+interaction
+lat, lon
+Dynamic programming for
+departure and speed, with
+feedback execution
+Obstacle
+passage
+lon →all
+three
+Quadratic programming for
+passage paths, space–time
+planning, and lane return
+Rule
+compliance
+lon or all
+three
+Signal/STOP handling uses lon.
+Emergency yielding can use a
+reference and lane change on all
+three channels.
+Route guidance
+nav
+Adjusted navigation inputs guide
+model-generated motion
+C. Physical Execution Architecture and Skill
+Contracts
+C.1. Tasks and Skill Instances
+Skill families address recurring geometric, temporal, and
+traffic-rule requirements. Each skill implementation com-
+putes the task’s constraints from measured geometry and
+motion. Persistent tasks link these requirements to scene en-
+tities and retain execution status and channel responsibility.
+Admission grants the skill instance access to the required
+channels. Pending requests wait until applicability and chan-
+nel conditions are met. Once admitted, a task continues
+across VLM updates according to its completion and han-
+dover conditions.
+Binding first resolves the counterpart and region named
+by a relation, then identifies the observations needed by the
+skill. For a merge, these include the front and rear vehicles
+bracketing the gap. Task identity can remain stable while
+these observations change. Before the vehicle commits to
+a maneuver, new valid observations can update the binding.
+After commitment, the task evaluates changes as part of the
+continuing maneuver or recovery.
+C.2. Skill Contract
+The skill contract defined in the main paper specifies ap-
+plicability Ωi, required channels Wi, output generation κi,
+completion di, and handover readiness hi. Each applied
+channel has a single source.
+Rule-compliance tasks retain obligations and progress
+across observations, including traffic-signal and STOP han-
+dling and emergency yielding. Channel ownership governs
+skill contributions, while the safety filter checks the com-
+posed motion command from any skill family or the model.
+Binding and admission.
+For a proposed relation rt ∈Rt,
+the interface binds its scene entities to current observations:
+bi = bind(rt, Et) ∈B ∪{⊥},
+(S3)
+where B is the set of supported physical bindings and ⊥
+indicates an unresolved binding. Admission requires valid
+bindings, applicable skill conditions, and available channels,
+following the main paper’s admission rule. The channel set
+is reserved together, preserving the skill’s coupled control
+requirements. A request whose physical conditions are met
+may still wait for admission while another task owns the
+required channels.
+C.3. Model Adapter and Controller Selection
+The adapter constructs navigation inputs and converts model
+outputs to the shared execution interface.
+Trajectory-
+producing models use a tracker, while control-producing
+models retain native commands. Route guidance adjusts
+navigation before a model query. Lateral references are se-
+lected before tracking, and longitudinal contributions adjust
+the command on their allocated channel. The safety filter
+checks the composed command. Execution monitoring can
+request a new prediction when continuation requires a fresh
+reference.
+The orchestrator selects between feedback and learned
+controllers. The feedback controller uses PID tracking. The
+learned controller is a frozen reference-tracking multilayer
+perceptron (MLP) with three 512-unit hidden layers, Lay-
+erNorm, and SiLU activations. It receives a 20-point path,
+target speed, ego-motion feedback, the previous command,
+and disturbance estimates.
+Its nine predicted longitudi-
+nal/steering command pairs use a tanh output, with the first
+pair applied. Training minimizes closed-loop tracking error
+through a calibrated vehicle-dynamics model. Feedback con-
+trol tracks model or skill references, while learned control is
+selected for eligible model-reference tracking.
+Controller selection from execution feedback.
+The
+tracking-error monitor evaluates the most recent historical
+world-frame reference aged between 0.25 and 0.6 s. This
+history measures tracking response, while execution uses
+references that pass current validity checks. Using an earlier
+reference exposes lateral error that reanchoring a new path
+at the current position would hide. Projection onto this ref-
+erence gives lateral error ey and heading error eψ. Its target
+speed gives speed error ev. The normalized response error is
+ϵt = max
+
+mt
+|ey|
+0.5 m, mt
+|eψ|
+15◦, qt
+|ev|
+2.5 m/s
+
+.
+(S4)
+Here mt enables geometric errors at speeds of at least 0.5 m/s.
+The speed gate qt is active when the target changes by at
+most 1.25 m/s and the absolute speed error has not improved
+13
+
+
+by more than 0.1 m/s since the reference was applied. This
+distinguishes a changing motion request from an inadequate
+tracking response.
+Selecting the learned controller requires a valid model
+reference, an available tracker, and model-reference tracking
+in control of both motion channels. An error above one for
+0.3 s switches tracking to the learned controller. Error below
+0.5 for 0.5 s returns tracking to the feedback controller. A
+3 s limit on learned controller use and 1 s cooldown bound
+repeated switching. Four alternations between acceleration
+and braking commands within 2 s (active pedal at least 0.5,
+opposite pedal at most 0.05) provide an additional trigger,
+using the tracking commands actually applied at positive
+target speed. A conflicting task or invalid reference resets the
+monitor. These rules change the controller while retaining
+the selected motion reference.
+C.4. Traffic-Interaction Planning and Execution
+The traffic-interaction skill plans motion along an avail-
+able path while the task maintains its interaction goal. The
+path can come from the model or a task-specific reference.
+Tracked vehicles are propagated along their observed courses
+using estimated speed. Oriented body overlap with ego path
+samples produces a space–time occupancy grid over an 8 s
+horizon at 0.1 s intervals. Crossing and same-direction traf-
+fic contribute conflict and headway constraints, respectively.
+Crossings and merges share the planner while current ge-
+ometry and motion specify its constraints. Static occupancy
+limits the space available for stopping and passage.
+Dynamic programming searches longitudinal position,
+speed, actuator-response state, and the preceding accelera-
+tion command. Each transition integrates a candidate acceler-
+ation and checks occupancy, speed bounds, and task-specific
+motion constraints. Terminal states either clear the conflict
+or retain sufficient stopping space before it. The objective
+accounts for completion time, clearance margin, acceleration
+effort, and changes in acceleration. State discretization and
+dominance pruning retain competing feasible trajectories.
+An unsuccessful coarse search is retried at finer position and
+speed resolution.
+Execution uses the first command and retains the remain-
+ing plan with its original time reference. Before reuse, the
+remaining commands are rolled forward from the current
+measured state against refreshed occupancy and the same mo-
+tion constraints. A valid retained plan can therefore continue
+between searches. When no feasible departure exists, an un-
+committed task waits or decelerates. An already committed
+task instead compares recovery trajectories using collision
+and motion-constraint violations before comfort costs. The
+task remains active during recovery, and the common safety
+filter checks the applied command.
+C.5. Obstacle-Passage Planning and Execution
+An obstacle-passage relation identifies the obstructing entity
+and the intended passage side. The skill projects measured
+obstacle extent, free road boundaries, and tracked motion
+into route coordinates (s, l). Static occupancy bounds the
+admissible lateral interval [l−
+k , l+
+k ] for the ego body at each
+longitudinal sample. The basic passage path solves
+min
+l
+X
+k
+
+(lk −lref
+k )2 + 2(Dlk)2 + 100(D2lk)2
++ 20(Dl0 −tan ψ0)2,
+s.t.
+l−
+k ≤lk ≤l+
+k ,
+(S5)
+where lref
+k
+is the reference lateral offset, D is a finite dif-
+ference along the route, and ψ0 is the initial heading rela-
+tive to it. The initial lateral position is fixed. The planner
+samples the corridor at 1 m intervals over a 60 m horizon
+and truncates it where the bounds become infeasible. A
+curvature-constrained formulation additionally carries for-
+ward the current path’s initial geometry.
+Tracked traffic supplies space–time occupancy along the
+passage. Speed search selects among candidate acceleration
+profiles, checking body overlap and the ability to stop before
+an infeasible corridor. A viable reference is tracked in closed
+loop. Lane return remains part of the task after passing the
+obstacle. Measured obstacle extent sets clearance bounds,
+road geometry sets available passage space, and tracked traf-
+fic constrains timing in same-direction or oncoming lanes.
+The same implementation can therefore handle different ob-
+struction types and layouts within its applicability conditions.
+The VLM identifies the interaction, while the skill computes
+its geometry and timing.
+C.6. Safety Filtering
+The common safety filter checks the composed command
+against applicable traffic-rule obligations and observed con-
+tact constraints. Signal and STOP tasks maintain their obli-
+gations across steps. Contact checks use tracked bodies and
+LiDAR occupancy along the proposed motion. Braking or
+speed restrictions can override longitudinal contributions
+from the model or any skill. The task remains responsible
+during these adjustments, with release governed by comple-
+tion and handover checks.
+C.7. Relation to Other Runtime Architectures
+Table S3 compares what related harnesses coordinate dur-
+ing execution. In ROSE-Drive, channel ownership retains
+task responsibility while compatible model and skill outputs
+contribute together. Task state and execution feedback guide
+controller selection, reference reuse, and model inference.
+14
+
+
+Table S3. Runtime coordination mechanisms. The comparison summarizes the mechanisms described by each work. AutoAgent0 is
+concurrent work.
+System
+What is coordinated
+Mechanism
+AutoAgent0 [23]
+Candidate motion trajectory
+Verify nominal proposals against refined scene context. Generate and revise recovery
+proposals when needed.
+Harness VLA [42]
+Analytic or VLA primitive call
+Compose analytic staging and transport with a frozen VLA for contact-rich execution.
+RoboHarness [15]
+Heterogeneous policy for a
+subtask
+Use execution memory for capability-aware routing and prepare a compatible state
+for the next policy.
+ROSE-Drive
+Task-owned channels and
+model calls
+Combine model and skill contributions during a maneuver. Retain task state through
+handover and coordinate controllers, reference reuse, and inference.
+Capability composition and task continuity
+Wait for a gap
+Cross with feedback
+Clear, then check
+Ego vehicle
+Traffic stream
+Conflict zone
+Model
+Traffic Interaction
+Execute
+Handover checks
+Model trial
+Model driving
+Task state
+Source
+Transition
+Route
+Path
+Speed
+Model
+Model / task path
+Model path
+Interaction
+Model
+Check
+Task clear?
+Handover ready?
+Progress?
+Release
+Retry
+Channel owner
+Interaction
+None
+Status
+Active
+Monitor
+Idle
+Figure S1. Capability composition and task continuity in one traffic interaction. Model and skill outputs are combined across channels.
+A monitored trial applies model outputs while the task retains channel ownership. Route, Path, and Speed correspond to navigation,
+lateral, and longitudinal channels. Task status is Active during execution and handover checks, Monitor during the trial, and Idle after task
+termination. Gray-violet denotes the model and ochre the interaction task.
+D. Task Continuity and Handover
+D.1. Lifecycle
+Task status follows the same three phases shown in Fig. S1.
+Active covers waiting, execution, and handover checks.
+Monitor applies model outputs during a monitored model
+trial, and Idle follows task termination. Returning a channel
+can precede task termination. A request awaiting admis-
+sion is not yet active. Table S4 lists task operations from
+nomination to release, including binding updates and recov-
+ery. Output-source changes and responsibility release are
+separate state transitions.
+A traffic-interaction task can hold the speed channel while
+waiting for a gap. It can update its binding before commit-
+ment. Once it begins the maneuver, it remains responsible
+for continuation or recovery as traffic changes.
+D.2. Completion and Handover Readiness
+Completion evaluates local task fulfillment. Handover readi-
+ness evaluates whether the model can continue from the pose,
+velocity, route context, and observed conflicts resulting from
+the intervention. For example, after the vehicle passes an
+obstruction, the task can remain active while it guides the
+vehicle back into its lane.
+When handover includes a model trial, the model supplies
+control while the task retains channel ownership. The run-
+time releases those channels once it verifies that the model
+can continue. If the trial fails, the task can resume control.
+Channels can also be returned while a task is still active. For
+example, after lane return, an obstacle-passage task can give
+back its channels and continue monitoring the model path.
+A new conflict can prompt it to request the channels again.
+15
+
+
+Table S4. Task lifecycle operations. The applicable operations depend on the task, its execution state, and current observations. A task can
+return individual channels before it ends.
+Operation
+Required conditions
+Task update
+Effect on execution
+Nominate
+Valid VLM proposal
+Create or update a task request
+Await admission before acquiring
+channels.
+Admit
+Valid binding, skill applicability,
+available channels
+Assign the requested channels to the
+task
+Permit outputs on those channels.
+Wait
+An admitted task awaiting a feasible
+opportunity
+Maintain the task and its assigned
+channels
+Continue observation and waiting
+control.
+Commit
+The executor starts following a
+feasible maneuver plan
+Mark the maneuver as committed
+Retain responsibility for
+continuation and recovery.
+Rebind
+A reviewed, valid binding for the
+same task before commitment
+Update the continuing task’s valid
+bindings
+Preserve task identity through the
+update.
+Complete
+The task meets its fulfillment
+conditions
+Mark the requirement as fulfilled
+Check whether the model is ready to
+take over.
+Recover
+Execution review calls for recovery
+after unsuitable continuation or
+handover
+Resume skill control or recovery
+planning on held channels
+Retain task responsibility.
+Model trial
+For a monitored handover,
+completion and readiness checks
+pass and model output is valid
+Retain channel ownership during the
+trial
+Apply model control and observe the
+resulting motion.
+Release
+A validated plan needs fewer
+channels or the task ends
+Remove the task as owner of the
+returned channels
+Make those channels available for
+reassignment.
+D.3. Traffic-Interaction Handover Conditions
+The traffic-interaction skill evaluates task clearance, conflict
+continuity, front and rear spacing, and the receiving model’s
+operating conditions. The conflict check projects braking,
+constant-speed, and acceleration continuations over a 2 s
+horizon against current occupancy. Front and rear checks
+compare observed spacing with response-based distance re-
+quirements. When the receiving model has a speed cap, the
+handover check compares it with the current speed.
+Table S5 summarizes the checks. The longitudinal spac-
+ing check uses the response-distance model of RSS [32]. For
+rear and front speeds vr, vf ≥0, the required bumper gap is
+δ(vr, vf) =
+"
+vrρ + aρ2
+2
++ (vr + aρ)2
+2br
+−
+v2
+f
+2bf
+#
++
+, (S6)
+where [z]+ = max(z, 0). The implementation uses response
+time ρ = 0.6 s, acceleration bound a = 2 m/s2, and braking
+magnitudes br = 4 and bf = 6 m/s2. The front check evalu-
+ates δ(vego, vlead), while the rear check reverses the roles to
+δ(vfollower, vego). Conflict projections span 2 s at 0.1 s inter-
+vals using current occupancy. These checks assess readiness
+for a trial. The trial then measures model continuation.
+Before generating new outputs, the orchestrator reviews
+the model commands applied during the trial and the re-
+sulting motion. The task retains channel ownership during
+the model trial, which lasts up to 2 s. The orchestrator ac-
+cepts handover once the model makes forward progress or
+Table S5. Traffic-interaction handover checks. These checks
+support entry into a monitored model trial.
+Check
+Physical evidence
+Task clearance (di)
+Ego body has cleared the task’s conflict re-
+gion.
+Conflict continuity
+Current occupancy supports the projected
+handover continuations.
+Front spacing
+Gap to the observed vehicle ahead satisfies
+the response-distance requirement.
+Rear spacing
+Associated followers have sufficient ob-
+served separation at handover.
+Model speed cap
+Current speed is within the receiving
+model’s speed cap, when configured.
+Valid output
+The receiving model supplies valid output
+for the required channels.
+an observed object ahead justifies waiting.
+D.4. Channel Allocation
+Channel allocation is non-preemptive. Existing holders re-
+tain their channels. Requests acquire free channels only
+when their bindings and applicability conditions are satisfied
+(Appendix C). Channel-set expansion is atomic, preserving
+the previous allocation if a conflict occurs. A successful
+contraction releases the removed channels. A task’s outputs
+can be applied only to channels it holds.
+16
+
+
+E. System Evolution
+System evolution uses execution records to improve skill
+execution and orchestration offline. Revisions change ap-
+plicability conditions, output generation, and computation
+scheduling through the same task interface. All stages retain
+the five relation families, four skill families, and three con-
+trol channels. The driving model, perception networks, and
+VLM keep the same weights throughout these stages.
+E.1. Offline Revision and Inheritance
+Crossings and merges share a traffic-interaction planner.
+Each task supplies its own geometry and traffic motion, so a
+change to the planner can serve both maneuvers. Later stages
+inherit the revised planner through the same skill contract.
+For either maneuver, the orchestrator can pair the planner’s
+speed output with a compatible model path.
+Execution records link observations and task bindings
+to the outputs applied on each channel and the resulting
+motion. Coding agents use these records to locate an unmet
+requirement, revise the skill or its coordination rules, and
+evaluate the revised behavior.
+E.2. Physical Mechanisms Behind Revisions
+Yielding along the intended path.
+During a turn, a pedes-
+trian near the exit can conflict with the intended path while
+lying outside the vehicle’s current heading direction. Pro-
+jecting the interaction along the intended path lets yielding
+account for the space the vehicle is about to traverse. The
+projection is recomputed as road orientation and participant
+positions change. Stage 2 inherits this mechanism from
+Stage 1.
+Obstacle passage before crossing.
+A vehicle partially ob-
+structing the ego lane before a straight junction creates a
+dependency between passage and crossing. Admitting the
+crossing task first can reserve channels needed to pass the ob-
+struction. The revised applicability condition defers crossing
+when measured clearance permits passage to finish before
+the junction, allowing the passage task to acquire the chan-
+nels first.
+The condition requires an active same-direction maneuver,
+a fresh measured obstruction endpoint, and straight-ahead
+junction commands. It projects the obstruction’s far endpoint
+toward the junction and checks that the remaining separation
+accommodates the ego half-length and a junction clearance.
+Applicability follows this measured spatial relationship, al-
+lowing the same rule to handle different obstacle positions
+and junction layouts.
+E.3. System Stages
+Stage 1 establishes the initial library and runtime on
+Bench2Drive v0.0.3. Stage 2 extends the inherited system
+Table S6. Capability accumulation across system stages. Later
+stages inherit the preceding implementation with model, perception,
+and VLM weights fixed.
+Stage
+System changes
+1
+Initial integration of traffic interaction, obstacle passage,
+rule compliance, and route guidance through task binding,
+channel ownership, and handover conditions.
+2
+Refined traffic observations and route guidance, static-
+occupancy protection, and updated applicability condi-
+tions.
+3
+Local cruising and following control, expanded reference
+reuse, and refined model-inference conditions.
+on v0.0.4 and also includes closed-loop runs on CARLA
+training routes. Stage 3 refines the system on Fail2Drive
+(Table S6).
+Benchmark evaluations freeze the corresponding stage
+and cover both development and held-out sets under the
+main-paper evaluation protocol. Stage 1 transfers to v0.0.4
+and Stage 2 to Fail2Drive before revision on the respective
+target benchmark. Longest6 is reserved for evaluating frozen
+systems throughout development.
+E.4. Development and Held-Out Sets
+Development sets contain routes used for system revision
+and regression checks, while held-out sets contain routes ex-
+cluded from these development activities. The development
+and held-out sets contain 82/138 routes on Bench2Drive
+v0.0.3, 60/160 on v0.0.4, and 68/132 on Fail2Drive. Ta-
+ble S7 compares AutoMoT with and without ROSE-Drive
+on the same routes within each set. The Bench2Drive results
+use the same route evaluations as the main-paper compar-
+isons. The Fail2Drive sets pool Base and Gen routes.
+On v0.0.3, development-set DS improves by 21.07 and
+SR rises from 45.12% to 91.46%. On held-out routes, Au-
+toMoT alone already reaches 97.63 DS, and ROSE-Drive
+maintains 97.91 with SR unchanged at 93.48%. Held-out DS
+gains of 11.27 on v0.0.4 and 12.29 on Fail2Drive show that
+the shared capabilities also improve performance beyond the
+development sets.
+E.5. Frozen-Stage Transfer to Longest6
+The transfer protocol evaluates AutoMoT and SimLingo
+alone and with the same system stages frozen before
+Longest6 evaluation. Each configuration uses the 36 routes
+of Longest6 v2 and the Leaderboard 2 evaluator. Within
+Stages 1–3, each model retains the same sensor configu-
+ration, driving-model checkpoint, and shared perception
+checkpoint. SimLingo additionally tests reuse of stages con-
+structed with AutoMoT. Evaluation uses the official 200 m
+global-plan spacing and minimum-speed penalty.
+Table S8 reports route-averaged DS and RC. The initial
+17
+
+
+Table S7. Performance on development and held-out sets. Paired comparisons of AutoMoT and AutoMoT with ROSE-Drive. Gains are
+computed before rounding. SR is a percentage.
+DS ↑
+SR (%) ↑
+Benchmark
+Set
+Routes
+Model
++ ROSE-Drive
+∆
+Model
++ ROSE-Drive
+Bench2Drive v0.0.3
+Development
+82
+76.31
+97.37
++21.07
+45.12
+91.46
+Held-out
+138
+97.63
+97.91
++0.29
+93.48
+93.48
+Bench2Drive v0.0.4
+Development
+60
+76.76
+95.62
++18.86
+48.33
+88.33
+Held-out
+160
+87.16
+98.43
++11.27
+73.13
+95.00
+Fail2Drive
+Development
+68
+65.63
+78.99
++13.36
+54.41
+77.94
+Held-out
+132
+79.46
+91.75
++12.29
+68.94
+94.70
+Table S8. Frozen-stage transfer to Longest6. Each model and the
+VLM remain fixed across stages. Both models use the same system
+stages. RC is a percentage. Values are rounded to integers.
+AutoMoT
+SimLingo
+Configuration
+DS ↑
+RC ↑
+DS ↑
+RC ↑
+Model alone
+25
+70
+22
+70
+Stage 1
+36
+71
+36
+73
+Stage 2
+44
+83
+39
+80
+Stage 3
+52
+91
+47
+84
+gain includes system construction, while subsequent gains
+measure the transfer of accumulated revisions under fixed
+model and perception weights.
+F. Execution Analysis and Measurement Proto-
+col
+F.1. Task Continuity and Handover
+The main paper’s qualitative cases show how task continuity
+follows physical progress. During lane borrowing, the VLM
+stops proposing obstacle passage while a 2.63 m lateral offset
+remains. Retaining the task lets lane return continue. During
+traffic interaction, the task combines model steering with
+skill-generated speed until handover readiness checks pass.
+Table S9 relates these decisions to the maneuver stages.
+In the traffic-interaction case, the vehicle exceeds the
+receiving model’s configured speed cap (10.91 versus
+9.72 m/s), and the model outputs full braking. The task con-
+tinues driving until the handover checks pass, then monitors
+model motion before releasing task responsibility.
+F.2. Capability Composition
+The separate merge episode in the main paper’s capability-
+composition table shows how capability composition retains
+useful model output during skill execution. Applied steering
+follows the model while the skill supplies throttle in place
+of the model’s full-brake command. The task holds both
+motion channels, retaining recovery responsibility while
+using the model’s steering. After release, the controller
+tracks a model reference generated 0.10 s earlier without new
+model inference. Model outputs can therefore contribute
+through capability composition, handover, and reference
+reuse.
+F.3. Adaptive Scheduling and Inference Events
+Inference utilization is computed over the complete Longest6
+runs of the final Stage 3 system with AutoMoT and Sim-
+Lingo. Each control step is assigned to one execution path
+using model-inference events and the applied steering, throt-
+tle, and brake commands. Model calls follow the main
+paper’s inference rule. Required holds, valid model refer-
+ences, and executable skill plans satisfy ηhold
+t
+, ηreuse
+t
+, and
+ηplan
+t
+, respectively. Feedback control executes these outputs,
+adjusting cruising and following speed from current observa-
+tions. The categories distinguish vehicle motion, reference
+reuse, feedback control, and traffic-interaction planning. Ini-
+tialization and warmup are excluded. Table S10 reports the
+distribution.
+The table groups applied execution paths, which can share
+the same inference-skipping condition. Task responsibility
+is tracked separately and can span categories. A skill can
+use a model-generated path, and a model trial can apply the
+model’s command while its physical task remains active.
+The system skips model inference on 71.5% of steps with
+AutoMoT and 71.3% with SimLingo. Cached model refer-
+ences account for 11.7% and 10.1% of steps, respectively.
+The remaining skipped steps execute required holds, valid
+motion references, or skill plans through feedback control.
+F.4. Agent Computation Latency
+We replay recorded Longest6 sensor inputs in temporal order
+on an RTX 5090 outside CARLA, executing the complete
+agent and measuring wall-clock latency at each control step.
+System latency weights the measured execution-path distri-
+butions by their frequencies in the 36 AutoMoT Longest6
+routes, with equal weight per route. Both models use these
+18
+
+
+Table S9. Task continuity through handover. Model output application and task release are separate events.
+Case
+Time (s)
+Relation or execution evidence
+System behavior
+Lane borrowing
+16.05
+Obstacle-passage relation
+Wait for opposing traffic.
+25.05
+Obstacle-passage relation
+Borrow the adjacent lane and pass the blockage.
+27.05
+No new proposal, lateral offset 2.63 m
+Keep lane-return control active.
+31.05
+Vehicle aligned with original lane
+Apply model motion.
+Traffic interaction
+11.05
+Traffic-interaction relation
+Wait for a suitable gap.
+13.05
+Traffic-interaction relation
+Join the traffic stream.
+17.05
+No new proposal, model outputs full braking
+Defer handover while continuing the task.
+17.45
+Handover checks pass
+Start a model trial.
+17.65
+Model trial accepted
+Release the task.
+18.05
+Traffic-rule relation
+Apply model control with the rule check.
+Table S10. Execution-path distribution over complete Longest6 runs. Rounded percentages of control steps assigned to mutually
+exclusive runtime paths. Feedback control can also operate within other paths. Bold rows are group totals.
+Execution path
+AutoMoT (%)
+SimLingo (%)
+Model inference skipped
+71.5
+71.3
+Stopping hold
+19.3
+21.8
+Feedback control while moving
+18.0
+16.2
+Cached model reference
+11.7
+10.1
+Feedback control while stationary
+10.2
+11.5
+Traffic-interaction execution between planning calls
+4.8
+4.9
+Other feedback-control updates
+4.5
+3.6
+Red-light handling
+3.0
+3.2
+New model inference
+28.5
+28.7
+Model inference while moving
+15.9
+14.1
+Model inference while stationary
+10.6
+12.5
+Model inference during traffic-interaction planning
+2.0
+2.0
+weights. Timing spans preprocessed sensor inputs to final
+control commands, including system preparation, perception,
+VLM and driving-model inference, orchestration, planning,
+tracking, the safety filter, and synchronization. Initialization,
+warmup, and visualization are excluded.
+F.5. Execution Architecture Comparisons
+Table S11 separates the comparison of the final system on
+Bench2Drive v0.0.3 into one route per interaction type and
+18 additional high-interaction routes where AutoMoT per-
+forms poorly. Each configuration is evaluated once per route
+for the paired analysis below. Direct handover uses the
+full system’s skills and output generators but applies model
+control and immediately releases responsibility at task com-
+pletion. In both configurations, ongoing tasks persist when
+the VLM supplies no new proposal. The comparison isolates
+the full system’s handover readiness checks and monitored
+model trial, which retain responsibility until model continua-
+tion is accepted.
+The model-controlled cruising/following variant uses
+model inference in place of local cruising and following
+control, retaining skill execution and the safety filter.
+Decision-tree task selection replaces the VLM’s judg-
+ments with shallow decision trees fitted only to the PDM-
+Lite training set. The rules operate on perception-derived
+candidates and supply proposals to the same execution ar-
+chitecture, retaining persistent tasks, capability composition,
+handover checks, and inference conditions.
+AutoMoT + perception and safety retains auxiliary per-
+ception and the safety filter while disabling task admission
+and skill execution.
+Rule-based model replacement.
+This comparison re-
+places the driving model with receding-horizon kinematic
+motion planning.
+A bounded best-first search expands
+constant-curvature motion primitives from measured ego
+motion, with pose and curvature defining each search state.
+Curvature and its change along the path are bounded. Can-
+didate ranking combines path length, curvature, navigation
+progress, lane alignment, road clearance, and reference con-
+tinuity. Inputs comprise perception-derived semantic BEV,
+detected boxes, ego motion, and the current and next naviga-
+19
+
+
+Table S11. Stage 3 execution architecture comparisons by route group. Driving score (DS) and success rate (SR) on 44 routes covering
+all Bench2Drive interaction types and 18 additional high-interaction routes.
+Route group
+Configuration
+DS ↑
+SR (%) ↑
+44 interaction types
+Full ROSE-Drive
+99.67
+95.45
+AutoMoT alone
+87.78
+72.73
+AutoMoT + perception & safety
+90.15
+72.73
+Decision-tree task selection
+94.79
+84.09
+Rule-based model replacement
+73.82
+47.73
+Whole-vehicle skill takeover
+89.18
+72.73
+Model-controlled cruising/following
+97.17
+90.91
+Direct handover
+97.72
+93.18
+Fixed-schedule updates
+95.60
+86.36
+18 high-interaction routes
+Full ROSE-Drive
+100.00
+100.00
+AutoMoT alone
+73.81
+38.89
+AutoMoT + perception & safety
+79.19
+50.00
+Decision-tree task selection
+85.55
+72.22
+Rule-based model replacement
+66.95
+33.33
+Whole-vehicle skill takeover
+72.93
+50.00
+Model-controlled cruising/following
+92.05
+83.33
+Direct handover
+89.05
+77.78
+Fixed-schedule updates
+92.66
+83.33
+tion targets (TP/NTP). Vehicle-footprint checks test drivable
+space and occupancy. Path curvature and free stopping dis-
+tance bound speed, while traffic-interaction skills handle
+temporal conflicts. The planner supplies path and speed ref-
+erences through the decision harness. Perception, the VLM,
+skills, reference reuse, controllers, and safety filtering are
+retained.
+Whole-vehicle skill takeover.
+An engaged skill receives
+exclusive navigation, lateral, and longitudinal channels.
+Skills retain their native outputs. The same motion-primitive
+planner supplies any missing path or speed reference from
+perceived geometry and navigation targets. During takeover,
+navigation adjustments condition this planner, and model
+trajectories do not supply the skill’s missing outputs. The
+learned model remains available for driving outside skill
+execution and for handover. Perception, the VLM, feedback
+controllers, and safety filtering are retained. This compari-
+son tests complete takeover against capability composition,
+where a model path can remain useful while a skill regulates
+speed.
+Fixed-schedule updates.
+This variant retains the model,
+perception and VLM weights, skills, and controller imple-
+mentations. It queries the model on three of every ten control
+steps and updates perception and orchestration on a fixed
+67% of steps. Skill applicability, planning, channel alloca-
+tion, and controller-selection rules operate at these updates.
+Between updates, selected controllers track retained refer-
+ences using current vehicle state. The VLM keeps its origi-
+nal cadence. Sensor ingestion, feedback control, and safety
+checks continue at every control step.
+Paired route analysis.
+We pair outcomes by route and
+bootstrap the 62 route pairs with 20,000 resamples. The 95%
+percentile intervals for the full system’s DS advantage are
+[1.35, 8.52] over direct handover, [1.13, 7.74] over model-
+controlled cruising/following, and [8.06, 17.86] over per-
+ception and safety alone. These intervals describe variation
+across the evaluated routes.
+The full system incurs zero vehicle collisions, compared
+with four across three routes for direct handover and five
+across five routes for model-controlled cruising/following.
+Perception and safety alone incur 17 vehicle collisions across
+16 routes.
+G. Benchmark Results and Baseline Sources
+On Bench2Drive v0.0.3, the AutoMoT comparison uses
+our paired route evaluations. SimLingo and TransFuser++
+model-alone scores follow the Bench2Drive leaderboard [1].
+On v0.0.4, SimLingo model-alone and LEAD expert scores
+follow the benchmark release [3], while AutoMoT and Trans-
+Fuser++ model-alone scores use our evaluations. All ROSE-
+Drive results come from our evaluations. Privileged experts
+in the main paper use ground-truth scene state [1, 29].
+Fail2Drive.
+Table S12 reports the split-wise and average
+DS, SR, and HM for each model alone and with ROSE-Drive.
+AutoMoT-alone results come from our evaluations, while
+20
+
+
+Table S12. Model and system performance on Fail2Drive. ROSE-Drive rows describe the accumulated Stage 3 system. In-distribution
+(Base) and generalization (Gen) each contain 100 routes. HM is the harmonic mean of DS and SR within each split. Average takes the mean
+of the two splits for each metric. SR is a percentage.
+Base
+Gen
+Average
+Method
+DS ↑
+SR ↑
+HM ↑
+DS ↑
+SR ↑
+HM ↑
+DS ↑
+SR ↑
+HM ↑
+BridgeDrive
+91.6
+95.0
+93.3
+81.9
+75.0
+78.3
+86.8
+85.0
+85.8
++ ROSE-Drive
+91.6
+99.0
+95.1
+88.9
+94.0
+91.4
+90.3
+96.5
+93.3
+SimLingo
+82.6
+79.3
+80.9
+71.7
+55.0
+62.2
+77.2
+67.2
+71.6
++ ROSE-Drive
+89.2
+95.0
+92.0
+85.4
+89.0
+87.1
+87.3
+92.0
+89.6
+AutoMoT
+79.6
+73.0
+76.2
+69.9
+55.0
+61.6
+74.8
+64.0
+68.9
++ ROSE-Drive
+89.0
+91.0
+90.0
+85.8
+87.0
+86.4
+87.4
+89.0
+88.2
+published SimLingo and BridgeDrive model-alone results
+follow [23]. HM is computed within each split, and average
+HM is the mean of the two split HMs.
+21

@@ -1,0 +1,1591 @@
+FASTROVERVLA: FAST VISION-LANGUAGE-ACTION
+EXECUTION FOR OFF-ROAD AUTONOMOUS DRIVING
+Changtao Zhao1, Yingxue Guan1, Li Wang1,2,∗, Shijie Zhao3,
+Yuhang Zhang3, Shengkai Zhang4, Qing Wang5, Ziying Song5,†
+1School of Mechanical Engineering, Beijing Institute of Technology, Beijing 100081, China
+2Chongqing Innovation Center, Beijing Institute of Technology, Chongqing 401120, China
+3School of Mechanical Engineering and Intelligent Equipment, Chang’an University
+4School of Electronic and Information Engineering, Beijing Jiaotong University
+5School of Artificial Intelligence (School of Software), Yanshan University
+∗Corresponding author: Li Wang (wangli_bit@bit.edu.cn)
+†Project lead: Ziying Song
+ABSTRACT
+Off-road vision-language-action (VLA) models generate scene-conditioned plans, but frequent trajec-
+tory updates can repeatedly invoke expensive multimodal inference. Reusing a prediction reduces
+this demand while leaving its commands exposed to changes in vehicle motion. FastRoverVLA
+addresses this mismatch by decoupling visual plan generation from motion-conditioned execution.
+Its training-free interface maintains decoded plans between visual predictions. A speed–curvature
+action buffer is aligned with measured motion at each update, integrated into a local trajectory, and
+advanced by consuming the current action. The corrected remainder is written back to the buffer,
+preserving motion corrections across successive updates. A bounded refresh rule normalizes speed
+and curvature variations within a newly decoded plan and assigns a short or long reuse budget
+according to the resulting plan-roughness score. The interface requires neither backbone features
+nor an additional learned driving policy. Over a 3 s horizon, independent real-request evaluation
+achieves average displacement error (ADE) and final displacement error (FDE) of 0.328/0.596 m
+on ORAD-3D and 0.266/0.526 m on RELLIS-3D, reducing FDE by 18.0% and 36.7% at request
+rates of 6.0% and 4.8%, respectively. These runs retain lower errors across four backbones and both
+datasets and reduce Qwen3-VL request-processing cost by factors of 16.6 and 20.8 under serial replay,
+while mechanism and motion-only controls identify persistent state correction as the main source of
+the observed accuracy benefit. The source code and evaluation materials are publicly available at
+https://github.com/ADEPT-ORG/FastRoverVLA.
+Keywords Artificial Intelligence, Computer vision, Autonomous driving, off-road trajectory planning, recurrent
+execution
+1
+Introduction
+Off-road driving requires motion decisions in environments without fixed lane structure, where surface conditions,
+visibility, and feasible routes can change within a journey [1–3]. Vision-language-action (VLA) models connect
+visual observations and language-based reasoning to numerical actions or trajectories [4–7]. Their outputs must also
+accommodate the vehicle motion that follows prediction. A scene-conditioned plan can remain relevant across several
+trajectory updates, while its speed and curvature commands require continued adjustment to the measured state.
+Coupling every trajectory update to a new prediction repeatedly invokes multimodal inference [8–11]. Efficient encoders
+and inference pipelines reduce the cost of individual calls [12,13], while slow–fast systems combine expensive reasoning
+with a faster planning path [6,14]. Action-chunk methods address continuity between predicted sequences through
+temporal aggregation, constrained generation, or learned correction [15–17]. These developments leave a specific
+execution problem at the decoded-action interface: retaining the motion corrections accumulated after a plan has been
+generated, without another learned planner or access to the generative sampler.
+A retained plan must account for two changes during reuse: commands are consumed as time advances, and measured
+motion changes the state to which the remaining commands must be matched. Direct replay advances the sequence
+without resolving this state mismatch. Realigning the original plan at each update incorporates current motion but
+arXiv:2611.26242v1  [cs.RO]  19 Nov 2026
+
+
+FastRoverVLA
+VLA Planner
+t0
+t1
+t2
+t3
+…
+Time
+Old trajectory
+State drift
+Plan
+Align
+Continue
+t0
+t1
+t2
+t3
+…
+(a) Frame-synchronous VLA execution
+(b) Direct trajectory replay (failure case)
+Frequent trajectory intervention ×
+State drift under replay ×
+VLM inference in background
+Time
+Sparse intervention + state consistency √
+(c) FastRoverVLA(ours)
+Figure 1: Motivation of FastRoverVLA. (a) Frame-synchronous prediction. (b) State mismatch during direct reuse. (c) Recurrent
+state alignment and write-back between plan refreshes. The separated paths depict distinct planning and trajectory-update rates; the
+arrows indicate scheduling dependencies.
+discards previous corrections. Carrying the corrected remainder into the next update preserves both the unconsumed
+actions and the motion corrections retained in them (Fig. 1).
+FastRoverVLA decouples visual plan generation from recurrent execution around a frozen vision-language model
+(VLM) and a deterministic action adapter. The name combines “Fast” for reduced VLM inference demand, “Rover”
+for off-road driving, and “VLA” for vision-language-action planning. Visual inference refreshes the action buffer,
+while recurrent execution maintains motion-conditioned trajectories between refreshes. Each update aligns the retained
+speed–curvature actions with measured ego motion, generates a local trajectory, consumes the current action, and writes
+the corrected remainder back to the buffer. A bounded rule uses variation within the refreshed plan to assign its reuse
+budget. The resulting interface separates visual plan generation from motion-conditioned trajectory updates without
+modifying the backbone or training an auxiliary driving policy.
+Evaluation on ORAD-3D [3] and RELLIS-3D [1] separates three questions: whether decoded plans benefit from
+persistent correction, whether visual initialization adds information beyond motion history, and whether sparse refresh
+reduces measured inference demand. Shared-prediction controls isolate the maintenance operations; motion-only
+and matched-image controls examine initialization. Backbone transfer, disjoint-sequence evaluation, and a past-only
+heading check test the stability of the execution effect. Independent real-request runs measure its computational
+consequence under serial replay.
+The main contributions are:
+• FastRoverVLA introduces an action-level execution interface for off-road VLA planning. Maintaining a
+decoded plan as a recurrent state separates visual prediction from motion adaptation, allowing local trajectory
+updates between model requests without an additional learned driving policy.
+• The interface combines state alignment, action consumption, and correction write-back to preserve measured-
+motion updates in the retained plan. A bounded refresh rule assigns reuse budgets from normalized action
+variation, controlling inference demand through the same decoded-action representation.
+• Controlled replay and independent real-request evaluation cover two datasets and four backbones. In real-
+request evaluation, Qwen3-VL reduces 3 s FDE by 18.0% and 36.7% relative to every-update execution, while
+serial request-processing cost falls by factors of 16.6 and 20.8, respectively.
+2
+Related Work
+2.1
+Vision-Language-Action Planning
+Robotic VLA models such as RT-2 and OpenVLA [18,19] connect vision-language representations to actions. Driving
+planners UniAD and VAD [20,21] emphasize planning-oriented scene representations. LMDrive, DriveLM, DriveVLM,
+and EMMA [4–7] incorporate language instructions, structured understanding, or hierarchical reasoning. AutoVLA,
+2
+
+
+FastRoverVLA
+ORION, ReCogDrive, and SimLingo [8, 9, 11, 22] connect language or reasoning with numerical driving actions;
+DriveMoE [10] specializes vision and action experts. ColaVLA, WAM-Flow, and Latent-CoT-Drive [23–25] explore
+latent reasoning, parallel decoding, or world-model-based planning. Complementary work improves the information and
+constraints used for planning: FocalAD [26] models decision-critical local interactions, and GraphBEV++ [27] aligns
+camera–LiDAR features. GraphWorld and DriveFuture [28,29] use latent world-state or future-aware conditioning.
+DriveWorld-VLA [30] integrates world modeling with VLA planning, while MindDrive [31] evaluates world-model-
+generated candidates with a VLM. GuideFlow [32] constrains flow matching, and DIVER [33] applies reward-guided
+diffusion to multimodal planning. These advances improve scene-conditioned plan generation, whereas decoded actions
+must also remain consistent with the changing execution state. FastRoverVLA addresses this execution stage through
+deterministic measured-motion updates to speed–curvature actions. Its frozen planner supplies new visual plans, while a
+retained action buffer preserves corrections between predictions, separating plan maintenance from encoder, reasoning,
+and decoding design.
+2.2
+Terrain-Aware Off-Road Planning
+Off-road planning couples geometric clearance with physical traversability. BADGR and STEP [34,35] learn navi-
+gation affordances or combine stochastic traversability with risk-aware planning. How Does It Feel?, V-STRONG,
+and RoadRunner [36–38] learn terrain costs or traversability from visual, proprioceptive, or LiDAR observations.
+TRAIL [39] supports joint path and speed optimization through continuous terrain representations; terrain-adaptive
+MPC [40] incorporates vehicle–terrain interactions and online parameter estimates. OFF-EMMA [41] uses visual
+prompts and self-consistent reasoning for off-road trajectory generation. RELLIS-3D, ORFD, and ORAD-3D [1–3]
+provide evaluation settings with rugged terrain and varied visibility. These approaches determine where and how to
+move, but measured vehicle motion can require adjustment without changing the selected route or terrain assessment.
+FastRoverVLA complements terrain interpretation by updating decoded actions between visual predictions, maintaining
+motion consistency without requiring new terrain labels or traversability estimates at every update.
+2.3
+Efficient and State-Consistent Execution
+Temporal planners exploit cross-frame information: MomAD [42] carries trajectory and perception momentum,
+MomADv2 [43] retains command-consistent memory and uses flow refinement, and MomWorld [44] propagates latent
+future scene states. Efficiency methods improve visual encoding or model size [12,45], reduce reasoning [8,46,47], or
+accelerate action generation and inference [13,48]. Slow–fast systems combine infrequent VLM planning with trajectory
+refinement [6], learn adaptive activation and fusion [14], or schedule query, cache, and drop decisions [49]. These
+mechanisms determine when guidance arrives, while action maintenance determines how decoded sequences evolve
+during execution. ACT [15] ensembles overlapping predictions, and Diffusion Policy [50] generates receding-horizon
+action sequences. RTC [16] asynchronously generates chunks while preserving committed actions and constraining
+overlap through inpainting; REMAC [17] learns within-chunk corrections and preserves prefixes across chunks.
+FastRoverVLA instead deterministically aligns a retained speed–curvature sequence with measured motion and writes
+corrections back for subsequent updates. Its bounded refresh rule admits new visual plans, while intermediate updates
+require neither sampler access nor an auxiliary learned planner. The focus is persistent state correction after decoding,
+distinct from learned temporal planning, query scheduling, or new-chunk generation.
+3
+Methodology
+FastRoverVLA maintains a speed–curvature action buffer between visual predictions (Fig. 2). A refresh initializes the
+buffer from the current image, ego motion, and instruction. Subsequent updates align its actions with measured motion
+and retain the corrected remainder until the reuse budget expires. A plan denotes the action sequence, and a trajectory
+denotes the positions obtained by integrating that sequence.
+3.1
+Action-Buffer Initialization
+Buffer initialization provides a common action representation for fresh predictions and retained plans. Let t index
+trajectory updates, h index future actions, and H denote the output horizon length. At a refresh, the frozen VLM and its
+deterministic adapter return Lt ≤H parsed actions, eAt = {(evt,h, eκt,h)}Lt
+h=1, where ev and eκ denote speed and curvature.
+A short output is completed by repeating its last action; an empty output uses measured speed and curvature throughout.
+The completed plan is
+ˆAt = {(ˆvt,h, ˆκt,h)}H
+h=1,
+(1)
+where ˆvt,h and ˆκt,h are the predicted speed and curvature at horizon step h.
+3
+
+
+FastRoverVLA
+Inputs
+Image
+…
+Ego motion
+speed
+curvature
+…
+Prompt
+Drive forward 
+on the trail.
+…
+VLM
+…
+Frozen VLM
+Planner
+Recurrent Execution Interface
+Action buffer
+…
+Consume
+1
+…
+Next action
+(v, k)
+Align
+2
+…
+…
+Current state
+(Vt, Kt)
+Update in 
+action space
+Write-back
+3
+…
+…
+Next buffer
+Outputs
+Waypoints
+Control
+Speed
+Steering
+FastRoverVLA
+Next action
+Original action
+Updated action
+Figure 2: FastRoverVLA framework. A frozen VLM initializes a speed–curvature buffer from images, ego motion, and an
+instruction. Consume–align–write-back updates produce integrated waypoints between budgeted refreshes (Section 3.3). The control
+panel denotes a potential downstream interface; evaluation uses waypoints and logged states, without a vehicle controller.
+Let a0
+t = (vt, κt) contain measured speed and curvature, and let rt = 1 indicate a VLM refresh (rt = 0 denotes reuse).
+The active plan is
+Ct(h) =
+α ˆAt(h) + (1 −α)a0
+t,
+rt = 1,
+Fill(Bt−1, H)(h),
+rt = 0,
+(2)
+where Bt−1 stores the corrected remainder from the preceding update and α ∈[0, 1] weights the fresh plan. Fill(B, H)
+extends a nonempty buffer to H actions by repeating its last action. An empty buffer triggers a refresh. Thus, horizon
+completion uses the available action state without an additional visual prediction.
+3.2
+State-Consistent Recurrent Execution
+Changes in vehicle motion create a mismatch between the retained commands and the current state. Each action is
+therefore aligned with measured speed and curvature:
+¯at,h = βCt(h) + (1 −β)a0
+t,
+h = 1, . . . , H,
+(3)
+where β ∈[0, 1] weights the active plan and ¯at,h = (¯vt,h, ¯κt,h) is the aligned action. The fresh-plan weight α applies
+only at refresh, whereas β applies at every update, including refresh. Alignment operates in action space, adjusting
+speed and curvature before integration.
+Starting from measured speed, a bound δv ≥0 limits the change between consecutive speed commands. Speeds are
+clipped to nonnegative values, and curvature is unchanged by this bound. The corrected plan A∗
+t = {(v∗
+t,h, κ∗
+t,h)}H
+h=1 is
+integrated into an ego-relative trajectory,
+Yt = Φ(A∗
+t , ∆t),
+(4)
+where Φ denotes planar integration and ∆t is the nominal logged-state and integration interval. Position (xh, yh) and
+heading ψh are measured relative to the vehicle pose at the current update, with (x0, y0, ψ0) = (0, 0, 0). Omitting index
+t for clarity,
+xh = xh−1 + v∗
+h cos(ψh−1)∆t,
+yh = yh−1 + v∗
+h sin(ψh−1)∆t,
+ψh = ψh−1 + κ∗
+hv∗
+h∆t.
+(5)
+The output Yt contains the resulting H positions under planar kinematic integration.
+4
+
+
+FastRoverVLA
+After consuming the first action, Tail(·) removes it and stores the remaining H −1 corrected actions:
+Bt = Tail(A∗
+t ).
+(6)
+Writing back the corrected remainder makes subsequent alignment depend on the motion corrections retained in the
+buffer as well as the current measured state. In the cyclic consume–align–write-back view, consumption at the preceding
+update has already removed the previous interval’s action before current alignment begins. During logged replay,
+subsequent measured states are supplied by the recorded sequence.
+3.3
+Bounded VLM Refresh
+The refresh rule controls inference demand through variation in the decoded actions. Higher-variation plans receive
+shorter reuse budgets, while lower-variation plans can be retained longer. For Lt ≥2, the mean absolute changes in
+speed and curvature, dv
+t and dκ
+t , are computed before horizon completion:
+dv
+t =
+1
+Lt −1
+Lt
+X
+h=2
+|evt,h −evt,h−1|,
+dκ
+t =
+1
+Lt −1
+Lt
+X
+h=2
+|eκt,h −eκt,h−1|,
+(7)
+The normalized plan-variation score is
+zt = max
+dv
+t
+sv
+, dκ
+t
+sκ
+
+,
+(8)
+where sv and sκ are the validation 90th percentiles of the corresponding raw features, lower-bounded by 10−4. Before
+normalization, both features are set to zero for a single parsed action and to one for an empty parsed list. The score zt,
+termed plan roughness, summarizes action variation rather than terrain conditions. The surfaces in Fig. 3 are schematic
+representations of these scalar quantities.
+The reuse budget is
+Kt =
+Ks,
+zt ≥τ,
+Kl,
+zt < τ,
+Ks < Kl,
+(9)
+where τ is the validation-selected threshold, and Ks, Kl are the short and long budgets. Higher plan roughness receives
+Ks; otherwise, Kl applies. The budget remains fixed until refresh and counts reuse updates only, giving a maximum
+refresh interval of Kt + 1 updates. A refresh at t is followed by reuse updates t + 1, . . . , t + Kt, with the next refresh
+due by t + Kt + 1. Fig. 3 illustrates the aggregation of action variation and the resulting budget assignment.
+Speed variation
+High
+Low
+t
+t + 𝑳𝒕− 1
+Curvature variation
+𝒅𝒕
+𝜅
+High
+Low
+t
+t + 𝑳𝒕− 1
+Plan roughness
+zₜ = max ( 
+d𝒕
+𝒗
+s𝒗,
+𝒅𝒕
+𝜅
+s𝜅)
+High
+Low
+t
+zₜ < τ  →  Kₗ (long reuse)
+t + 1
+t + Kₗ
+zₜ ≥ τ  →  Kₛ (short reuse)
+t + Kₛ
+t + 𝑳𝒕− 1
+t + 1
+𝒅𝒕
+𝒗
+Figure 3: Plan-variation-based bounded refresh. Speed and curvature variations are normalized and aggregated into the plan-
+roughness score zt. The threshold τ selects a short reuse budget Ks for higher variation and a long reuse budget Kl otherwise.
+The output horizon and refresh interval are separate parameters. Each update integrates H commands from the current
+measured state to produce an H∆t-second trajectory. Recurrent correction and tail completion sustain these updates
+throughout reuse, including intervals longer than the original visual prediction horizon.
+Each sequence starts with an empty buffer and a plan refresh. A subsequent refresh replaces the buffer when it is
+unavailable or its reuse budget is exhausted. Between refreshes, execution uses Bt−1 and current measured motion
+without reading a new image. Parameters are fixed after validation. Candidate budgets are ranked by validation FDE,
+then ADE and refresh rate, subject to the constraints relative to fixed-interval execution.
+5
+
+
+FastRoverVLA
+4
+Experiments
+The experiments test whether motion-conditioned plan maintenance can reduce visual inference while preserving
+trajectory accuracy in off-road driving. Comparisons across planning systems and frozen backbones establish overall
+performance, while controlled ablations distinguish the effects of state correction, visual initialization, and refresh
+scheduling. Cross-sequence tests and independent model requests then examine whether the accuracy and inference
+savings persist beyond the shared-prediction replay.
+4.1
+Experimental Setup
+Data and Protocol. Experiments use ORAD-3D [3] and RELLIS-3D [1], with 636 evaluation frames from 11 sequences
+and 650 frames from three sequences, respectively. Each frame anchors a motion history and its future ground-truth (GT)
+trajectory. ORAD-3D separates validation and test sequences; the RELLIS-3D temporal splits have disjoint evaluation
+timestamps and supporting history/future indices. Evaluation follows logged-state open-loop replay: measured motion
+is read at every update, independently of the preceding prediction, and the buffer resets at sequence boundaries. Within
+each backbone, all policies share the same evaluation frames and per-update processing. Every-update execution
+admits a fresh plan at each timestamp. Fixed-interval execution retains the recurrent interface with a constant refresh
+budget, while FastRoverVLA selects the budget from plan variation. Both reuse policies update the trajectory at every
+timestamp, including updates without a visual prediction. The matched comparisons use only motion history available
+at the current timestamp. Controlled replay reads the same cached predictions without invoking the model, and U/R
+counts updates per admitted plan. Independent real-request runs generate their own plans on the same logged states.
+Evaluation Metrics. Each trajectory is evaluated at six ego-relative positions, spaced 0.5 s apart over 3 s. Average
+displacement error (ADE) averages the six position errors, and final displacement error (FDE) measures the 3 s endpoint
+error. Intermediate L2 errors are reported at 1 and 2 s. Root mean squared error (RMSE) is computed from coordinate
+errors within each sample and averaged across frames; P95FDE is the 95th percentile of FDE. All errors are in meters.
+Sequence-level intervals use 10,000 paired whole-sequence bootstrap resamples, weighting sequence means equally
+to account for temporal dependence within recordings. ORAD-3D uses the preceding displacement as its reference
+heading. RELLIS-3D retains the archived centered-heading convention, with a past-only check in Section 4.4.
+Implementation. All backbone comparisons use the same evaluation frames, GT trajectories, and execution operators.
+Model weights are frozen, and execution parameters are fixed after validation. The default Qwen3-VL configuration
+uses β = 0.65 and δv = 0.25 m/s, with (Ks, Kl, τ, α) = (12, 32, 0.1463, 0.40) on ORAD-3D and (8, 24, 1.2074, 0.65)
+on RELLIS-3D; thresholds are rounded. Fixed reuse budgets are 12 and 8, respectively. Runtime measurements use
+one RTX 4090, BF16 weights, 448 × 448 images, and temperature zero. Request cost is cumulative model-request
+processing time per logged update under serial replay, excluding initialization, image preparation, and warm-up.
+Table 1: RELLIS-3D system comparison under the input and horizon adaptations in Section 4.1. FastRoverVLA has the lowest
+displayed errors. Frozen weights; 3 s horizon; errors: m (↓); bold: column minima.
+Method
+L2 error↓
+ADE↓
+RMSE↓
+P95FDE
+↓
+1 s
+2 s
+3 s
+OFF-EMMA [41]
+0.168
+0.428
+0.805
+0.395
+0.336
+2.068
+ReCogDrive [11]
+0.292
+0.693
+1.365
+0.692
+0.586
+3.306
+AutoVLA [8]
+0.293
+1.217
+3.089
+1.235
+1.159
+5.293
+SimLingo [22]
+2.411
+8.201
+14.067
+6.955
+5.951
+20.018
+DriveMoE [10]
+1.347
+3.763
+6.219
+3.206
+2.684
+10.480
+Drive-π0 [10]
+0.857
+2.958
+5.147
+2.521
+2.170
+10.647
+FastRoverVLA
+0.126
+0.286
+0.526
+0.266
+0.222
+1.375
+Baseline Methods. The comparison includes OFF-EMMA [41], ReCogDrive [11], AutoVLA [8], SimLingo [22],
+DriveMoE, and Drive-π0 [10]. These independently developed driving systems provide reference points for evaluating
+FastRoverVLA as a complete planning method. Their inclusion extends the evaluation across different pretrained
+planning pipelines. Complementary experiments apply the proposed execution interface to four frozen backbones and
+compare execution policies using shared predictions. The system-level comparison therefore assesses overall trajectory
+accuracy, while the matched backbone experiments and component ablations identify the contribution of recurrent
+execution.
+6
+
+
+FastRoverVLA
+4.2
+Main Results
+FastRoverVLA has the lowest mean and upper-tail errors in Table 1. Relative to OFF-EMMA, ADE decreases by 32.6%
+and P95FDE by 33.5%, showing comparable improvements in average and tail accuracy. At 0.5 s, within every model’s
+native prediction horizon, mean position error is 0.070 m versus 0.087 m for OFF-EMMA. The short-horizon gain is
+therefore present before trajectory continuation affects the shorter outputs. Fig. 4 also shows a lower central error range,
+although the distributions overlap across individual frames.
+0.01
+0.1
+1
+10
+ADE (m) #
+FastRoverVLA
+Drive-:0
+DriveMoE
+SimLingo
+AutoVLA
+ReCogDrive
+OFF-EMMA
+Figure 4: Frame-level 3 s ADE on RELLIS-3D under the adaptations in Table 1. Curves: peak-normalized densities in log-error
+space; thick bars: interquartile ranges; thin lines: 5th–95th percentiles; ticks: medians; diamonds: arithmetic means.
+Table 2: Recurrent execution improves all eight backbone–dataset pairs under shared frozen predictions. Errors: m (↓); U/R: updates
+per admitted plan (↑). Bold: within-backbone displayed optima, including ties.
+Backbone
+Execution
+ORAD-3D
+RELLIS-3D
+ADE↓
+FDE↓
+P95FDE
+↓
+U/R↑
+ADE↓
+FDE↓
+P95FDE
+↓
+U/R↑
+Qwen3-VL-2B
+Every update
+0.384
+0.726
+1.736
+1.0
+0.387
+0.820
+1.933
+1.0
+Fixed interval
+0.330
+0.599
+1.478
+12.2
+0.289
+0.584
+1.507
+8.8
+FastRoverVLA
+0.327
+0.593
+1.445
+17.2
+0.266
+0.526
+1.375
+21.0
+MiniCPM-V-2.6
+Every update
+0.390
+0.740
+1.732
+1.0
+0.457
+0.905
+1.886
+1.0
+Fixed interval
+0.327
+0.595
+1.478
+12.2
+0.292
+0.574
+1.454
+8.8
+FastRoverVLA
+0.324
+0.589
+1.455
+18.2
+0.282
+0.555
+1.394
+21.0
+Qwen2.5-VL-3B
+Every update
+0.376
+0.705
+1.686
+1.0
+0.338
+0.696
+1.636
+1.0
+Fixed interval
+0.332
+0.601
+1.481
+12.2
+0.278
+0.556
+1.480
+8.8
+FastRoverVLA
+0.332
+0.601
+1.481
+12.2
+0.268
+0.529
+1.382
+13.8
+InternVL2.5-2B
+Every update
+0.377
+0.712
+1.690
+1.0
+0.354
+0.745
+1.839
+1.0
+Fixed interval
+0.331
+0.601
+1.464
+12.2
+0.287
+0.582
+1.531
+8.8
+FastRoverVLA
+0.332
+0.601
+1.464
+13.5
+0.266
+0.527
+1.390
+15.5
+Recurrent execution lowers ADE and FDE across all eight backbone–dataset pairs in Table 2. For Qwen3-VL, FDE
+falls by 18.2% on ORAD-3D and 35.8% on RELLIS-3D, accompanied by P95FDE reductions of 16.8% and 28.9%.
+Fixed-interval reuse also improves accuracy, confirming that fewer predictions can remain effective when the retained
+actions are corrected. On RELLIS-3D, plan-conditioned refresh further reduces FDE by 3.3–9.9% relative to fixed
+intervals and increases the number of updates served by each plan. Its additional accuracy gain is smaller on ORAD-3D,
+where Qwen2.5-VL has identical fixed and adaptive results.
+4.3
+Ablation Study
+Table 3 tests the execution components at matched refresh times. Removing alignment increases FDE by 43.7% on
+ORAD-3D and 60.5% on RELLIS-3D; removing write-back increases it by 22.8% and 40.3%. Current-state correction
+and its persistence therefore make distinct contributions. Fresh-plan blending and speed bounds have smaller effects.
+Matched plans outperform shuffled and null initializations, but kinematic initialization comes within 0.004/0.011 m
+7
+
+
+FastRoverVLA
+Table 3: State alignment and write-back improve reuse. Upper block: shared refresh times; the no-reuse-correction control also
+shares refresh-time processing. Lower block: no requests or scheduled refresh. Errors: m (↓); bold: displayed column minima,
+including ties.
+Control
+ORAD-3D
+RELLIS-3D
+ADE↓
+FDE↓
+RMSE↓
+P95FDE
+↓
+ADE↓
+FDE↓
+RMSE↓
+P95FDE
+↓
+Shared VLA-derived refresh times
+FastRoverVLA
+0.327
+0.593
+0.267
+1.445
+0.266
+0.526
+0.222
+1.375
+Direct stale reuse
+0.500
+0.906
+0.404
+2.260
+0.471
+0.901
+0.387
+2.646
+No correction during reuse
+0.507
+0.924
+0.411
+2.330
+0.455
+0.876
+0.375
+2.511
+No per-update alignment (β = 1)
+0.454
+0.852
+0.374
+2.064
+0.419
+0.844
+0.353
+2.360
+No correction write-back
+0.396
+0.728
+0.323
+1.776
+0.371
+0.738
+0.310
+1.907
+No fresh-plan blend (α = 1)
+0.327
+0.593
+0.267
+1.440
+0.266
+0.527
+0.223
+1.380
+No speed bound
+0.326
+0.592
+0.266
+1.459
+0.267
+0.527
+0.223
+1.375
+Shuffled plan
+0.341
+0.609
+0.277
+1.548
+0.277
+0.548
+0.231
+1.381
+Kinematic plan
+0.329
+0.597
+0.269
+1.450
+0.270
+0.537
+0.226
+1.375
+Null plan
+0.394
+0.733
+0.324
+2.043
+0.335
+0.646
+0.278
+1.615
+Motion-only controls: no visual requests or refresh schedule
+Constant current motion
+0.407
+0.775
+0.335
+1.780
+0.434
+0.937
+0.375
+2.066
+Persistent motion-only
+0.330
+0.599
+0.270
+1.477
+0.261
+0.515
+0.218
+1.367
+FDE of the full method. Persistent motion-only execution is similarly accurate on ORAD-3D and slightly more accurate
+on RELLIS-3D, identifying recurrent motion correction as the dominant source of the local prediction gain.
+Fig. 5(c,d) compares policies with identical refresh-time plans. The gap at older reuse ages shows the benefit of
+continuing to correct the retained actions, including beyond the original six-action horizon. Each curve averages the
+frames reaching a given age.
+The image control in Table 4 holds motion history and the prompt fixed while using true, gray, or cross-sequence donor
+images. Each case starts from a fresh plan. Turning cases require speed of at least 0.5 m/s, absolute yaw rate of at
+most 3◦/s, and at least 15◦between valid first and last GT trajectory segments; GT is used only for this grouping. True
+images reduce FDE by 6.9% versus gray inputs and 4.3% versus donor inputs on the 14 RELLIS-3D turning frames.
+The seven ORAD-3D turning frames and the full test sets do not show the same advantage. Visual initialization thus
+has a conditional contribution in this diagnostic.
+(a) ORAD-3D: ADE distribution
+0
+0.5
+1
+1.5
+2
+2.5
+ADE (m)
+0
+1
+2
+3
+Probability density
+Every update
+FastRoverVLA
+(c) ORAD-3D: state correction
+0
+1-2
+3-5
+6-11
+12-23
+24+
+Reuse age (0.5 s updates)
+0
+0.4
+0.8
+1.2
+Mean FDE (m)
+No reuse correction
+FastRoverVLA
+(b) RELLIS-3D: ADE distribution
+0
+0.5
+1
+1.5
+2
+2.5
+ADE (m)
+0
+1
+2
+3
+Probability density
+(d) RELLIS-3D: state correction
+0
+1-2
+3-5
+6-11
+12-23
+24+
+Reuse age (0.5 s updates)
+0
+0.4
+0.8
+1.2
+Mean FDE (m)
+Figure 5: Matched Qwen3-VL replay. (a,b) ADE densities use a shared within-dataset bandwidth and reflection at zero. (c,d) Mean
+FDE by reuse age; both policies have identical refresh-time trajectories, but the control omits subsequent correction. Shading marks
+ages beyond the six-action horizon.
+8
+
+
+FastRoverVLA
+Table 4: Image-content controls at fresh-plan initialization. Turning subsets: Section 4.3. Errors: m (↓); bold: dataset/group minima.
+Image input
+All frames
+Turning subset
+ADE
+FDE
+ADE
+FDE
+ORAD-3D
+True
+0.385
+0.727
+0.468
+1.014
+Gray
+0.384
+0.726
+0.464
+1.005
+Donor
+0.385
+0.728
+0.465
+1.008
+RELLIS-3D
+True
+0.391
+0.831
+0.515
+1.080
+Gray
+0.386
+0.820
+0.539
+1.159
+Donor
+0.387
+0.822
+0.523
+1.128
+Fig. 6 compares trajectories in camera and metric BEV views across straight travel and turns. FastRoverVLA follows
+the recorded path more closely on the rough straight and confined left turn, where every-update predictions accumulate
+lateral deviation. The BEV views distinguish path direction from endpoint distance, while the camera views retain the
+surrounding terrain and visibility conditions. Further examples can be explored at https://adept-org.github.io/
+FastRoverVLA/.
+4.4
+Robustness and Sensitivity Analysis
+Table 5: Refresh timing, signals, and reuse caps in frozen-Qwen3 replay. R/C/Q: initial-action residual, output incompleteness, and
+plan roughness. Errors: m (↓); rate: admissions/update (%); bold: displayed block minima.
+Setting
+ORAD-3D
+RELLIS-3D
+ADE↓
+FDE↓
+P95FDE
+↓
+Rate(%)↓
+ADE↓
+FDE↓
+P95FDE
+↓
+Rate(%)↓
+Timing and cross-dataset rule transfer
+Fixed interval
+0.330
+0.599
+1.478
+8.2
+0.289
+0.584
+1.507
+11.4
+Uniform, matched budget
+0.329
+0.597
+1.519
+5.8
+0.268
+0.530
+1.377
+4.8
+Local plan-conditioned rule
+0.327
+0.593
+1.445
+5.8
+0.266
+0.526
+1.375
+4.8
+Transferred frozen rule
+0.331
+0.603
+1.531
+5.3
+0.272
+0.541
+1.391
+5.7
+Validation-selected refresh signals
+Q only
+0.327
+0.593
+1.445
+5.8
+0.266
+0.526
+1.375
+4.8
+R + C
+0.334
+0.607
+1.544
+6.1
+0.271
+0.539
+1.394
+5.2
+R + Q
+0.329
+0.597
+1.508
+7.7
+0.270
+0.537
+1.394
+4.8
+C + Q
+0.331
+0.599
+1.477
+4.9
+0.266
+0.526
+1.375
+4.8
+R + C + Q
+0.334
+0.606
+1.544
+6.0
+0.270
+0.537
+1.394
+4.8
+Maximum reuse budget (updates)
+Kmax = 6
+0.342
+0.623
+1.548
+15.1
+0.290
+0.584
+1.502
+14.3
+Kmax = 8
+0.335
+0.610
+1.467
+11.8
+0.289
+0.584
+1.507
+11.4
+Kmax = 12
+0.330
+0.599
+1.478
+8.2
+0.272
+0.543
+1.397
+8.2
+Kmax = 16
+0.328
+0.595
+1.508
+7.5
+0.276
+0.552
+1.398
+6.8
+Kmax = 24
+0.327
+0.596
+1.473
+6.9
+0.266
+0.526
+1.375
+4.8
+Kmax = 32
+0.327
+0.593
+1.445
+5.8
+0.266
+0.526
+1.375
+4.8
+Table 5 examines the accuracy retained at different refresh budgets. On RELLIS-3D, the plan-conditioned rule reduces
+FDE by 9.9% and admissions by 58.1% relative to fixed intervals. The offline uniform schedule at the same admission
+count remains within 0.004 m FDE on both datasets, showing that these sparse budgets tolerate changes in refresh
+timing. The transferred rule also retains lower errors than every-update execution. Adding residual or incompleteness
+signals does not consistently improve ADE or FDE over plan roughness alone. Larger reuse caps reduce admissions,
+while upper-tail error fluctuates rather than improving monotonically.
+Error reduction persists when sequences receive equal weight (Table 6). The 95% intervals exclude zero for both
+metrics, with lower FDE on 10 of 11 ORAD-3D sequences and all three RELLIS-3D sequences. The latter intervals
+describe variation among only three recordings. On an additional 931 ORAD-3D frames from disjoint sequences, the
+frozen rule also improves every-update execution, reaching 0.820 m FDE at a 6.6% admission rate. The execution
+benefit therefore extends beyond the sequences used for calibration and the main test.
+9
+
+
+FastRoverVLA
+FDE: 0.88 / 0.06 m
+(a) Rough straight
+-4
+-2
+0
+2
+right (m)
+0
+2
+4
+6
+forward (m)
+BEV
+FDE: 0.64 / 0.06 m
+(b) Dirt trail
+-2
+0
+2
+right (m)
+0
+2
+4
+forward (m)
+BEV
+FDE: 0.63 / 0.35 m
+(c) Night turn
+-3
+-2
+-1
+0
+1
+2
+right (m)
+-1
+0
+1
+2
+3
+4
+forward (m)
+BEV
+FDE: 0.82 / 0.48 m
+(d) Confined left
+-3
+-2
+-1
+0
+1
+2
+right (m)
+-1
+0
+1
+2
+3
+4
+forward (m)
+BEV
+FDE: 0.37 / 0.15 m
+(e) Snowy right
+-2
+0
+2
+4
+right (m)
+0
+2
+4
+6
+forward (m)
+BEV
+FDE: 1.11 / 0.32 m
+(f) Woodland trail
+-4
+-2
+0
+2
+4
+6
+right (m)
+0
+2
+4
+6
+8
+10
+forward (m)
+BEV
+Ground truth
+Every-update
+FastRoverVLA
+Figure 6: ORAD-3D trajectories from matched Qwen3-VL predictions. Camera and BEV views show six waypoints; curves
+interpolate them for display. Boxes: schematic ego poses; gray points: synchronized LiDAR. Camera projections use per-frame
+calibration and a 0.65 m display lift. Labels give every-update / FastRoverVLA FDE.
+Table 6: Sequence-balanced error reductions (every-update minus FastRoverVLA, m ↑). Intervals: 10,000 whole-sequence bootstrap
+resamples; improved: sequences with lower error.
+Dataset
+Metric
+Reduction
+Interval(95%)
+Improved
+ORAD-3D
+ADE
+0.055
+[0.030, 0.078]
+10/11
+FDE
+0.125
+[0.073, 0.175]
+10/11
+RELLIS-3D
+ADE
+0.111
+[0.092, 0.138]
+3/3
+FDE
+0.271
+[0.239, 0.328]
+3/3
+The execution gain persists when the RELLIS-3D reference heading uses past positions only (Table 7). Rescoring the
+same trajectories gives a 32.9% FDE reduction in controlled Qwen3-VL replay and reductions of 21.8–33.8% across the
+four real-request backbones. Inputs, actions, and refresh schedules are unchanged. Removing alignment or write-back
+still increases error, so the component effects are preserved as well. The improvement consequently does not depend on
+the archived centered-heading convention.
+4.5
+Inference Efficiency
+FastRoverVLA reduces model requests by 91.8–95.2% across the eight backbone–dataset pairs while also lowering
+ADE and FDE relative to every-update execution (Table 8). Qwen3-VL requests a fresh plan on 6.0% of ORAD-3D
+updates and 4.8% of RELLIS-3D updates, reducing cumulative request-processing time by factors of 16.6 and 20.8. Its
+3 s FDE simultaneously decreases by 18.0% and 36.7%. The saving comes from avoiding repeated visual inference
+while motion-conditioned trajectory updates continue at every logged state.
+10
+
+
+FastRoverVLA
+Table 7: Past-only heading preserves the execution effect on RELLIS-3D. Only the scoring frame changes. Errors: m (↓); bold:
+upper-panel column minima and lower-panel within-backbone minima.
+Controlled execution
+Archived heading
+Past-only heading
+ADE↓
+FDE↓
+ADE↓
+FDE↓
+Every update
+0.387
+0.820
+0.438
+0.903
+Fixed interval
+0.289
+0.584
+0.339
+0.666
+FastRoverVLA
+0.266
+0.526
+0.316
+0.606
+No per-update alignment
+0.419
+0.844
+0.449
+0.883
+No correction write-back
+0.371
+0.738
+0.414
+0.805
+Kinematic initialization, matched refresh
+0.270
+0.537
+0.320
+0.616
+Constant current motion
+0.434
+0.937
+0.483
+1.018
+Persistent motion only, no refresh
+0.261
+0.515
+0.311
+0.595
+Independent real-request trajectories
+Past-only ADE
+Past-only FDE
+Backbone
+Every update
+FastRoverVLA
+Every update
+FastRoverVLA
+Qwen3-VL-2B
+0.441
+0.315
+0.914
+0.605
+MiniCPM-V-2.6
+0.412
+0.318
+0.834
+0.612
+Qwen2.5-VL-3B
+0.389
+0.318
+0.781
+0.611
+InternVL2.5-2B
+0.400
+0.316
+0.819
+0.607
+Table 8: Independent real-request execution improves accuracy and reduces cost relative to every-update prediction. Errors: m (↓);
+Req.: requests/update (%); C: request-processing ms/update. Bold: within-backbone minima, including ties.
+Backbone
+Execution
+ORAD-3D
+RELLIS-3D
+ADE↓
+FDE↓
+Req.(%)↓
+C↓
+ADE↓
+FDE↓
+Req.(%)↓
+C↓
+Qwen3-VL-2B
+Every update
+0.385
+0.727
+100.0
+355.4
+0.391
+0.831
+100.0
+443.9
+Fixed interval
+0.330
+0.599
+8.2
+28.0
+0.287
+0.581
+11.4
+50.1
+FastRoverVLA
+0.328
+0.596
+6.0
+21.4
+0.266
+0.526
+4.8
+21.3
+MiniCPM-V-2.6
+Every update
+0.397
+0.754
+100.0
+1336.1
+0.364
+0.753
+100.0
+1392.8
+Fixed interval
+0.332
+0.604
+8.2
+108.1
+0.280
+0.558
+11.4
+157.3
+FastRoverVLA
+0.329
+0.597
+6.0
+79.8
+0.269
+0.533
+4.8
+66.2
+Qwen2.5-VL-3B
+Every update
+0.377
+0.706
+100.0
+3461.2
+0.339
+0.697
+100.0
+3212.2
+Fixed interval
+0.332
+0.601
+8.2
+246.6
+0.277
+0.555
+11.4
+356.2
+FastRoverVLA
+0.332
+0.601
+8.2
+255.6
+0.268
+0.529
+7.2
+225.6
+InternVL2.5-2B
+Every update
+0.377
+0.709
+100.0
+2102.2
+0.353
+0.742
+100.0
+2089.0
+Fixed interval
+0.331
+0.601
+8.2
+185.7
+0.284
+0.574
+11.4
+236.0
+FastRoverVLA
+0.330
+0.599
+7.5
+171.7
+0.266
+0.527
+6.5
+128.5
+5
+Conclusion
+FastRoverVLA maintains decoded driving plans through recurrent motion correction, allowing visual planning and
+trajectory updates to run at different frequencies. State alignment, action consumption, and correction write-back
+preserve a usable speed–curvature buffer between bounded refreshes. Across four frozen backbones and two off-road
+datasets, the interface reduces trajectory error and model-request demand without retraining. Independent Qwen3-VL
+runs reduce requests by 94.0% on ORAD-3D and 95.2% on RELLIS-3D, with 3 s FDE reductions of 18.0% and 36.7%
+and request-processing savings of 16.6 and 20.8 times. The ablations show that accuracy depends on carrying motion
+corrections into later updates, while bounded refresh governs inference demand. The corrected action remainder enables
+later trajectory updates to use motion feedback accumulated since the last visual prediction. Closed-loop evaluation
+remains necessary to assess performance under state-estimation error and changing scene conditions.
+Acknowledgments
+This work was supported by the National Natural Science Foundation of China under Grant No. 52502496, the Beijing
+Natural Science Foundation under Grant No. L2609087, and the Natural Science Foundation of Chongqing, China
+under Grant No. CSTB2025NSCQ-GPX0413.
+11
+
+
+FastRoverVLA
+References
+[1] Peng Jiang, Philip Osteen, Maggie Wigness, and Srikanth Saripalli. RELLIS-3D dataset: Data, benchmarks and analysis. In
+Proc. IEEE Int. Conf. Robot. Autom. (ICRA), pages 1110–1116, 2021.
+[2] Chen Min, Weizhong Jiang, Dawei Zhao, Jiaolong Xu, Liang Xiao, Yiming Nie, and Bin Dai. ORFD: A dataset and benchmark
+for off-road freespace detection. In Proc. IEEE Int. Conf. Robot. Autom. (ICRA), pages 2532–2538, 2022.
+[3] Chen Min, Jilin Mei, Heng Zhai, Shuai Wang, Tong Sun, Fanjie Kong, Haoyang Li, Fangyuan Mao, Fuyang Liu, Shuo Wang,
+Yiming Nie, Qi Zhu, Liang Xiao, Dawei Zhao, and Yu Hu. Advancing off-road autonomous driving: The large-scale ORAD-3D
+dataset and comprehensive benchmarks. arXiv preprint arXiv:2510.16500, 2025.
+[4] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song, Steven L. Waslander, Yu Liu, and Hongsheng Li. LMDrive: Closed-loop
+end-to-end driving with large language models. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages
+15120–15130, 2024.
+[5] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen, Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo, Andreas
+Geiger, and Hongyang Li. DriveLM: Driving with graph visual question answering. In Proc. Eur. Conf. Comput. Vis. (ECCV),
+pages 256–274, 2024.
+[6] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, Xianpeng Lang, and Hang
+Zhao. DriveVLM: The convergence of autonomous driving and large vision-language models. In Proc. Conf. Robot Learn.
+(CoRL), volume 270 of Proceedings of Machine Learning Research, pages 4698–4726, 2025.
+[7] Jyh-Jing Hwang, Runsheng Xu, Hubert Lin, Wei-Chih Hung, Jingwei Ji, Kristy Choi, Di Huang, Tong He, Paul Covington,
+Benjamin Sapp, Yin Zhou, James Guo, Dragomir Anguelov, and Mingxing Tan. EMMA: End-to-end multimodal model for
+autonomous driving. arXiv preprint arXiv:2410.23262, 2024.
+[8] Zewei Zhou, Tianhui Cai, Seth Z. Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. AutoVLA: A vision-language-
+action model for end-to-end autonomous driving with adaptive reasoning and reinforcement fine-tuning. In Adv. Neural Inf.
+Process. Syst. (NeurIPS), volume 38, pages 27920–27956, 2025.
+[9] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui, Dingkang Liang, Chong Zhang, Dingyuan Zhang, Hongwei Xie,
+Bing Wang, and Xiang Bai. ORION: A holistic end-to-end autonomous driving framework by vision-language instructed
+action generation. In Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), pages 24823–24834, 2025.
+[10] Zhenjie Yang, Yilin Chai, Xiaosong Jia, Qifeng Li, Yuqian Shao, Xuekai Zhu, Haisheng Su, and Junchi Yan. DriveMoE:
+Mixture-of-experts for vision-language-action model in end-to-end autonomous driving. In Proc. IEEE/CVF Conf. Comput.
+Vis. Pattern Recognit. (CVPR), pages 10678–10688, 2026.
+[11] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun, Bing
+Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. ReCogDrive: A reinforced cognitive framework
+for end-to-end autonomous driving. In Proc. Int. Conf. Learn. Represent. (ICLR), pages 157518–157556, 2026.
+[12] Pavan Kumar Anasosalu Vasu, Fartash Faghri, Chun-Liang Li, Cem Koc, Nate True, Albert Antony, Gokula Santhanam, James
+Gabriel, Peter Grasch, Oncel Tuzel, and Hadi Pouransari. FastVLM: Efficient vision encoding for vision language models. In
+Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 19769–19780, 2025.
+[13] Zekai Li, Yihao Liang, Hongfei Zhang, Jian Chen, Yesheng Liang, and Zhijian Liu. FlashDrive: Flash vision-language-action
+inference for autonomous driving. arXiv preprint arXiv:2608.12932, 2026.
+[14] Ruifei Zhang, Junlin Xie, Wei Zhang, Weikai Chen, Xiao Tan, Xiang Wan, and Guanbin Li. AdaDrive: Self-adaptive slow-fast
+system for language-grounded autonomous driving. In Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), pages 5112–5121,
+2025.
+[15] Tony Z. Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manipulation with low-cost
+hardware. In Proc. Robot.: Sci. Syst. (RSS), 2023.
+[16] Kevin Black, Manuel Y. Galliker, and Sergey Levine. Real-time execution of action chunking flow policies. In Adv. Neural Inf.
+Process. Syst. (NeurIPS), volume 38, 2025.
+[17] Haoxuan Wang, Gengyu Zhang, Yan Yan, Yuzhang Shang, Ramana Rao Kompella, and Gaowen Liu. Real-time robot execution
+with masked action chunking. In Proc. Int. Conf. Learn. Represent. (ICLR), 2026.
+[18] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted Xiao, Fei Xia, et al. RT-2: Vision-language-action models transfer
+web knowledge to robotic control. In Proc. Conf. Robot Learn. (CoRL), volume 229, pages 2165–2183, 2023.
+[19] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, et al. OpenVLA: An open-source
+vision-language-action model. In Proc. Conf. Robot Learn. (CoRL), volume 270, pages 2679–2713, 2025.
+[20] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, et al. Planning-oriented autonomous driving. In Proc.
+IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 17853–17862, 2023.
+[21] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, et al. VAD: Vectorized scene representation for
+efficient autonomous driving. In Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), pages 8340–8350, 2023.
+[22] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski. SimLingo: Vision-only closed-loop autonomous driving with
+language-action alignment. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 11993–12003, 2025.
+12
+
+
+FastRoverVLA
+[23] Qihang Peng, Xuesong Chen, Chenye Yang, Shaoshuai Shi, and Hongsheng Li. ColaVLA: Leveraging cognitive latent
+reasoning for hierarchical parallel trajectory planning in autonomous driving. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit. (CVPR), pages 17809–17819, 2026.
+[24] Yifang Xu, Jiahao Cui, Zhihao Zhu, Hanlin Shang, Shan Luan, Mingwang Xu, Feipeng Cai, Neng Zhang, Yaoyi Li, Jia Cai,
+and Siyu Zhu. WAM-Flow: Parallel coarse-to-fine motion planning via discrete flow matching for autonomous driving. In
+Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 24918–24928, 2026.
+[25] Shuhan Tan, Kashyap Chitta, Yuxiao Chen, Ran Tian, Yurong You, Yan Wang, Wenjie Luo, Yulong Cao, Philipp Krähenbühl,
+Marco Pavone, and Boris Ivanovic. Latent chain-of-thought world modeling for end-to-end autonomous driving. In Proc.
+IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 39724–39733, 2026.
+[26] Bin Sun, Boao Zhang, Jiayi Lu, Xinjie Feng, Jiachen Shang, Rui Cao, Mengchao Zheng, Chuanye Wang, Shichun Yang,
+Yaoguang Cao, and Ziying Song. FocalAD: Local motion planning for end-to-end autonomous driving. Automot. Innov., 2026.
+[27] Ziying Song, Caiyan Jia, Lin Liu, Shaoqing Xu, Lei Yang, and Yadan Luo. GraphBEV++: Multi-modal feature alignment for
+autonomous driving. arXiv preprint arXiv:2606.16354, 2026.
+[28] Ziying Song, Caiyan Jia, Lin Liu, Lei Yang, Shengkai Zhang, Feiyang Jia, Fengda Zhao, Peiliang Wu, Shaoqing Xu, Chen Lv,
+and Yadan Luo. GraphWorld: Long-horizon planning with world models for end-to-end autonomous driving. arXiv preprint
+arXiv:2606.16274, 2026.
+[29] Yufeng Hong, Xiaotian Zhou, Yingyan Li, Xiangpo Zhou, Lin Liu, Yadan Luo, Shaoqing Xu, Lei Yang, and Ziying Song.
+DriveFuture: Future-aware latent world models for autonomous driving. In Adv. Neural Inf. Process. Syst. (NeurIPS), 2026.
+[30] Feiyang Jia, Lin Liu, Ziying Song, Caiyan Jia, Hangjun Ye, Xiaoshuai Hao, and Long Chen. DriveWorld-VLA: Unified
+latent-space world modeling with vision–language–action for autonomous driving. In Proc. Int. Conf. Mach. Learn. (ICML),
+volume 306 of Proceedings of Machine Learning Research, pages 51836–51856. PMLR, 2026.
+[31] Bin Sun, Yaoguang Cao, Yan Wang, Rui Wang, Jiachen Shang, Xiejie Feng, Jiayi Lu, Jia Shi, Shichun Yang, Xiaoyu Yan,
+and Ziying Song. MindDrive: An all-in-one framework bridging world models and vision-language model for end-to-end
+autonomous driving. arXiv preprint arXiv:2512.04441, 2025.
+[32] Lin Liu, Caiyan Jia, Guanyi Yu, Ziying Song, Junqiao Li, Feiyang Jia, Peiliang Wu, Xiaoshuai Hao, and Yadan Luo. GuideFlow:
+Constraint-guided flow matching for planning in end-to-end autonomous driving. In Proc. IEEE/CVF Conf. Comput. Vis.
+Pattern Recognit. (CVPR), pages 3719–3728, 2026.
+[33] Ziying Song, Lin Liu, Hongyu Pan, Bencheng Liao, Mingzhe Guo, Lei Yang, Yongchang Zhang, Shaoqing Xu, Caiyan Jia, and
+Yadan Luo. DIVER: Reinforced diffusion breaks imitation bottlenecks in end-to-end autonomous driving. IEEE Trans. Pattern
+Anal. Mach. Intell., 48(11):13856–13872, 2026.
+[34] Gregory Kahn, Pieter Abbeel, and Sergey Levine. BADGR: An autonomous self-supervised learning-based navigation system.
+arXiv preprint arXiv:2002.05700, 2020.
+[35] David D. Fan, Kyohei Otsu, Yuki Kubo, Anushri Dixit, Joel Burdick, and Ali-Akbar Agha-Mohammadi. STEP: Stochastic
+traversability evaluation and planning for risk-aware off-road navigation. In Proc. Robot.: Sci. Syst. (RSS), 2021.
+[36] Mateo Guaman Castro, Samuel Triest, Wenshan Wang, Jason M. Gregory, Felix A. Sanchez, John G. Rogers, and Sebastian A.
+Scherer. How does it feel? self-supervised costmap learning for off-road vehicle traversability. In Proc. IEEE Int. Conf. Robot.
+Autom. (ICRA), pages 931–938, 2023.
+[37] Sanghun Jung, JoonHo Lee, Xiangyun Meng, Byron Boots, and Alexander Lambert. V-STRONG: Visual self-supervised
+traversability learning for off-road navigation. In Proc. IEEE Int. Conf. Robot. Autom. (ICRA), pages 1766–1773, 2024.
+[38] Jonas Frey, Manthan Patel, Deegan Atha, Julian Nubert, David Fan, Ali Agha, Curtis Padgett, Patrick Spieler, Marco Hutter,
+and Shehryar Khattak. RoadRunner: Learning traversability estimation for autonomous off-road driving. IEEE Trans. Field
+Robot., 1:192–212, 2024.
+[39] Yixuan Jia, Qingyuan Li, and Jonathan P. How. Off-road navigation via implicit neural representation of terrain traversability.
+IEEE Robot. Autom. Lett., 11(6):7126–7133, 2026.
+[40] Siyuan Yu, Congkai Shen, James Dallas, Bogdan I. Epureanu, Paramsothy Jayakumar, and Tulga Ersal. A real-time terrain-
+adaptive local trajectory planner for high-speed autonomous off-road navigation on deformable terrains. IEEE Trans. Intell.
+Transp. Syst., 26(3):3324–3340, 2025.
+[41] Liangdong Zhang, Yiming Nie, Haoyang Li, Fanjie Kong, Baobao Zhang, Shunxin Huang, Kai Fu, Chen Min, and Liang Xiao.
+A vision-language-action model with visual prompt for OFF-road autonomous driving. arXiv preprint arXiv:2601.03519, 2026.
+[42] Ziying Song, Caiyan Jia, Lin Liu, Hongyu Pan, Yongchang Zhang, Junming Wang, Xingyu Zhang, Shaoqing Xu, Lei Yang,
+and Yadan Luo. Don’t shake the wheel: Momentum-aware planning in end-to-end autonomous driving. In Proc. IEEE/CVF
+Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 22432–22441, 2025.
+[43] Ziying Song, Shengkai Zhang, Lin Liu, Peiliang Wu, Lei Yang, Dongyang Xu, Bin Sun, Li Wang, Shaoqing Xu, Caiyan Jia,
+and Yadan Luo. MomADv2: Reliable temporal memory for end-to-end autonomous driving. arXiv preprint arXiv:2608.23405,
+2026.
+13
+
+
+FastRoverVLA
+[44] Ziying Song, Shengkai Zhang, Lei Yang, Haozhuang Chi, Yuchen Liu, Jiangtao Su, Lin Liu, Ziyang Liu, and Chen Lv.
+MomWorld: Momentum-aware latent world model for long-horizon autonomous driving. arXiv preprint arXiv:2609.33737,
+2026.
+[45] Ruifei Zhang, Wei Zhang, Xiao Tan, Sibei Yang, Xiang Wan, Xiaonan Luo, and Guanbin Li. VLDrive: Vision-augmented
+lightweight MLLMs for efficient language-grounded autonomous driving. In Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV),
+pages 5923–5933, 2025.
+[46] Ishaan Rawal, Shubh Gupta, Yihan Hu, and Wei Zhan. NoRD: A data-efficient vision-language-action model that drives
+without reasoning. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 10965–10975, 2026.
+[47] Zhenghao Peng, Wenhao Ding, Yurong You, Yuxiao Chen, Wenjie Luo, Thomas Tian, Yulong Cao, Apoorva Sharma, Danfei
+Xu, Boris Ivanovic, Boyi Li, Yan Wang, and Marco Pavone. Counterfactual VLA: Self-reflective vision-language-action model
+with adaptive reasoning. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), pages 4022–4031, 2026.
+[48] Xinyang Wang, Qian Liu, Wenjie Ding, Zhao Yang, Wei Li, Chang Liu, Bailin Li, Kun Zhan, Xianpeng Lang, and Wei Chen.
+Unifying language-action understanding and generation for autonomous driving. In Proc. IEEE/CVF Conf. Comput. Vis.
+Pattern Recognit. (CVPR), pages 25193–25203, 2026.
+[49] Sining Ang, Yuan Chen, Haiyan Liu, Xuanyao Mao, Jason Bao, Xuliang, Bingchuan Sun, and Yan Wang. ASSCG: Just-right
+gating over chattering for fast-slow LLM planning in autonomous driving. arXiv preprint arXiv:2606.25509, 2026.
+[50] Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin Burchfiel, and Shuran Song. Diffusion policy:
+Visuomotor policy learning via action diffusion. In Proc. Robot.: Sci. Syst. (RSS), 2023.
+A
+Author Biographies
+Changtao Zhao is currently pursuing the B.E. degree in mechatronic engineering at China Agricultural University,
+Beijing, China. He was a research intern with the School of Mechanical Engineering, Beijing Institute of Technology,
+Beijing, China. His research interests include autonomous driving, embodied intelligence, computer vision, and
+robotics.
+Yingxue Guan is currently pursuing the B.E. degree at China Agricultural University, Beijing, China. She was a
+research intern with the School of Mechanical Engineering, Beijing Institute of Technology, Beijing, China. Her
+research interests include computer vision, autonomous driving, mechanical design, and robotics.
+Li Wang received the Ph.D. degree in mechatronic engineering from Harbin Institute of Technology, China, in 2020.
+He was a postdoctoral researcher with the Department of Automotive Engineering, Tsinghua University, China. He is
+currently a Special Associate Researcher with the School of Mechanical Engineering, Beijing Institute of Technology,
+Beijing, China. His research interests include off-road autonomous driving, embodied intelligence, human–machine
+collaboration for intelligent unmanned systems, and 3-D scene reconstruction.
+Shijie Zhao received the B.S. degree in mechanical engineering from Chang’an University, China, in 2024. He is
+currently pursuing the M.S. degree in mechanical engineering at Chang’an University, China. His research interests
+include autonomous driving and vision-language-action models.
+Yuhang Zhang studied for the B.S. degree in mechanical engineering at Chang’an University, China, from 2020 to
+2024. Since 2024, he has been pursuing the M.S. degree in mechanical engineering at Chang’an University, China.
+His research interests include autonomous driving and world models.
+Shengkai Zhang received the B.S. degree in computer science and technology from Hebei University, China, in
+2026. He is currently pursuing the M.S. degree in computer technology at Beijing Jiaotong University, China. His
+research interests include end-to-end autonomous driving, world models, and embodied intelligence.
+Qing Wang received the B.S. degree from Henan University, China, in 2026. He is currently pursuing the M.S.
+degree with the School of Artificial Intelligence, Yanshan University, China. His research interests include embodied
+agents, world models, and vision-language-action models.
+Ziying Song received the B.S. degree from Hebei Normal University of Science and Technology, China, in 2019, the
+M.S. degree from Hebei University of Science and Technology, China, in 2022, and the Ph.D. degree in computer
+science and technology from Beijing Jiaotong University, China, in March 2026. He is currently an Assistant
+Professor with the School of Artificial Intelligence, Yanshan University, China. His research interests include
+autonomous driving, robust perception, end-to-end autonomous driving, world models, embodied intelligence, and
+vision-language-action models.
+14

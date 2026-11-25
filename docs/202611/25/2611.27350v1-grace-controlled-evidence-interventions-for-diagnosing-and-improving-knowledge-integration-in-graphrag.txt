@@ -1,0 +1,1439 @@
+GRACE: Controlled Evidence Interventions for
+Diagnosing and Improving Knowledge Integration
+in GraphRAG
+Minh Pham, Quang Nguyen, Phong Kieu, and Cong Tran[0000−0001−9467−4978]*
+Posts and Telecommunications Institute of Technology, Hanoi, Vietnam
+{MinhPV.B22KH078, PhongKH.B22KH084}@stu.ptit.edu.vn
+quangnm@ptit.edu.vn
+*Corresponding author: congtt@ptit.edu.vn
+Abstract. GraphRAG systems answer knowledge-intensive questions
+by combining a language model’s parametric knowledge with relational
+evidence retrieved from a graph. Aggregate accuracy, however, obscures
+whether failures arise from missing paths, distractors, or preference for
+memorised knowledge. Diagnosing these behaviours requires changing
+the evidence while holding the question fixed. We introduce GRACE,
+constructed by executing LC-QuAD 2.0 SPARQL queries over Wikidata
+to recover answers and supporting paths, extracting an intact evidence
+subgraph for each question, and deriving four controlled interventions
+from it: severing a supporting path, injecting type-compatible distrac-
+tors, attaching high-degree hubs, and replacing the supported answer
+with a counterfactual entity. All five states share the same question and
+option positions, with targets derived from their evidence; retaining only
+validated five-state groups yields 4,028 questions and 20,140 question–
+graph pairs. These comparisons expose two limitations: question-only
+routing cannot distinguish different evidence states for the same ques-
+tion, and relevance guidance improves answer-supporting states but re-
+duces accuracy when the support path is severed. The latter shows that
+individually useful facts do not necessarily provide sufficient collective
+support. This motivates QCFSE-SA, which jointly models question–fact
+relevance and graph-level sufficiency. Typed local attention follows con-
+nections between facts, global attention integrates the complete sup-
+plied graph, and question-conditioned readouts provide organisational
+guidance to a frozen generator. A separately calibrated graph-support
+gate controls abstention, addressing insufficiency that relevance guid-
+ance alone does not resolve. With identical factual context and a frozen
+generator, QCFSE-SA raises controlled-state accuracy from 57.17% to
+62.78% (+5.61 points; question-clustered 95% CI [+5.04,+6.17]) and
+broken-state accuracy from 55.41% to 67.85%, although over-abstention
+remains a challenge on semantic distractors.
+Keywords: Retrieval-augmented generation · Knowledge graphs ·
+Benchmark · Causal evaluation · Knowledge conflict.
+arXiv:2611.27350v1  [cs.AI]  20 Nov 2026
+
+
+1
+Introduction
+Retrieval-augmented generation (RAG) combines parametric knowledge with
+inference-time evidence [27, 9], while graph-based variants organise that evidence
+as entities, relations, or hierarchical summaries [7, 12, 41]. This combination cre-
+ates a basic attribution problem: a correct answer does not reveal whether the
+generator actually used the retrieved graph or simply relied on knowledge al-
+ready encoded in its parameters. Consider the query “What currency is used by
+the country whose capital is Paris?”. A language model may already associate
+France with the euro, while a retrieved graph may independently support the
+same answer through the path Paris →France →Euro. If the system outputs
+Euro, correctness alone cannot tell which source determined the prediction.
+This ambiguity becomes consequential when the retrieved evidence is less
+straightforward. The graph may contain facts that are individually relevant
+but collectively insufficient to support an answer, plausible alternatives such as
+French franc connected through a different relation, or highly connected entities
+that are structurally salient without supporting the query. In other cases, the
+supplied graph may support an answer that conflicts with the model’s paramet-
+ric knowledge. The central question is therefore not only whether GraphRAG
+answers correctly, but whether it can distinguish supporting evidence from dis-
+traction, recognise when the available evidence is insufficient, and follow the sup-
+plied context when it conflicts with memory. A single end-to-end score cannot
+distinguish these failure modes. Text perturbation studies have exposed related
+robustness failures [3, 5, 52], but do not isolate the structural failure modes of
+graph evidence.
+GRACE addresses this gap through controlled, matched evidence conditions.
+For each question, it fixes the question and answer interface while evaluating
+the system under five graph states that separate complete support, missing sup-
+port, semantic distraction, topological distraction, and context–memory conflict.
+Holding the question fixed removes variation in question difficulty from these
+comparisons and also exposes a limitation of pre-retrieval, question-only rout-
+ing: the same question can be paired with evidence that is sufficient, insufficient,
+distracting, or conflicting, none of which can be observed before the retrieved
+graph is inspected.
+More importantly, these controlled comparisons reveal that relevance is not
+sufficiency. In our experiments, relevance-based evidence organisation improves
+every state in which the graph still supports an answer, yet reduces accuracy
+when the critical support path is severed: residual facts can remain relevant
+to the question without jointly forming a complete basis for answering. This
+observation motivates two complementary components. QCFSE organises the
+complete supplied graph conditional on the question and its fact connections,
+while QCFSE-SA additionally estimates whether the graph as a whole provides
+sufficient support to answer. The factual context and frozen generator remain
+identical in the paired comparison, isolating evidence integration from changes
+in retrieval volume or model scale.
+
+
+Research Questions.
+We ask which failure modes the controlled interventions expose (RQ1),
+whether question-only routing can distinguish evidence conditions that arise
+after retrieval (RQ2), and whether question-conditioned evidence organisation
+and explicit sufficiency control improve a frozen generator under fixed factual
+context (RQ3).
+Contributions.
+– GRACE: 4,028 questions and 20,140 matched observations across five graph
+states, with a validated construction and evaluation protocol.
+– A five-state audit of four graph-retrieval frameworks and two question-only
+routing policies.
+– QCFSE, which produces question-conditioned organisational guidance
+over the complete supplied graph while preserving its factual context, and
+QCFSE-SA, which adds calibrated graph-level sufficiency control.
+– The empirical finding that relevance and sufficiency are distinct require-
+ments.
+2
+Related Work
+2.1
+GraphRAG and KGQA
+Retrieval-augmented generation combined learned retrieval with generation and
+multi-passage reading [24, 14, 27, 17, 2, 18, 9]. Later systems organised evidence
+through corpus graphs, hierarchical summaries, or associative retrieval [7, 12, 41,
+13], while KG-oriented methods exposed structured interfaces, retrieved rela-
+tion paths, traversed graphs, or selected and scored question-specific subgraphs
+[20, 32, 43, 16, 34, 4, 36, 37, 53]. KG-completion work likewise addressed missing
+structure [28, 30]. Existing KGQA and knowledge-intensive benchmarks covered
+semantic parsing, compositional questions, verification, and shared-corpus re-
+trieval [6, 46, 51, 44, 26, 38, 50, 8], but ordinarily associated each question with
+only one evidence condition.
+2.2
+Robustness and Knowledge Conflict
+Prior robustness studies separated noise rejection, integration, and counterfac-
+tual behaviour, and showed that irrelevant content, its position, or even a small
+adversarial injection could change a RAG answer [3, 5, 52, 29, 42, 54]. A com-
+plementary literature examined disagreement between parametric memory and
+context, including entity substitution, explicit separation of contextual and mem-
+orised answers, conflict taxonomies, and unreliable self-assessment of knowledge
+boundaries [31, 48, 35, 49, 39]. These studies primarily perturbed passages or in-
+ferred conflict behaviour from separate examples.
+
+
+2.3
+Adaptive Retrieval and Controlled Evaluation
+Adaptive RAG methods triggered, skipped, or iterated retrieval using generation
+confidence, reflection tokens, predicted complexity, self-reported knowledge, rea-
+soning steps, or entity popularity [21, 1, 19, 47, 45, 33]; these decisions inherited
+known difficulties in confidence calibration, self-evaluation, and selective predic-
+tion [11, 22, 23]. Controlled evaluation offered a complementary methodology:
+behavioural tests, contrast sets, and counterfactually augmented data isolated
+targeted decision factors rather than relying only on aggregate accuracy [40, 10,
+25].
+2.4
+Research Gap and Positioning of GRACE
+The preceding lines of work leave three evaluation factors entangled. Standard
+KGQA benchmarks vary the question together with its evidence, passage-level
+robustness tests do not capture failures caused by graph structure, and adap-
+tive retrieval policies often decide from the question or model confidence before
+observing the evidence that must support the answer. Consequently, they can-
+not cleanly determine whether an error arises from retrieval routing, evidence
+organisation, or failure to recognise that the available evidence is insufficient.
+GRACE addresses this gap by holding the question, answer options, and
+option positions fixed while intervening directly on the supplied graph. For every
+question, it evaluates an intact graph alongside states that sever the reasoning
+path, add type-compatible or topologically salient distractors, or replace the
+supported entity. These matched comparisons isolate missing support, graph-
+specific distraction, and context–memory conflict from question difficulty. They
+also allow a question-only gate to be evaluated against the graph conditions
+realised after routing, revealing when an evidence-dependent decision cannot be
+made from the question alone and motivating separate mechanisms for evidence
+organisation and sufficiency recognition.
+3
+The GRACE Benchmark
+3.1
+Matched Construction and Source Data
+GRACE treats the five states of one question as a matched group. For question
+q, the natural-language text, the ordered option tuple Oq, and the option letters
+remain fixed; only the supplied graph Sq,v and its state-dependent target yq,v
+change. This design reduces confounding by question difficulty and makes within-
+question prediction changes attributable to the evidence intervention.
+Questions and executable SPARQL programs come from LC-QuAD 2.0 [6].1
+We execute SELECT queries against Wikidata [46], resolve the answer and sup-
+porting path, map identifiers to English labels, and extract a clean subgraph
+containing that path and its neighbourhood. As Fig. 1 shows, every retained
+source item must yield all five states, one fixed option tuple, and a fully vali-
+dated mapping.
+1 http://lc-quad.sda.tech/
+
+
+LC-QuAD 2.0 
+question + SPARQL
+Natural-
+language
+question 
+SPARQL
+query
+Execute on
+Wikidata
+Resolve answer set
++ gold evidence path
+Extract clean 
+evidence subgraph
+Gold path + supporting
+neighbourhood
+Generate five controlled 
+graph interventions
+swapping
+type matching
+topological
+clean
+broken
+Create shared 4-
+option MCQ
+ (fixed across states)
+state target 
+A
+B
+C
+D
+Validate, audit and
+release
+Quality checks, audit
+and release
+benchmark dataset
+Fig. 1. GRACE construction pipeline. The question and option interface remain fixed
+while the evidence graph is transformed into five matched states and validated as one
+group.
+3.2
+Five Evidence States
+Table 1 defines five transformations of the same clean graph. They form matched
+conditions rather than five unrelated datasets.
+The two diagnostically unusual cases are deliberate. broken preserves related
+residual facts but removes a necessary link, so it tests insufficiency rather than
+generic noise rejection. swapping remains internally answerable and tests consis-
+tency with supplied evidence rather than recovery of an external-world fact.
+3.3
+Fixed Options and Controlled-State Targets
+Each four-option tuple contains the factual answer, the entity introduced by
+swapping, Insufficient information to answer, and one additional distractor. Dis-
+tinct strings are shuffled once with a question-derived seed and then reused across
+states. Let yfact
+q
+, yins
+q , and yswap
+q
+be their respective option letters. The target is
+yq,v =
+
+
+
+
+
+yfact
+q
+,
+v ∈{clean, type matching, topological},
+yins
+q ,
+v = broken,
+yswap
+q
+,
+v = swapping.
+(1)
+The clean state anchors factual QA; the controlled average additionally measures
+abstention after evidence removal and response to an explicit counterfactual.
+We therefore call it controlled-state accuracy rather than external-world factual
+accuracy.
+3.4
+Validation and Statistics
+A group is accepted only if the clean path is well formed, all transformations
+succeed, the swapped entity is distinct and present, four options map bijectively
+to A–D, and every answer and transformation remains traceable to its source.
+Missing or unparsable system outputs count as errors. Of 6,046 test candidates,
+4,028 pass all checks, yielding 20,140 observations with complete five-state cov-
+erage (Table 2). The same rules create the separate training resources.
+The intervention is controlled at the graph-input level, not at every internal
+stage of a retrieval framework; indexing, retrieval, and context construction can
+
+
+Table 1. Controlled graph states and the behaviour each state isolates. All examples
+use the query “What currency is used by the country whose capital is Paris?”
+State
+Graph
+transformation
+Example
+Diagnostic question
+clean
+Keep the
+resolved evidence
+path and
+neighbourhood
+intact.
+Paris
+France
+capital_of
+Euro
+currency
+Expected: Euro
+Can the system use
+complete, correct
+graph evidence?
+broken
+Remove a critical
+gold-path triple
+(edge), severing
+the resolved
+support path.
+Paris
+France
+capital_of
+Euro
+currency
+Expected: Insufficient
+information
+Can it recognise that
+related residual facts
+do not complete a
+proof?
+type matching Add entities
+compatible with
+the semantic
+type of the
+answer.
+Paris
+France
+capital_of
+Euro
+currency
+French
+franc
+former_currency
+Expected: Euro
+Can it resist
+plausible semantic
+alternatives?
+topological
+Add high-degree
+entities and their
+connections.
+Paris
+France
+capital_of
+Euro
+currency
+Europe
+Italy
+Asia
+EU
+part_of
+has_part
+has_part
+contains
+borders
+Berlin
+Expected: Euro
+Can it resist
+structural salience
+and hub bias?
+swapping
+Substitute the
+supported
+answer entity
+with a distinct
+entity while
+preserving a
+coherent graph
+form.
+Paris
+France
+capital_of
+French
+franc
+currency
+Expected: French franc
+Does it update
+toward the supplied
+graph when context
+conflicts with
+parametric memory?
+
+
+Table 2. GRACE test-set statistics. Percentages describe retained questions.
+Property
+Value
+Question category
+Share
+Source candidates
+6,046
+timeless fact
+51.3%
+Retained questions
+4,028
+past event, no timestamp
+33.0%
+States per question
+5
+past event with timestamp
+8.3%
+Question–graph pairs
+20,140
+present status
+4.7%
+Matched-state coverage
+100%
+fictional or mythological
+2.8%
+SPARQL form
+SELECT
+validated structural errors
+0
+still introduce system-specific failures. The paired QCFSE experiment adds a
+stricter byte-identical factual-context control in Section 5.
+4
+Proposed Method
+4.1
+Overview and Decision Rule
+A retrieved graph creates two distinct decisions. Evidence organisation asks
+which facts and connections matter for the question; evidence sufficiency asks
+whether those facts form a complete basis for answering. A remaining fact can
+be relevant after the decisive path has been severed, so relevance alone cannot
+justify an answer. QCFSE addresses the first decision by encoding the complete
+question–graph pair, and QCFSE-SA adds an explicit sufficiency controller.
+Let q be a question, Oq its ordered options, and Sv = (e1, . . . , en) the com-
+plete graph supplied in evidence state v, where ei = (si, ri, oi) is a KG triple.
+QCFSE produces organisational guidance gθ(q, Sv) and a graph-support proba-
+bility cθ(q, Sv) ∈[0, 1]. With frozen generator G, calibration-selected threshold
+τ, and insufficient-information option yins, the complete decision is
+ˆyq,v =
+(
+yins,
+cθ(q, Sv) < τ,
+G(q, Oq, Sv, gθ(q, Sv)) ,
+cθ(q, Sv) ≥τ.
+(2)
+QCFSE always takes the second branch; QCFSE-SA may abstain. Both inspect
+every fact, and G receives the same ordered factual context as the Full-KG
+control.
+Figure 2 summarises inference and the separate training/calibration stages.
+4.2
+Question-Conditioned Full-Subgraph Propagation
+Each triple becomes a fact node. Two nodes are connected when their
+subject
+or
+object
+endpoints
+coincide.
+The
+directed
+edge
+type
+Tij
+∈
+{SS, SO, OS, OO, self, ∅} records which endpoints match; N(i) = {j : Tij̸ = ∅}
+is the local neighbourhood. A frozen semantic encoder Eϕ embeds the question
+and verbalised triples, and a learned projection maps them to initial states
+q(0) ∈Rd and H(0) = [h(0)
+1 , . . . , h(0)
+n ] ∈Rn×d.
+
+
+2. Question-graph propagation layer 
+(repeat 
+)
+(a) Typed local attention 
+(b) Global attention 
+(c) Question-conditioned message
+(d) Fusion, residual processing, and graph update 
+Concat +
+Dropout
+(e) Graph → Question update
+Inputs
+MHA
+Outputs
+Typed fact graph 
+OO
+self
+OS
+SS
+SO
+1. Inputs and fact graph
+Factual context 
+Encoder
+: "
+?"
+Question 
+Encoder
+mean pool +
+shared projection
+mean pool + 
+shared projection
+3. Readout heads (after  layers)
+Repeat for
+(a) Fact relevance 
+ 
+(b) Aggregation weights 
+bilinear
+softmax
+(c) Graph support 
+(d) Organisational guidance
+4. Sufficiency-aware answering
+Frozen generator 
+Abstain
+Prediction
+Typed Attn
+Global Attn
+Fig. 2. QCFSE-SA architecture. Typed local attention follows fact-graph edges, global
+attention compares all facts, and question-conditioned messages couple the two repre-
+sentations. Separate readouts estimate fact relevance, aggregation weights, and graph
+support before sufficiency-aware answering.
+At propagation layer ℓ, typed local attention follows only graph-adjacent
+facts. For head a, with dh = d/H, it uses
+sa
+ij =
+⟨h(ℓ)
+i W a
+Q, h(ℓ)
+j W a
+K⟩
+√dh
++ ba
+Tij,
+(3)
+aa
+ij = softmaxj∈N (i)(sa
+ij),
+(4)
+L(ℓ)
+i
+= WO
+H
+Concat
+a=1
+
+X
+j∈N (i)
+aa
+ijh(ℓ)
+j W a
+V
+
+.
+(5)
+The learned scalar ba
+Tij lets structural role affect attention independently of se-
+mantic similarity. In contrast, the global branch U (ℓ) = MHAglobal(H(ℓ)) uses
+standard self-attention with a separate set of projections, normalises each head
+over all j ∈{1, . . . , n}, and uses neither the adjacency mask nor an edge-type
+bias. Thus L(ℓ) preserves endpoint-sharing paths, whereas U (ℓ) compares locally
+disconnected facts.
+A feature-wise gate injects the current question into each fact,
+Γ (ℓ)
+i
+= σ
+
+Wg Concat(h(ℓ)
+i , q(ℓ)) + bg
+
+,
+(6)
+C(ℓ)
+i
+= Γ (ℓ)
+i
+⊙(Wcq(ℓ) + bc).
+(7)
+
+
+The local, global, and question-conditioned messages are fused by feature con-
+catenation:
+R(ℓ) = Wm Concat
+
+L(ℓ), U (ℓ), C(ℓ)
++ bm,
+(8)
+H(ℓ+1) = TransformerBlock
+
+H(ℓ), R(ℓ)
+,
+(9)
+q(ℓ+1) = LN
+
+q(ℓ) + MHA(q(ℓ), H(ℓ+1), H(ℓ+1))
+
+.
+(10)
+The transformer block comprises the standard residual, layer-normalisation, and
+feed-forward operations. The last line writes the updated graph back into the
+question, yielding a bidirectional q →Sv →q interaction at every layer.
+4.3
+Relevance, Aggregation, and Sufficiency Readouts
+After the final layer, write hi = h(L)
+i
+and ¯q = q(L). A question-conditioned
+softmax produces aggregation weights αi and graph summary z:
+ρi = ⟨Wfhi, Wq¯q⟩
+√
+d
+,
+αi =
+eρi
+P
+j eρj ,
+z =
+X
+i
+αihi.
+(11)
+Separate heads then predict independent fact relevance and whole-graph sup-
+port,
+pi = σ(MLPe(Concat(hi, ¯q, hi ⊙¯q))) ,
+(12)
+cθ(q, Sv) = σ(MLPg(Concat(z, ¯q, z ⊙¯q))) .
+(13)
+The distinction is essential: α distributes unit mass for aggregation, each pi inde-
+pendently marks a potentially critical fact, and cθ judges the graph as a whole.
+QCFSE serialises these scores and observed fact connections as soft metadata
+beside the unchanged graph. The metadata contains no option letters, candidate
+answers, labels, or generator outputs.
+4.4
+Structural Training Objective
+Training uses only questions and paired clean/broken graphs. For question q, let
+Cq and Bq be those fact sets, let ye
+i = 1[ei ∈Cq \ Bq] mark a fact removed by
+path severing, and let q′ be a mismatched question from the minibatch. The fact
+head logit is ξi; the graph-support logit is γ(q, S), with cθ(q, S) = σ(γ(q, S)).
+The complete objective is
+Le = −
+1
+Nlab
+X
+i
+[w+ye
+i log σ(ξi) + (1 −ye
+i ) log(1 −σ(ξi))] ,
+(14)
+Lcb = 1
+B
+X
+q
+softplus (m −γ(q, Cq) + γ(q, Bq)) ,
+(15)
+Lqm = 1
+B
+X
+q
+softplus (m −γ(q, Cq) + γ(q′, Cq)) ,
+(16)
+L = λeLe + λcbLcb + λqmLqm.
+(17)
+
+
+The three losses are complementary. Le identifies locally critical facts and uses
+positive weight w+ for class imbalance. Lcb encourages γ(q, Cq) ≥γ(q, Bq) +
+m, teaching whether the controlled path remains sufficient. Lqm encourages
+γ(q, Cq) ≥γ(q′, Cq) + m, preventing the support head from treating generic
+graph completeness as question-specific support. Here m > 0 is the required
+ranking margin and the λ values weight the objectives. The encoder receives no
+answer options, answer keys, or generator responses.
+4.5
+Sufficiency Calibration and Context Preservation
+After training and checkpoint selection, τ is selected on a disjoint 300-question
+calibration set by maximising controlled-state accuracy over observed support
+scores and is frozen before testing. Calibration labels therefore determine only
+the decision threshold and do not train the evidence representation. The paired
+comparison also preserves factual context: both arms pass the identical serialised
+Sv to G, only gθ is appended, and ordered-context hashes are checked for every
+pair.
+5
+Experimental Evaluation
+5.1
+Metrics and Protocol
+We report per-state exact-match accuracy and their equal-weight mean
+(controlled-state accuracy); failed or unparsable outputs count as incorrect.
+All 95% confidence intervals use 10,000 paired question-clustered bootstrap
+resamples, keeping the five states of each question in one cluster. QCFSE
+uses 4,250 questions for training, 750 for checkpoint selection, and a disjoint
+300-question calibration set for sufficiency-threshold selection. The common
+generator is Qwen3.5-35B-A3B (4-bit AWQ, temperature 0, seed 42), and
+the frozen encoder is cross-encoder/ms-marco-MiniLM-L6-v2. All paired
+Full-KG/QCFSE runs fix the question, options, ordered graph, generator,
+prompt, and decoding settings; factual-context hashes match for all 20,140 test
+instances.
+5.2
+Retrieval-Framework Baselines
+GraphRAG [7], LightRAG [12], RAPTOR [41], and a FAICO-style retriever
+[4] start from the supplied state graph and feed their selected context to the
+common MCQ generator and parser. They retain framework-specific community,
+local-graph, hierarchical, or connected-subgraph indexing, but cannot access a
+different corpus. Table 3 reports per-state accuracy and completion for the four
+retrieval-framework baselines.
+RAPTOR is strongest among completed general-purpose baselines but de-
+grades most under swapping. FAICO-style retrieval is conservative on broken
+graphs yet weak on intact and conflicting evidence, showing that connectivity-
+based abstention is not accurate evidence use. GraphRAG and LightRAG are
+
+
+Table 3. Controlled-state accuracy (%) of retrieval-framework artifacts. Failures count
+as wrong; completion is the percentage of parsed state outputs.
+System
+N Comp. Clean Broken Type Topo. Swap
+Avg.
+RAPTOR
+4,028
+99.68 62.16
+52.58 56.28 55.88 40.47 53.48
+FAICO-style
+4,028 100.00 31.33
+69.86 31.63 31.26 19.71 36.76
+GraphRAG
+4,028
+29.98 13.95
+16.26 12.41 15.39 10.13 13.63
+LightRAG snapshot 2,946
+90.29 49.29
+44.30 45.08 48.37 36.35 44.68
+Table 4. Question-only routing over 4,028 questions. Retr. is the percentage sent to
+the RAG branch.
+Method
+Clean Broken
+Type
+Topo.
+Swap
+Avg.
+Retr.
+Always retrieve
+60.90
+54.57
+59.29
+59.93
+42.38
+55.41 100.00
+Open-ended gate
+62.31
+55.73 60.68 61.47 43.84 56.81
+88.41
+Option-aligned gate
+59.53
+55.56
+58.49
+59.16
+32.72
+53.09
+31.58
+primarily pipeline diagnostics because of low and incomplete completion, respec-
+tively, and do not support a universal framework ranking.
+5.3
+Question-Only Answerability Routing
+Two DeBERTa-v3-base encoders [15] predict no-context answerability from the
+question, using either open-ended answer matching or an option-aligned probe.
+Table 4 compares them with always retrieving.
+The open-ended gate gains 1.40 points (95% CI [+0.94, +1.89]) while saving
+11.59% of calls. Aggressive option-aligned routing saves 68.42% but loses 2.32
+points, including 9.66 on swapping. A question-only gate applies the same route
+to every evidence state and can therefore suppress context precisely when the
+graph must override a strong parametric answer.
+5.4
+Evidence Organisation and Sufficiency Control
+Table 5 and Figure 3 compare evidence organisation alone with the addition of
+sufficiency control across the five graph states.
+Relevance Is Not Sufficiency. QCFSE improves every supported-evidence
+state, with its largest gain on swapping (+7.55), but falls from 55.41% to 47.39%
+on broken. This does not contradict perfect clean-over-broken validation ranking:
+ranking orders two graphs but does not make a broken score trigger abstention.
+After severing, residual facts may remain relevant although they no longer com-
+plete a proof; relevance guidance amplifies these clues while the generator is still
+required to answer.
+Sufficiency-Aware Result. QCFSE-SA raises overall accuracy by 5.61 points
+over Full-KG plain, with question-clustered 95% CI [+5.04, +6.17], and reaches
+
+
+Clean
+Broken
+Type matching
+Topological
+Swapping
+40
+50
+60
+70
+62.76
+55.41
+62.14
+62.88
+42.65
+69.02
+47.39
+66.63
+69.02
+50.20
+69.02
+67.85
+60.10
+66.73
+50.20
+Controlled-state accuracy (%)
+Full-KG plain
+QCFSE
+QCFSE-SA
+Fig. 3. Paired controlled-state accuracy. Evidence organisation helps on supported
+graphs, while explicit sufficiency control repairs the severed-evidence failure.
+Table 5. Paired full-test controlled-state accuracy (%).
+Method
+Clean
+Broken
+Type
+Topo.
+Swap
+Avg.
+Full-KG plain
+62.76
+55.41
+62.14
+62.88
+42.65
+57.17
+QCFSE
+69.02
+47.39
+66.63
+69.02
+50.20
+60.45
+QCFSE-SA
+69.02
+67.85
+60.10
+66.73
+50.20
+62.78
+67.85% on broken (+12.44). This repairs the objective mismatch while retaining
+QCFSE’s gains on clean and swapping graphs.
+Remaining Calibration Error. The gate also abstains on some answerable
+distractor graphs, causing accuracy in the type matching state to fall 2.04 points
+below plain. GRACE therefore localises the remaining problem: distinguishing
+an incomplete proof from a complete but difficult graph.
+5.5
+Threats to Validity
+About 99% of broken serialisations contain an Unknown entity cue, which the
+method may exploit despite not seeing the state name. GRACE is derived from
+one KGQA source (LC-QuAD 2.0 over Wikidata), one query form (SELECT),
+and one paired generator; incomplete LightRAG and GraphRAG runs preclude a
+final framework ranking. Swapping measures consistency with supplied evidence,
+not external-world truth. These caveats do not affect the byte-identical-context
+QCFSE comparison.
+6
+Conclusion
+GRACE uses matched graph interventions to expose evidence-integration fail-
+ures that clean accuracy and question-only routing conceal. QCFSE shows that
+question-conditioned organisation improves how a frozen generator uses a fixed
+complete graph, while its broken-state regression establishes that relevance is
+
+
+not sufficiency. QCFSE-SA makes sufficiency explicit, improving the aggregate
+result while revealing over-abstention on difficult but answerable graphs as the
+next calibration problem.
+References
+1. Asai,
+A.,
+Wu,
+Z.,
+Wang,
+Y.,
+Sil,
+A.,
+Hajishirzi,
+H.:
+Self-rag:
+Learn-
+ing to retrieve, generate, and critique through self-reflection. In: Kim, B.,
+Yue,
+Y.,
+Chaudhuri,
+S.,
+Fragkiadaki,
+K.,
+Khan,
+M.,
+Sun,
+Y.
+(eds.)
+In-
+ternational
+Conference
+on
+Learning
+Representations.
+vol.
+2024,
+pp.
+9112–
+9141
+(2024),
+https://proceedings.iclr.cc/paper_files/paper/2024/file/
+25f7be9694d7b32d5cc670927b8091e1-Paper-Conference.pdf
+2. Borgeaud, S., Mensch, A., Hoffmann, J., Cai, T., Rutherford, E., Millican, K., et al.:
+Improving language models by retrieving from trillions of tokens. In: Chaudhuri,
+K., Jegelka, S., Song, L., Szepesvari, C., Niu, G., Sabato, S. (eds.) Proceedings of
+the 39th International Conference on Machine Learning. Proceedings of Machine
+Learning Research, vol. 162, pp. 2206–2240. PMLR (17–23 Jul 2022), https://
+proceedings.mlr.press/v162/borgeaud22a.html
+3. Chen, J., Lin, H., Han, X., Sun, L.: Benchmarking large language models
+in retrieval-augmented generation. In: Proceedings of the Thirty-Eighth AAAI
+Conference on Artificial Intelligence and Thirty-Sixth Conference on Innova-
+tive Applications of Artificial Intelligence and Fourteenth Symposium on Edu-
+cational Advances in Artificial Intelligence. AAAI’24/IAAI’24/EAAI’24, AAAI
+Press (2024). https://doi.org/10.1609/aaai.v38i16.29728, https://doi.org/10.
+1609/aaai.v38i16.29728
+4. Cheng, G., Zhao, K., Ye, K., Qiao, P., Zhang, Z., Che, S., et al.: Faico: Faith-
+ful and complete knowledge graph augmented reasoning. In: Proceedings of the
+32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining
+V.1. p. 140–151. KDD ’26, Association for Computing Machinery, New York,
+NY, USA (2026). https://doi.org/10.1145/3770854.3780336, https://doi.org/
+10.1145/3770854.3780336
+5. Cuconasu, F., Trappolini, G., Siciliano, F., Filice, S., Campagnano, C., Maarek,
+Y., et al.: The power of noise: Redefining retrieval for rag systems. In: Proceedings
+of the 47th International ACM SIGIR Conference on Research and Development
+in Information Retrieval. p. 719–729. SIGIR ’24, Association for Computing Ma-
+chinery, New York, NY, USA (2024). https://doi.org/10.1145/3626772.3657834,
+https://doi.org/10.1145/3626772.3657834
+6. Dubey, M., Banerjee, D., Abdelkawi, A., Lehmann, J.: Lc-quad 2.0: A large dataset
+for complex question answering over wikidata and dbpedia. In: Ghidini, C., Hartig,
+O., Maleshkova, M., Svátek, V., Cruz, I., Hogan, A., Song, J., Lefrançois, M., Gan-
+don, F. (eds.) The Semantic Web – ISWC 2019. pp. 69–78. Springer International
+Publishing, Cham (2019)
+7. Edge, D., Trinh, H., Cheng, N., Bradley, J., Chao, A., Mody, A., et al.: From
+local to global: A graph rag approach to query-focused summarization (2025),
+https://arxiv.org/abs/2404.16130
+8. Es, S., James, J., Espinosa Anke, L., Schockaert, S.: RAGAs: Automated
+evaluation
+of
+retrieval
+augmented
+generation.
+In:
+Aletras,
+N.,
+De
+Clercq,
+O. (eds.) Proceedings of the 18th Conference of the European Chapter of
+the Association for Computational Linguistics: System Demonstrations. pp.
+
+
+150–158. Association for Computational Linguistics, St. Julians, Malta (Mar
+2024). https://doi.org/10.18653/v1/2024.eacl-demo.16, https://aclanthology.
+org/2024.eacl-demo.16/
+9. Gao, Y., Xiong, Y., Gao, X., Jia, K., Pan, J., Bi, Y., et al.: Retrieval-augmented
+generation for large language models: A survey (2024), https://arxiv.org/abs/
+2312.10997
+10. Gardner, M., Artzi, Y., Basmov, V., Berant, J., Bogin, B., Chen, S., et al.:
+Evaluating models’ local decision boundaries via contrast sets. In: Cohn, T.,
+He, Y., Liu, Y. (eds.) Findings of the Association for Computational Linguis-
+tics: EMNLP 2020. pp. 1307–1323. Association for Computational Linguistics,
+Online (Nov 2020). https://doi.org/10.18653/v1/2020.findings-emnlp.117, https:
+//aclanthology.org/2020.findings-emnlp.117/
+11. Guo, C., Pleiss, G., Sun, Y., Weinberger, K.Q.: On calibration of modern neu-
+ral networks. In: Precup, D., Teh, Y.W. (eds.) Proceedings of the 34th Inter-
+national Conference on Machine Learning. Proceedings of Machine Learning Re-
+search, vol. 70, pp. 1321–1330. PMLR (06–11 Aug 2017), https://proceedings.
+mlr.press/v70/guo17a.html
+12. Guo, Z., Xia, L., Yu, Y., Ao, T., Huang, C.: LightRAG: Simple and fast
+retrieval-augmented generation. In: Christodoulopoulos, C., Chakraborty, T., Rose,
+C., Peng, V. (eds.) Findings of the Association for Computational Linguis-
+tics: EMNLP 2025. pp. 10746–10761. Association for Computational Linguistics,
+Suzhou, China (Nov 2025). https://doi.org/10.18653/v1/2025.findings-emnlp.568,
+https://aclanthology.org/2025.findings-emnlp.568/
+13. Gutiérrez, B.J., Shu, Y., Gu, Y., Yasunaga, M., Su, Y.: Hipporag: Neurobio-
+logically inspired long-term memory for large language models. In: Globerson,
+A., Mackey, L., Belgrave, D., Fan, A., Paquet, U., Tomczak, J., Zhang,
+C. (eds.) Advances in Neural Information Processing Systems. vol. 37, pp.
+59532–59569. Curran Associates, Inc. (2024). https://doi.org/10.52202/079017-
+1902,
+https://proceedings.neurips.cc/paper_files/paper/2024/file/
+6ddc001d07ca4f319af96a3024f6dbd1-Paper-Conference.pdf
+14. Guu, K., Lee, K., Tung, Z., Pasupat, P., Chang, M.W.: Realm: retrieval-augmented
+language model pre-training. In: Proceedings of the 37th International Conference
+on Machine Learning. ICML’20, JMLR.org (2020)
+15. He, P., Gao, J., Chen, W.: DeBERTav3: Improving deBERTa using ELECTRA-
+style
+pre-training
+with
+gradient-disentangled
+embedding
+sharing.
+In:
+The
+Eleventh International Conference on Learning Representations (2023), https:
+//openreview.net/forum?id=sE7-XhLxHA
+16. He, X., Tian, Y., Sun, Y., Chawla, N.V., Laurent, T., LeCun, Y., et al.:
+G-retriever:
+Retrieval-augmented
+generation
+for
+textual
+graph
+under-
+standing
+and
+question
+answering.
+In:
+Globerson,
+A.,
+Mackey,
+L.,
+Bel-
+grave,
+D.,
+Fan,
+A.,
+Paquet,
+U.,
+Tomczak,
+J.,
+Zhang,
+C.
+(eds.)
+Ad-
+vances
+in
+Neural
+Information
+Processing
+Systems.
+vol.
+37,
+pp.
+132876–
+132907.
+Curran
+Associates,
+Inc.
+(2024).
+https://doi.org/10.52202/079017-
+4224,
+https://proceedings.neurips.cc/paper_files/paper/2024/file/
+efaf1c9726648c8ba363a5c927440529-Paper-Conference.pdf
+17. Izacard, G., Grave, E.: Leveraging passage retrieval with generative models for
+open domain question answering. In: Merlo, P., Tiedemann, J., Tsarfaty, R. (eds.)
+Proceedings of the 16th Conference of the European Chapter of the Association
+for Computational Linguistics: Main Volume. pp. 874–880. Association for Com-
+
+
+putational Linguistics, Online (Apr 2021). https://doi.org/10.18653/v1/2021.eacl-
+main.74, https://aclanthology.org/2021.eacl-main.74/
+18. Izacard, G., Lewis, P., Lomeli, M., Hosseini, L., Petroni, F., Schick, T., et al.: Atlas:
+few-shot learning with retrieval augmented language models. J. Mach. Learn. Res.
+24(1) (Jan 2023)
+19. Jeong, S., Baek, J., Cho, S., Hwang, S.J., Park, J.: Adaptive-RAG: Learn-
+ing to adapt retrieval-augmented large language models through question com-
+plexity. In: Duh, K., Gomez, H., Bethard, S. (eds.) Proceedings of the 2024
+Conference of the North American Chapter of the Association for Computa-
+tional Linguistics: Human Language Technologies (Volume 1: Long Papers). pp.
+7036–7050. Association for Computational Linguistics, Mexico City, Mexico (Jun
+2024). https://doi.org/10.18653/v1/2024.naacl-long.389, https://aclanthology.
+org/2024.naacl-long.389/
+20. Jiang, J., Zhou, K., Dong, Z., Ye, K., Zhao, X., Wen, J.R.: StructGPT: A general
+framework for large language model to reason over structured data. In: Bouamor,
+H., Pino, J., Bali, K. (eds.) Proceedings of the 2023 Conference on Empirical Meth-
+ods in Natural Language Processing. pp. 9237–9251. Association for Computa-
+tional Linguistics, Singapore (Dec 2023). https://doi.org/10.18653/v1/2023.emnlp-
+main.574, https://aclanthology.org/2023.emnlp-main.574/
+21. Jiang, Z., Xu, F., Gao, L., Sun, Z., Liu, Q., Dwivedi-Yu, J., et al.: Active re-
+trieval augmented generation. In: Bouamor, H., Pino, J., Bali, K. (eds.) Proceed-
+ings of the 2023 Conference on Empirical Methods in Natural Language Processing.
+pp. 7969–7992. Association for Computational Linguistics, Singapore (Dec 2023).
+https://doi.org/10.18653/v1/2023.emnlp-main.495, https://aclanthology.org/
+2023.emnlp-main.495/
+22. Kadavath, S., Conerly, T., Askell, A., Henighan, T., Drain, D., Perez, E., et al.:
+Language models (mostly) know what they know (2022), https://arxiv.org/abs/
+2207.05221
+23. Kamath, A., Jia, R., Liang, P.: Selective question answering under domain
+shift. In: Jurafsky, D., Chai, J., Schluter, N., Tetreault, J. (eds.) Proceed-
+ings of the 58th Annual Meeting of the Association for Computational Lin-
+guistics. pp. 5684–5696. Association for Computational Linguistics, Online (Jul
+2020). https://doi.org/10.18653/v1/2020.acl-main.503, https://aclanthology.
+org/2020.acl-main.503/
+24. Karpukhin, V., Oguz, B., Min, S., Lewis, P., Wu, L., Edunov, S., et al.: Dense
+passage retrieval for open-domain question answering. In: Webber, B., Cohn, T.,
+He, Y., Liu, Y. (eds.) Proceedings of the 2020 Conference on Empirical Methods in
+Natural Language Processing (EMNLP). pp. 6769–6781. Association for Compu-
+tational Linguistics, Online (Nov 2020). https://doi.org/10.18653/v1/2020.emnlp-
+main.550, https://aclanthology.org/2020.emnlp-main.550/
+25. Kaushik, D., Hovy, E., Lipton, Z.C.: Learning the difference that makes a dif-
+ference with counterfactually-augmented data (2020), https://arxiv.org/abs/
+1909.12434
+26. Kim,
+J.,
+Park,
+S.,
+Kwon,
+Y.,
+Jo,
+Y.,
+Thorne,
+J.,
+Choi,
+E.:
+FactKG:
+Fact verification via reasoning on knowledge graphs. In: Rogers, A., Boyd-
+Graber, J., Okazaki, N. (eds.) Proceedings of the 61st Annual Meeting of
+the Association for Computational Linguistics (Volume 1: Long Papers). pp.
+16190–16206. Association for Computational Linguistics, Toronto, Canada (Jul
+2023).
+https://doi.org/10.18653/v1/2023.acl-long.895,
+https://aclanthology.
+org/2023.acl-long.895/
+
+
+27. Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., et al.:
+Retrieval-augmented generation for knowledge-intensive nlp tasks. In: Proceedings
+of the 34th International Conference on Neural Information Processing Systems.
+NIPS ’20, Curran Associates Inc., Red Hook, NY, USA (2020)
+28. Lin, J., Wang, L., Lu, X., Hu, Z., Zhang, W., Lu, W.: Improving knowledge
+graph completion with structure-aware supervised contrastive learning. In: Al-
+Onaizan, Y., Bansal, M., Chen, Y.N. (eds.) Proceedings of the 2024 Confer-
+ence on Empirical Methods in Natural Language Processing. pp. 13948–13959.
+Association for Computational Linguistics, Miami, Florida, USA (Nov 2024).
+https://doi.org/10.18653/v1/2024.emnlp-main.772, https://aclanthology.org/
+2024.emnlp-main.772/
+29. Liu,
+N.F.,
+Lin,
+K.,
+Hewitt,
+J.,
+Paranjape,
+A.,
+Bevilacqua,
+M.,
+Petroni,
+F., et al.: Lost in the middle: How language models use long contexts.
+Transactions
+of
+the
+Association
+for
+Computational
+Linguistics
+12,
+157–
+173 (2024). https://doi.org/10.1162/tacl_a_00638, https://aclanthology.org/
+2024.tacl-1.9/
+30. Liu, Y., Cao, Y., Lin, X., Shang, Y., Wang, S., Pan, S.: Enhancing large lan-
+guage model for knowledge graph completion via structure-aware alignment-
+tuning. In: Christodoulopoulos, C., Chakraborty, T., Rose, C., Peng, V. (eds.)
+Proceedings of the 2025 Conference on Empirical Methods in Natural Lan-
+guage Processing. pp. 20970–20984. Association for Computational Linguistics,
+Suzhou, China (Nov 2025). https://doi.org/10.18653/v1/2025.emnlp-main.1061,
+https://aclanthology.org/2025.emnlp-main.1061/
+31. Longpre, S., Perisetla, K., Chen, A., Ramesh, N., DuBois, C., Singh, S.: Entity-
+based knowledge conflicts in question answering. In: Moens, M.F., Huang, X.,
+Specia, L., Yih, S.W.t. (eds.) Proceedings of the 2021 Conference on Empirical
+Methods in Natural Language Processing. pp. 7052–7063. Association for Compu-
+tational Linguistics, Online and Punta Cana, Dominican Republic (Nov 2021).
+https://doi.org/10.18653/v1/2021.emnlp-main.565, https://aclanthology.org/
+2021.emnlp-main.565/
+32. Luo,
+L.,
+Li,
+Y.F.,
+Haffari,
+R.,
+Pan,
+S.:
+Reasoning
+on
+graphs:
+Faith-
+ful
+and
+interpretable
+large
+language
+model
+reasoning.
+In:
+Kim,
+B.,
+Yue,
+Y.,
+Chaudhuri,
+S.,
+Fragkiadaki,
+K.,
+Khan,
+M.,
+Sun,
+Y.
+(eds.)
+Inter-
+national
+Conference
+on
+Learning
+Representations.
+vol.
+2024,
+pp.
+14400–
+14423
+(2024),
+https://proceedings.iclr.cc/paper_files/paper/2024/file/
+3e2aeb66481dd63a32421bf032b70384-Paper-Conference.pdf
+33. Mallen, A., Asai, A., Zhong, V., Das, R., Khashabi, D., Hajishirzi, H.: When
+not to trust language models: Investigating effectiveness of parametric and non-
+parametric memories. In: Rogers, A., Boyd-Graber, J., Okazaki, N. (eds.) Proceed-
+ings of the 61st Annual Meeting of the Association for Computational Linguistics
+(Volume 1: Long Papers). pp. 9802–9822. Association for Computational Linguis-
+tics, Toronto, Canada (Jul 2023). https://doi.org/10.18653/v1/2023.acl-long.546,
+https://aclanthology.org/2023.acl-long.546/
+34. Mavromatis, C., Karypis, G.: GNN-RAG: Graph neural retrieval for efficient large
+language model reasoning on knowledge graphs. In: Che, W., Nabende, J., Shutova,
+E., Pilehvar, M.T. (eds.) Findings of the Association for Computational Linguistics:
+ACL 2025. pp. 16682–16699. Association for Computational Linguistics, Vienna,
+Austria (Jul 2025). https://doi.org/10.18653/v1/2025.findings-acl.856, https://
+aclanthology.org/2025.findings-acl.856/
+
+
+35. Neeman, E., Aharoni, R., Honovich, O., Choshen, L., Szpektor, I., Abend, O.: Dis-
+entQA: Disentangling parametric and contextual knowledge with counterfactual
+question answering. In: Rogers, A., Boyd-Graber, J., Okazaki, N. (eds.) Proceed-
+ings of the 61st Annual Meeting of the Association for Computational Linguistics
+(Volume 1: Long Papers). pp. 10056–10070. Association for Computational Linguis-
+tics, Toronto, Canada (Jul 2023). https://doi.org/10.18653/v1/2023.acl-long.559,
+https://aclanthology.org/2023.acl-long.559/
+36. Pan,
+S.,
+Luo,
+L.,
+Wang,
+Y.,
+Chen,
+C.,
+Wang,
+J.,
+Wu,
+X.:
+Unifying
+large
+language
+models
+and
+knowledge
+graphs:
+A
+roadmap.
+IEEE
+Trans-
+actions
+on
+Knowledge
+and
+Data
+Engineering
+36(7),
+3580–3599
+(2024).
+https://doi.org/10.1109/TKDE.2024.3352100
+37. Peng, B., Zhu, Y., Liu, Y., Bo, X., Shi, H., Hong, C., et al.: Graph retrieval-
+augmented generation: A survey. ACM Trans. Inf. Syst. 44(2) (Dec 2025).
+https://doi.org/10.1145/3777378, https://doi.org/10.1145/3777378
+38. Petroni, F., Piktus, A., Fan, A., Lewis, P., Yazdani, M., De Cao, N., et al.:
+KILT: a benchmark for knowledge intensive language tasks. In: Toutanova, K.,
+Rumshisky, A., Zettlemoyer, L., Hakkani-Tur, D., Beltagy, I., Bethard, S., Cot-
+terell, R., Chakraborty, T., Zhou, Y. (eds.) Proceedings of the 2021 Conference
+of the North American Chapter of the Association for Computational Linguis-
+tics: Human Language Technologies. pp. 2523–2544. Association for Computational
+Linguistics, Online (Jun 2021). https://doi.org/10.18653/v1/2021.naacl-main.200,
+https://aclanthology.org/2021.naacl-main.200/
+39. Ren, R., Wang, Y., Qu, Y., Zhao, W.X., Liu, J., Wu, H., et al.: Investigating the
+factual knowledge boundary of large language models with retrieval augmenta-
+tion. In: Rambow, O., Wanner, L., Apidianaki, M., Al-Khalifa, H., Eugenio, B.D.,
+Schockaert, S. (eds.) Proceedings of the 31st International Conference on Computa-
+tional Linguistics. pp. 3697–3715. Association for Computational Linguistics, Abu
+Dhabi, UAE (Jan 2025), https://aclanthology.org/2025.coling-main.250/
+40. Ribeiro, M.T., Wu, T., Guestrin, C., Singh, S.: Beyond accuracy: Behavioral testing
+of NLP models with CheckList. In: Jurafsky, D., Chai, J., Schluter, N., Tetreault,
+J. (eds.) Proceedings of the 58th Annual Meeting of the Association for Com-
+putational Linguistics. pp. 4902–4912. Association for Computational Linguis-
+tics, Online (Jul 2020). https://doi.org/10.18653/v1/2020.acl-main.442, https:
+//aclanthology.org/2020.acl-main.442/
+41. Sarthi, P., Abdullah, S., Tuli, A., Khanna, S., Goldie, A., Manning, C.:
+Raptor: Recursive abstractive processing for tree-organized retrieval. In: Kim,
+B., Yue, Y., Chaudhuri, S., Fragkiadaki, K., Khan, M., Sun, Y. (eds.) In-
+ternational Conference on Learning Representations. vol. 2024, pp. 32628–
+32649
+(2024),
+https://proceedings.iclr.cc/paper_files/paper/2024/file/
+8a2acd174940dbca361a6398a4f9df91-Paper-Conference.pdf
+42. Shi, F., Chen, X., Misra, K., Scales, N., Dohan, D., Chi, E.H., et al.: Large
+language models can be easily distracted by irrelevant context. In: Krause, A.,
+Brunskill, E., Cho, K., Engelhardt, B., Sabato, S., Scarlett, J. (eds.) Proceed-
+ings of the 40th International Conference on Machine Learning. Proceedings of
+Machine Learning Research, vol. 202, pp. 31210–31227. PMLR (23–29 Jul 2023),
+https://proceedings.mlr.press/v202/shi23a.html
+43. Sun, J., Xu, C., Tang, L., Wang, S., Lin, C., Gong, Y., et al.: Think-on-
+graph: Deep and responsible reasoning of large language model on knowl-
+edge graph. In: Kim, B., Yue, Y., Chaudhuri, S., Fragkiadaki, K., Khan, M.,
+Sun, Y. (eds.) International Conference on Learning Representations. vol. 2024,
+
+
+pp. 3868–3898 (2024), https://proceedings.iclr.cc/paper_files/paper/2024/
+file/10a6bdcabbd5a3d36b760daa295f63c1-Paper-Conference.pdf
+44. Talmor, A., Berant, J.: The web as a knowledge-base for answering complex ques-
+tions. In: Walker, M., Ji, H., Stent, A. (eds.) Proceedings of the 2018 Confer-
+ence of the North American Chapter of the Association for Computational Lin-
+guistics: Human Language Technologies, Volume 1 (Long Papers). pp. 641–651.
+Association for Computational Linguistics, New Orleans, Louisiana (Jun 2018).
+https://doi.org/10.18653/v1/N18-1059, https://aclanthology.org/N18-1059/
+45. Trivedi, H., Balasubramanian, N., Khot, T., Sabharwal, A.: Interleaving re-
+trieval with chain-of-thought reasoning for knowledge-intensive multi-step ques-
+tions. In: Rogers, A., Boyd-Graber, J., Okazaki, N. (eds.) Proceedings of the
+61st Annual Meeting of the Association for Computational Linguistics (Vol-
+ume 1: Long Papers). pp. 10014–10037. Association for Computational Linguis-
+tics, Toronto, Canada (Jul 2023). https://doi.org/10.18653/v1/2023.acl-long.557,
+https://aclanthology.org/2023.acl-long.557/
+46. Vrandečić, D., Krötzsch, M.: Wikidata: a free collaborative knowledgebase. Com-
+mun. ACM 57(10), 78–85 (Sep 2014). https://doi.org/10.1145/2629489, https:
+//doi.org/10.1145/2629489
+47. Wang, Y., Li, P., Sun, M., Liu, Y.: Self-knowledge guided retrieval aug-
+mentation for large language models. In: Bouamor, H., Pino, J., Bali, K.
+(eds.) Findings of the Association for Computational Linguistics: EMNLP
+2023.
+pp.
+10303–10315.
+Association
+for
+Computational
+Linguistics,
+Singa-
+pore (Dec 2023). https://doi.org/10.18653/v1/2023.findings-emnlp.691, https:
+//aclanthology.org/2023.findings-emnlp.691/
+48. Xie, J., Zhang, K., Chen, J., Lou, R., Su, Y.: Adaptive chameleon or stub-
+born sloth: Revealing the behavior of large language models in knowledge con-
+flicts. In: Kim, B., Yue, Y., Chaudhuri, S., Fragkiadaki, K., Khan, M., Sun,
+Y. (eds.) International Conference on Learning Representations. vol. 2024, pp.
+35623–35646 (2024), https://proceedings.iclr.cc/paper_files/paper/2024/
+file/99261adc8a6356b38bcf999bba9a26dc-Paper-Conference.pdf
+49. Xu, R., Qi, Z., Guo, Z., Wang, C., Wang, H., Zhang, Y., et al.: Knowledge con-
+flicts for LLMs: A survey. In: Al-Onaizan, Y., Bansal, M., Chen, Y.N. (eds.)
+Proceedings of the 2024 Conference on Empirical Methods in Natural Lan-
+guage Processing. pp. 8541–8565. Association for Computational Linguistics, Mi-
+ami, Florida, USA (Nov 2024). https://doi.org/10.18653/v1/2024.emnlp-main.486,
+https://aclanthology.org/2024.emnlp-main.486/
+50. Yang,
+X.,
+Sun,
+K.,
+Xin,
+H.,
+Sun,
+Y.,
+Bhalla,
+N.,
+Chen,
+X.,
+et
+al.:
+Crag
+-
+comprehensive
+rag
+benchmark.
+In:
+Globerson,
+A.,
+Mackey,
+L.,
+Belgrave,
+D.,
+Fan,
+A.,
+Paquet,
+U.,
+Tomczak,
+J.,
+Zhang,
+C.
+(eds.)
+Ad-
+vances
+in
+Neural
+Information
+Processing
+Systems.
+vol.
+37,
+pp.
+10470–
+10490.
+Curran
+Associates,
+Inc.
+(2024).
+https://doi.org/10.52202/079017-
+0335,
+https://proceedings.neurips.cc/paper_files/paper/2024/file/
+1435d2d0fca85a84d83ddcb754f58c29-Paper-Datasets_and_Benchmarks_Track.
+pdf
+51. Yih, W.t., Richardson, M., Meek, C., Chang, M.W., Suh, J.: The value of seman-
+tic parse labeling for knowledge base question answering. In: Erk, K., Smith, N.A.
+(eds.) Proceedings of the 54th Annual Meeting of the Association for Computa-
+tional Linguistics (Volume 2: Short Papers). pp. 201–206. Association for Computa-
+tional Linguistics, Berlin, Germany (Aug 2016). https://doi.org/10.18653/v1/P16-
+2033, https://aclanthology.org/P16-2033/
+
+
+52. Yoran, O., Wolfson, T., Ram, O., Berant, J.: Making retrieval-augmented
+language
+models
+robust
+to
+irrelevant
+context.
+In:
+Kim,
+B.,
+Yue,
+Y.,
+Chaudhuri,
+S.,
+Fragkiadaki,
+K.,
+Khan,
+M.,
+Sun,
+Y.
+(eds.)
+International
+Conference
+on
+Learning
+Representations.
+vol.
+2024,
+pp.
+29862–29883
+(2024),
+https://proceedings.iclr.cc/paper_files/paper/2024/file/
+8011b23e1dc3f57e1b6211ccad498919-Paper-Conference.pdf
+53. Zhang, Q., Chen, S., Bei, Y., Yuan, Z., Zhou, H., Hong, Z., et al.: A survey of
+graph retrieval-augmented generation for customized large language models (2025),
+https://arxiv.org/abs/2501.13958
+54. Zou, W., Geng, R., Wang, B., Jia, J.: Poisonedrag: knowledge corruption attacks
+to retrieval-augmented generation of large language models. In: Proceedings of the
+34th USENIX Conference on Security Symposium. SEC ’25, USENIX Association,
+USA (2025)

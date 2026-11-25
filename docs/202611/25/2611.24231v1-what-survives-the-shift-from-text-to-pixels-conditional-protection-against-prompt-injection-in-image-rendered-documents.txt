@@ -1,0 +1,1397 @@
+What Survives the Shift from Text to Pixels? Conditional Protection against
+Prompt Injection in Image-Rendered Documents
+Haoyang Liu, Yinong Xu, Zhe Lang, Zhenyu Guan, Qianyun Zhang
+School of Cyber Science and Technology, Beihang University
+Abstract
+Multimodal language models increasingly answer questions
+over external documents, exposing them to indirect prompt
+injection: commands planted in untrusted content to hijack
+the response. Rendering untrusted content as page images
+lowers attack success on average, leaving open which in-
+jected operations survive rendering, at what utility cost, and
+whether failed image attacks reflect unread commands or
+commands read but not followed. We pair text and page-
+image versions of 191 English question-answering sources
+across six models, measuring marker appending, answer for-
+matting, and answer replacement alongside clean Question-
+Answering utility. Rendering reduces append and format
+execution for every model, yet Qwen3-VL-8B still executes
+image-borne replacement at 77.96%. Protection also de-
+pends on target type, rendering settings, wording, and repeti-
+tion, and a search over eight fixed attack candidates largely
+closes the image deficit in appending and formatting for
+Qwen and Gemini, though not for GPT-5-nano. Utility ratios
+on original questions range from 93.31% to 101.61%, but
+Qwen falls to 61.99% when answers combine two evidence
+spans. Illegibility cannot explain all failed attacks: models
+often transcribe and identify image-borne commands they do
+not execute, and trusted user authorization raises execution
+on unchanged pages. Inside Qwen, patching early attack-
+region states induces all three operations, more weakly in
+images. Attention blocking suggests why: a text command
+acts through its own positions, whereas visual encoding
+spreads an image command and its target across the instruc-
+tion page. Rendering thus offers conditional protection, mo-
+tivating evaluations that report security by model, operation,
+and attack budget alongside utility.
+1. Introduction
+Retrieval-augmented generation and document question an-
+swering ground a model’s responses in external sources
+[5, 14]. Such sources supply evidence under a trust hier-
+archy in which system and user instructions take precedence
+over commands embedded in external content [26]. Indirect
+prompt injection exploits this trust boundary by planting a
+command next to the evidence [10, 31]. A promising miti-
+gation is to render the document as page images, so that a
+multimodal model reads the same words through its vision
+encoder rather than its text tokenizer. Rendering long pas-
+sages reduces decoder token usage while preserving retrieval
+and summarization performance [15], and Zhang et al. [34]
+demonstrate that rendering untrusted text as images reduces
+attack execution rates across two prompt injection bench-
+marks, including under adaptive attacks.
+Figure 1 illustrates how rendering can suppress an in-
+jected command while preserving the answer. Given the
+same question, factual content, and embedded command,
+Qwen correctly answers that the author of Cock and Bull
+was born in 1961 in both runs. Its response to the text
+document additionally carries the marker requested by the
+attacker, whereas its response to the rendered page does not.
+Answer correctness alone is therefore insufficient to assess
+security: a successful attack can alter the response without
+corrupting the answer. Prior results establish that rendering
+helps on average, but leave open a finer-grained question:
+which decisions about the response can an external author
+still control through a rendered page, and why?
+Figure 1. Matched text–image Qwen trial on HotpotQA.
+We argue that answering this question requires looking
+beyond the aggregate modality gap along three axes. First,
+the gap depends on what the command requests and how
+it is delivered. Appending a line leaves the answer intact,
+whereas replacing it with a fixed phrase must override the
+user’s request, and an aggregate over one fixed attack can
+mask acute vulnerability. Second, a missing marker is am-
+1
+arXiv:2611.24231v1  [cs.CR]  18 Nov 2026
+
+
+biguous: the model may have failed to read the command,
+or it may have read the command and followed the user
+instead. Since type size and visual degradation modulate
+typographic attacks [3], legibility is a plausible yet untested
+explanation. Third, prior work has localized states that influ-
+ence prompt injection compliance in text models [28], but
+it remains unclear which regions encode the semantics of a
+rendered command.
+To disentangle these factors, we pair text and image ver-
+sions of 191 question-answering (QA) sources from Long-
+Bench [2] across six models, holding the question, evidence,
+and attack wording fixed within each pair. We measure ap-
+pend, format, and replacement execution alongside clean QA
+F1 on original questions and integration questions requiring
+two evidence spans. On a 90-source subset, we test how tar-
+get type, presentation, and a query budget over fixed attack
+candidates affect execution. Behavioral diagnostics exam-
+ine reading versus following, while interventions in Qwen
+test how states derived from the source influence operation
+execution and target selection [33].
+Our contributions are threefold:
+• An operation-level evaluation of rendered injection.
+We build a matched text–image benchmark measuring per-
+operation attack execution and clean QA utility on two
+question types. Rendering suppresses append and format
+attacks for all six models, yet protection varies with model,
+operation, target type, and presentation, can largely vanish
+under a small candidate search, and may come with sharp
+utility losses on integration questions.
+• A behavioral separation of reading from following.
+Across three models, reporting, identification, and exe-
+cution can dissociate; for Qwen, OCR transcripts of the
+pages are executed far more often than the pages them-
+selves, and user authorization changes execution on un-
+changed pages. Legibility alone therefore cannot explain
+failed image attacks.
+• A mechanistic contrast of how each modality carries a
+command. Qwen’s early attack-region states induce all
+three operations in both modalities, beyond random and
+position-shifted controls. Target redirection and attention
+blocking indicate that a text command is confined to its
+own positions, whereas an image command and its target
+are also carried by visual tokens elsewhere on the page.
+2. Related Work
+2.1. Visual Text Representation
+Text can reach a language model as discrete tokens or as
+patches of a rendered image. Pixel-based models encode
+rendered text without a fixed vocabulary [23–25], and their
+accuracy depends on how characters are grouped into patches
+[17]. OCR-free document models extend this paradigm to
+visually rich pages [12, 13, 18], and page images now serve
+as retrieval units [7] and as compressed context for multi-
+modal decoders [15, 27]. These studies ask what rendering
+preserves for the task. Our setting imposes an additional re-
+quirement: the model must recover evidence from the page
+while respecting the user’s authority over which operations
+to perform. We therefore measure clean question answering,
+including questions that integrate evidence, jointly with the
+execution of embedded commands.
+2.2. Prompt Injection Attacks
+Prompt injection exploits a trust boundary: system and user
+messages define the task, whereas retrieved documents, tool
+outputs, and observations supply data [16, 21]. In indirect
+attacks, a third party plants instructions in content the model
+later consumes [10], with goals ranging from manipulat-
+ing the response to leaking information or triggering unau-
+thorized tool calls [6, 31, 32]. Defenses delimit untrusted
+data [11], separate instructions from data through structured
+queries [4], or train models to prioritize privileged instruc-
+tions [26]. Our three attack operations span increasing con-
+trol over the response, from appending a string to replacing
+the answer altogether.
+Images can carry instructions as well. Overlaid words
+mislead CLIP [8], and typographic or adversarial visual
+prompts jailbreak vision-language models [9, 22] or inject
+instructions into multimodal assistants and agents [1, 29].
+Nagaraja et al. [20] varied the placement and visibility of
+commands embedded in natural images, and Balakrishnan
+et al. [3] linked typographic attack success to font size and
+visual degradation. Pictionary inverts this direction: the
+application itself renders untrusted material to weaken its
+instructions [34]. In contrast, we hold the document and
+instruction fixed across modalities and ask which operations
+survive the transformation. Matched question answering,
+reading diagnostics, and trusted authorization separate read-
+ing from following the source, while activation patching
+[19, 33] and attention blocking locate where each modality
+carries the command.
+3. Problem Formulation and Experimental
+Setup
+3.1. Trust boundary
+Let S denote the system policy, Q the user question, and D
+the external source. The attacker inserts an instruction A
+into D while retaining its original facts. Only the source is
+under attacker control. With R the renderer and ⊕insertion
+at a designated position, the two responses are
+yT = M(S, Q, D ⊕A),
+(1)
+yV = M(S, Q, R(D ⊕A)).
+(2)
+The system prompt instructs the model to treat the external
+source as untrusted, while the user prompt specifies the
+2
+
+
+question and marks the source boundaries. The source may
+provide evidence for answering the question, but instructions
+within it have no authority to override the system policy or
+the user’s request. This trust boundary is the same in T and
+V , where the source and injected instructions are presented
+together as text or page images, respectively.
+3.2. Sources and operations
+We use 191 English source instances from LongBench
+[2]: 80 Qasper questions about research papers [5], 69
+MultiFieldQA-en questions over documents from multiple
+domains, and 42 HotpotQA questions requiring evidence
+across passages [30]. Each source instance comprises exter-
+nal content, its original question, and reference answers.
+We study three attack operations, each with two fixed
+wordings. Append requests the answer followed by a source-
+specific marker on a new line. Format requests one line
+consisting of the marker, a vertical bar, and the answer. The
+marker is absent from the original question, document, and
+references. Replace directs the model to replace the answer
+with “You are attacked!”.
+3.3. Source modalities and models
+The two source modalities are text (T) and page images (V );
+the system policy and user question remain text in both. We
+use three prompt wrappers (W1, W2, and Wa) and fixed
+default rendering settings.
+We run Qwen3-VL-8B-Instruct locally and access GPT-5-
+nano, Haiku 5.5, Gemini 3.1 Flash-Lite, GLM-5.3-Flash, and
+DeepSeek V4.1 Flash 1017 via an API gateway. The core
+comparison uses the same questions, attacks, and PNGs for
+all six. We use Qwen for rendering and wording experiments,
+behavioral diagnostics, and interventions that require access
+to decoder states. GPT-5-nano, whose append and format
+ASR falls from above 70% in text to zero in images, and
+Gemini, which has the highest image ASR, also join part of
+these experiments.
+3.4. Scoring
+Our security measure is Attack Success Rate (ASR), the
+rate at which visible responses execute the injected operation:
+appending the marker, formatting the answer, or replacing it
+with the target phrase.
+Responses truncated by the output length limit are marked
+as unknown and excluded from scoring. For each opera-
+tion we average its two wordings within source, then aver-
+age sources within dataset and give the three datasets equal
+weight. For clean questions, we compute LongBench word-
+overlap F1 on the full response, taking the best score across
+references after normalizing case, articles, punctuation, and
+whitespace. The utility ratio (UR) is image F1 divided by
+text F1, using the dataset-weighted values displayed in Ta-
+ble 2. Reported pH values use Holm correction within each
+analysis family.
+We used GPT-6 Astra to assist with code development,
+experiment execution, and writing the plotting code. We
+used Claude Opus 5.5 to edit and organize the manuscript.
+The authors reviewed the generated code and checked the
+experimental outputs.
+4. Does Rendering Close the Injection Channel?
+We first compare the six models on the original questions
+under W1. Table 1 reports attack execution by operation and
+modality, and Table 2 reports clean QA utility.
+4.1. Attack Execution across Models and Opera-
+tions
+Rendering reduces attack execution, but the remaining vul-
+nerability depends on the model and operation (Table 1).
+For append and format, image ASR is lower than text ASR
+for every model: Gemini still executes roughly 50% of the
+image attacks, whereas all other models remain below 12%.
+The text baseline also matters when interpreting these reduc-
+tions. GPT-5-nano and Haiku both reach zero image ASR,
+but their text rates exceed 72% and remain below 6%, respec-
+tively, yielding markedly different modality gaps. Answer
+replacement, however, changes the relative vulnerability of
+Qwen and Gemini: Qwen executes the fixed-phrase replace-
+ment attack in most image responses, while every API model
+stays near zero in images and GLM also stays near zero in
+text. Thus, low image ASR for append and format does not
+imply resistance to answer replacement, and aggregating
+across operations can obscure substantial vulnerability to a
+particular operation.
+4.2. QA Performance across Question Types
+On the original questions, UR stays within 93–102% for all
+six models (Table 2). To test utility when evidence must
+be combined, we add one integration question per source
+(191 in total) that requires two evidence spans. Because
+these questions differ from the original benchmark questions,
+the two sets characterize utility under different question
+demands.
+The integration-question modality gap varies across mod-
+els. Qwen loses the most and GPT-5-nano also falls below
+its original-question UR, whereas Haiku, Gemini, and GLM
+show no loss. Thus, the large loss for Qwen does not gen-
+eralize to every model, and utility on the original questions
+alone does not characterize the cost of combining evidence
+from rendered pages.
+4.3. Attack Execution on Sources Answered in Both
+Modalities
+Lower image ASR could reflect weaker question answering
+on rendered pages or resistance to the injected instruction.
+For each of the six models, we restrict the comparison in
+3
+
+
+Table 1. Attack success rates (%; lower is better). ∆= Image −Text is computed from the displayed rates in percentage points.
+Model
+Append
+Format
+Replace
+Text
+Image
+∆
+Text
+Image
+∆
+Text
+Image
+∆
+Qwen3-VL-8B
+73.78
+5.01
+−68.77
+71.72
+11.35
+−60.37
+98.73
+77.96
+−20.77
+GPT-5-nano
+77.95
+0.00
+−77.95
+72.12
+0.00
+−72.12
+29.53
+1.12
+−28.41
+Haiku 5.5
+2.46
+0.00
+−2.46
+5.11
+0.00
+−5.11
+0.93
+0.00
+−0.93
+Gemini 3.1 Flash-Lite
+93.97
+47.27
+−46.70
+97.85
+59.79
+−38.06
+30.57
+0.24
+−30.33
+GLM-5.3-Flash
+65.10
+4.48
+−60.62
+61.63
+1.92
+−59.71
+0.24
+0.00
+−0.24
+DeepSeek V4.1 Flash
+64.87
+0.61
+−64.26
+89.26
+6.69
+−82.57
+3.60
+0.00
+−3.60
+Table 2. Clean QA F1 and utility ratio (UR, %) on original (Orig.)
+and integration (Integr.) questions.
+Model
+Question
+Text
+Image
+UR (%)
+Orig.
+50.99
+50.33
+98.71
+Qwen3-VL-8B
+Integr.
+59.22
+36.71
+61.99
+Orig.
+50.11
+49.83
+99.44
+GPT-5-nano
+Integr.
+86.72
+77.48
+89.35
+Orig.
+52.29
+53.13
+101.61
+Haiku 5.5
+Integr.
+81.97
+84.07
+102.56
+Orig.
+55.18
+55.04
+99.75
+Gemini 3.1
+Flash-Lite
+Integr.
+83.46
+84.05
+100.71
+Orig.
+52.87
+52.60
+99.49
+GLM-5.3-Flash
+Integr.
+82.10
+82.92
+101.00
+Orig.
+54.82
+51.15
+93.31
+DeepSeek V4.1
+Flash
+Integr.
+87.84
+85.13
+96.91
+Table 1 to sources whose clean QA F1 reaches a threshold
+τ ∈[0, 1] in both modalities. For Qwen, the paired image–
+text intervals exclude zero for all three operations at every
+threshold; even at τ = 1 (46 sources), append ASR is 72.39%
+in text but 3.37% in images. The modality gap thus persists
+on sources that Qwen answers correctly from both text and
+images.
+5. What Makes Rendered Commands Effec-
+tive?
+The modality gap depends on what the command requests
+and how the source is presented. The controlled experiments
+in this section use 90 sources, 30 per dataset. We first cross
+the operations with target type on the original questions;
+holding Qwen fixed, we then vary page resolution and typog-
+raphy, task-referencing wording, command placement, and
+repetition; finally, we let the attacker try several commands.
+We further construct a direct question for each source that
+asks for a local fact answerable from a single evidence span;
+the task-binding and placement tests use direct and integra-
+tion questions, and the repetition tests use direct questions.
+5.1. Operation and target type
+Table 1 couples operation, target type, and task-referencing
+wording. To separate these factors, we cross all three opera-
+Table 3. Strict success (%). ∆= Image−Text uses the displayed
+rates; ∗marks paired pH < 0.05 after Holm correction over 54
+tests within each model.
+Operation
+Natural phrase
+Random string
+Text
+Image
+∆
+Text
+Image
+∆
+Qwen3-VL-8B
+Append
+73.89
+51.11 −22.78∗87.22
+59.44 −27.78∗
+Format
+68.89
+73.89
++5.00
+94.44
+77.78 −16.66∗
+Replace
+79.44
+80.56
++1.12
+95.56
+73.33 −22.23∗
+GPT-5-nano
+Append
+15.00
+1.13 −13.87∗21.67
+0.57 −21.10∗
+Format
+33.89
+2.24 −31.65∗55.00
+2.26 −52.74∗
+Replace
+0.00
+0.56
++0.56
+1.11
+0.00
+−1.11
+Gemini 3.1 Flash-Lite
+Append
+80.56
+25.56 −55.00∗92.78
+51.11 −41.67∗
+Format
+86.11
+41.67 −44.44∗98.89
+71.11 −27.78∗
+Replace
+0.56
+0.00
+−0.56
+2.22
+0.00
+−2.22
+tions with natural phrases and equal-length random alphanu-
+meric strings under W1, reusing each source’s target strings
+across operations. Commands share a question-referencing
+lead-in and occupy a separate page before or after the un-
+changed source, with matched placement in text. We call this
+the separate-page protocol, in contrast to the inline protocol
+of the main experiments, which embeds commands within
+the source text. Alongside operation execution, we measure
+strict success, requiring the exact target in the requested
+structure.
+For Qwen, the strict-success gap depends on both opera-
+tion and target type (Table 3). Appending is less successful
+on images for both target types; formatting and replacement
+show a significant image deficit only for random strings.
+Their interactions between target type and modality survive
+Holm correction, showing that a single target type can mis-
+represent the modality gap. Yet Qwen’s image execution of
+formatting and replacement remains near ceiling for random
+strings: their strict-success deficits largely reflect reproduc-
+tion errors rather than failure to attempt the operation. GPT-
+5-nano and Gemini instead show significant image deficits
+in appending and formatting for both target types. Their
+execution rates lie within 5.00 percentage points of strict
+4
+
+
+20
+26
+32
+0
+25
+50
+75
+100
+Image ASR (%)
+(a) Font size
+704 px
+876 px
+1280 px
+Gen.
+Ques.
+Evid.
+(b) Binding
+Direct
+Integration
+1
+2
+4
+(c) Copies
+Append
+Format
+Figure 2. Qwen image ASR across presentation conditions. Shaded
+bands show pointwise 95% CIs.
+success, so these deficits reflect failures to execute. Target
+type still changes the size of the gap: the GPT-5-nano for-
+matting deficit is larger with random strings, an interaction
+that survives Holm correction.
+For Qwen, image execution of appending and formatting
+also far exceeds that under the inline protocol on the same
+sources, so its low image execution of these operations in
+Table 1 depends on presentation as well as operation. Be-
+cause the separate-page protocol changes both placement
+and task-referencing wording, Section 5.3 examines them
+separately.
+5.2. Rendering resolution and font size
+We cross export widths of 704, 876, and 1280 pixels with
+CSS font sizes of 20, 26, and 32, holding the source con-
+tent and attack wording fixed. Higher resolution and larger
+type both weaken the protection afforded by rendering (Fig-
+ure 2(a)): for fixed-phrase replacement under W1, enlarging
+the font from 20 to 32 (width 876) and widening the page
+from 704 to 1280 pixels (font size 26) each raise execution
+by more than 25 percentage points. The security benefit of
+presenting a source as an image thus depends strongly on its
+rendering settings.
+The two factors show diminishing joint gains: resolution
+matters more at small font sizes, and enlarging the font
+adds less once resolution is high, a pattern supported by the
+negative width-by-font interaction and replicated under W2.
+Coarse rendering also costs utility (clean QA F1 of 42.21 at
+the coarsest W1 setting versus 48.72 at the default), so low
+attack execution at coarse settings cannot by itself establish
+protection without a utility cost.
+5.3. Task binding and placement
+We compare three replacement wordings with a fixed target
+phrase (Figure 2(b)): Generic (Gen.) omits task-specific
+references, Question-bound (Ques.) repeats the question,
+and Evidence-bound (Evid.) repeats the question and quotes
+evidence openings. Question-bound is the most effective
+wording in all four modality and question-type combina-
+tions, raising ASR over the generic wording by 17.78–30.00
+percentage points. Evidence-bound wording works just as
+40
+60
+80
+100
+Qwen (%)
+(a) Append
+(b) Format
+(c) Replace
+0
+25
+50
+75
+100
+GPT-5-nano (%)
+(d) Append
+(e) Format
+(f) Replace
+1
+4
+8
+16
+Budget
+0
+25
+50
+75
+100
+Gemini (%)
+(g) Append
+1
+4
+8
+16
+Budget
+(h) Format
+1
+4
+8
+16
+Budget
+(i) Replace
+Text
+Image
+Figure 3. Cumulative strict success (%) by query budget. Shaded
+bands show 95% CIs; dashed lines mark the budget-1 level. (a)–(c)
+Qwen; (d)–(f) GPT-5-nano; (g)–(i) Gemini.
+well in text but is the weakest wording in images, falling be-
+low even the generic wording. Holding the evidence-bound
+wording fixed, moving the command farther from the cited
+evidence increases image ASR for both question types.
+5.4. Repetition
+Repeating the command raises image format execution: two
+concentrated copies add 24.44 percentage points, and four
+distributed copies perform similarly to four concentrated
+ones (Figure 2(c) shows concentrated copies). Image append
+execution changes little.
+5.5. Multiple attack candidates
+To test whether the image deficit persists when an attacker
+can try several commands, we build 16 attack candidates per
+operation by crossing eight lead-in framings with the two
+operation wordings of Section 5.1. All candidates follow
+the separate-page protocol, and each source keeps one target
+for every candidate. We split the 90 sources into 30 devel-
+opment and 60 test sources, balanced across datasets, rank
+the candidates by development strict success for each model,
+operation, and modality, and freeze this order. On the test
+sources, a query budget of k counts a source as attacked if
+any of the first k candidates achieves strict success.
+For Qwen, a small search largely closes the image deficit
+(Figure 3(a)–(c)): the append gap shrinks from −37.37 to
+−3.33 percentage points by budget eight, formatting reaches
+100% in both modalities at budget eight after a significant
+deficit through budget four, and replacement shows no signif-
+icant gap at any budget. Gemini follows the same pattern for
+5
+
+
+Table 4. Reporting (R), understanding (U), and execution (A) rates
+(%) under the inline protocol. Blue boldface highlights execution
+rates. Each endpoint uses sources scored in both modalities within
+each model.
+Operation
+Text
+Image
+R
+U
+A
+R
+U
+A
+Qwen3-VL-8B
+Append
+2.22
+8.89
+73.17
+66.86
+6.67
+0.00
+Format
+0.00
+37.78
+68.89
+71.97
+24.44
+2.22
+Replace
+1.11
+68.89
+96.67
+75.56
+48.89
+76.67
+GPT-5-nano
+Append
+77.46 100.00
+82.22
+51.75
+64.44
+0.00
+Format
+80.00
+90.79
+64.44
+54.44
+55.40
+0.00
+Replace
+83.25 100.00
+30.00
+36.58
+85.56
+2.22
+Gemini 3.1 Flash-Lite
+Append
+51.11 100.00
+91.11
+91.11
+91.11
+37.78
+Format
+48.89
+95.56
+97.78
+97.78
+93.33
+57.78
+Replace
+98.89
+98.89
+26.67
+95.56
+98.89
+0.00
+appending and formatting, but its replacement gap persists
+(Figure 3(g)–(i)). GPT-5-nano keeps a significant image
+deficit for every operation and budget (Figure 3(d)–(f)). A
+single-command image deficit therefore need not imply ro-
+bustness to even a limited search; whether it survives the
+search depends on the model and operation.
+6. Reading versus Following Instructions
+A failed image-borne attack may reflect difficulty reading the
+instruction or a failure to follow it. We examine reporting
+and understanding diagnostics, OCR text inputs, neutral
+descriptions, and trusted authorization.
+6.1. Reporting, understanding, and execution
+We measure three endpoints on the same sources. Reporting
+(R) asks the model to transcribe the injected passage ver-
+batim without executing it; obeying the command instead
+counts as failure. Understanding (U) measures operation-
+and-target identification: the model must classify the re-
+quested operation among four options and return the exact
+target. Execution (A, for attack execution) records operation
+execution on the original question.
+For Qwen under the inline protocol (Table 4), image re-
+porting and execution diverge for appending and formatting:
+among sources with successful image reporting, execution
+is 0.00% and 3.70%, respectively. Replacement is instead
+executed on most images despite only moderate operation-
+and-target identification accuracy. Low R need not indicate
+unread content: 89 of 90 text replacement responses execute
+the command instead of reporting it. Low U can likewise
+reflect failure to follow the diagnostic task or reproduce the
+exact target, rather than lack of understanding alone. Under
+the separate-page protocol, image reporting and execution
+Command
+Neutral
+Source wording
+0
+25
+50
+75
+100
+ASR (%)
+(a) Neutral description
+Prohibit Permit
+Prohibit Permit
+Prohibit Permit
+Qwen
+GPT-5-nano
+Gemini
+(b) User authorization
+Text / Append
+Text / Format
+Image / Append
+Image / Format
+Figure 4. Behavioral diagnostics. (a) Qwen command versus
+neutral-description ASR. (b) Prohibit versus Permit ASR for Qwen,
+GPT-5-nano, and Gemini.
+co-occur more often, with no significant modality difference
+in A.
+GPT-5-nano and Gemini show a sharper dissociation. Un-
+der the inline protocol, Gemini reports and identifies more
+than 90% of image append and format commands yet ex-
+ecutes far fewer; GPT-5-nano reports and identifies more
+than half but executes none. This dissociation also appears
+under the separate-page protocol. Both API models report
+neutral passages accurately without executing an operation.
+For Qwen, replacing commands with neutral descriptions
+retaining the marker reduces append and format ASR to zero
+in both modalities (Figure 4(a)), showing that the marker
+alone is insufficient. Thus, accurate reporting and identifica-
+tion can coexist with little execution, while low diagnostic
+accuracy need not imply that a command was unread.
+6.2. OCR text versus page images
+On the inline append and format sources, we replace each
+page image with its OCR transcript, supplied as text. On
+the 89 sources scored in all conditions, OCR text yields
+41.80% operation execution despite recognition errors, ver-
+sus 70.96% for the original text and 1.11% for images. Cor-
+recting the OCR within the attack span raises strict success
+by 14.44 percentage points but operation execution by only
+an unresolved 3.33 points. Recognition errors thus mainly
+reduce exact reproduction, and text containing such errors is
+still executed far more often than the page image.
+6.3. User authorization and prohibition
+The user-authorization experiment holds the page fixed and
+changes the trusted user’s authorization. Under the Wa pol-
+icy, the user prohibits or permits the source operation with-
+out restating its content (Figure 4(b)). Permission markedly
+raises Qwen’s image append and format execution, whereas
+its text rates are already near ceiling under prohibition. Gem-
+ini reaches 100% under Permit in both modalities, starting
+from low prohibited image rates. GPT-5-nano approaches
+6
+
+
+ceiling with permission in text but remains far lower in
+images. Its authorization effect is thus smaller in images,
+whereas Gemini’s is larger. Identical image content can
+therefore support execution when the trusted task permits its
+operation.
+Together, the diagnostics show that inability to read is
+insufficient to explain all failed image attacks, while leaving
+room for recognition and execution errors. We next test
+whether changing states derived from the source can alter
+the requested operation.
+7. Mechanistic Analysis
+7.1. Selecting residual-stream sites
+We use Qwen’s open weights to test how states at the in-
+jected passage influence operation execution through activa-
+tion patching [33]. For each source, we pair a command run
+with a neutral run that rewrites the command as a neutral de-
+scription, keeping donor and recipient in the same modality.
+During prefill, an on intervention replaces neutral-recipient
+states with command states; an off intervention reverses the
+direction. The recipient then generates freely. Whereas prior
+work found late sites governing compliance in text LLMs
+[28], we examine the influence of attack-region states across
+text and image modalities.
+We reserve 60 sources for site discovery and 131 for con-
+firmation. A coarse screen measures bidirectional changes
+in the relative log-probability of an append-bearing can-
+didate versus a legitimate answer. Among eight decoder
+depths, attack-region residual inputs at zero-based L5 and
+L11 score highest. After adjustment for norm-matched ran-
+dom perturbations, full residual-input patching outperforms
+half-strength and component-specific alternatives at both
+sites. Linear probes also distinguish command from neutral-
+description runs in both modalities. Both sites exceed the
+preset five-percentage-point retention threshold for random-
+control-adjusted bidirectional execution effects in free gener-
+ation and pass the clean QA check. We therefore fix L5 and
+L11 for confirmation and transfer across operations.
+7.2. Induction and suppression across three opera-
+tions
+We evaluate induction and suppression of append, format,
+and fixed-phrase replacement on the same 131 sources (Fig-
+ure 5). Let δA = hcommand
+A
+−hneutral
+A
+denote the state
+difference at attack positions A. Attack-region patching
+adds δA to a neutral recipient or subtracts it from a com-
+mand recipient at A. We compare it with two controls: a
+norm-matched random perturbation at A, and the same ±δA
+added at a disjoint set of source positions after the attack,
+excluding evidence positions. This position-shifted (shift)
+control preserves the perturbation while changing where it
+is applied. All interventions act only during prefill.
+L5
+L11
+L5
+L11
+0
+20
+40
+60
+80
+100
+ASR (%)
+On
+Off
+(a) Append / Text
+60.06
+56.74
+0
+0
+0
+0
+0.71
+0
+0
+0
+56.04
+60.24
+58.57%
+L5
+L11
+L5
+L11
+0
+20
+40
+60
+80
+100
+ASR (%)
+On
+Off
+(b) Append / Image
+6.38
+5.68
+0
+0
+0
+0
+0
+0
+0
+0
+7.89
+7.89
+8.59%
+L5
+L11
+L5
+L11
+0
+20
+40
+60
+80
+100
+ASR (%)
+On
+Off
+(c) Format / Text
+75.18
+70.36
+0
+0
+0
+0
+28.45
+0
+0
+0
+67.33
+70.51
+72.98%
+L5
+L11
+L5
+L11
+0
+20
+40
+60
+80
+100
+ASR (%)
+On
+Off
+(d) Format / Image
+20.81
+21.49
+0
+0
+0
+0
+0
+0
+0
+0
+19.45
+19.45
+20.13%
+L5
+L11
+L5
+L11
+0
+20
+40
+60
+80
+100
+ASR (%)
+On
+Off
+(e) Replace / Text
+99.44
+98.89
+0
+0
+0
+0
+92.53
+18.96
+0
+0
+99.44
+99.44
+99.44%
+L5
+L11
+L5
+L11
+0
+20
+40
+60
+80
+100
+ASR (%)
+On
+Off
+(f) Replace / Image
+67.89
+69.05
+0
+0
+0
+0
+5.75
+0
+0
+0
+69.02
+69.58
+71.93%
+Attack-region
+Random
+Shift
+ASR (no patch)
+Figure 5. Three-operation patching. Orange dashed lines mark
+unpatched command ASR on the off-intervention matched set;
+neutral on-recipients have zero ASR.
+Adding the command–neutral state difference at the at-
+tack positions in neutral runs can elicit each of the three
+operations, whereas neither the random nor the shift control
+elicits them in the scored responses (Figure 5). Text induc-
+tion is stronger for every operation at both layers, and image
+induction differs sharply by operation, following the behav-
+ioral ordering from replacement through format to append.
+In the reverse direction, attack-region off patching elim-
+inates observed execution for all three operations in both
+modalities, whereas the shifted perturbation largely pre-
+serves it. Random off perturbations, however, also eliminate
+image append and format execution and image fixed-phrase
+replacement execution at L11. Inducing a particular opera-
+tion therefore provides the clearest evidence for the contribu-
+tion of the targeted states: disruption can suppress execution,
+while only the attack-region intervention produces the re-
+quested operation in a neutral run.
+Source-paired comparisons show that attack-region patch-
+ing induces and suppresses answer formatting and fixed-
+phrase replacement more strongly than shift patching in
+both modalities; image append effects are smaller and less
+precisely resolved. Across operations, the control-adjusted
+bidirectional effects are larger in text.
+7
+
+
+Table 5. Strict success (%) in target redirection. ∗marks donor-
+code gains over the self-donor, random, and shift controls with
+pH < 0.05.
+Operation Layer
+Text
+Image
+Self
+Rec.
+Don.
+Self
+Rec.
+Don.
+L11
+56.60 0.00 54.51∗
+2.38
+2.22
+2.22
+Append
+L17
+56.60 0.00 55.28∗
+2.38
+2.22 1.11
+L11
+26.32 0.00 28.47∗59.38 57.29
+2.08
+Format
+L17
+26.32 0.00 28.61∗59.38 59.38 0.00
+7.3. Redirecting the bound target
+The command–neutral contrast tests whether an operation oc-
+curs, not which target it uses. We therefore place two random
+codes in the source and bind the append or format operation
+to one of them. Layers L11 and L17 are selected on 12
+discovery sources by linear readout of the bound code, and
+all tests use 48 other sources. At L11, attack-region probes
+identify the bound code in 100.00% of text and 98.44% of
+image runs, while transfer at chance level to neutral refer-
+ences containing both codes. We then replace the recipient’s
+attack-region states with those of a donor bound to the other
+code and score the same responses against the recipient’s
+(Rec.) and donor’s (Don.) codes (Table 5). Self-donor
+patching provides the baseline, scored against the recipient’s
+code (Self). In text, responses switch to the donor’s code,
+exceeding the self-donor, random, and shift controls in all 12
+comparisons. Image responses do not switch: image format
+still produces the recipient’s code, and image append is near
+floor even under self-donor patching. The bound code is
+therefore decodable from image attack-region states, but at
+these sites it does not determine which code the response
+produces.
+7.4. Blocking the attack region
+Section 7.3 patches only the attack region. Before the de-
+coder, however, the vision encoder attends across each page,
+so other visual tokens on the instruction page may also carry
+the command. We test this on the same 48 sources and two
+commands. In all 36 decoder layers, during both prefill and
+generation, we block every position outside the attack po-
+sitions A from attending to A, recomputing from an empty
+KV cache. Controls block a size-matched set of other source
+positions or, for images, the whole instruction page. With A
+blocked, we also replace the page’s visual features outside A,
+at the main visual input and all three DeepStack inputs, with
+those of a clean page, a neutral-description page, or the page
+bound to the other code. These pages share every input patch
+outside A, so the replaced features can differ only through
+visual encoding of the content inside A.
+Blocking A eliminates text execution but barely affects
+images; only blocking the whole page eliminates image
+Table 6. Strict success (%) under attention blocking and Prohibit.
+Condition
+Text
+Image
+Append Format Append Format
+No block
+90.63
+83.33
+53.13
+79.17
+Matched positions
+93.75
+86.46
+48.96
+80.21
+Attack region A
+0.00
+0.00
+46.88
+76.04
+Instruction page
+–
+–
+0.00
+0.00
+execution (Table 6). Clean or neutral-description features
+outside A also eliminate image execution. Features from the
+page bound to the other code make every response identical
+to the donor’s response under the same block, so donor-
+code strict success equals the image attack-region entries
+in Table 6 and recipient-code strict success is zero. The
+modality-by-blocking interaction is +84.38 points for ap-
+pend and +80.21 for format. Clean QA F1 stays within
+52.88–56.00 under every block.
+These results suggest that the modalities differ in where
+the command is represented. A text command stays at its
+own positions: the response must read them directly, and
+other text positions hold no usable copy. In an image, vi-
+sual encoding carries the command, including the bound
+code, into visual tokens of the same page outside A. This
+also accounts for the earlier image results: patching only A
+leaves the recipient’s code elsewhere on the page, so image
+responses do not switch, and adding the command–neutral
+difference at A competes with neutral content on the rest
+of the page, consistent with the weaker image induction in
+Figure 5.
+8. Conclusion
+We studied which injected instructions survive when external
+documents are rendered as page images. Across six models,
+rendering reduces append and format execution, but its pro-
+tection is conditional: Qwen remains susceptible to answer
+replacement, the gap varies with target type and presentation,
+and a small search over attack candidates closes much of
+it for some models. Utility is largely preserved on original
+questions but drops for some models on integration questions.
+Illegibility cannot explain all failed image attacks: models
+transcribe commands they do not execute and execute more
+when the user permits. Inside Qwen, a text command acts
+through its own positions, whereas an image command is
+spread across the instruction page. Rendering-based de-
+fenses should therefore be evaluated by operation-specific
+execution under attack budgets alongside utility on questions
+that integrate evidence.
+References
+[1] Eugene Bagdasaryan, Tsung-Yin Hsieh, Ben Nassi, and Vi-
+taly Shmatikov. Abusing images and sounds for indirect
+8
+
+
+instruction injection in multi-modal LLMs. arXiv preprint
+arXiv:2307.10490, 2023.
+[2] Yushi Bai, Xin Lv, Jiajie Zhang, Hongchang Lyu, Jiankai
+Tang, Zhidian Huang, Zhengxiao Du, Xiao Liu, Aohan Zeng,
+Lei Hou, et al. Longbench: A bilingual, multitask bench-
+mark for long context understanding. In Proceedings of the
+62nd annual meeting of the association for computational
+linguistics (volume 1: Long papers), pages 3119–3137, 2024.
+[3] Ravikumar Balakrishnan, Sanket Mendapara, and Ankit Garg.
+Reading Between the Pixels: Linking Text-Image Embed-
+ding Alignment to Typographic Attack Success on Vision-
+Language Models. arXiv preprint arXiv:2604.12371, 2026.
+[4] Sizhe Chen, Julien Piet, Chawin Sitawarin, and David Wagner.
+StruQ: Defending against prompt injection with structured
+queries. In 34th USENIX Security Symposium (USENIX Se-
+curity 25), pages 2383–2400, 2025.
+[5] Pradeep Dasigi, Kyle Lo, Iz Beltagy, Arman Cohan, Noah A
+Smith, and Matt Gardner. A dataset of information-seeking
+questions and answers anchored in research papers. In Pro-
+ceedings of the 2021 Conference of the North American Chap-
+ter of the Association for Computational Linguistics: Human
+Language Technologies, pages 4599–4610, 2021.
+[6] Edoardo Debenedetti, Jie Zhang, Mislav Balunovic, Luca
+Beurer-Kellner, Marc Fischer, and Florian Tramèr. Agentdojo:
+A dynamic environment to evaluate prompt injection attacks
+and defenses for llm agents. Advances in neural information
+processing systems, 37:82895–82920, 2024.
+[7] Manuel Faysse, Hugues Sibille, Tony Wu, Bilel Omrani, Gau-
+tier Viaud, Céline Hudelot, and Pierre Colombo. Colpali:
+Efficient document retrieval with vision language models. In
+International Conference on Learning Representations, pages
+61424–61449, 2025.
+[8] Gabriel Goh, Nick Cammarata, Chelsea Voss, Shan Carter,
+Michael Petrov, Ludwig Schubert, Alec Radford, and Chris
+Olah. Multimodal neurons in artificial neural networks. Dis-
+till, 6(3):e30, 2021.
+[9] Yichen Gong, Delong Ran, Jinyuan Liu, Conglei Wang, Tian-
+shuo Cong, Anyu Wang, Sisi Duan, and Xiaoyun Wang. Fig-
+step: Jailbreaking large vision-language models via typo-
+graphic visual prompts. In Proceedings of the AAAI Confer-
+ence on Artificial Intelligence, pages 23951–23959, 2025.
+[10] Kai Greshake, Sahar Abdelnabi, Shailesh Mishra, Christoph
+Endres, Thorsten Holz, and Mario Fritz. Not what you’ve
+signed up for: Compromising real-world llm-integrated appli-
+cations with indirect prompt injection. In Proceedings of the
+16th ACM workshop on artificial intelligence and security,
+pages 79–90, 2023.
+[11] Keegan Hines, Gary Lopez, Matthew Hall, Federico Zarfati,
+Yonatan Zunger, and Emre Kiciman. Defending against indi-
+rect prompt injection attacks with spotlighting. arXiv preprint
+arXiv:2403.14720, 2024.
+[12] Geewook Kim, Teakgyu Hong, Moonbin Yim, JeongYeon
+Nam, Jinyoung Park, Jinyeong Yim, Wonseok Hwang, Sang-
+doo Yun, Dongyoon Han, and Seunghyun Park. OCR-free
+document understanding transformer. In European Confer-
+ence on Computer Vision, pages 498–517. Springer, 2022.
+[13] Kenton Lee, Mandar Joshi, Iulia Raluca Turc, Hexiang Hu,
+Fangyu Liu, Julian Martin Eisenschlos, Urvashi Khandel-
+wal, Peter Shaw, Ming-Wei Chang, and Kristina Toutanova.
+Pix2struct: Screenshot parsing as pretraining for visual lan-
+guage understanding. In International Conference on Ma-
+chine Learning, pages 18893–18912. PMLR, 2023.
+[14] Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni,
+Vladimir Karpukhin, Naman Goyal, Heinrich Küttler, Mike
+Lewis, Wen-tau Yih, Tim Rocktäschel, et al.
+Retrieval-
+augmented generation for knowledge-intensive NLP tasks.
+Advances in neural information processing systems, 33:9459–
+9474, 2020.
+[15] Yanhong Li, Zixuan Lan, and Jiawei Zhou. Text or Pixels?
+Evaluating Efficiency and Understanding of LLMs with Vi-
+sual Text Inputs. In EMNLP (Findings), pages 10564–10578,
+2025.
+[16] Yupei Liu, Yuqi Jia, Runpeng Geng, Jinyuan Jia, and
+Neil Zhenqiang Gong. Formalizing and benchmarking prompt
+injection attacks and defenses. In 33rd USENIX Security Sym-
+posium (USENIX Security 24), pages 1831–1847, 2024.
+[17] Jonas F Lotz, Elizabeth Salesky, Phillip Rust, and Desmond
+Elliott. Text rendering strategies for pixel language models.
+In Proceedings of the 2023 Conference on Empirical Methods
+in Natural Language Processing, pages 10155–10172, 2023.
+[18] Minesh Mathew, Dimosthenis Karatzas, and CV Jawahar.
+Docvqa: A dataset for vqa on document images. In 2021
+IEEE Winter Conference on Applications of Computer Vision
+(WACV), pages 2199–2208. IEEE, 2021.
+[19] Kevin Meng, David Bau, Alex Andonian, and Yonatan Be-
+linkov. Locating and editing factual associations in gpt. Ad-
+vances in neural information processing systems, 35:17359–
+17372, 2022.
+[20] Neha Nagaraja, Lan Zhang, Zhilong Wang, Bo Zhang, and
+Pawan Patil. Image-based prompt injection: Hijacking mul-
+timodal llms through visually embedded adversarial instruc-
+tions. In 2025 3rd International Conference on Foundation
+and Large Language Models (FLLM), pages 916–922. IEEE,
+2025.
+[21] Fábio Perez and Ian Ribeiro.
+Ignore previous prompt:
+Attack techniques for language models.
+arXiv preprint
+arXiv:2211.09527, 2022.
+[22] Xiangyu Qi, Kaixuan Huang, Ashwinee Panda, Peter Hender-
+son, Mengdi Wang, and Prateek Mittal. Visual adversarial
+examples jailbreak aligned large language models. In Pro-
+ceedings of the AAAI conference on artificial intelligence,
+pages 21527–21536, 2024.
+[23] Phillip Rust, Jonas F Lotz, Emanuele Bugliarello, Eliz-
+abeth Salesky, Miryam de Lhoneux, and Desmond El-
+liott.
+Language modelling with pixels.
+arXiv preprint
+arXiv:2207.06991, 2022.
+[24] Elizabeth Salesky, David Etter, and Matt Post. Robust open-
+vocabulary translation from visual text representations. In
+Proceedings of the 2021 Conference on Empirical Methods
+in Natural Language Processing, pages 7235–7252, 2021.
+[25] Michael Tschannen, Basil Mustafa, and Neil Houlsby. Clippo:
+Image-and-language understanding from pixels only.
+In
+2023 IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 11006–11017. IEEE, 2023.
+9
+
+
+[26] Eric Wallace, Kai Xiao, Reimar Leike, Lilian Weng, Johannes
+Heidecke, and Alex Beutel. The instruction hierarchy: Train-
+ing LLMs to prioritize privileged instructions. arXiv preprint
+arXiv:2404.13208, 2024.
+[27] Haoran Wei, Yaofeng Sun, and Yukun Li.
+Deepseek-
+OCR: Contexts optical compression.
+arXiv preprint
+arXiv:2510.18234, 2025.
+[28] Rui Wen, Jiayang Liu, Zeyu Yang, Jun Sakuma, and Lu Sun.
+Where Do LLMs Decide to Break the Rules? Mechanistic
+Localization of Prompt Injection Compliance. arXiv preprint
+arXiv:2609.37737, 2026.
+[29] Chen Wu, Rishi Shah, Jing Yu Koh, Russ Salakhutdinov,
+Daniel Fried, and Aditi Raghunathan. Dissecting adversarial
+robustness of multimodal lm agents. In International Con-
+ference on Learning Representations, pages 28362–28383,
+2025.
+[30] Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Bengio,
+William Cohen, Ruslan Salakhutdinov, and Christopher D
+Manning. HotpotQA: A dataset for diverse, explainable multi-
+hop question answering. In Proceedings of the 2018 confer-
+ence on empirical methods in natural language processing,
+pages 2369–2380, 2018.
+[31] Jingwei Yi, Yueqi Xie, Bin Zhu, Emre Kiciman, Guangzhong
+Sun, Xing Xie, and Fangzhao Wu. Benchmarking and defend-
+ing against indirect prompt injection attacks on large language
+models. In Proceedings of the 31st ACM SIGKDD Confer-
+ence on Knowledge Discovery and Data Mining V. 1, pages
+1809–1820, 2025.
+[32] Qiusi Zhan, Zhixiang Liang, Zifan Ying, and Daniel Kang.
+Injecagent: Benchmarking indirect prompt injections in tool-
+integrated large language model agents. In Findings of the
+Association for Computational Linguistics: ACL 2024, pages
+10471–10506, 2024.
+[33] Fred Zhang and Neel Nanda. Towards best practices of acti-
+vation patching in language models: Metrics and methods. In
+International Conference on Learning Representations, pages
+1651–1678, 2024.
+[34] Jie Zhang, Andrei Baroian, Jan N van Rijn, Avital Shafran,
+and Florian Tramèr. Render Before Reading: Visual Ren-
+dering as a Prompt Injection Defense.
+arXiv preprint
+arXiv:2609.36121, 2026.
+10

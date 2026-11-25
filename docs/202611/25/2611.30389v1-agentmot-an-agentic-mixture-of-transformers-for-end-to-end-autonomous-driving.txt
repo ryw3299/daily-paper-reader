@@ -1,0 +1,1942 @@
+AgentMoT: An Agentic Mixture-of-Transformers
+for End-to-End Autonomous Driving
+Qihang Huang1*
+Collister Chua1*
+YuJie Yan1
+Shiyu Fang2
+Zhan Chen1
+Haoran Xu1
+Zirui Li1
+Chen Lv1†
+1Nanyang Technological University
+2Tongji University
+AgentMoT: adaptive native computation and tool use
+Agent self-scheduling
+Dual-loop evolution
+Bench2Drive results
+1 Direct action
+Routine driving
+A / MoT drives
+Agent
+World
+Action
+Joint attention
+2 Reasoning
+Anticipate the merge
+VLA / MoT drives
+Agent
+World
+Action
+Joint attention
+3 Rule skill
+Yield to emergency vehicle
+Skill drives
+Agent
+World
+Action
+Joint attention
+4 Future prediction
+Anticipate front + rear
+t+1 t+2
+WAM / MoT drives
+Agent
+World
+Action
+Joint attention
+5 Direct action
+Steady traffic: back to A
+A / MoT drives
+Agent
+World
+Action
+Joint attention
+Agent self-scheduler
+Keep
+No G call
+Reconsider
+Call G
+Execution layer
+Wake-up request
+Model +
+tools
+Closed-loop
+experience
+Rollouts
+Inner: Router / G / self-scheduler
+Outer: refine tools + feedback
+Version
+DS
+SR (%)
+v0.0.3
+94.48
+85.45
+v0.0.4
+92.33
+82.73
+Figure 1. Adaptive computation and tool use during a drive. VLA reasons about a ramp vehicle merging ahead. G then selects
+the rule skill to yield to an emergency vehicle. WAM predicts surrounding traffic (hollow vehicles), and A resumes steady driving.
+The blue vehicle is ego, the red vehicle is the emergency vehicle, and dashed paths are ego plans. Dots indicate active native experts,
+all grey while the rule skill controls the vehicle. Below, the self-scheduler screens ordinary wake-up requests. Mandatory requests
+call G directly. Dual-loop evolution updates scheduling, skills, and execution feedback.
+Abstract
+Driving models need to choose which capabilities to use
+and when to reconsider their decisions. We introduce
+AgentMoT, a Mixture-of-Transformers with built-in agent
+reasoning and system scheduling. Combinations of agent,
+world, and action experts form three jointly trained
+pathways for direct-action, vision-language-action, and
+world-action computation. The Router selects a native
+pathway, while the agent expert supplies reasoning and
+selects skills. Execution feedback raises wake-up re-
+quests, and the agent self-scheduler learns whether to
+reconsider the task decision or keep it. Mandatory re-
+quests invoke the agent directly. The relative-capability
+principle guides these choices by relating the benefit of
+*Equal contribution.
+†Corresponding author: lyuchen@ntu.edu.sg.
+additional computation or intervention to its cost. After
+open-loop initialization, dual-loop evolution trains the
+Router, agent, and self-scheduler from closed-loop experi-
+ence while failure-driven updates refine skills and execu-
+tion feedback. AgentMoT achieves state-of-the-art results
+on Bench2Drive v0.0.3 and v0.0.4, with 94.48/92.33 driv-
+ing score and 85.45/82.73% success rate, respectively.
+With skills disabled, learned routing improves over the
+strongest fixed pathway by 1.79 driving-score points and
+4.09 percentage points of success rate on v0.0.3. Abla-
+tion studies further show gains from closed-loop agent
+learning, two-view queries, and event-triggered wake-up.
+1. Introduction
+End-to-end driving connects sensor observations to mo-
+tion through learned perception and planning [12, 20].
+1
+arXiv:2611.30389v1  [cs.RO]  23 Nov 2026
+
+
+Vision-language reasoning enriches scene interpreta-
+tion [14, 27], while world prediction anticipates traffic
+evolution [6, 13]. Driving agents further provide access
+to specialized tools [24, 29, 36]. Together, these capabil-
+ities expand what a driving model can do. Their value
+in a particular scene depends on which capabilities the
+model chooses to use and when it revisits that choice.
+Using these capabilities requires choosing a native
+pathway, deciding whether to delegate to a skill, and
+determining when to reconsider (Fig. 1). Each choice
+depends on context. Reasoning and prediction cost com-
+putation. A skill suited to a blocked lane may be in-
+appropriate for an ordinary stopped vehicle. Repeated
+confirmation wastes agent calls, while new interactions
+demand attention.
+We present AgentMoT, which embeds agent capa-
+bilities into a driving Mixture-of-Transformers (MoT,
+Fig. 2). A Router selects among direct-action (A), vision-
+language-action (VLA), and world-action model (WAM)
+pathways formed by agent, world, and action experts.
+The agent expert supplies reasoning within VLA and
+WAM. System scheduling combines task selection by G
+with call timing from the agent self-scheduler. G selects
+native driving or a skill and target. The execution layer
+builds the skill–target menu and sends wake-up requests
+with updated driving context. The agent self-scheduler
+screens ordinary requests, choosing reconsider or keep.
+Mandatory requests call G directly and can add a rear
+view to identify an approaching vehicle before deciding
+whether to yield.
+Under the relative capability principle, an option is
+useful when its expected benefit over the default justi-
+fies its cost. The appropriate choice depends on both
+the scene and the capabilities available to the model.
+This motivates updating scheduling as those capabilities
+evolve.
+Dual-loop evolution keeps these learned choices
+aligned with the available capabilities. After joint na-
+tive training and open-loop initialization of the Router
+and G, the inner loop trains the Router, G, and the agent
+self-scheduler on closed-loop training-route experience.
+The outer loop attributes failures and refines skills and
+execution feedback. Rollouts with the updated model
+and skills supply experience for the next round.
+Our contributions are threefold. (1) We introduce
+AgentMoT, which unifies three native driving paradigms
+with a shared agent expert for reasoning and tool use.
+The model learns to select native computation, delegate
+tasks, and reconsider decisions in response to execution
+feedback. (2) We develop dual-loop evolution that con-
+nects scheduling learned from closed-loop experience
+with failure-driven refinement of skills and execution
+feedback. (3) We achieve state-of-the-art performance on
+Bench2Drive v0.0.3 and v0.0.4. Ablation studies demon-
+strate the benefits of learned routing, agent learning, and
+execution feedback.
+2. Related Work
+End-to-end driving.
+End-to-end driving integrates per-
+ception, prediction, and planning through learned scene
+representations [12, 19, 20]. Vision-language models en-
+rich action generation with semantic understanding and
+reasoning [27, 38]. Future-scene prediction improves
+planning [22, 31], with INTERACT [6] learning inter-
+action dynamics from driving videos. Closed-loop post-
+training further improves driving policies [5, 10, 11].
+Together, these directions motivate the complementary
+direct-action, reasoning, and prediction capabilities in
+AgentMoT.
+Mixture-of-Transformers.
+MoT combines modality-
+specific Transformer parameters with shared attention,
+allowing specialized representations to interact within
+one model [23]. AutoMoT [14] couples understanding
+and action experts through layer-wise attention for driv-
+ing. OccWAM [13] uses a three-expert MoT to jointly
+generate future occupancy and ego trajectories. These
+architectures share context across specialized forms of
+computation. AgentMoT organizes agent, world, and
+action experts into three selectable driving pathways.
+The agent expert also supports task decisions through
+the shared vision-language backbone, connecting native
+planning with tool use and system scheduling.
+Adaptive computation and agents.
+Adaptive compu-
+tation allocates resources according to the decision, from
+selecting specialized experts [32] to adjusting reasoning
+effort [9, 26]. Temporal decision methods additionally
+learn when to observe or act [3, 37]. Tool-using agents
+connect reasoning to environmental feedback [33]. Driv-
+ing agents extend this approach with module schedul-
+ing, active perception, and verification during execu-
+tion [24, 29, 36]. These ideas address both capability
+choice and the timing of decisions. In AgentMoT, the
+Router selects native computation, G chooses a task, and
+the self-scheduler determines whether execution feed-
+back warrants reconsideration.
+3. AgentMoT
+AgentMoT learns which native pathway to use, whether
+to delegate a task, and when to reconsider the task deci-
+sion. The model generates native plans and task decisions
+end to end, with skills invoked as tools. Figure 2 connects
+these choices to execution feedback.
+2
+
+
+AgentMoT, one shared model
+1 Router: which pathway?
+2 Agent G: capability selection
+Self-scheduling
+Agent expert
+Shared VLM
+World expert
+future prediction
+Action expert
+trajectory generation
+layer-wise joint attention
+System
+scheduling
+future BEV maps
+ego trajectory
+text emb.
+ViT
+BEV encoder
+WAM
+A / VLA
+...
+World noise
+...
+Action noise
+Projector
+Ego status
+Navigation
+command
+route,
+speed,
+command
+camera history
+LiDAR BEV
+every 4 control ticks
+Filled dot: active expert
+A
+Agent
+World
+Action
+Joint attention
+BEV encoder
+A
+End-to-End
+Driving Model
+VLA
+Agent
+World
+Action
+Joint attention
+BEV encoder
+VLA
+Vision-Language-Action
+Model
+WAM
+Agent
+World
+Action
+Joint attention
+BEV encoder
+WAM
+World-Action
+Model
+Driving
+context
+Agent G
+Select
+Native pathway
+Router-selected
+Skill Library
+skill + target
+Execute
+Scene / task feedback
+Agent G
+task decisions
+Agent self-scheduler
+Initial call
+Keep
+Reconsider
+Mandatory call
+Execution
+Simulation control ticks
+Reports: every 5 ticks
+t
+t+5
+t+10
+t+15
+t+20
+t+25
+t+30
+t+35
+t+40
+Decision
+Wake-up request
+Wake-up request
+Interrupt
+Filled: call G / Open: keep current decision
+Figure 2. AgentMoT selects computation, tools, and when to call its agent. Left, system scheduling covers task selection and
+self-scheduling. Attention passes agent context to world and action experts, and world context to action. Native reasoning and G use
+role-specific LoRA adapters. Top right, the Router independently selects A, VLA, or WAM from BEV tokens and context before
+native expert activation. Middle right, G selects native driving or a skill and target. Bottom, the self-scheduler screens ordinary
+wake-up requests. Mandatory requests call G directly. Decisions flow down and execution feedback flows up. Larger execution
+markers denote state reports. Time is in simulation control ticks, and sensor images are recorded observations.
+3.1. Relative capability
+For context x, option a, and default a0, define
+∆(x, a; a0) = [B(x, a)−B(x, a0)]−[C(x, a)−C(x, a0)],
+(1)
+where B is expected driving benefit and C is compu-
+tation or intervention cost over the decision’s horizon,
+expressed in compatible units. Positive relative capability
+motivates using the additional capability. The defaults are
+A for routing, native driving for delegation, and keeping
+the current task decision for self-scheduling.
+This principle guides three learning problems. Rout-
+ing explicitly compares plan rewards and latency costs.
+Delegation uses task applicability as supervision, while
+self-scheduling balances call reduction against retaining
+calls labeled for reconsideration. Section 4 describes
+their training signals and objectives.
+3.2. Three native pathways
+A bird’s-eye-view (BEV) encoder fuses RGB and Li-
+DAR into spatial features. Camera history, speed, and
+navigation inputs enter the agent expert through its vision-
+language backbone. The pathways share the action ex-
+pert’s Transformer layers and use pathway-specific input
+and output modules. They differ in which expert repre-
+sentations condition trajectory generation.
+A (direct action). The action expert maps BEV fea-
+tures, ego state, and navigation context to an ego trajec-
+tory. VLA (vision-language-action). The agent expert’s
+vision-language representations supply layer-wise key–
+value context to action generation. WAM (world-action
+model). Agent reasoning conditions the world expert,
+which predicts six future BEV semantic maps at 0.5-
+second intervals. The action expert attends to both agent
+and world key–value states. Obstacle classes in the pre-
+dicted maps and perceived object boxes guide trajectory
+refinement for clearance and smooth motion. A uses the
+3
+
+
+action expert, VLA adds the agent expert, and WAM uses
+all three.
+Each pathway generates six trajectory points over
+three seconds. A lightweight Router reads BEV tokens
+and compact context features (ego motion, navigation,
+and situation indicators) before activating the selected
+experts. The shared trajectory interface lets the model
+switch computation as the scene changes.
+3.3. Agent reasoning and system scheduling
+System scheduling combines task selection by G with
+call timing from the agent self-scheduler (Sec. 3.4). The
+agent expert supplies native reasoning and generates task
+decisions through G. Calls to G add structured scene and
+task information and a skill–target menu to the image in-
+puts. Native reasoning and G share the vision-language
+backbone with role-specific low-rank adaptation (LoRA)
+adapters and separate key–value caches. Agent post-
+training updates the task adapter while keeping the back-
+bone and native-planning parameters fixed.
+The skill library provides reusable task-level tools for
+traffic negotiation, obstruction passing, navigation-goal
+adaptation, and traffic-rule compliance. The rule skill in-
+cludes emergency-vehicle yielding. The execution layer
+constructs a skill–target menu from perceived objects,
+navigation context, and task state. At time t, the task-
+selection policy is πG(· | xG
+t , Mt), where the driving
+context xG
+t contains images, perception-derived scene
+information, and task state, and Mt is the skill–target
+menu. G chooses NATIVE (native driving) or a skill and
+target. For NATIVE, the Router-selected pathway plans
+the trajectory. The execution layer checks skill–target
+choices, applies accepted choices through controls or
+planning references, and reports task progress to later
+calls.
+3.4. Self-scheduling from execution feedback
+Task decisions often remain useful across many planning
+steps. The execution layer refreshes the driving context
+and skill–target menu while native planning or a skill
+controls the vehicle. It sends wake-up requests when
+observations warrant a new decision. Ordinary requests
+come from menu changes, task and traffic events, and
+periodic reviews. The agent self-scheduler screens these
+requests, choosing reconsider (call G) or keep (reuse the
+current task decision).
+Mandatory requests bypass this choice and call G di-
+rectly with refreshed inputs. Execution interrupts and
+conflicts between the current task and observed condi-
+tions raise mandatory requests. Active wake-up rules also
+raise mandatory requests for persistent lack of progress, a
+new persistent blocker, or persistent new skill options. An
+age-triggered refresh makes an existing request manda-
+tory once a preset decision-age threshold is reached. The
+execution layer supplies the evidence and requests recon-
+sideration, while G makes the task decision.
+Two-view queries.
+Execution feedback can also re-
+quest additional visual evidence. A rear-vehicle cue can
+trigger a mandatory two-view query with current front
+and rear images. The answer confirms the vehicle type
+and whether yielding is needed.
+4. Dual-Loop Evolution
+The value of a routing or task decision depends on the
+capabilities it selects. The inner loop trains the Router,
+G, and agent self-scheduler from paired plan rewards,
+task applicability, and agent-call outcomes. The outer
+loop uses failures to refine skills and execution feedback.
+Rollouts with the updated model and skills provide the
+experience for the next round (Fig. 3).
+4.1. From joint training to closed-loop evolution
+Open-loop training mixes A, VLA, and WAM driving ex-
+amples with SimLingo question–answer supervision [27]
+and GPT-annotated skill–target choices for G. This estab-
+lishes the native pathways and connects scene understand-
+ing to skill selection. The open-loop Router learns from
+pathway trajectory errors against PDM-Lite reference
+plans.
+Training-route rollouts then produce closed-loop
+records. They supply paired pathway rewards, recorded
+G proposals, and agent-call outcomes to the inner-loop
+objectives below, and failure episodes to the outer loop.
+4.2. Learning which pathway to use
+Router learning uses the one-step decision structure of
+contextual bandits in reinforcement learning (RL) [4, 8,
+21]. The Router optimizes the reward of the plan selected
+at each recorded context. For each recorded observa-
+tion, we generate three-second plans from A, VLA, and
+WAM with paired seeds. Scoring all three provides full-
+information supervision for offline learning with reward
+rR(x, k) = Splan(x, k) −λd min(d(x, k), 3) −λcℓk.
+(2)
+Here rR is the Router reward for context x and pathway
+k ∈{A, VLA, WAM}. Splan is the change in route driv-
+ing score over a three-second plan replay, computed with
+official driving criteria and recorded scene evolution. d
+is expert-trajectory deviation in meters, and ℓk is latency
+in seconds. Overbars average four paired seeds. The
+weights λd and λc penalize deviation (capped at 3 m) and
+latency.
+The Router makes two binary choices: whether to
+leave the default A for deeper computation, and then
+VLA or WAM. Both are trained on Eq. 2. The first min-
+imizes expected regret, the reward lost relative to the
+4
+
+
+Closed-loop evidence
+Updated components
+Outer loop / improve execution
+Inner loop / learn scheduling
+GPT attribution
+Failure source
+Rollout records
+Decisions + rewards
+Task + call outcomes
+Execution traces
+Failures
+Execution errors
+Coding-agent
+refinement
+Paired pathway replay
+Driving benefit − cost
+One-step offline RL
+Task + agent-call records
+Decision targets
+Supervised learning
+Task targets + call labels
+Skills +
+execution feedback
+Model updates
+Router
+Agent +
+self-scheduler
+Updated components → new training-route rollouts
+Figure 3. Dual-loop evolution. Closed-loop records supply failure evidence and learning targets. The outer loop uses GPT
+attribution and coding-agent refinement to update skills and execution feedback. The inner loop updates the Router from paired plan
+rewards, agent task decisions from task applicability, and the self-scheduler from agent-call outcomes. The dotted path collects new
+training-route rollouts with the updated components.
+Table 1. Closed-loop driving performance on Bench2Drive v0.0.3. Expert denotes the policy used to collect training data.
+Baselines follow the original papers. Best and second-best reported scores are bold and underlined, respectively.
+Method
+Venue
+Expert
+DS ↑
+SR (%) ↑
+WoTE [22]
+ICCV’25
+Think2Drive
+61.71
+31.36
+AutoVLA [38]
+NeurIPS’25
+PDM-Lite
+78.84
+57.73
+UniDrive-WM [31]
+ECCV’26
+Think2Drive
+79.31
+56.42
+MindDrive-L [10]
+ECCV’26
+Think2Drive
+80.59
+58.26
+SimLingo [27]
+CVPR’25
+PDM-Lite
+85.07
+67.27
+DeepSight [35]
+ICML’26
+Think2Drive
+86.23
+71.36
+BridgeDrive [25]
+ICLR’26
+PDM-Lite
+87.99
+74.99
+KnowVal-SimLingo [30]
+CVPR’26
+PDM-Lite
+88.42
+69.03
+AutoMoT+ [14]
+ICML’26
+PDM-Lite
+89.42
+74.09
+TakeVLA [11]
+arXiv’26
+PDM-Lite
+89.72
+73.73
+OccWAM [13]
+arXiv’26
+PDM-Lite
+90.45
+77.27
+AgentMoT
+—
+PDM-Lite
+94.48
+85.45
+Table 2. Closed-loop driving performance on Bench2Drive
+v0.0.4. Baselines follow the official release [2]. Best and
+second-best reported scores are bold and underlined, respec-
+tively.
+Method
+DS ↑
+SR (%) ↑
+ADMLP [34]
+35.39
+0.00
+VAD [20]
+38.65
+17.27
+UniAD [12]
+38.69
+19.09
+TCP [28]
+51.44
+26.36
+ThinkTwice [17]
+52.84
+27.73
+DriveAdapter [16]
+54.96
+30.45
+DriveTransformer [19]
+60.20
+35.91
+Drive-π0 [32]
+69.71
+45.91
+SimLingo [27]
+86.55
+70.45
+AgentMoT
+92.33
+82.73
+better of A and deeper computation under the current
+second choice. This objective favors deeper computation
+when its relative capability is positive (Eq. 1). The sec-
+ond predicts the higher-reward pathway between VLA
+and WAM, weighted by their reward gap on contexts
+where deeper computation improves on A. A refinement
+stage then revisits contexts assigned to A and moves
+them to VLA when a comfort-sensitive reward favors
+it. Appendix C details the paired training targets and
+optimization settings.
+4.3. Learning whether to delegate
+Routing exploits complementary native capabilities, but
+their failure histories overlap. In native-pathway runs
+on 139 training routes, 61 routes contain at least one
+failed run (DS below 100). On 32 of them (52.5%), A,
+VLA, and WAM have each failed at least once. These
+shared difficulties motivate skills with explicit geometry
+5
+
+
+Table 3. Multi-ability success rates (%). Mean averages the
+five official abilities. Baselines follow published results [25]
+for v0.0.3 and the official release [2] for v0.0.4.
+Bench2Drive v0.0.3
+Method
+Over.
+Merge
+Brake
+Give
+way
+Signs
+Mean
+DriveTransformer [19]
+35.00
+17.57
+48.36
+40.00
+52.10
+38.60
+DriveMoE [32]
+40.00
+34.67
+65.45
+40.00
+59.44
+47.91
+MindDrive-L [10]
+66.67
+42.31
+76.67
+50.00
+68.42
+60.81
+TransFuser++ [15]
+57.77
+58.75
+83.33
+40.00
+82.11
+64.39
+SimLingo [27]
+57.04
+54.01
+88.33
+53.33
+82.45
+67.03
+TakeVLA [11]
+64.44
+63.64
+91.67
+50.00
+85.48
+71.05
+BridgeDrive [25]
+66.67
+69.92
+90.00
+50.00
+89.47
+73.15
+AgentMoT
+88.89
+78.75
+95.00
+90.00
+94.74
+89.48
+Bench2Drive v0.0.4
+Method
+Over.
+Merge
+Brake
+Give
+way
+Signs
+Mean
+DriveTransformer
+30.43
+39.06
+49.12
+0.00
+61.63
+36.05
+ThinkTwice
+20.29
+20.31
+59.64
+33.33
+66.86
+40.09
+DriveAdapter
+26.09
+21.88
+64.90
+33.33
+69.18
+43.08
+Drive-π0
+24.64
+39.06
+73.68
+33.33
+66.86
+47.52
+SimLingo
+63.77
+60.94
+91.23
+50.00
+90.70
+71.34
+AgentMoT
+81.16
+73.44
+92.98
+83.33
+93.02
+84.79
+and motion models for constrained optimization, such as
+traffic negotiation and obstruction passing. With native
+driving as the default, the agent must learn whether a
+skill applies and which target it should act on.
+Agent post-training.
+We adapt G with closed-loop
+task supervision and reference regularization that retains
+its prior responses. Offline labeling rules use scenario
+annotations, the recorded skill–target menu, and task
+state to construct answer targets. These targets retain
+applicable recorded answers or remove inapplicable skill
+calls. Two-view examples supply vehicle-identification
+and yielding targets and use only the answer loss.
+We mix closed-loop records with replayed reference
+driving examples and optimize
+LG = Lans + αLfirst
++ βclLcl
+KL + βreplayLreplay
+KL
+.
+(3)
+Here Lans is full-answer cross-entropy. The first-token
+term Lfirst uses KL divergence to match a soft target
+that downweights inapplicable skills. The two reference
+KL terms use the fixed pre-update agent to regularize
+responses on closed-loop records and replayed driving
+examples, respectively. The weights α, βcl, and βreplay
+balance these terms. Appendix D specifies target con-
+struction and loss weights.
+4.4. Learning when to reconsider
+Execution raises wake-up requests on events and peri-
+odic reviews. Most resulting agent calls retain the current
+task decision (Table 6). With keep as the default, the
+agent self-scheduler learns to reserve calls for attempted
+revisions. It uses feedback available before the call to
+predict whether reconsideration is needed. Calls logged
+before learned self-scheduling provide supervision. A
+call receives the reconsider label (mj = 1) if it changes
+accepted skill–target choices or returns only rejected pro-
+posals. All other calls receive the keep label (mj = 0).
+This retains attempted revisions even when the execu-
+tion layer rejects them. Appendix E defines the outcome
+categories.
+The pre-call feedback xj contains the wake-up request,
+elapsed time, scene dynamics, task state, and previous
+answer. The self-scheduler is a lightweight classifier
+with parameters ϕ that predicts a reconsider probability
+pϕ(xj). We train it with weighted binary cross-entropy,
+Lsched = −Ej[w+mj log pϕ(xj)+(1−mj) log(1−pϕ(xj))].
+(4)
+The weight w+ balances positive and negative examples.
+An ordinary wake-up request calls G when pϕ(xj) ≥τ,
+where τ is a calibrated threshold. Otherwise, the current
+task decision is kept. Mandatory requests call G directly
+(Sec. 3.4).
+4.5. Outer-loop attribution and capability repair
+GPT reviews failed training episodes with trajectories,
+scheduling choices, task states, and official infraction
+events. It distinguishes errors in pathway selection and
+agent decisions from errors in skill execution. Skill-
+execution errors guide coding-agent changes to skills or
+the execution layer, including the feedback and wake-up
+path. The authors review these changes before training-
+route rollouts generate records for the next inner-loop
+update.
+5. Experiments
+5.1. Experimental setup
+Benchmark and data.
+We evaluate in CARLA
+0.9.15 [7] on Bench2Drive v0.0.3 and v0.0.4 [2, 18].
+Each version contains 220 evaluation routes. Version
+0.0.4 introduces a new evaluation set with different routes
+and scenario instances [2]. We report driving score (DS),
+success rate (SR, the percentage of routes with DS equal
+to 100), and the five official ability groups separately for
+each version. We initialize the model from driving logs
+and refine routing, task selection, and self-scheduling
+with closed-loop CARLA records. Following the bench-
+mark protocol, training routes are separate from the 220
+evaluation routes.
+Router learning uses paired plans from 264 develop-
+ment routes. Agent post-training and self-scheduling
+use 476 episodes partitioned by route into training and
+6
+
+
+Table 4. Native pathway selection on Bench2Drive v0.0.3. All four configurations use the same model without skills. Each ability
+cell reports mean DS / success rate (%). The last two columns report DS and SR over all 220 routes. Ability groups overlap. Higher
+is better. Bold highlights leading values.
+Ability-wise mean DS / SR (%)
+Overall
+Pathway
+Overtaking
+Merging
+Emergency
+brake
+Give
+way
+Traffic
+signs
+DS SR (%)
+Fixed A
+85.30 / 71.11 83.12 / 63.75 87.74 / 73.33 84.90 / 40.00 85.26 / 67.37 86.37
+69.55
+Fixed VLA
+81.14 / 62.22 82.11 / 60.00 93.00 / 80.00 84.90 / 40.00 85.02 / 62.11 86.68
+68.18
+Fixed WAM
+80.95 / 60.00 85.83 / 63.75 92.53 / 80.00 84.90 / 40.00 87.17 / 67.37 87.91
+69.55
+Learned Router 86.54 / 71.11 87.93 / 70.00 92.30 / 80.00 84.80 / 40.00 88.02 / 69.47 89.70
+73.64
+Overtaking
+Merging
+Emergency
+brake
+Give
+way
+Traffic
+signs
+Overtaking
+Merging
+Emergency
+brake
+Give
+way
+Traffic
+signs
+a
+Fixed pathways
+b
+Learned routing
+Fixed A
+Fixed VLA
+Fixed WAM
+Fixed-pathway average
+Router
+Figure 4. Routing combines complementary native capabilities. Mean driving score (DS) in each Bench2Drive v0.0.3 ability
+group, with skills disabled. (a) Fixed A, VLA, and WAM. (b) Learned routing versus the mean of the three fixed pathways (dashed).
+Both radars span 75–95 DS in 5-point intervals. Ability groups overlap. Table 4 gives the full values.
+Table 5. Ablations of agent learning and execution feedback.
+All configurations use the same 60 selected Bench2Drive v0.0.3
+routes.
+Configuration
+DS ↑
+SR (%) ↑
+Without two-view queries
+91.83
+80.00
+Without event-triggered wake-up
+92.57
+85.00
+Open-loop G
+93.98
+85.00
+Full model
+95.09
+90.00
+Table 6. 72.4% of agent calls are empty updates or reaffir-
+mations. Agent-call outcomes across 476 episodes collected
+with sampled decoding before learned self-scheduling.
+Call outcome
+Calls
+Share (%)
+Empty update or reaffirmation
+29,006
+72.4
+Other outcomes
+11,036
+27.6
+validation sets. Appendices B–E detail the splits, data
+collection, and training settings.
+Implementation.
+We use a Qwen3-VL-2B back-
+bone [1] with a rank-64 task adapter. The Router has
+0.84M parameters across two five-member ensembles
+and reads 64 BEV tokens plus context features. Routing
+updates every four simulation control ticks, and execution
+reports state every five ticks.
+5.2. Bench2Drive-220 performance
+Tables 1 and 2 compare models on Bench2Drive v0.0.3
+and v0.0.4, respectively. AgentMoT achieves state-of-
+the-art performance among PDM-Lite-trained models on
+both, obtaining 94.48 DS and 85.45% SR on v0.0.3, and
+92.33 DS and 82.73% SR on v0.0.4. Table 3 reports
+success rates across the five official abilities. AgentMoT
+leads every ability among the listed methods, with mean
+ability SRs of 89.48% on v0.0.3 and 84.79% on v0.0.4.
+The following comparisons use v0.0.3 to examine path-
+way selection, agent learning, and execution feedback.
+7
+
+
+1  Rear event wakes the agent
+Execution event
+Mandatory call
+G
+POLICE; YIELD
+Rule skill
+2  Yield, then resume native driving
+G selects native driving at tick 240
+Front / tick 100
+Rear detail / tick 100
+Yield / tick 200
+Police passes / tick 220
+Figure 5. Execution feedback wakes the agent to yield to
+a police vehicle from behind. A rear-vehicle cue prompts a
+two-view query bypassing the self-scheduler. G activates the
+rule skill, then selects native driving after the police vehicle
+passes. All frames come from one recorded episode.
+5.3. Native pathways and learned selection
+Table 4 compares fixed A, VLA, WAM, and the Router on
+all 220 routes with skills disabled to isolate computation
+choice.
+The fixed pathways have complementary strengths
+(Fig. 4a). A leads overtaking at 85.30 DS, VLA emer-
+gency braking at 93.00, and WAM merging and traffic
+signs at 85.83 and 87.17. WAM has the highest overall
+fixed-pathway DS of 87.91.
+Learned routing improves overall driving. It reaches
+89.70 DS and 73.64% SR, gains of 1.79 DS and 4.09 per-
+centage points over the best fixed scores. Its SR matches
+or exceeds the best fixed pathway in every ability group.
+It also exceeds the fixed-pathway average DS in four
+groups (Fig. 4b), with comparable giving-way DS (84.80
+versus 84.90).
+5.4. Agent learning and execution feedback
+Table 5 ablates agent learning and execution feedback.
+The same 60 routes are used in all conditions and were
+selected to cover all 44 scenario types. Their full-model
+reference comes from the corresponding 220-route re-
+sults and achieves 95.09 DS and 90.00% SR.
+Closed-loop agent learning.
+Replacing G with its
+open-loop initialization reduces performance to 93.98
+DS and 85.00% SR, drops of 1.11 DS points and 5.00
+percentage points of SR. The remaining learned com-
+ponents retain their full-model parameters. The result
+supports refining task decisions and two-view answers
+through closed-loop experience.
+Event-triggered wake-up.
+Disabling event-triggered
+wake-up reduces performance to 92.57 DS and 85.00%
+SR. Ordinary and mandatory event-triggered calls are
+removed, including rear-vehicle cues, and emergency
+yielding uses the perception-based rule. Periodic reviews
+still receive refreshed driving context and skill–target
+menus. The drops of 2.52 DS and 5.00 percentage points
+of SR support event-triggered calls when the scene or
+task changes.
+Two-view queries.
+Disabling two-view queries reduces
+performance to 91.83 DS and 80.00% SR, drops of 3.26
+DS points and 10.00 percentage points of SR. This com-
+parison replaces two-view queries and agent-based iden-
+tity confirmation with perception-based emergency recog-
+nition and yielding. Other wake-up rules and the self-
+scheduler remain enabled. The result supports acquiring
+additional visual evidence in response to execution feed-
+back.
+A focused comparison on the five emergency-vehicle
+yielding routes raises mean DS from 70.0 to 100.0 when
+two-view queries are enabled. Figure 5 illustrates the
+mechanism.
+A rear-vehicle cue prompts a two-view
+query, and G identifies the approaching police vehicle
+and selects the rule skill to yield. It returns to native
+driving after the police vehicle passes.
+These results support both directions of interaction
+between the model and execution. Agent post-training
+improves the decisions sent downward, while event-
+triggered requests and two-view queries improve when
+and with what evidence the agent is consulted. Learned
+routing addresses a complementary choice inside native
+planning by adapting which experts participate. Together,
+these mechanisms adapt the computation used for a tra-
+jectory and the task decision that governs execution.
+5.5. Agent-call analysis
+Before learned self-scheduling, 72.4% of 40,042 agent
+calls return an empty update or reaffirm the accepted
+skill–target choice (Table 6). This repetition motivates
+learning when to reconsider.
+In offline replay of 89 route-disjoint validation
+episodes, the agent self-scheduler skips 2,629 of 7,313
+calls (35.95%) while retaining 959 of 1,002 calls labeled
+reconsider (95.71%). Appendix E details the call labels
+and replay protocol. We next examine how routing and
+self-scheduling affect model computation.
+5.6. Computational efficiency
+Routing and agent self-scheduling jointly reduce esti-
+mated model computation from 209.25 to 103.57 ms
+per control tick, a 50.51% reduction (Table 7).
+We
+profile warmed model calls on an RTX 5090 at batch
+size one with GPU synchronization. For the recorded
+8
+
+
+Table 7. Amortized model computation. Values are estimated milliseconds per control tick using the same recorded Bench2Drive
+v0.0.3 invocation mix and RTX 5090 timings. The planning column includes one BEV encoder pass per sensor update, including
+updates during skill execution. Shared components comprise the detection and semantic heads, two-view queries, and traffic-signal
+queries. Totals use unrounded timings. Reductions are relative to fixed WAM with fixed-interval G.
+Configuration
+Planning
++ Router
+G
++ self-scheduler
+Shared components
+Total
+Reduction (%)
+Fixed WAM + fixed-interval G
+137.23
+58.55
+13.47
+209.25
+0.00
+Router + fixed-interval G
+80.02
+58.55
+13.47
+152.03
+27.34
+Fixed WAM + self-scheduling
+137.23
+10.08
+13.47
+160.78
+23.16
+Full AgentMoT
+80.02
+10.08
+13.47
+103.57
+50.51
+Table 8. Complete native pathway latency and use. Latency
+includes one BEV encoder pass and inference through the se-
+lected pathway, measured in milliseconds per plan on an RTX
+5090 outside CARLA. Share is the percentage of native plans
+using each pathway on Bench2Drive v0.0.3.
+Pathway
+Share (%)
+Mean latency (ms)
+A
+54.84
+38.87
+VLA
+10.52
+157.96
+WAM
+34.65
+176.35
+Bench2Drive v0.0.3 workload, amortized computation
+sums each component’s mean latency multiplied by its
+invocation count and divides by the number of control
+ticks. The estimate excludes input preprocessing, trans-
+port, and execution-layer CPU work. The Router reuses
+the BEV features from the current sensor update.
+The four configurations use the same recorded work-
+load to separate the computation savings from routing
+and self-scheduling. The baseline uses WAM for native
+planning and calls G at every five-tick state report. We
+apply the recorded pathway choices, agent-call schedule,
+or both, with the same native planning frequency and the
+same counts of two-view and traffic-signal queries.
+Router.
+A accounts for 54.84% of native plans (Ta-
+ble 8). The observed pathway mix averages 99.03 ms per
+native plan, compared with 176.35 ms for fixed WAM.
+Per control tick, fixed WAM costs 137.23 ms and learned
+routing costs 80.02 ms, including 1.76 ms for the Router.
+The net saving is 57.22 ms per control tick.
+Agent self-scheduling.
+The agent self-scheduler keeps
+the current decision for 40.24% of ordinary wake-up
+requests. Event-triggered requests and learned keep deci-
+sions together reduce task calls to G by 82.84% relative
+to fixed-interval calling. Including the self-scheduler’s
+0.04 ms overhead per control tick, the combined cost
+of task calls and self-scheduling falls from 58.55 to
+10.08 ms, saving 48.47 ms.
+6. Conclusion
+AgentMoT combines three native driving pathways with
+an agent that selects tools and learns when to reconsider.
+Dual-loop evolution improves these choices through
+closed-loop learning and failure-driven refinement of
+skills and execution feedback. The model achieves state-
+of-the-art performance among PDM-Lite-trained models
+on both Bench2Drive versions.
+LLM Usage Statement
+Codex (GPT-6-Sol) and Claude Opus 5.5 assisted system
+implementation, analysis of execution records, code revi-
+sion, and evaluation runs. GPT-6 assisted open-loop skill–
+target annotation and supervision-label review (Sec. 4.1),
+as well as closed-loop failure attribution (Sec. 4.5).
+References
+[1] Shuai Bai, Yuxuan Cai, Ruizhe Chen, et al.
+Qwen3-
+VL Technical Report. arXiv preprint arXiv:2511.21631,
+2025.
+[2] Bench2Drive Team. Bench2Drive v0.0.4 Update. Official
+release documentation, 2026.
+[3] André Biedenkapp, Raghu Rajan, Frank Hutter, and Mar-
+ius Lindauer. TempoRL: Learning when to act. In Pro-
+ceedings of the 38th International Conference on Machine
+Learning, pages 914–924. PMLR, 2021.
+[4] David Brandfonbrener, William F. Whitney, Rajesh Ran-
+ganath, and Joan Bruna. Offline RL Without Off-Policy
+Evaluation. In Advances in Neural Information Process-
+ing Systems, 2021.
+[5] Keyu Chen, Nanfei Ye, Yida Wang, Wenchao Sun,
+Danqi Zhao, Hao Cheng, and Sifa Zheng.
+CRAFT:
+Counterfactual-to-Interactive Reinforcement Fine-Tuning
+for Driving Policies. arXiv preprint arXiv:2605.04470,
+2026.
+[6] Zhan Chen, Songyan Zhang, Wenhui Huang, Zirui Li,
+Zhidong Wang, Qihang Huang, Shiyu Fang, and Chen Lv.
+INTERACT: Learning Interaction-Aware World Dynam-
+ics from Driving Videos for Autonomous Driving. arXiv
+preprint arXiv:2611.02526, 2026.
+[7] Alexey Dosovitskiy, German Ros, Felipe Codevilla, An-
+tonio Lopez, and Vladlen Koltun. CARLA: An Open Ur-
+9
+
+
+ban Driving Simulator. arXiv preprint arXiv:1711.03938,
+2017.
+[8] Miroslav Dudík, John Langford, and Lihong Li. Doubly
+Robust Policy Evaluation and Learning. In Proceedings of
+the 28th International Conference on Machine Learning,
+2011.
+[9] Gongfan Fang, Xinyin Ma, and Xinchao Wang. Thinkless:
+LLM Learns When to Think. In Advances in Neural
+Information Processing Systems, pages 151268–151295.
+Curran Associates, Inc., 2025.
+[10] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng
+Cui, Hongwei Xie, Bing Wang, Guang Chen, Hangjun Ye,
+Dingkang Liang, and Xiang Bai. MindDrive: A Vision-
+Language-Action Model for Autonomous Driving via
+Online Reinforcement Learning. In European Conference
+on Computer Vision, 2026.
+[11] Yinfeng Gao, Deqing Liu, Qichao Zhang, Yupeng Zheng,
+Haochen Tian, Guang Li, Hangjun Ye, Long Chen, Da-
+Wei Ding, and Dongbin Zhao. Learning from Mistakes:
+Post-Training for Driving VLA with Takeover Data. arXiv
+preprint arXiv:2603.14972, 2026.
+[12] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao
+Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin,
+Wenhai Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng
+Dai, Yu Qiao, and Hongyang Li. Planning-Oriented Au-
+tonomous Driving.
+In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+2023.
+[13] Qihang Huang, Wenhui Huang, Collister Chua, Shiyu
+Fang, Zhan Chen, Songyan Zhang, Zhidong Wang, Daiy-
+ing Tian, and Chen Lv. OccWAM: Occupancy World-
+Action Models with Joint Scene-to-Ego Flow Matching.
+arXiv preprint arXiv:2610.17688, 2026.
+[14] Wenhui Huang, Songyan Zhang, Qihang Huang, Zhi-
+dong Wang, Zhiqi Mao, Collister Chua, Zhan Chen,
+Long Chen, and Chen Lv. AutoMoT: A Unified Vision-
+Language-Action Model with Asynchronous Mixture-of-
+Transformers for End-to-End Autonomous Driving. In
+Proceedings of the 43rd International Conference on Ma-
+chine Learning, 2026.
+[15] Bernhard Jaeger, Kashyap Chitta, and Andreas Geiger.
+Hidden Biases of End-to-End Driving Models. arXiv
+preprint arXiv:2306.07957, 2023.
+[16] Xiaosong Jia,
+Yulu Gao,
+Li Chen,
+Junchi Yan,
+Patrick Langechuan Liu, and Hongyang Li. DriveAdapter:
+Breaking the Coupling Barrier of Perception and Planning
+in End-to-End Autonomous Driving. In Proceedings of
+the IEEE/CVF International Conference on Computer
+Vision, 2023.
+[17] Xiaosong Jia, Penghao Wu, Li Chen, Jiangwei Xie, Con-
+ghui He, Junchi Yan, and Hongyang Li. Think Twice be-
+fore Driving: Towards Scalable Decoders for End-to-End
+Autonomous Driving. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+2023.
+[18] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang,
+and Junchi Yan. Bench2Drive: Towards Multi-Ability
+Benchmarking of Closed-Loop End-To-End Autonomous
+Driving. arXiv preprint arXiv:2406.03877, 2024.
+[19] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan.
+DriveTransformer: Unified Transformer for Scalable End-
+to-End Autonomous Driving. In International Conference
+on Learning Representations, 2025.
+[20] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie
+Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang
+Huang, and Xinggang Wang. VAD: Vectorized Scene
+Representation for Efficient Autonomous Driving. In
+Proceedings of the IEEE/CVF International Conference
+on Computer Vision, 2023.
+[21] Sergey Levine, Aviral Kumar, George Tucker, and Justin
+Fu. Offline Reinforcement Learning: Tutorial, Review,
+and Perspectives on Open Problems.
+arXiv preprint
+arXiv:2005.01643, 2020.
+[22] Yingyan Li, Yuqi Wang, Yang Liu, Jiawei He, Lue Fan,
+and Zhaoxiang Zhang. End-to-End Driving with Online
+Trajectory Evaluation via BEV World Model. In Pro-
+ceedings of the IEEE/CVF International Conference on
+Computer Vision, 2025.
+[23] Weixin Liang, Lili Yu, Liang Luo, Srinivasan Iyer, Ning
+Dong, Chunting Zhou, Gargi Ghosh, Mike Lewis, Wen-
+tau Yih, Luke Zettlemoyer, and Xi Victoria Lin. Mixture-
+of-Transformers: A Sparse and Scalable Architecture
+for Multi-Modal Foundation Models. Transactions on
+Machine Learning Research, 2025.
+[24] Jiageng Liu, Seth Z. Zhao, Zewei Zhou, Alejandro Huerta,
+Aidan Bayer-Calvert, Yuxin Bao, Haotian Lin, Robert
+Spataru, Zijun Cui, Yining Hong, Bolei Zhou, and Jiaqi
+Ma. AutoAgent0: An Agentic Runtime for Safe Closed-
+Loop Driving. arXiv preprint arXiv:2610.18866, 2026.
+[25] Shu Liu, Wenlin Chen, Weihao Li, Zheng Wang, Lijin
+Yang, Jianing Huang, Yipin Zhang, Zhongzhan Huang, Ze
+Cheng, and Hao Yang. BridgeDrive: Diffusion Bridge Pol-
+icy for Closed-Loop Trajectory Planning in Autonomous
+Driving. In International Conference on Learning Repre-
+sentations, 2026.
+[26] Yuechen Luo, Fang Li, Shaoqing Xu, Zhiyi Lai, Lei Yang,
+Qimao Chen, Ziang Luo, Zixun Xie, Shengyin Jiang, Ji-
+axin Liu, Long Chen, Bing Wang, Ken Deng, and Zhi-xin
+Yang. AdaThinkDrive: Adaptive Thinking via Reinforce-
+ment Learning for Autonomous Driving. arXiv preprint
+arXiv:2509.13769, 2025.
+[27] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski.
+SimLingo: Vision-Only Closed-Loop Autonomous Driv-
+ing with Language-Action Alignment. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pages 11993–12003, 2025.
+[28] Penghao Wu, Xiaosong Jia, Li Chen, Junchi Yan,
+Hongyang Li, and Yu Qiao. Trajectory-guided Control
+Prediction for End-to-end Autonomous Driving: A Sim-
+ple yet Strong Baseline. In Advances in Neural Informa-
+tion Processing Systems, 2022.
+[29] Zhongyu Xia, Wenhao Chen, Yongtao Wang, and Ming-
+Hsuan Yang.
+DrivingAgent: Design and Scheduling
+Agents for Autonomous Driving Systems. arXiv preprint
+arXiv:2606.12236, 2026.
+[30] Zhongyu Xia, Wenhao Chen, Yongtao Wang, and Ming-
+Hsuan Yang. KnowVal: A Knowledge-Augmented and
+10
+
+
+Value-Guided Autonomous Driving System. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, 2026.
+[31] Zhexiao Xiong, Xin Ye, Burhan Yaman, Sheng Cheng,
+Yiren Lu, Jingru Luo, Nathan Jacobs, and Liu Ren.
+UniDrive-WM: Unified Understanding, Planning and
+Generation World Model for Autonomous Driving. In
+European Conference on Computer Vision, 2026.
+[32] Zhenjie Yang, Yilin Chai, Xiaosong Jia, Qifeng Li,
+Yuqian Shao, Xuekai Zhu, Haisheng Su, and Junchi
+Yan. DriveMoE: Mixture-of-Experts for Vision-Language-
+Action Model in End-to-End Autonomous Driving. arXiv
+preprint arXiv:2505.16278, 2025.
+[33] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak
+Shafran, Karthik Narasimhan, and Yuan Cao. ReAct:
+Synergizing Reasoning and Acting in Language Models.
+In International Conference on Learning Representations,
+2023.
+[34] Jiang-Tian Zhai, Ze Feng, Jinhao Du, Yongqiang Mao,
+Jiang-Jiang Liu, Zichang Tan, Yifu Zhang, Xiaoqing Ye,
+and Jingdong Wang. Rethinking the Open-Loop Evalu-
+ation of End-to-End Autonomous Driving in nuScenes.
+arXiv preprint arXiv:2305.10430, 2023.
+[35] Lingjun Zhang, Changjie Wu, Linzhe Shi, Jiangyang Li,
+Jiaxin Liu, Lei Yang, Hang Zhang, Mu Xu, and Hong
+Wang. DeepSight: Long-Horizon World Modeling via La-
+tent States Prediction for End-to-End Autonomous Driv-
+ing. In Proceedings of the 43rd International Conference
+on Machine Learning, 2026.
+[36] Weicheng Zheng, Xiaofei Mao, Nanfei Ye, Pengxiang Li,
+Kun Zhan, Xianpeng Lang, and Hang Zhao. DriveAgent-
+R1: Advancing VLM-based Autonomous Driving with
+Active Perception and Hybrid Thinking. arXiv preprint
+arXiv:2507.20879, 2025.
+[37] Helen Zhou, Audrey Huang, Kamyar Azizzadenesheli,
+David Childers, and Zachary Lipton. Timing as an Action:
+Learning When to Observe and Act. In Proceedings of the
+27th International Conference on Artificial Intelligence
+and Statistics, pages 3979–3987. PMLR, 2024.
+[38] Zewei Zhou, Tianhui Cai, Seth Z. Zhao, Yun Zhang,
+Zhiyu Huang, Bolei Zhou, and Jiaqi Ma.
+AutoVLA:
+A Vision-Language-Action Model for End-to-End Au-
+tonomous Driving with Adaptive Reasoning and Rein-
+forcement Fine-Tuning. In Advances in Neural Informa-
+tion Processing Systems, 2025.
+11
+
+
+Appendix
+Table S1. Model configuration. World maps and trajectory
+points use the current ego coordinate frame.
+Component
+Configuration
+Sensors
+Front RGB and LiDAR; additional rear
+RGB for two-view queries
+Agent expert
+Qwen3-VL-2B [1], 28 language layers,
+width 2048
+World expert
+28 Transformer layers, width 1024
+World output
+Six 64 × 64 BEV maps, 13 semantic
+classes, 1 m cells
+Action expert
+28 Transformer layers, width 1024
+Action output
+Six XY waypoints over 3 s, a 20-point
+spatial route
+Router
+Learned pathway selection, 837,790 pa-
+rameters
+Task adapter
+Rank 64, LoRA scaling αLoRA = 128,
+dropout 0.05, language attention and
+MLP projections
+Planning history
+Four
+frames
+at
+(−0.75, −0.50, −0.25, 0) s
+Agent-call history
+Four frames at (−1.5, −1.0, −0.5, 0) s,
+resized to 512 × 256
+Two-view query
+Current front/rear views and motion con-
+text, at most 10 generated tokens
+This appendix specifies the model configuration, collec-
+tion records, offline learning procedures, and evaluation
+protocol for AgentMoT.
+A. Model and execution configuration
+Agent, world, and action experts form three native path-
+ways. A uses the action expert, VLA adds the agent ex-
+pert, and WAM uses all three. A BEV encoder processes
+RGB and LiDAR. The Router selects expert activation
+from BEV tokens and compact context features. Native
+planning and task decisions share one vision-language
+backbone with role-specific LoRA adapters and sepa-
+rate key–value caches. System scheduling combines
+task selection by G with call timing from the agent self-
+scheduler. Table S1 summarizes the configuration.
+Native planning.
+The agent encodes camera history,
+speed, navigation targets, and a route command. Its
+layer-wise key–value states condition the action expert in
+VLA and the world expert in WAM. WAM conditions the
+action expert on both agent and world key–value states.
+A uses BEV features and ego/navigation inputs. All
+pathways share the action expert’s Transformer layers,
+use pathway-specific input and output modules, and feed
+a common controller.
+Shared parameters and adapters.
+Native reasoning
+and task decisions use separate LoRA adapters on the
+shared language backbone. VLA and WAM use the
+native-reasoning adapter, while task decisions and two-
+view queries use the task adapter. Routing and A use
+BEV inputs without native agent reasoning. Agent post-
+training updates the task adapter with all other model
+parameters fixed.
+Task decisions.
+Each agent call combines images and
+perception-derived scene information with task state to
+form the driving context. The execution layer constructs
+the skill–target menu from observed objects, naviga-
+tion context, and task state. At deployment, G uses
+greedy decoding. The reply selects native driving or del-
+egates a task for traffic negotiation, obstruction passing,
+navigation-goal adaptation, or traffic-rule compliance.
+The rule skill includes emergency-vehicle yielding. Task
+progress and the resulting scene inform subsequent agent
+calls.
+Execution and agent calls.
+The simulation advances
+by 0.05 s per control tick. Routing is refreshed every four
+ticks on planning requests. Execution reports driving
+state every five ticks. Changes in available skill–target
+choices, task and traffic events, and a review every 40
+ticks produce wake-up requests from the execution layer.
+For ordinary requests, the agent self-scheduler selects
+reconsider (call G) or keep (skip the call). Mandatory
+requests call G directly. The first wake-up request at least
+120 ticks after the previous call invokes G directly (the
+age-triggered refresh). Native planning and skill execu-
+tion continue between agent calls. Section 5.6 analyzes
+amortized model computation outside CARLA.
+Execution feedback and two-view queries.
+The exe-
+cution layer rebuilds the driving context and skill–target
+menu from current sensor tracks, ego motion, navigation,
+and task state. Mandatory requests include execution
+interrupts and observed conflicts, meaning execution re-
+ports that the current task conflicts with measured scene
+conditions.
+Active wake-up adds checks for persistent low
+progress without a traffic-control reason to wait, a new
+persistent blocker in the driving corridor, and newly avail-
+able skill options that persist. These rules invoke G with
+refreshed driving context and menu, bypassing the self-
+scheduler.
+A rear-vehicle cue can additionally trigger a manda-
+tory two-view query. The execution layer supplies current
+12
+
+
+Table S2. Collected training and validation data. Each row
+specifies its counting unit. Selected intervention points are
+defined in Sec. D.
+Data
+Train
+Validation
+Router routes
+223
+41
+Router replay contexts
+107,068
+32,669
+Agent collection routes
+120
+28
+Agent collection episodes
+387
+89
+Logged agent calls
+32,729
+7,313
+Selected intervention points
+308
+73
+Reference driving examples
+554
+—
+front and rear views, ego speed, and recent rear-track ob-
+servations. Training and inference use the same rear-view
+crop. Section D.3 specifies the supervision.
+B. Data and partitioning
+A, VLA, and WAM are trained jointly on driving logs
+in a mixed-pathway stream that also includes SimLingo
+question–answer examples [27] and GPT-annotated skill–
+target choices for G. The open-loop Router is trained
+separately using pathway trajectory errors relative to
+PDM-Lite reference plans. Closed-loop CARLA data
+then refines routing, task selection, and self-scheduling.
+Each closed-loop record joins sensor features, skill–target
+menus, answers, task transitions, controls, and official
+infractions at a decision point.
+Table S2 summarizes the data and splits. All episodes
+from a route remain in one split, separate from the bench-
+mark evaluation routes. Router configuration selection
+uses 223 training routes and 41 validation routes. The
+benchmark Router is retrained on all 264 development
+routes. The agent self-scheduler uses the same 120 train-
+ing routes and 28 validation routes as G.
+Task events and infractions are aligned to their occur-
+rence frames. Agent post-training uses answer targets
+from the training partition and 554 reference driving
+examples for KL replay. Self-scheduler thresholds are
+calibrated on the training routes.
+C. Router learning with one-step offline RL
+After initialization from open-loop trajectory errors
+against PDM-Lite plans, the Router learns an offline
+one-step decision policy using the contextual-bandit for-
+mulation from RL [4, 8, 21]. The context is a recorded
+observation, the action is a pathway choice, and the re-
+ward scores its three-second plan. We evaluate A, VLA,
+and WAM with paired sampling seeds, obtaining full-
+information supervision for all three choices. The de-
+ployed policy reads BEV tokens and context features.
+C.1. Paired pathway targets
+At each recorded context, we generate a three-second
+plan from each pathway with four paired seeds. The
+scorer applies driving criteria for collision, traffic lights,
+stop signs, lane departure, and progress, together with
+expert-trajectory deviation and nominal per-pathway la-
+tency measured in profiling.
+WAM includes world-
+guided plan refinement in both target construction and
+execution, and its latency includes that cost.
+For context i, pathway k, and seed m, let Si,k,m be the
+change in route driving score from the recorded decision
+point to the end of the three-second plan replay. The
+scorer combines route completion, infraction penalties,
+and lane departure using the official driving-score criteria.
+Averaging the paired samples gives Si,k. We write the
+main paper’s reward rR(xi, k) as ri,k here. The reward
+is
+ri,k = Si,k −λd min(di,k, 3) −λcℓk,
+(S1)
+with score change in driving-score points, distance in me-
+ters, and nominal per-pathway latency in seconds. Train-
+ing uses the weights in Table S3.
+C.2. Router architecture
+The policy attends to 64 BEV tokens, each projected from
+1512 to 64 dimensions by a fixed PCA transform. A 25-
+dimensional context supplies the attention query through
+a 13-way situation indicator, 11 scalars, and a data-source
+indicator that is fixed at deployment. The scalars encode
+speed, one-second speed change, upcoming turn angle,
+junction status, lateral route deviation, red-light status,
+distance to turn onset, acceleration, front-object gap, gap
+availability, and following status. Situation categories
+distinguish junction maneuvers, stopping causes, obsta-
+cle avoidance, following, merging, vulnerable road users,
+and cruising. These features are computed from percep-
+tion, ego motion, and navigation context.
+A 64-dimensional query attends to projected token
+keys and values. The resulting summary and context feed
+two 96-unit hidden layers and a routing readout, with
+ReLU activations and dropout 0.2 in the hidden trunk.
+The two five-member ensembles of the Router contain
+837,790 trainable parameters in total, excluding fixed
+PCA and normalization buffers.
+The primary Router, the three-way stage that pre-
+cedes the A–VLA refinement described below, factors its
+choice according to expert activation. A uses only the
+action expert, whereas VLA and WAM both activate the
+agent expert, and WAM additionally activates the world
+expert. A gate predicts the probability gi of activating
+agent reasoning, and a conditional head predicts the prob-
+ability hi of VLA given that agent reasoning is active.
+13
+
+
+The pathway probabilities are
+(pi,A, pi,VLA, pi,WAM) = (1 −gi, gihi, gi(1 −hi)).
+(S2)
+This factorization separates whether to activate agent
+reasoning from whether to add world prediction. Both
+probabilities are predicted from the same context and
+trained jointly with the objectives below. For training,
+rewards are centered within each context and clipped to
+the training-set 1st and 99th percentiles, giving eri,k. With
+sg denoting stopped gradients, the gate compares A with
+the VLA/WAM mixture defined by the current hi:
+vA
+i = eri,A,
+(S3)
+vD
+i = sg(hi)eri,VLA + (1 −sg(hi))eri,WAM,
+(S4)
+v∗
+i = max(vA
+i , vD
+i ).
+(S5)
+The gate minimizes the expected reward lost by choosing
+A or this mixture instead of the better of the two:
+Lgate = Ei[(1 −gi)(v∗
+i −vA
+i ) + gi(v∗
+i −vD
+i )]. (S6)
+The conditional head learns which of VLA and WAM
+offers the higher reward, using binary cross-entropy with
+target 1[ri,VLA > ri,WAM]. Examples are weighted by
+the absolute VLA–WAM reward gap and restricted to
+contexts where a deeper pathway improves on A. This fo-
+cuses supervision on the value of world prediction when
+agent reasoning can improve driving reward, while giving
+near-tied choices little weight. Weights are normalized
+by their training-set mean. The two losses are optimized
+jointly.
+The primary Router is a five-member ensemble and
+selects the pathway with the highest mean probability
+across its members. When it selects A, we ask whether
+enabling the agent expert alone justifies its extra latency
+once the reward also accounts for ego-trajectory comfort.
+A and VLA differ by precisely this expert. Switching
+from A to WAM would also enable world prediction, so
+the primary Router retains that decision.
+On training contexts initially assigned to A, a five-
+member refinement ensemble learns the paired A-minus-
+VLA reward difference. Its target uses Eq. S1 with the
+refinement latency weight in Table S3 and adds a comfort
+term. We standardize the comfort score on the training
+set, with higher values for smoother plans, and scale it by
+the training standard deviation of driving-score change
+before applying the comfort weight.
+C.3. Deployment
+Table S3 summarizes the optimization settings. For an
+initial A choice, let µ and σ denote the mean and stan-
+dard deviation of the five predicted A-minus-VLA reward
+differences. The refinement retains A if µ + 0.5σ > 0
+Table S3. Router learning configuration.
+Setting
+Value
+Optimizer
+AdamW
+Learning rate / weight decay
+10−3 / 10−4
+Batch size
+1024
+Routing objective
+Expected regret +
+weighted BCE
+Training passes per model
+8
+Latency weight λc (primary / refinement)
+1.5 / 1.0
+Refinement comfort weight
+0.06
+Expert-deviation weight λd
+2.0
+Selection training routes / contexts
+223 / 107,068
+Validation routes / contexts
+41 / 32,669
+Benchmark training routes / contexts
+264 / 139,737
+Table S4. Paired plan rewards on validation routes. Entries
+show the mean reward difference between the Router and each
+indicated fixed pathway, with 95% route-bootstrap intervals.
+Positive values favor the Router.
+Latency weight
+Router minus A
+Router minus WAM
+λc = 0.1
+1.23 [0.49, 2.50]
+0.11 [−0.02, 0.23]
+λc = 0.5
+1.20 [0.44, 2.32]
+0.14 [0.01, 0.27]
+and selects VLA otherwise. The Router selects among A,
+VLA, and WAM every four control ticks on native plan-
+ning requests and retains that choice between updates.
+C.4. Routing reward on validation routes
+We evaluate the Router trained on 223 routes using paired
+three-second plans from the 41 validation routes. We
+score the same plans twice with Eq. S1, fixing the eval-
+uation deviation weight at λd = 0.25 and varying the
+evaluation latency weight λc (Table S4). We average the
+paired reward differences over contexts and compute per-
+centile intervals from 2,000 bootstrap samples of routes,
+retaining all contexts from each sampled route.
+D. Agent collection and post-training
+The collection records original agent recommendations,
+executed actions, randomized assignments, and task out-
+comes separately. These records supply task applicability
+targets and agent-call outcomes.
+D.1. Randomized intervention collection
+Randomized interventions broaden the recorded deci-
+sions beyond those the agent would choose itself. At
+episode initialization, a seeded draw assigns natural ex-
+ecution, forced call, or forced no-call with probabilities
+0.5, 0.25, and 0.25. An opportunity becomes eligible
+when an object first appears in the menu for a target skill.
+Each eligible opportunity is selected with probability 0.3
+14
+
+
+until one is chosen, so an episode contributes at most one
+selected point.
+The natural arm preserves the agent’s sampled re-
+sponse. Collection uses full-vocabulary sampling at tem-
+perature 1.0 with a budget of 128 new tokens, recording
+generated tokens and their probabilities. The forced-call
+arm repeats the selected target request until acceptance or
+four seconds. The forced-no-call arm suppresses the tar-
+get skill family for 20 seconds. Other execution sources
+are recorded to identify compliance with the assigned
+intervention. Across the collection, 381 selected points
+receive 211 natural, 83 forced-call, and 87 forced-no-call
+assignments.
+Outcome records align official progress and infrac-
+tions, task completion, and the return to native driving
+with each agent call.
+D.2. Task applicability supervision
+Offline labeling rules use scenario annotations, the
+recorded skill–target menu, and task state to identify
+applicable skills. Obstruction-passing targets distinguish
+lane-blocking accident, construction, parked-vehicle, and
+door-opening scenarios. Navigation-goal adaptation tar-
+gets identify an exit task, and emergency-yield targets
+identify the designated emergency vehicle. At deploy-
+ment, the agent selects from the skill–target menu using
+images, perception-derived scene information, and task
+state.
+Answer targets either delete an inapplicable first skill–
+target choice or keep an applicable recorded answer.
+Teacher forcing covers the full target. A second target op-
+erates on the first answer token. We use the task adapter
+from the preceding round of closed-loop training as the
+fixed reference. In the following losses, x denotes the
+complete input to G, including the driving context and
+skill–target menu. Let π0 denote the fixed reference
+policy, π(1)
+0 (v | x) its first-token distribution over vocab-
+ulary tokens v, and bx(v) an indicator for token prefixes
+associated with an inapplicable skill. The soft target is
+qx(v) =
+π(1)
+0 (v | x) exp[−4bx(v)]
+P
+v′ π(1)
+0 (v′ | x) exp[−4bx(v′)]
+.
+(S7)
+Minimizing KL(qx∥π(1)
+G ) suppresses the unsupported
+prefixes while retaining a distribution over alternatives.
+Prefix groups handle alternative tokenizations of the same
+skill name.
+We mix the closed-loop training records with a replay
+set of 554 reference driving examples. Replayed exam-
+ples are trained solely through token-level KL to the fixed
+reference agent to retain prior responses across driving
+contexts. On closed-loop records, reference KL follows
+the original sampled answer prefixes. First-token exam-
+ples apply it to the remaining answer positions. Deletion
+Table S5. Agent post-training recipe. The mixed stream trains
+task decisions and two-view queries through the task adapter.
+Setting
+Value
+Optimizer
+AdamW
+Learning rate
+9 × 10−6
+Weight decay
+0
+Effective batch size
+32
+Warm-up updates
+20
+Gradient norm limit
+1.0
+Answer weight / first-token weight α
+1 / 1
+KL weight βcl, closed-loop records
+0.02
+KL weight βreplay, replayed examples
+0.10
+First-token suppression margin
+4.0
+Reference driving examples
+554
+examples use only answer cross-entropy on the edited
+answer. Table S5 gives the training configuration.
+For each record, the reference KL is
+Ki =
+X
+t∈Ti
+KL
+ π0(· | xi, yi,<t) ∥πG(· | xi, yi,<t)
+
+,
+(S8)
+where yi,<t is the recorded answer prefix and Ti con-
+tains the answer positions selected above. The combined
+objective is
+LG = −EDans log πG(y+
+i | xi) + αEDfirst KL(qi∥π(1)
+G )
++ βclEDclKi + βreplayEDreplayKi.
+(S9)
+Here y+
+i is the corrected or preserved answer, qi = qxi
+is the first-token target, and π(1)
+G
+is the first-token dis-
+tribution. The datasets Dans and Dfirst supply answer
+and first-token targets. The answer dataset includes the
+two-view examples. The closed-loop records Dcl and
+reference driving examples Dreplay supply reference KL
+Ki. Table S5 specifies α, βcl, and βreplay.
+D.3. Two-view queries
+For the inputs in Sec. A, scenario metadata and visual
+review determine a vehicle-type and yielding target. Non-
+yielding followers supply at least three negative examples
+per yielding example, including police vehicles outside a
+designated emergency scenario. Two-view examples en-
+ter the mixed training stream with answer cross-entropy
+only.
+E. Learning when to reconsider
+The agent-call dataset contains 40,042 agent calls from
+476 episodes, with 32,729 training and 7,313 validation
+calls. Table S6 groups calls by updates to accepted skill–
+target choices and task state.
+15
+
+
+Table S6.
+Agent-call outcomes before learned self-
+scheduling. Counts cover 40,042 agent calls.
+Outcome
+Count
+Share (%)
+Empty update
+19,906
+49.7
+Reaffirmation
+9,100
+22.7
+Choice change
+2,944
+7.4
+Rejected-only proposal
+2,654
+6.6
+Task transition
+5,438
+13.6
+• Empty update. no choice update and unchanged task
+state.
+• Reaffirmation. existing choices are kept, possibly
+alongside rejected proposals.
+• Choice change. a skill–target choice is added, with-
+drawn, or revised.
+• Rejected-only proposal. a proposal is rejected without
+a kept or changed choice.
+• Task transition. task state changes without a change
+to the accepted choices.
+If outcomes overlap, we assign the first matching cate-
+gory in the order choice change, task transition, reaffirma-
+tion, rejected-only proposal, and empty update. Choice
+changes and rejected-only proposals receive reconsider
+labels (mj = 1), and the remaining classes receive keep
+labels (mj = 0).
+Training and calibration.
+The agent self-scheduler
+uses a lightweight classifier with features describing the
+wake-up request, elapsed time, scene dynamics, task
+state, and previous answer. It is trained with weighted
+binary cross-entropy, using positive weight (1 −ρ)/ρ for
+positive-label fraction ρ in the fitting data. A threshold
+calibrated on training routes balances call reduction with
+retention of reconsider-labeled calls. The self-scheduler
+filters ordinary wake-up requests. Mandatory requests,
+the first agent call, and retries for missing or malformed
+answers invoke G directly. Keep reuses the current task
+decision.
+Held-out replay.
+Replay over 89 validation episodes
+on 28 routes includes 7,313 logged agent calls. The
+deployed self-scheduler skips 2,629 calls (35.95%) and
+retains 959 of 1,002 reconsider-labeled calls (95.71%).
+Of the 43 deferred reconsider-labeled calls, 42 have a
+subsequent agent call within the episode. The median
+interval to that call is five simulation control ticks. With
+the request-based refresh rule described in Appendix A,
+the longest observed interval between calls was 160 ticks.
+F. Attribution and skill refinement
+Failure attribution uses trajectories, official events, se-
+lected pathways, agent decisions, task states, and con-
+trols. The attribution distinguishes errors in native action
+generation, pathway selection, agent decisions, and skill
+execution. It records events originating in the scenario
+separately. Skill-execution errors guide coding-agent
+changes to skills or execution feedback. The authors re-
+view these changes before rollouts with the refined skills
+supply new examples for the next inner-loop update.
+G. Evaluation and additional analyses
+G.1. Benchmark and controlled comparisons
+We use CARLA 0.9.15 and official seed 2000 for both
+Bench2Drive versions [2, 7, 18]. DS combines route
+completion with infraction penalties. SR is the percent-
+age of routes with DS equal to 100. The five v0.0.3
+ability groups contain 45 overtaking, 80 merging, 60
+emergency-braking, 10 giving-way, and 95 traffic-sign
+routes. Routes can belong to multiple groups.
+With skills disabled, we evaluate fixed A, VLA, WAM,
+and the Router on all 220 routes and report mean route
+DS and SR within each ability group. The three agent
+ablations share 60 routes covering all 44 scenario types.
+The full system scores 95.09 DS and 90.00% SR on these
+routes. Replacing G with its open-loop initialization
+removes closed-loop training for task decisions and two-
+view answers. The Router, native pathways, and self-
+scheduler keep their full-model parameters.
+The wake-up ablation disables calls triggered by menu
+changes, task and traffic events, execution interrupts, ob-
+served conflicts, active wake-up rules, and rear-vehicle
+cues. Emergency yielding uses the perception-based rule.
+The first call, periodic reviews, and retries for missing
+or malformed answers remain enabled. Periodic reviews
+receive the updated driving context and skill–target menu.
+All learned parameters, the self-scheduler, and the age-
+triggered refresh retain their settings.
+G.2. Overlap in native pathway failures
+The native-pathway collection contains 430 scored runs
+on 139 distinct training routes. We have recorded runs
+for all three pathways on 81 routes. We define a failed
+run by official DS below 100. For each pathway, a route
+enters its failure set if any recorded run fails, pooling
+seeds and repeated runs. Across all 139 training routes,
+61 had a recorded failure for at least one pathway. Of
+these, 32 (52.5%) had a recorded failure for all three.
+16

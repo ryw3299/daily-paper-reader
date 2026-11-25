@@ -1,0 +1,1556 @@
+PREPRINT
+1
+FIRE-Drive: Feasibility-Informed Risk Evaluation for End-to-End
+Diffusion Planning
+Qifeng Xie, Kai-Yuan Feng, Member, IEEE, Wenkang Wan, Yue Wu, Senior Member, IEEE,
+Maoguo Gong, Fellow, IEEE, and Kai Sheng
+Abstract—Diffusion-based
+end-to-end
+autonomous
+driving
+models have shown strong potential in generating multimodal
+planning trajectories. However, their performance still depends
+heavily on trajectory initialization, mode evaluation, and su-
+pervision quality. Weakly constrained noisy initialization may
+introduce infeasible proposals and increase the burden of de-
+noising. Moreover, selecting the optimal mode remains chal-
+lenging when candidate trajectories are geometrically similar
+but differ in safety, interaction risk, and progress. To address
+these issues, we propose FIRE-Drive, a feasibility-informed risk
+evaluation framework for end-to-end autonomous driving. FIRE-
+Drive improves diffusion-based planning through dynamic fea-
+sible anchor initialization, candidate-specific bird’s-eye-view risk
+evidence, and compact high-quality candidate supervision with
+lightweight refinement. This design aligns the initial support,
+risk-aware scoring, and multimodal supervision of trajectory
+modes under a unified planning objective. It enables the diffusion
+decoder to focus on refining plausible trajectories while the scorer
+distinguishes modes using local risk evidence. Experiments on
+NAVSIM v1 show that FIRE-Drive achieves a Predictive Driver
+Model Score of 91.5 with a ResNet34 backbone. Additional
+closed-loop evaluation on 220 Bench2Drive routes yields a Driving
+Score of 71.43 and a Success Rate of 42.73%. Component
+ablations and a scorer comparison under matched candidate in-
+puts support the contributions of feasible initialization, auxiliary
+supervision, and risk-informed selection. Our code is available
+at https://github.com/Latte00/FIRE-drive.
+Index
+Terms—Autonomous
+driving,
+Artificial
+Intelligence,
+Methods for safety, diffusion planning, multimodal supervision
+I. INTRODUCTION
+E
+ND-to-end
+(E2E)
+autonomous
+driving
+has
+recently
+emerged as a promising paradigm for unifying percep-
+tion, prediction, and planning within a single learnable frame-
+work [1], [2]. Compared with modular pipelines, E2E planners
+can reduce hand-crafted interface mismatches and can directly
+Corresponding author: Kai-Yuan Feng.
+Qifeng Xie is with the School of Electronic Engineering, Xidian University,
+and also with the Key Laboratory of Collaborative Intelligence Systems,
+Ministry of Education, Xidian University, Xi’an, Shaanxi Province 710071,
+China (e-mail: 24021110872@stu.xidian.edu.cn).
+Kai-Yuan Feng and Kai Sheng are with the Faculty of Infor-X, Xidian
+University, and also with the Key Laboratory of Collaborative Intelligence
+Systems, Ministry of Education, Xidian University, Xi’an, Shaanxi Province
+710071, China (e-mail: fkylwl@gmail.com; kaisheng@xidian.edu.cn).
+Wenkang Wan is with the Key Laboratory of Collaborative Intelligence
+Systems, Ministry of Education, Xidian University, Xi’an, Shaanxi Province
+710071, China (e-mail: wanwk@stu.xidian.edu.cn).
+Yue Wu is with the School of Computer Science and Technology, Xidian
+University, and also with the Key Laboratory of Collaborative Intelligence
+Systems, Ministry of Education, Xidian University, Xi’an, Shaanxi Province
+710071, China (e-mail: ywu@xidian.edu.cn).
+Maoguo Gong is with the Key Laboratory of Collaborative Intelligence
+Systems, Ministry of Education, Xidian University, Xi’an, Shaanxi Province
+710071, China, and also with the College of Artificial Intelligence, Inner
+Mongolia Normal University, Hohhot 010028, China (e-mail: gong@ieee.org).
+a) Trajectory vocabulary paradigm
+Discrete Vocabulary
+Rule-based
+Scorer-based
+Rule-based
+Scorer-based
+Constrained Anchor
+c) FIRE-Drive (ours)
+Diffusion-based
+Scorer-based
+Risk
+context
+Multimodal 
+supervision
+Diffusion-based
+Scorer-based
+Risk
+context
+Multimodal 
+supervision
+b) Diffusion paradigm
+Disturbed Anchor
+Diffusion-based
+Fig. 1.
+Comparison of representative E2E planning paradigms. Dense
+vocabulary methods first construct a large candidate table and then select
+a trajectory by rules or scoring; conventional diffusion planners decode from
+noisy or perturbed anchors; FIRE-Drive introduces feasibility-informed anchor
+initialization and risk-aware evaluation before final selection.
+optimize the final driving behavior from scene observations.
+A central difficulty, however, is that human driving futures
+are inherently multimodal: the same traffic scene may admit
+multiple plausible maneuvers, interaction patterns, and risk-
+efficiency trade-offs [3]. Therefore, an effective E2E planner
+should not only generate diverse future trajectories, but also
+ensure that the generated candidates are feasible, distinguish-
+able, and properly supervised.
+A common planning strategy constructs a trajectory vocab-
+ulary or proposal pool and then selects a plan using learned
+scores [4], [5], as illustrated in Fig. 1. This separates candidate
+coverage from decision making, but also creates two coupled
+requirements: the pool must contain useful alternatives, and the
+scorer must identify them. A selector cannot recover a feasible
+maneuver absent from its candidate set, while geometrically
+similar candidates may require different decisions because
+of their local collision exposure or road-boundary proximity.
+Candidate generation and evaluation should therefore be de-
+signed together.
+Diffusion-based planners offer continuous multimodal gen-
+arXiv:2611.22297v1  [cs.RO]  17 Nov 2026
+
+
+PREPRINT
+2
+eration through denoising [6], [7], but this flexibility leaves
+three challenges. First, fixed anchors or generic perturbations
+need not respect the current drivable region, obstacle layout, or
+ego-motion reachability, leaving the decoder to correct scene-
+inconsistent starting points. Physical priors help structure
+trajectory modeling [8], yet scene-dependent admissibility also
+matters. Second, geometric plausibility alone does not deter-
+mine driving quality: similar trajectories can differ in safety
+and progress, requiring candidate-specific risk evidence for
+selection. Third, supervision from a single logged future pro-
+vides limited guidance for alternative maneuvers. Additional
+references are useful only when their diversity is accompanied
+by scene compatibility and adequate driving quality.
+The distinction between motion plausibility and scene fea-
+sibility is particularly important at initialization. A trajectory
+can be smooth and consistent with the current vehicle state
+while entering occupied space or extending beyond a drivable
+boundary. Conversely, an unoccupied road region may be
+difficult to reach under the current speed and steering limits.
+A useful initial candidate should account for both restrictions.
+This motivates a scene-dependent admissible region that com-
+bines semantic drivability with ego-motion reachability, rather
+than relying on a motion prior alone to locate the starting
+hypotheses.
+Selection presents a related but different problem. Consider
+two candidates that follow nearly the same lane but differ
+slightly in lateral clearance or longitudinal progress. Their
+trajectory embeddings may be similar, yet one can pass closer
+to a vehicle or road boundary. The relevant evidence is
+therefore not just what objects exist in the scene, but where
+each candidate travels relative to them. Candidate-conditioned
+risk context makes these spatial relationships available to the
+scorer, while explicit risk supervision encourages attention to
+the regions that explain potential infractions.
+The interplay between training data and learning strategies
+is central to E2E driving [9]. Additional supervision must
+therefore preserve the distinction between possible and useful
+behavior. The logged future provides a demonstrated response,
+but does not enumerate all acceptable maneuvers. Geometric
+variation can supply alternatives, although larger variation does
+not necessarily imply better supervision. We therefore treat
+reference construction as a quality-control step: behavioral
+alternatives are screened against scene geometry and evaluator
+scores before they become training targets. Caching this com-
+pact reference set separates its construction cost from repeated
+training updates.
+We propose FIRE-Drive to address these challenges through
+coordinated initialization, evaluation, and supervision. Scene-
+adaptive anchor priors are constrained by semantic drivability
+and ego-motion reachability before denoising. A candidate-
+conditioned bird’s-eye-view (BEV) risk context supplies local
+evidence for trajectory selection. Compact, quality-filtered
+auxiliary references supervise secondary modes and support
+lightweight refinement; their trajectories and evaluator scores
+are cached offline for reuse. Together, these components
+improve the starting hypotheses, the training targets, and the
+evidence used to choose the final plan.
+The contributions of this paper are summarized as follows:
+• We introduce a dynamic feasible anchor strategy that
+replaces weakly constrained seeds with scene-consistent
+trajectory priors constructed under semantic drivability
+and motion-reachability constraints.
+• We propose a mode risk context module that combines
+candidate-conditioned BEV evidence, semantic risk bias,
+and infraction supervision to support safety-aware trajec-
+tory selection.
+• We formulate a compact procedure for high-quality can-
+didate supervision, combining behavior-based reference
+generation, geometry and quality filtering, and offline
+caching to supervise secondary modes without repeated
+reference evaluation.
+• FIRE-Drive achieves 91.5 PDMS on NAVSIM v1 and
+71.43 DS with 42.73% SR over 220 Bench2Drive routes.
+Component and matched-input scorer ablations evaluate
+the contributions of the proposed designs.
+II. RELATED WORK
+A. E2E Autonomous Driving
+E2E driving has evolved from direct image-to-control im-
+itation [10]–[12] toward structured systems that learn per-
+ception and planning jointly [1], [13]. Closed-loop simula-
+tion exposes the consequences of prediction errors beyond
+individual frames [14], motivating trajectory-guided control
+and iterative decoding [15], [16]. Richer sensor fusion and
+temporal reasoning improve the scene evidence available to the
+planner [17], [18], while vectorized and sparse representations
+reduce dependence on dense scene processing [2], [19], [20].
+Another direction strengthens the relationship between pre-
+dicted interactions and ego decisions through joint optimiza-
+tion, hierarchical prediction, or game-theoretic reasoning [21]–
+[23]. Unified transformer architectures further facilitate infor-
+mation exchange across driving tasks [24]. However, richer
+representations and tighter task coupling alone do not ensure
+that every generated mode is feasible or receives useful super-
+vision. Studies of PDM and PlanTF also show that good open-
+loop fitting does not directly translate into reliable closed-
+loop behavior [25], [26]. This motivates distinguishing scene
+representation from the use of that representation in planning.
+Even with a shared perception backbone, different initial
+candidate supports, training targets, and selection criteria can
+lead to different driving decisions. FIRE-Drive addresses these
+proposal-level choices within a diffusion planner, complement-
+ing advances in scene encoding and interaction modeling.
+B. Diffusion Models for Trajectory Prediction and Planning
+Denoising-based generation [27], [28] provides a flexible
+representation of multimodal trajectories and actions [29],
+[30]. Its application to driving spans multi-agent forecasting
+and joint prediction–planning [31], [32]. Truncated diffusion,
+goal-driven flow matching, and diffusion bridges adapt this
+formulation to E2E trajectory generation [6], [7], [33]. Their
+flexibility makes feasibility control important: representing
+multiple futures does not by itself make those futures admis-
+sible in the current scene.
+
+
+PREPRINT
+3
+Physical structure enters existing methods in different
+forms: ResAD predicts normalized residuals around a de-
+terministic inertial reference [8], and WAKE integrates ve-
+hicle kinematics into trajectory prediction [34]. Diffusion-
+Phy adopts a multi-stage physical-prior pipeline involving
+dynamic-state prediction, neural compensation, and latent-
+state encoding to construct adaptive anchors [35]. FIRE-Drive
+adopts a simpler initialization design, emphasizing the spatial
+admissibility of the denoising seeds through explicit semantic–
+reachability constraints, while leaving detailed trajectory shap-
+ing to the decoder and refiner. Specifically, the intersection
+of semantic and reachable regions restricts sampled anchor
+locations, beyond using physical features to condition their
+distribution. Other approaches enforce constraints during flow
+generation [36] or use reward-based evolutionary search [37];
+our design places the spatial restriction before decoding.
+Reward-based learning provides another route to improv-
+ing candidate quality. DIVER combines multiple references
+and one-to-one matching with GRPO rewards for diversity
+and driving quality [38]; DiffusionDriveV2 uses anchor-aware
+GRPO and a trajectory-conditioned selector [39]. Their pol-
+icy updates involve trajectory sampling and reward evalu-
+ation, adding computationally demanding online evaluation
+to training. FIRE-Drive uses offline-cached, quality-filtered
+references as reusable supervised targets for secondary modes.
+This avoids repeated reward evaluation for auxiliary reference
+supervision, while retaining online infraction evidence for risk-
+context training.
+C. Mode Evaluation and Multimodal Supervision
+Learning to rank proposals is increasingly important as
+candidate generation improves. Scorer distillation and dedi-
+cated trajectory representations learn to distinguish candidate
+quality [4], [5], [40], [41], while recent proposal-centric sys-
+tems further emphasize the interaction between generation and
+selection [42]–[44]. Future-scene modeling and safety-oriented
+value estimation provide additional ways to assess downstream
+outcomes [45], [46]. Explicit risk fields and risk-aware op-
+timization connect spatial hazard assessment with trajectory
+planning [47], [48], while risk-aware prediction incorporates
+safety-critical interactions into future motion estimation [49].
+FIRE-Drive brings spatial risk evidence into learned candi-
+date scoring: candidate-conditioned BEV context, semantic
+risk bias, and infraction supervision guide the scorer toward
+hazards relevant to each trajectory, beyond aggregate score
+regression alone. The matched-input scorer ablation supports
+the benefit of this risk evidence independently of changes in
+candidate quality.
+A separate issue is what supervises the alternatives being
+scored. Learned latent anchors and multimodal aggregation
+improve the representation of possible futures [50], and mode
+assignment directs supervision to predictions compatible with
+the observed future [51], [52]. However, a single observa-
+tion cannot specify the quality of every alternative maneu-
+ver. Multi-reference supervision broadens the available tar-
+gets [53], but reference diversity alone does not establish scene
+feasibility or driving utility. FIRE-Drive explicitly screens
+auxiliary references by geometry and evaluator quality, then
+uses candidate matching and bounded refinement to supervise
+secondary modes. This connects broader supervision to a
+compact set of evaluated alternatives.
+III. METHODOLOGY
+A. Overall Framework
+FIRE-Drive takes a stitched image from the front-left, front,
+and front-right cameras, LiDAR measurements, and ego status
+as input. The perception backbone encodes these observations
+into scene features χ, including BEV features and semantic
+predictions. As shown in Fig. 2, scene-conditioned anchors
+initialize the diffusion decoder, which predicts K trajectories
+Yk with T waypoints containing position and heading. A
+bounded refiner produces ˆYk, and a risk-aware scorer selects
+the final plan:
+Y ∗= ˆYk∗,
+k∗= arg max
+k
+S( ˆYk, χ).
+(1)
+When refinement is disabled, ˆYk = Yk. During training, offline
+auxiliary references supervise secondary modes, while local-
+ized infraction evidence supervises the scorer’s risk attention.
+Initialization defines the decoder’s starting hypotheses, can-
+didate supervision supplies additional learning targets, and risk
+context informs selection among the refined outputs. Scene
+features are shared across modes, while anchor embeddings
+and trajectory queries preserve mode-specific representations.
+B. Dynamic Feasible Anchor Initialization
+Fixed anchors and unconstrained noise can place initial
+hypotheses outside the locally admissible driving region [6],
+[7]. We instead combine a scene-conditioned Gaussian prior
+with an explicit feasible mask, as illustrated in Fig. 3.
+The ego-status encoding and ego query are fused into a
+shared context, which is combined with a learnable embedding
+for each mode to obtain zk. Prediction heads produce a
+residual mean ∆µk and a positive, bounded standard deviation
+σk. A motion prior µphy
+k
+estimated from ego velocity and
+acceleration provides the reference mean [8]:
+ˆAk ∼N
+
+µphy
+k
++ α∆µk, diag(σ2
+k)
+
+,
+(2)
+where α scales the learned residual. Softplus and clipping keep
+the predicted standard deviations positive and bounded.
+The motion prior captures continuation of the current ego
+state, while the learned residual adapts this reference to the
+encoded scene. Separate mode embeddings allow the predic-
+tion heads to produce different means and uncertainty scales
+from the same observation. The Gaussian samples provide
+alternative starting hypotheses, but their spatial support is
+further shaped by the feasible mask. In this way, the learned
+distribution specifies where candidates are likely to lie, and the
+mask specifies which sampled locations are admissible under
+the current scene estimate.
+To incorporate scene geometry, the semantic BEV mask
+Msem retains drivable regions and suppresses occupied space.
+A reachable mask Mreach is obtained by propagating a simpli-
+fied bicycle model under admissible acceleration and steering
+
+
+PREPRINT
+4
+Scene Encoder
+BEV Head
+Trajectory
+One-step diffusion
+Scorer
+High-quality 
+Trajectory
+Behavioral warping 
+Risk Context
+Attention map 
+Supervision
+Learnable Mode
+Embeddings
+Better Candidates
+Mode Risk
+Anchor
+Initialization
+Dynamic feasible 
+Refine
+Bounded residual
+Front-view
+images
+LiDAR
+Ego status
+Backbone
+Backbone
+Linear
+Fusion
+BEV
+feature
+Status
+encoding
+Mode Scores
+Mode Scores
+Proposals
+Fig. 2.
+Overall framework of the proposed method. FIRE-Drive intervenes in diffusion planning through feasibility-informed anchor initialization, mode-
+conditioned risk evaluation, and compact candidate-guided refinement.
+Learnable Mode
+Embeddings
+Semantic 
+Mask
+Feasible Mask
+Feasible Anchors
+Gaussian 
+Sampling
+LN
+LN
+MLP
+MLP
+Dynamic 
+Mask
+MLP
+MLP
+MLP
+MLP
+μ
+σ
+μ
+σ
+Ego Token
+Status 
+Encoding
+Ego Token
+Status 
+Encoding
+Fig. 3.
+Illustration of dynamic feasible anchor initialization. Semantic
+drivability and ego-motion reachability jointly define the admissible region
+for anchor initialization.
+sequences and projecting reachable positions onto BEV. Their
+intersection defines the admissible region:
+Mfea = Msem ⊙Mreach.
+(3)
+The two masks provide complementary information. Se-
+mantic drivability alone can retain road regions that are diffi-
+cult to reach from the current vehicle state. Reachability alone
+can include locations occupied by another agent or outside the
+road. Their intersection incorporates both restrictions into the
+initialization, allowing the decoder to begin from hypotheses
+informed by scene layout as well as ego motion. The mask is
+reconstructed from the current observation at each planning
+cycle. Samples are then projected into this region over a
+configurable constraint horizon Tc:
+A(t)
+k
+=
+(
+ΠMfea( ˆA(t)
+k ),
+t ≤Tc,
+ˆA(t)
+k ,
+t > Tc.
+(4)
+Here ΠMfea maps inadmissible samples to the estimated feasi-
+ble region. This constrains initialization; subsequent decoding
+and selection determine final-trajectory feasibility.
+The anchors enter the decoder directly, without an ad-
+ditional forward-noising step. The decoder attends to BEV
+and surrounding-agent features and performs a single residual
+denoising update. An anchor loss Lanc minimizes the mean
+negative log-likelihood of matched target anchors under the
+predicted Gaussian priors.
+C. Mode Risk Context
+Geometrically similar trajectories may pass through dif-
+ferent obstacle or boundary regions. The mode risk context
+module in Fig. 4 makes this local evidence available before
+trajectory scoring.
+We construct a semantic BEV risk prior at position P:
+R(P) = λoff
+ 1 −pdrv(P)
+
++ λobspobs(P),
+(5)
+where pdrv is the maximum of road and centerline prob-
+abilities, and pobs aggregates obstacle occupancy, including
+pedestrians. Spatial-maximum normalization with a numerical
+stabilizer gives ˜R. Target BEV labels supply the prior during
+training, while predicted semantics supply it at inference.
+The risk prior is shared across candidate modes and de-
+scribes spatial hazards in the scene. It is not itself a trajectory
+score: the same obstacle may be relevant to one candidate
+and distant from another. Candidate conditioning is introduced
+through the trajectory query, which carries sampled features
+along the evaluated path together with the mode representation
+and ego state. This separates the scene-level location of
+potential hazards from their relevance to a particular trajectory.
+For each decoded trajectory Yk, we fuse sampled BEV
+features, its mode token, and ego encoding into a query qk.
+
+
+PREPRINT
+5
+Mode Tokens
+Embed
+Grid
+Sample
+Mode Bev Feature
+1*1 Conv
+Flatten
+LN
+Concat
+Cross
+Attention
+LN
+LN
+MLP
+MLP
+Q
+K, V
+Mode Risk
+Context
+R
+Risk Prior
+c
+Proposals
+Feature Map
+Ego Token
+Fig. 4. Illustration of the mode risk context module. Candidate-specific trajectory queries extract local BEV risk evidence, which is fused into the scoring
+branch to distinguish geometrically similar modes.
+Let bj ∈Rd be the projected BEV token at spatial position j.
+Risk-biased attention aggregates the candidate context as
+ak,j = softmaxj
+ 
+q⊤
+k bj/
+√
+d + β ˜Rj
+τattn
+!
+,
+ck =
+X
+j
+ak,jbj,
+(6)
+where β controls risk bias and τattn is the attention tempera-
+ture. The implementation centers the risk map spatially before
+adding it; this constant shift leaves the softmax unchanged.
+A learned pre-fusion module combines ck with the trajectory
+token before the multi-component PDM scorer decodes its
+scores.
+The content term in attention measures compatibility be-
+tween the candidate query and a BEV location, while the risk
+term increases the salience of potentially hazardous regions.
+Their combination enables the context to represent nearby con-
+flicts even when two candidates have similar overall shapes.
+Because the context is fused before score decoding, the scorer
+can learn how this evidence relates to each predicted quality
+component rather than receiving only a fixed penalty after
+prediction. The score remains a learned assessment of the
+complete candidate.
+The auxiliary loss Lattn aligns attention with online colli-
+sion and off-road evidence. Event locations are projected onto
+BEV and represented by Gaussian targets, with exponentially
+decaying temporal weights bounded below by a minimum
+weight. After normalization, the targets supervise predicted
+attention through target-to-prediction KL divergence. Gaussian
+width, decay, minimum weight, and loss strength are hyperpa-
+rameters. This supplies localized risk supervision in addition
+to trajectory-score targets.
+Scalar quality labels indicate whether a candidate is desir-
+able, but do not identify which spatial region accounts for a
+collision or boundary violation. The event-based attention tar-
+gets provide this localization. Gaussian spreading gives nearby
+BEV cells a graded training signal, and temporal weighting
+emphasizes earlier events while retaining a contribution from
+later ones. Risk bias and attention supervision therefore serve
+different roles: one guides feature aggregation, while the other
+trains that aggregation using observed infractions.
+D. High-Quality Candidate Supervision and Refinement
+Reference construction. Left-overtake, right-overtake, and
+acceleration warping operators construct auxiliary trajectories
+from the logged future. Up to five references and their
+evaluator scores are cached per scene. With C denoting the
+non-padding pool and G the geometry-validity indicator, the
+effective set is
+C+ = {Cm ∈C : G(Cm) = 1, Q(Cm) > Q(Y gt)}.
+(7)
+Geometry checks limit the absolute wrapped heading change
+between adjacent waypoints to 1.5 rad and allow at most
+one sign reversal in lateral increments; the separate heading-
+reversal count filter is disabled. On NAVSIM, Q is the cached
+PDM evaluator score, distinct from the learned scorer S.
+References and scores are prepared offline and reused during
+training; neither is needed at inference.
+The score comparison is scene-specific: each reference is
+compared with the logged trajectory under the same cached
+evaluator. Consequently, the number of effective references
+varies across scenes even though the cache has a fixed
+maximum capacity. A scene with no qualifying reference
+still provides the ordinary GT supervision. The additional
+targets extend supervision only where the cached pool offers
+an eligible alternative, rather than forcing every scene to
+contribute the same number of secondary targets.
+Candidate matching. Excluding the GT-assigned mode,
+we sort candidate–mode pairs by mean waypoint distance in
+the xy plane and greedily accept pairs whose candidate and
+mode have not been used. The loss Lcand averages distances
+over accepted pairs. Empty sets skip this auxiliary loss while
+retaining the primary training objectives. Candidate matching
+remains active without refinement and then supervises decoder
+outputs directly.
+Bounded refinement. A lightweight refiner uses the mode
+token and ego encoding to predict residual corrections, clipped
+componentwise to ±1.0 m in x and y and ±0.1 rad in heading
+
+
+PREPRINT
+6
+TABLE I
+EVALUATION ON NAVSIM V1 WITH OFFICIAL NAVSIM METRICS. THE GRAY HUMAN-REFERENCE ROW IS RETAINED FOR CONTEXT. WITHIN EACH
+SEPARATED BLOCK, THE BEST AND SECOND-BEST RESULTS ARE BOLDED AND UNDERLINED, RESPECTIVELY.
+Method
+Backbone
+NC↑
+DAC↑
+EP↑
+TTC↑
+C↑
+PDMS↑
+Transfuser [17] (2022)
+ResNet34
+97.7
+92.8
+79.2
+92.8
+100
+84.0
+UniAD [1] (2023)
+ResNet34
+97.8
+91.9
+78.8
+92.9
+100
+83.4
+Hydra-MDP [4] (2024)
+ResNet34
+98.3
+96.0
+78.7
+94.6
+100
+86.5
+Hydra-MDP++ [5] (2025)
+ResNet34
+97.6
+96.0
+80.4
+93.1
+100
+86.6
+GoalFlow [33] (2025)
+ResNet34
+98.3
+93.8
+79.8
+94.3
+100
+85.7
+DiffusionDrive [6] (2025)
+ResNet34
+98.2
+96.2
+82.2
+94.7
+100
+88.1
+DiffusionDriveV2 [39] (2025)
+ResNet34
+98.3
+97.9
+87.5
+94.8
+99.9
+91.2
+DIVER [38] (2025)
+ResNet34
+98.5
+96.5
+82.6
+94.9
+100
+88.3
+ResAD [8] (2026)
+ResNet34
+98.0
+97.5
+83.3
+94.1
+100
+88.8
+DriveSuprim [44] (2026)
+ResNet34
+97.8
+97.3
+86.7
+93.6
+100
+89.9
+FIRE-Drive (Ours)
+ResNet34
+98.9
+97.5
+87.6
+95.8
+100
+91.5
+Hydra-MDP [4] (2024)
+V2-99
+98.4
+97.8
+86.5
+93.9
+100
+90.3
+Hydra-MDP [4] (2024)
+ViT-L
+98.4
+97.7
+85.0
+94.5
+100
+89.9
+ResAD [8] (2026)
+V2-99
+98.9
+97.8
+87.0
+94.9
+100
+90.6
+Hydra-MDP++ [5] (2025)
+V2-99
+98.6
+98.6
+85.7
+95.1
+100
+91.0
+VADv2 [19] (2026)
+BEVFormer
+98.3
+97.4
+82.3
+95.7
+100
+89.3
+Human Agent
+—
+100
+100
+87.5
+100
+99.9
+94.8
+DiffusionDrive Anchors
+Ground Truth
+Dynamic Anchors
+Feasibility Projection
+Fig. 5.
+Qualitative comparison of anchor initialization in four driving scenes. Each group shows DiffusionDrive anchors (gray), dynamic anchors before
+projection (purple), and dynamic anchors after projection (purple), from left to right. Green denotes the ground-truth trajectory, and yellow arrows indicate
+feasibility projection. The comparison illustrates local changes in the constrained anchor prefix rather than a full-horizon feasibility guarantee.
+per refinement step. Its loss Lref combines the minimum
+distance from a refined mode to GT with the mean nearest-
+reference distance for the remaining modes. Multiple modes
+may share a nearest reference. Samples without effective
+candidates contribute zero to the reference term, and the
+loss weights are normalized over the terms available in the
+minibatch.
+E. Training Objective
+The primary perception and planning loss Lbase is aug-
+mented by the anchor, attention, candidate-matching, and
+refinement losses:
+Ltotal = Lbase + λancLanc + λattnLattn
++ ηcandLcand + λrefLref.
+(8)
+The coefficients balance the supervised objectives. Candidate
+matching is applied at supervised decoder outputs, using the
+refined final output when refinement is enabled.
+We use a candidate-matching weight of 1.0 and a refinement
+auxiliary weight of 0.1 within the decoder loss. The GT and
+auxiliary-reference terms in refinement have equal relative
+weights of 1.0, normalized over the available terms. The
+attention KL loss is weighted by 0.1 when added to the overall
+objective. These are module-level weights; the decoder terms
+also inherit the base decoder-loss scaling.
+IV. EXPERIMENTS
+A. Experimental Setup
+1. NAVSIM. [54] We use NAVSIM v1 as the main bench-
+mark, evaluating quantitative comparisons and ablations on
+
+
+PREPRINT
+7
+its navtest split. Following the official non-reactive simula-
+tion protocol, we report Non-at-fault collision (NC), drivable
+area compliance (DAC), ego progress (EP), time-to-collision
+(TTC), comfort (C), and their weighted aggregation, namely
+the Predictive Driver Model Score (PDMS), defined as
+PDMS = NC · DAC · 5 TTC + 2 C + 5 EP
+12
+.
+(9)
+The equation uses per-scene component scores on a 0–
+1 scale; tables report dataset averages on a 0–100 scale.
+Detailed definitions of the individual metrics are provided in
+the NAVSIM benchmark paper [54].
+2. Bench2Drive. [55] We evaluate closed-loop driving in
+CARLA 0.9.15 on 220 Bench2Drive routes. Driving Score
+(DS) averages the per-route product of route completion
+and an infraction penalty factor. Success Rate (SR) is the
+percentage of evaluated routes completed successfully without
+disqualifying infractions under the benchmark criteria.
+3. Implementation details. Unless otherwise specified, all
+experiments follow the main model configuration. To bet-
+ter isolate planning performance, we use a ResNet34 back-
+bone [56] instead of a larger perception backbone. The input
+format follows DiffusionDrive [6]; the planner predicts 64 ego
+future modes, uses a 2-layer diffusion decoder, and applies one
+refinement step. The anchor constraint horizon is set to Tc = 3
+steps. Training is performed with AdamW using a learning rate
+of 2 × 10−4, a batch size of 64, and mixed precision on an
+NVIDIA RTX 5090 GPU. The main model is evaluated using
+the checkpoint from epoch 40.
+TABLE II
+REPORTED BENCH2DRIVE CLOSED-LOOP RESULTS. DS IS DRIVING
+SCORE AND SR IS SUCCESS RATE. BEST AND SECOND-BEST ENTRIES ARE
+BOLDED AND UNDERLINED. OTHER METHODS ARE LITERATURE RESULTS;
+FIRE-DRIVE IS EVALUATED ON 220 ROUTES.
+Method
+Year
+DS ↑
+SR (%) ↑
+UniAD-Base [1]
+2023
+45.81
+16.36
+VAD [2]
+2023
+42.35
+15.00
+DriveAdapter [57]
+2023
+64.22
+33.08
+MomAD (SD) [58]
+2025
+47.91
+18.11
+WoTE [59]
+2025
+61.71
+31.36
+DriveTransformer-L [24]
+2025
+63.46
+35.01
+DIVER [38]
+2025
+68.90
+36.75
+SafeDrive [60]
+2026
+66.77
+42.40
+Diffusion-Phy [35]
+2026
+67.49
+36.51
+SoAD [46]
+2026
+70.47
+41.36
+FIRE-Drive (Ours)
+2026
+71.43
+42.73
+SD denotes the SparseDrive-based MomAD variant. DIVER uses its highest-DS
+configuration in the cited paper (arXiv v3, Table I). SoAD includes safety creeping.
+Training data, sensor and navigation inputs, and auxiliary supervision differ across
+methods; these are system-level literature comparisons, not matched retrainings.
+B. Quantitative Results
+NAVSIM. Table I compares planning performance un-
+der the reported model configurations. Among the listed
+diffusion-based planners with a ResNet34 backbone, FIRE-
+Drive achieves the highest PDMS. Relative to DiffusionDrive
+and DIVER, its results combine stronger progress with higher
+NC and TTC scores. It also obtains a modest aggregate
+improvement over DiffusionDriveV2, with particularly strong
+NC and TTC. The within-framework ablations below examine
+how initialization, supervision, and scoring contribute to these
+results.
+Bench2Drive. Table II extends the comparison to reac-
+tive closed-loop driving. FIRE-Drive achieves higher DS and
+SR than the listed diffusion-based methods, Diffusion-Phy
+and DIVER, indicating competitive route-level performance
+alongside its NAVSIM results. It also exceeds SoAD in both
+metrics and achieves higher DS with slightly higher SR
+than SafeDrive. These literature comparisons reflect complete
+systems under their reported training and evaluation configu-
+rations.
+C. Ablation Studies
+TABLE III
+PROGRESSIVE COMPONENT ABLATION ON NAVSIM V1. HIGHER IS
+BETTER; BEST RESULTS ARE BOLDED.
+Variant
+NC
+DAC
+EP
+TTC PDMS
+DiffusionDrive†
+98.2 96.2 82.2 94.7
+88.1
+Feasible anchors
+98.3 96.6 84.6 94.8
+89.0
++ Candidate supervision
+97.7 97.6 87.5 93.0
+90.3
++ Risk-aware scoring
+98.4 97.6 88.4 94.6
+91.3
++ Refinement (Full)
+98.9 97.5 87.6 95.8
+91.5
+† Literature reference. Below the divider, modules are added progressively within our
+framework. Comfort is 100 throughout and is omitted.
+TABLE IV
+DETAILED ABLATION OF KEY DESIGNS ON NAVSIM V1. EACH VARIANT
+IS OBTAINED BY DISABLING ONE DESIGN FROM THE FULL MODEL. BEST
+RESULTS ARE BOLDED.
+Variant
+NC
+DAC
+EP
+TTC
+C
+PDMS
+Full Model
+98.9
+97.5
+87.6
+95.8
+100
+91.5
+w/o Anchor Constraint
+98.8
+97.0
+87.5
+95.5
+100
+91.1
+w/o Mode Risk Context
+98.5
+97.4
+87.6
+94.2
+99.8
+90.7
+We conduct all ablations on NAVSIM v1, since it is the
+primary benchmark of this work. Table III enables feasible
+anchor initialization, candidate supervision, risk-aware scor-
+ing, and refinement progressively, while Table IV evaluates
+the removal of each of two key designs from the full model.
+Feasible anchor. The anchor-enabled variant obtains 89.0
+PDMS. The DiffusionDrive score of 88.1 is included as a
+literature reference. The within-framework removal experi-
+ment in Table IV evaluates the contribution of the anchor
+constraint. Figure 5 complements this ablation by comparing
+DiffusionDrive initialization with dynamic anchors before and
+after feasibility projection. Across the illustrated scenes, the
+dynamic priors adapt to the local road layout, while projection
+adjusts the constrained prefix toward the admissible region.
+These initialization examples are distinct from the final de-
+coded planning trajectories.
+Candidate supervision. Compact high-quality candidate
+supervision further improves PDMS by 1.3 points, especially
+in EP and DAC. The supervision mask retains auxiliary
+references that outperform the ground-truth trajectory under
+
+
+PREPRINT
+8
+51.02% 
+8.53% 
+24.98% 
+4.67% 
+2.22% 
+8.58% 
+0
+10
+20
+30
+40
+50
+60
+0
+1
+2
+3
+4
+5
+Percentage of scenes (%)
+Number of effective candidates
+0
+5
+10
+15
+20
+25
+30
+-19 -15 -11 -7
+-3
+1
+5
+9
+13 17 21
+Percentage of scenes (%)
+ΔPDMS
+Tied (ΔPDMS=0)
+0
+10
+20
+30
+40
+50
+60
+70
+80
+90
+[0, 10)
+[20, 30) [40, 50) [60, 70) [80, 90)
+Percentage (%)
+PDMS
+Ground truth
+Cached candidates
+0
+100
+10
+90
+80
+70
+60
+50
+40
+30
+20
+Best candidate
+GT (80.2)
+Best candidate
+GT (99.0)
+Best candidate
+GT (80.1)
+Best candidate
+GT (89.7)
+(c) Distribution of Effective Candidate 
+(b) Distribution of ΔPDMS Between 
+Best Candidates and GT
+(a) PDMS Distributions of GT and 
+Cached Candidates
+(d) Visualization of the Best Candidate
+Fig. 6.
+Statistics and visualization of the auxiliary candidate pool. (a) PDMS distributions of ground-truth trajectories and cached candidates, normalized
+separately by their respective counts. (b) The central range of the per-scene PDMS difference between the best cached candidate and the ground truth; negative
+tails outside the displayed range are omitted, and ties are shown separately at zero. Percentages use the same training-scene denominator. ∆PDMS =
+PDMSbest candidate −PDMSGT. (c) The number of effective supervision candidates per scene after validity, geometry, and greater-than-GT filtering.
+Panels (b) and (c) summarize 103,288 training scenes. (d) Representative cached candidates and ground-truth trajectories.
+the cached evaluator score, providing additional progress-
+oriented training targets. NC and TTC decrease in this variant,
+indicating that the progress improvement is accompanied by
+lower safety-related scores before risk-aware scoring is added.
+This trade-off clarifies the role of auxiliary supervision: an
+evaluator-filtered reference set supplies useful alternatives, but
+does not ensure that the learned decoder reproduces their
+geometry exactly or that the selector chooses the best resulting
+mode. Moreover, filtering by an aggregate score does not
+require improvement in every component metric. The observed
+pattern therefore motivates coupling broader supervision with
+candidate-specific risk evaluation.
+Risk-aware scoring. Adding risk-aware scoring is associ-
+ated with a PDMS increase from 90.3 to 91.3 in Table III.
+NC and TTC recover while EP also increases, suggesting that
+the added risk evidence helps balance progress and safety
+within the expanded candidate set. Because the generator
+and scorer are jointly trained here, this experiment measures
+their combined response to the added branch. The fixed-input
+comparison below examines selection more directly.
+Trajectory refinement. Refinement provides a modest ag-
+gregate improvement, with stronger NC and TTC and slightly
+lower EP. This pattern is consistent with its role as a local
+correction of the decoded trajectories.
+The detailed ablation in Table IV shows that removing the
+anchor constraint reduces PDMS from 91.5 to 91.1. Here, “w/o
+Anchor Constraint” removes the feasible-region restriction on
+initialization. The full model achieves modest improvements,
+most notably in DAC and TTC, while EP changes little and
+comfort remains unchanged. This pattern supports the use of
+scene-admissible initialization to improve safety-related per-
+formance without reducing progress. The experiment evaluates
+the semantic–reachability restriction jointly, with the other
+components present; it does not isolate the two masks or
+establish an additive gain over the literature baseline.
+Removing mode risk context lowers both PDMS and TTC,
+supporting the use of candidate-conditioned risk evidence in
+the jointly trained system.
+D. Controlled Ablation of the Trajectory Scorer
+To examine selection under matched inputs, we retrain three
+scorer variants with the same input features and candidate
+trajectories and evaluate them on NAVSIM navtest. The full
+scorer includes mode risk context, semantic risk bias, and risk
+supervision. The first ablation removes both the risk bias and
+risk supervision, while the second removes mode risk context.
+These experiments compare scorer variants under fixed feature
+and trajectory conditions, separately from the jointly trained
+system ablations above.
+TABLE V
+SCORER ABLATION ON NAVSIM NAVTEST WITH MATCHED INPUT
+FEATURES AND CANDIDATE TRAJECTORIES. SCORERS ARE RETRAINED
+FOR THIS EXPERIMENT. HIGHER IS BETTER FOR ALL METRICS; BEST
+RESULTS ARE BOLDED.
+Scorer
+NC
+DAC
+EP
+TTC PDMS
+Full scorer
+98.4
+97.5
+88.1
+94.1
+91.0
+w/o Bias and Risk Supervision
+98.0
+97.1
+87.9
+93.8
+90.4
+w/o Risk Context
+98.2
+97.0
+87.6
+94.0
+90.3
+As shown in Table V, the full scorer improves PDMS by 0.6
+points over the variant without risk bias and risk supervision,
+and by 0.7 points over the baseline scorer [42] without risk
+context. It also leads across the other reported metrics. With
+
+
+PREPRINT
+9
+Ego Vehicle
+Ground Truth
+Planning
+Other Vehicle
+Risk Area
+(a) Congested Scenarios
+(b) Turning Scenarios
+(c) Intersection Scenarios
+(d) Common Scenarios
+Fig. 7.
+Visualization of risk-aware attention and planned trajectories in twelve examples grouped as (a) Congested Scenarios, (b) Turning Scenarios, (c)
+Intersection Scenarios, and (d) Common Scenarios. Colored overlays highlight spatial risk evidence around the evaluated trajectories. Purple and blue lines
+denote the ground-truth and planned trajectories, respectively.
+identical candidate trajectories, this comparison isolates the
+effect of the tested scorer designs on selection and supports the
+use of explicit risk evidence. The bias-and-supervision ablation
+evaluates the two components jointly.
+The gains across NC, DAC, EP, and TTC suggest that
+the tested risk-aware scorer improves safety-related scores
+while also selecting trajectories with slightly greater evaluated
+progress. This controlled experiment complements the joint-
+training ablation by holding candidate quality fixed; absolute
+scores should be compared within each experiment’s training
+conditions.
+E. Candidate Statistics and Qualitative Analysis
+Figure 6 summarizes the auxiliary reference pool and illus-
+trates representative candidate trajectories. Cached candidates
+span a range of evaluator scores. During training, the geometry
+and greater-than-GT masks select the subset used for auxiliary
+supervision, and scenes with no eligible reference contribute
+no candidate-supervision loss. The displayed best-candidate
+statistics describe the reference pool before this training-time
+selection. Among the 103,288 training scenes, 48.98% contain
+at least one effective supervision candidate; the remaining
+51.02% skip candidate supervision.
+The variable effective-set size reflects quality-based admis-
+sion. Strict greater-than-GT filtering excludes ties and cannot
+admit references when GT already reaches the evaluator
+ceiling. Other scenes may lack a reference satisfying both ge-
+ometry and score criteria. Retaining ordinary GT supervision
+in these cases avoids forcing arbitrary alternatives into training.
+Thus, the raw score distributions characterize the constructed
+pool, whereas the post-filter counts quantify its actual contribu-
+tion to supervision. These statistics support selective auxiliary
+supervision: the cached pool does not provide a qualifying
+alternative for every scene. They do not establish that better
+trajectories are absent outside this pool, but motivate reusing
+validated references where available.
+Figure 7 presents three examples in each of four illustra-
+tive groups: Congested Scenarios (a), Turning Scenarios (b),
+Intersection Scenarios (c), and Common Scenarios (d). These
+groups illustrate dense surrounding traffic, changes in road
+direction, junction interactions, and routine driving contexts,
+respectively. The risk overlays illustrate spatial evidence near
+surrounding vehicles and road boundaries along the evalu-
+ated trajectories, showing how candidate-conditioned context
+varies with the scene. The highlighted risk responses form
+spatial regions around the evaluated trajectories rather than
+being confined to a single object, reflecting the surrounding
+traffic and road-boundary context. These qualitative examples
+complement the matched-input scorer ablation.
+Figure 8 compares the three planners on five matched
+scenes, ordered from top to bottom. In the first scene, FIRE-
+Drive selects a visibly different lateral alternative and obtains
+both higher PDMS and greater route progress (RP) than the
+two baselines. This illustrates the value of selecting a useful
+alternative rather than merely following the logged trajectory’s
+projected shape. In the fifth scene, FIRE-Drive again achieves
+the highest PDMS and RP, showing a joint improvement in
+evaluated driving quality and progress.
+The middle scenes reveal more nuanced behavior. In the
+fourth scene, all methods reach a PDMS of 100, but FIRE-
+Drive achieves route progress of 30.81 m, compared with
+29.37 m for DiffusionDriveV2 and 24.48 m for DiffusionDrive.
+Its enlarged trajectory segment also follows the logged trajec-
+tory’s local direction more closely. RP therefore exposes dif-
+ferences that the saturated aggregate score cannot distinguish.
+In the second scene, FIRE-Drive matches DiffusionDriveV2’s
+maximum PDMS while showing a smoother projected trajec-
+tory through the turn. In the third, where a vehicle occupies
+the lane immediately ahead, it retains maximum PDMS with
+slightly shorter route progress, consistent with more cautious
+advancement behind the leading vehicle. Together, these exam-
+ples show that its gains are scene-dependent rather than arising
+
+
+PREPRINT
+10
+Planned Trajectory
+DiffusionDrive
+FIRE-Drive (Ours)
+DiffusionDriveV2
+Zoom-in View
+PDMS: 52.5
+RP: 18.05 m 
+PDMS: 99.7
+RP: 18.59 m 
+PDMS: 100.0
+RP: 9.86 m 
+PDMS: 100
+RP: 24.48 m 
+PDMS: 89.2
+RP: 28.75 m 
+PDMS: 91.5
+RP: 30.93 m 
+PDMS: 100.0
+RP: 29.37 m 
+PDMS: 86.52
+RP: 14.18 m 
+PDMS: 100.0
+RP: 18.83 m 
+PDMS: 100.0
+RP: 9.77 m 
+PDMS: 92.4
+RP: 31.81 m 
+PDMS: 100.0
+RP: 22.40 m 
+PDMS: 100.0
+RP: 18.80 m 
+PDMS: 100.0
+RP: 9.36 m 
+PDMS: 100.0
+RP: 30.81 m 
+Ground Truth
+Planning Metrics
+Fig. 8. Qualitative comparison of DiffusionDrive, DiffusionDriveV2, and FIRE-Drive on matched scenes. Red and blue lines denote the logged ground-truth
+trajectory and the planned trajectory, respectively. Yellow boxes mark regions shown in enlarged insets. Gray boxes report PDMS and route progress (RP, in
+meters).
+from uniformly extending trajectories. They complement the
+quantitative ablations by illustrating both alternative-maneuver
+selection and local trajectory alignment; RP is interpreted
+jointly with PDMS and scene geometry.
+
+
+PREPRINT
+11
+V. CONCLUSIONS
+This paper presented FIRE-Drive, a diffusion-based E2E
+planner that improves multimodal planning through feasibility-
+informed trajectory priors, risk-aware mode evaluation, and
+compact candidate-guided supervision. The proposed method
+constrains the initial trajectory prior with short-horizon se-
+mantic and reachability information, injects mode-conditioned
+BEV risk evidence into the scoring branch, and uses high-
+quality auxiliary candidates with lightweight refinement to
+strengthen supervision for secondary modes. Experiments on
+NAVSIM v1 and Bench2Drive show competitive planning per-
+formance in non-reactive and reactive evaluation settings. The
+matched-input scorer ablation further supports the contribution
+of explicit risk evidence to trajectory selection. The short-
+horizon initialization constraints leave full-horizon feasibility
+dependent on subsequent decoding and selection. The current
+single-frame input also limits temporal modeling, while the
+auxiliary reference pool covers only a subset of possible
+behaviors, particularly in highly interactive cases such as being
+overtaken or emergency avoidance. Future work will focus
+on temporal modeling and adaptive reference construction for
+interactive driving.
+REFERENCES
+[1] Y. Hu, J. Yang, L. Chen, K. Li, C. Sima, X. Zhu, S. Chai, S. Du, T. Lin,
+W. Wang, L. Lu, X. Jia, Q. Liu, J. Dai, Y. Qiao, and H. Li, “Planning-
+oriented autonomous driving,” in Proc. IEEE/CVF Conf. Comput. Vis.
+Pattern Recognit. (CVPR), 2023, pp. 17 853–17 862.
+[2] B. Jiang, S. Chen, Q. Xu, B. Liao, J. Chen, H. Zhou, Q. Zhang, W. Liu,
+C. Huang, and X. Wang, “VAD: Vectorized scene representation for
+efficient autonomous driving,” in Proc. IEEE/CVF Int. Conf. Comput.
+Vis. (ICCV), 2023, pp. 8340–8350.
+[3] N. Nayakanti, R. Al-Rfou, A. Zhou, K. Goel, K. S. Refaat, and B. Sapp,
+“Wayformer: Motion forecasting via simple and efficient attention
+networks,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), 2023.
+[4] Z. Li, K. Li, S. Wang, S. Lan, Z. Yu, Y. Ji, Z. Li, Z. Zhu, J. Kautz,
+Z. Wu, Y. Jiang, and J. M. Alvarez, “Hydra-MDP: End-to-end mul-
+timodal planning with multi-target hydra-distillation,” arXiv preprint
+arXiv:2406.06978, 2024.
+[5] K. Li, Z. Li, S. Lan, Y. Xie, Z. Zhang, J. Liu, Z. Wu, Z. Yu, and J. M.
+Alvarez, “Hydra-MDP++: Advancing end-to-end driving via expert-
+guided hydra-distillation,” arXiv preprint arXiv:2503.12820, 2025.
+[6] B. Liao, S. Chen, H. Yin, B. Jiang, C. Wang, S. Yan, X. Zhang, X. Li,
+Y. Zhang, Q. Zhang, and X. Wang, “DiffusionDrive: Truncated diffusion
+model for end-to-end autonomous driving,” in Proc. IEEE/CVF Conf.
+Comput. Vis. Pattern Recognit. (CVPR), 2025, pp. 12 037–12 047.
+[7] S. Liu, W. Chen, W. Li, Z. Wang, L. Yang, J. Huang, Y. Zhang,
+Z. Huang, Z. Cheng, and H. Yang, “BridgeDrive: Diffusion bridge policy
+for closed-loop trajectory planning in autonomous driving,” in Proc. Int.
+Conf. Learn. Represent. (ICLR), 2026.
+[8] Z. Zheng, S. Chen, H. Yin, X. Zhang, J. Zou, X. Wang, Q. Zhang, and
+L. Zhang, “ResAD: Normalized residual trajectory modeling for end-to-
+end autonomous driving,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit., 2026, pp. 3729–3739.
+[9] C. Xu, Y. Cui, J. Liu, Y. Guo, C. Qin, G. Zhang, X. Dong,
+S. Fang, P. Hang, and J. Sun, “A survey on end-to-end autonomous
+driving training from the perspectives of data, strategy, and plat-
+form,” IEEE Trans. Intell. Transp. Syst., 2026, early access, doi:
+10.1109/TITS.2026.3695999.
+[10] M. Bojarski, D. D. Testa, D. Dworakowski, B. Firner, B. Flepp, P. Goyal,
+L. D. Jackel, M. Monfort, U. Muller, J. Zhang, X. Zhang, J. Zhao, and
+K. Zieba, “End to end learning for self-driving cars,” arXiv preprint
+arXiv:1604.07316, 2016.
+[11] F. Codevilla, M. Muller, A. Lopez, V. Koltun, and A. Dosovitskiy, “End-
+to-end driving via conditional imitation learning,” in Proc. IEEE Int.
+Conf. Robot. Autom. (ICRA), 2018, pp. 4693–4700.
+[12] L. Le Mero, D. Yi, M. Dianati, and A. Mouzakitis, “A survey on
+imitation learning techniques for end-to-end autonomous vehicles,”
+IEEE Trans. Intell. Transp. Syst., vol. 23, no. 9, pp. 14 128–14 147,
+2022.
+[13] L. Chen, P. Wu, K. Chitta, B. Jaeger, A. Geiger, and H. Li, “End-to-
+end autonomous driving: Challenges and frontiers,” IEEE Trans. Pattern
+Anal. Mach. Intell., vol. 46, no. 12, pp. 10 164–10 183, 2024.
+[14] A. Dosovitskiy, G. Ros, F. Codevilla, A. Lopez, and V. Koltun,
+“CARLA: An open urban driving simulator,” in Proc. Conf. Robot
+Learn. (CoRL), 2017, pp. 1–16.
+[15] P. Wu, X. Jia, L. Chen, J. Yan, H. Li, and Y. Qiao, “Trajectory-guided
+control prediction for end-to-end autonomous driving: A simple yet
+strong baseline,” in Adv. Neural Inf. Process. Syst., vol. 35, 2022, pp.
+6119–6132.
+[16] X. Jia, P. Wu, L. Chen, J. Xie, C. He, J. Yan, and H. Li, “Think twice
+before driving: Towards scalable decoders for end-to-end autonomous
+driving,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.
+(CVPR), 2023, pp. 21 983–21 994.
+[17] K. Chitta, A. Prakash, B. Jaeger, Z. Yu, K. Renz, and A. Geiger, “Trans-
+Fuser: Imitation with transformer-based sensor fusion for autonomous
+driving,” IEEE Trans. Pattern Anal. Mach. Intell., vol. 45, no. 11, pp.
+12 878–12 895, 2022.
+[18] H. Shao, L. Wang, R. Chen, S. L. Waslander, H. Li, and Y. Liu,
+“ReasonNet: End-to-end driving with temporal and global reasoning,”
+in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit., 2023, pp.
+13 723–13 733.
+[19] B. Jiang, S. Chen, H. Gao, B. Liao, Q. Zhang, W. Liu, and X. Wang,
+“VADv2: End-to-end vectorized autonomous driving via probabilistic
+planning,” in Int. Conf. Learn. Represent., 2026.
+[20] W. Sun, X. Lin, Y. Shi, C. Zhang, H. Wu, and S. Zheng, “SparseDrive:
+End-to-end autonomous driving via sparse scene representation,” in
+Proc. IEEE Int. Conf. Robot. Autom., 2025, pp. 8795–8801.
+[21] Z. Huang, H. Liu, J. Wu, and C. Lv, “Differentiable integrated motion
+prediction and planning with learnable cost function for autonomous
+driving,” IEEE Trans. Neural Netw. Learn. Syst., vol. 35, no. 11, pp.
+15 222–15 236, 2024.
+[22] H. Liu, Z. Huang, W. Huang, H. Yang, X. Mo, and C. Lv, “Hybrid-
+prediction integrated planning for autonomous driving,” IEEE Trans.
+Pattern Anal. Mach. Intell., 2025.
+[23] Z. Huang, H. Liu, and C. Lv, “GameFormer: Game-theoretic modeling
+and learning of transformer-based interactive prediction and planning
+for autonomous driving,” in Proc. IEEE/CVF Int. Conf. Comput. Vis.,
+2023, pp. 3903–3913.
+[24] X. Jia, J. You, Z. Zhang, and J. Yan, “DriveTransformer: Unified
+transformer for scalable end-to-end autonomous driving,” in Int. Conf.
+Learn. Represent. (ICLR), 2025.
+[25] D. Dauner, M. Hallgarten, A. Geiger, and K. Chitta, “Parting with
+misconceptions about learning-based vehicle motion planning,” in Proc.
+Conf. Robot Learn., 2023, pp. 1268–1281.
+[26] J. Cheng, Y. Chen, X. Mei, B. Yang, B. Li, and M. Liu, “Rethinking
+imitation-based planners for autonomous driving,” in Proc. IEEE Int.
+Conf. Robot. Autom., 2024, pp. 14 123–14 130.
+[27] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,”
+in Adv. Neural Inf. Process. Syst., vol. 33, 2020, pp. 6840–6851.
+[28] J. Song, C. Meng, and S. Ermon, “Denoising diffusion implicit models,”
+in Proc. Int. Conf. Learn. Represent., 2021.
+[29] M. Janner, Y. Du, J. Tenenbaum, and S. Levine, “Planning with diffusion
+for flexible behavior synthesis,” in Proc. Int. Conf. Mach. Learn., 2022,
+pp. 9902–9915.
+[30] C. Chi, S. Feng, Y. Du, Z. Xu, E. Cousineau, B. Burchfiel, and S. Song,
+“Diffusion policy: Visuomotor policy learning via action diffusion,” in
+Proc. Robot.: Sci. Syst., 2023.
+[31] C. M. Jiang, A. Cornman, C. Park, B. Sapp, Y. Zhou, and D. Anguelov,
+“MotionDiffuser: Controllable multi-agent motion prediction using dif-
+fusion,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.
+(CVPR), 2023, pp. 9644–9653.
+[32] Y. Zheng, R. Liang, K. Zheng, J. Zheng, L. Mao, J. Li, W. Gu, R. Ai,
+S. E. Li, X. Zhan, and J. Liu, “Diffusion-based planning for autonomous
+driving with flexible guidance,” in Proc. Int. Conf. Learn. Represent.,
+2025.
+[33] Z. Xing, X. Zhang, Y. Hu, B. Jiang, T. He, Q. Zhang, X. Long,
+and W. Yin, “GoalFlow: Goal-driven flow matching for multimodal
+trajectories generation in end-to-end autonomous driving,” in Proc.
+IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), 2025, pp.
+1602–1611.
+[34] C. Wang, H. Liao, Z. Li, and C. Xu, “WAKE: Towards robust and
+physically feasible trajectory prediction for autonomous vehicles with
+
+
+PREPRINT
+12
+wavelet and kinematics synergy,” IEEE Trans. Pattern Anal. Mach.
+Intell., vol. 47, no. 4, pp. 3126–3140, 2025.
+[35] J. Hu, Z. Wang, X. Wu, Y. Hu, Y. Wu, and H. Liu, “Kinematic priors
+guide generative trajectory planning for autonomous vehicles,” Pattern
+Recognit., 2026.
+[36] L. Liu, C. Jia, G. Yu, Z. Song, J. Li, F. Jia, P. Wu, X. Hao, and Y. Luo,
+“GuideFlow: Constraint-guided flow matching for planning in end-to-
+end autonomous driving,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit., 2026, pp. 3719–3728.
+[37] B. Yang, H. Su, N. Gkanatsios, T.-W. Ke, A. Jain, J. Schneider, and
+K. Fragkiadaki, “Diffusion-ES: Gradient-free planning with diffusion for
+autonomous and instruction-guided driving,” in Proc. IEEE/CVF Conf.
+Comput. Vis. Pattern Recognit., 2024, pp. 15 342–15 353.
+[38] Z. Song, L. Liu, H. Pan, B. Liao, M. Guo, L. Yang, Y. Zhang,
+S. Xu, C. Jia, and Y. Luo, “DIVER: Reinforced diffusion breaks
+imitation bottlenecks in end-to-end autonomous driving,” arXiv preprint
+arXiv:2507.04049, 2025.
+[39] J. Zou, S. Chen, B. Liao, Z. Zheng, Y. Song, L. Zhang, Q. Zhang, W. Liu,
+and X. Wang, “DiffusionDriveV2: Reinforcement learning-constrained
+truncated diffusion modeling in end-to-end autonomous driving,” arXiv
+preprint arXiv:2512.07745, 2025.
+[40] E. Kirby, A. Boulch, Y. Xu, Y. Yin, G. Puy, E. Zablocki, A. Bursuc,
+S. Gidaris, R. Marlet, F. Bartoccioni, A.-Q. Cao, N. Samet, T.-H. Vu,
+and M. Cord, “Driving on registers,” arXiv preprint arXiv:2601.05083,
+2026.
+[41] Z. Li, W. Yao, Z. Wang, X. Sun, J. Chen, N. Chang, M. Shen, Z. Wu,
+S. Lan, and J. M. Alvarez, “Generalized trajectory scoring for end-to-end
+multimodal planning,” arXiv preprint arXiv:2506.06664, 2025.
+[42] K.
+Guo,
+H.
+Liu,
+X.
+Wu,
+J.
+Pan,
+and
+C.
+Lv,
+“iPad:
+Itera-
+tive proposal-centric end-to-end autonomous driving,” arXiv preprint
+arXiv:2505.15111, 2025.
+[43] W. Sun, X. Lin, K. Chen, Z. Pei, X. Li, Y. Shi, and S. Zheng,
+“SparseDriveV2: Scoring is all you need for end-to-end autonomous
+driving,” arXiv preprint arXiv:2603.29163, 2026.
+[44] W. Yao, Z. Li, S. Lan, Z. Wang, X. Sun, J. M. Alvarez, and Z. Wu,
+“DriveSuprim: Towards precise trajectory selection for end-to-end plan-
+ning,” Proc. AAAI Conf. Artif. Intell., vol. 40, no. 14, pp. 11 910–11 918,
+Mar. 2026.
+[45] Y. Wang, J. He, L. Fan, H. Li, Y. Chen, and Z. Zhang, “Driving into
+the future: Multiview visual forecasting and planning with world model
+for autonomous driving,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit. (CVPR), 2024, pp. 14 749–14 759.
+[46] Y. Gao, D. Liu, Y. Zheng, Q. Zhang, D.-W. Ding, and D. Zhao, “SoAD:
+Safety-oriented value estimation for enhanced closed-loop end-to-end
+autonomous driving,” IEEE Trans. Syst., Man, Cybern., Syst., vol. 56,
+no. 8, pp. 4942–4955, 2026.
+[47] Y. Tian, H. Pei, Y. Shi, Y. Zhang, D. Yao, L. Xiao, and B. Chen,
+“Driving risk field model and its application in trajectory planning: A
+new perspective,” IEEE Trans. Intell. Transp. Syst., vol. 26, no. 9, pp.
+13 522–13 537, 2025.
+[48] Z. Lin, J. Lan, A.-T. Nguyen, and D. Flynn, “Contingency-aware
+spatiotemporal optimization for safe autonomous vehicle trajectory
+planning,” IEEE Trans. Intell. Transp. Syst., vol. 26, no. 11, pp. 18 487–
+18 499, 2025.
+[49] Q. Wang, D. Xu, G. Kuang, C. Lv, S. E. Li, and B. Nie, “Risk-aware
+vehicle trajectory prediction under safety-critical scenarios,” IEEE Trans.
+Intell. Transp. Syst., vol. 26, no. 5, pp. 7156–7171, 2025.
+[50] B. Varadarajan, A. Hefny, A. Srivastava, K. S. Refaat, N. Nayakanti,
+A. Cornman, K. Chen, B. Douillard, C. P. Lam, D. Anguelov, and
+B. Sapp, “MultiPath++: Efficient information fusion and trajectory
+aggregation for behavior prediction,” in Proc. IEEE Int. Conf. Robot.
+Autom., 2022.
+[51] S. Shi, L. Jiang, D. Dai, and B. Schiele, “Motion transformer with global
+intention localization and local movement refinement,” in Adv. Neural
+Inf. Process. Syst., vol. 35, 2022.
+[52] Z. Zhou, J. Wang, Y.-H. Li, and Y.-K. Huang, “Query-centric trajectory
+prediction,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.
+(CVPR), 2023, pp. 17 863–17 873.
+[53] H. Liu, T. Li, H. Yang, L. Chen, C. Wang, K. Guo, H. Tian, H. Li, H. Li,
+and C. Lv, “Reinforced refinement with self-aware expansion for end-
+to-end autonomous driving,” IEEE Trans. Pattern Anal. Mach. Intell.,
+2026.
+[54] D. Dauner, M. Hallgarten, T. Li, X. Weng, Z. Huang, Z. Yang, H. Li,
+I. Gilitschenski, B. Ivanovic, M. Pavone, A. Geiger, and K. Chitta,
+“NAVSIM: Data-driven non-reactive autonomous vehicle simulation and
+benchmarking,” in Adv. Neural Inf. Process. Syst., 2024.
+[55] X. Jia, Z. Yang, Q. Li, Z. Zhang, and J. Yan, “Bench2Drive: Towards
+multi-ability benchmarking of closed-loop end-to-end autonomous driv-
+ing,” in NeurIPS Datasets Benchmarks Track, 2024.
+[56] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for
+image recognition,” in Proc. IEEE Conf. Comput. Vis. Pattern Recognit.
+(CVPR), 2016, pp. 770–778.
+[57] X. Jia, Y. Gao, L. Chen, J. Yan, P. L. Liu, and H. Li, “DriveAdapter:
+Breaking the coupling barrier of perception and planning in end-to-
+end autonomous driving,” in Proc. IEEE/CVF Int. Conf. Comput. Vis.
+(ICCV), 2023, pp. 7953–7963.
+[58] Z. Song, C. Jia, L. Liu, H. Pan, Y. Zhang, J. Wang, X. Zhang,
+S. Xu, L. Yang, and Y. Luo, “Don’t shake the wheel: Momentum-
+aware planning in end-to-end autonomous driving,” arXiv preprint
+arXiv:2503.03125, 2025.
+[59] Y. Li, Y. Wang, Y. Liu, J. He, L. Fan, and Z. Zhang, “End-to-end driving
+with online trajectory evaluation via BEV world model,” arXiv preprint
+arXiv:2504.01941, 2025.
+[60] J. Kim, J. Oh, S. Yu, H. Shin, D. Kwak, and J. W. Choi, “SafeDrive:
+Fine-grained safety reasoning for end-to-end driving in a sparse world,”
+in Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, 2026.

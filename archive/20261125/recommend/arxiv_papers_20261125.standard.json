@@ -1,0 +1,624 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-11-25T03:13:09.144877+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 3,
+    "deep_divecandidates": 1,
+    "deep_cap": 8,
+    "deep_selected": 1,
+    "quick_candidates": 15,
+    "quick_skim_target": 13,
+    "quick_selected": 13
+  },
+  "deep_dive": [
+    {
+      "id": "2611.27350v1",
+      "source": "arxiv",
+      "title": "GRACE: Controlled Evidence Interventions for Diagnosing and Improving Knowledge Integration in GraphRAG",
+      "abstract": "GraphRAG combines a language model's parametric knowledge with retrieved graph evidence, yet aggregate accuracy cannot show whether failures stem from missing paths, distractors, or conflicts with model knowledge. We introduce GRACE, a benchmark built by executing LC-QuAD 2.0 queries over Wikidata and applying four controlled interventions to each evidence subgraph: severing a support path, adding type-compatible distractors, attaching high-degree hubs, and replacing the supported answer with a counterfactual entity. Questions and option positions remain fixed across the five states. The validated benchmark contains 4,028 questions and 20,140 question-graph pairs. These comparisons reveal that question-only routing cannot distinguish evidence states, while relevance guidance can improve answerable states yet hurt when the support path is severed: relevant facts may not jointly suffice to answer. We propose QCFSE-SA, which combines typed local attention, global graph attention, and question-conditioned evidence guidance with a calibrated graph-support gate. With the factual context and generator held fixed, it improves controlled-state accuracy from 57.17% to 62.78% (+5.61 points; question-clustered 95% CI [+5.04, +6.17]) and broken-state accuracy from 55.41% to 67.85%. Over-abstention on semantic distractors remains an open challenge.",
+      "authors": [
+        "Minh Pham",
+        "Quang Nguyen",
+        "Phong Kieu",
+        "Cong Tran"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-11-20T09:23:21+00:00",
+      "link": "https://arxiv.org/pdf/2611.27350v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "controlled evidence interventions and counterfactual entity replacement for GraphRAG robustness",
+      "llm_evidence_cn": "GraphRAG证据干预与反事实鲁棒性评测",
+      "llm_evidence": "GraphRAG证据干预与反事实鲁棒性评测",
+      "canonical_evidence": "GraphRAG证据干预与反事实鲁棒性评测",
+      "llm_tldr_en": "GRACE builds a 4,028-question benchmark over Wikidata subgraphs with four controlled interventions, including distractors, hub injection and counterfactual entity replacement, to diagnose how GraphRAG integrates graph evidence.",
+      "llm_tldr_cn": "GraphRAG结合大模型参数知识与检索到的图证据，但总体准确率无法区分失败源于缺失路径、干扰项还是与模型知识冲突。作者构建GRACE基准，在Wikidata上执行LC-QuAD 2.0查询并对每个证据子图施加四种受控干预：切断支持路径、加入类型兼容干扰项、挂接高度数枢纽、用反事实实体替换答案。基准含4028个问题与20140个问题-图对，揭示仅靠问题路由无法可靠应对证据污染，为检索污染与反事实鲁棒性评测提供了系统工具。",
+      "llm_tldr": "GraphRAG结合大模型参数知识与检索到的图证据，但总体准确率无法区分失败源于缺失路径、干扰项还是与模型知识冲突。作者构建GRACE基准，在Wikidata上执行LC-QuAD 2.0查询并对每个证据子图施加四种受控干预：切断支持路径、加入类型兼容干扰项、挂接高度数枢纽、用反事实实体替换答案。基准含4028个问题与20140个问题-图对，揭示仅靠问题路由无法可靠应对证据污染，为检索污染与反事实鲁棒性评测提供了系统工具。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2611.22297v1",
+      "source": "arxiv",
+      "title": "FIRE-Drive: Feasibility-Informed Risk Evaluation for End-to-End Diffusion Planning",
+      "abstract": "Diffusion-based end-to-end autonomous driving models have shown strong potential in generating multimodal planning trajectories. However, their performance still depends heavily on trajectory initialization, mode evaluation, and supervision quality. Weakly constrained noisy initialization may introduce infeasible proposals and increase the burden of denoising. Moreover, selecting the optimal mode remains challenging when candidate trajectories are geometrically similar but differ in safety, interaction risk, and progress. To address these issues, we propose FIRE-Drive, a feasibility-informed risk evaluation framework for end-to-end autonomous driving. FIRE-Drive improves diffusion-based planning through dynamic feasible anchor initialization, candidate-specific bird's-eye-view risk evidence, and compact high-quality candidate supervision with lightweight refinement. This design aligns the initial support, risk-aware scoring, and multimodal supervision of trajectory modes under a unified planning objective. It enables the diffusion decoder to focus on refining plausible trajectories while the scorer distinguishes modes using local risk evidence. Experiments on NAVSIM v1 show that FIRE-Drive achieves a Predictive Driver Model Score of 91.5 with a ResNet34 backbone. Additional closed-loop evaluation on 220 Bench2Drive routes yields a Driving Score of 71.43 and a Success Rate of 42.73%. Component ablations and a scorer comparison under matched candidate inputs support the contributions of feasible initialization, auxiliary supervision, and risk-informed selection. Our code is available at https://github.com/Latte00/FIRE-drive.",
+      "authors": [
+        "Qifeng Xie",
+        "Kai-Yuan Feng",
+        "Wenkang Wan",
+        "Yue Wu",
+        "Maoguo Gong",
+        "Kai Sheng"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI"
+      ],
+      "published": "2026-11-17T06:54:08+00:00",
+      "link": "https://arxiv.org/pdf/2611.22297v1",
+      "tags": [
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "end-to-end diffusion planning for autonomous driving with risk-aware trajectory evaluation",
+      "llm_evidence_cn": "端到端扩散规划与风险感知轨迹评估的自动驾驶方法",
+      "llm_evidence": "端到端扩散规划与风险感知轨迹评估的自动驾驶方法",
+      "canonical_evidence": "端到端扩散规划与风险感知轨迹评估的自动驾驶方法",
+      "llm_tldr_en": "Proposes FIRE-Drive, a feasibility-informed risk evaluation framework that improves diffusion-based end-to-end driving planning through dynamic feasible anchor initialization and risk-aware mode selection.",
+      "llm_tldr_cn": "扩散式端到端自动驾驶规划高度依赖轨迹初始化与模式评估，噪声初始化易产生不可行轨迹，几何相近的候选在安全与交互风险上难以区分。作者提出FIRE-Drive，引入动态可行锚点初始化与基于可行性的风险评估来选择最优轨迹模式。实验表明该方法在闭环评测中提升了规划的安全性与合理性，为端到端扩散规划提供了更可靠的轨迹评价机制。",
+      "llm_tldr": "扩散式端到端自动驾驶规划高度依赖轨迹初始化与模式评估，噪声初始化易产生不可行轨迹，几何相近的候选在安全与交互风险上难以区分。作者提出FIRE-Drive，引入动态可行锚点初始化与基于可行性的风险评估来选择最优轨迹模式。实验表明该方法在闭环评测中提升了规划的安全性与合理性，为端到端扩散规划提供了更可靠的轨迹评价机制。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.20765v1",
+      "source": "arxiv",
+      "title": "STA: A Split Temporal Adversary Method for Evaluating Robustness of Multimodal RL-based Driving Policies",
+      "abstract": "Multimodal reinforcement learning (MRL) offers a promising paradigm for autonomous driving by jointly leveraging complementary sensor observations to learn effective decision-making policies. However, its effectiveness critically depends on temporal alignment across modalities, making temporal inconsistency a fundamental vulnerability. Even subtle misalignment or latency can corrupt fused representations and ultimately lead to decision failures. Existing studies have explored adversarial attacks to induce cross-modal temporal inconsistencies, thereby enabling systematic evaluation of the temporal robustness of MRL policies. However, existing methods remain limited in generality, realism, and adaptivity. To address these limitations, we propose the Split Temporal Adversary (STA), which formulates multimodal temporal attacks as a unified decision process that jointly optimizes attack timing and modality selection under realistic policy-aware and budget-constrained settings. STA includes two mechanisms: a) a unified multimodal temporal perturbation mechanism that delays observations via historical states, removing the need for modality-specific noise; b) a split multimodal adversarial decision mechanism that jointly optimizes attack timing and modality selection through adaptive optimization while leveraging the victim policy's clean actions to identify sensitive decision patterns. We provide a theoretical analysis of the induced distribution shift and a modality selection principle. Experiments in the CARLA simulator show that STA more than doubles the collision rate of the strongest baseline against PPO while using 17.8\\% fewer attack attempts, and that it generalizes to a VLM-based driving policy. These results reveal temporal consistency as a critical vulnerability, highlighting temporal robustness as essential for safe autonomous driving.",
+      "authors": [
+        "Shenghao Xiong",
+        "Xiaolin Chang"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR",
+        "cs.LG",
+        "cs.RO"
+      ],
+      "published": "2026-11-16T09:16:45+00:00",
+      "link": "https://arxiv.org/pdf/2611.20765v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "adversarial robustness evaluation of multimodal RL driving policies",
+      "llm_evidence_cn": "多模态强化学习驾驶策略的对抗鲁棒性评测",
+      "llm_evidence": "多模态强化学习驾驶策略的对抗鲁棒性评测",
+      "canonical_evidence": "多模态强化学习驾驶策略的对抗鲁棒性评测",
+      "llm_tldr_en": "Proposes STA, a split temporal adversary that injects cross-modal temporal inconsistency to systematically evaluate the robustness of multimodal reinforcement-learning driving policies with better generality and realism.",
+      "llm_tldr_cn": "多模态强化学习在自动驾驶中融合多种传感器提升决策能力，但其对模态间时序对齐高度敏感，细微错位即可导致决策失败。作者提出STA分裂时序对抗方法，通过构造跨模态时序不一致的对抗扰动来系统评测驾驶策略鲁棒性。实验表明该方法在通用性、真实性与自适应性上优于既有攻击，暴露了多模态驾驶策略的时序脆弱性。",
+      "llm_tldr": "多模态强化学习在自动驾驶中融合多种传感器提升决策能力，但其对模态间时序对齐高度敏感，细微错位即可导致决策失败。作者提出STA分裂时序对抗方法，通过构造跨模态时序不一致的对抗扰动来系统评测驾驶策略鲁棒性。实验表明该方法在通用性、真实性与自适应性上优于既有攻击，暴露了多模态驾驶策略的时序脆弱性。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.27460v1",
+      "source": "arxiv",
+      "title": "Poisoning Attacks and Collaborative Defense Framework for LightRAG-Based Construction Regulation Knowledge",
+      "abstract": "Retrieval-augmented generation (RAG) is widely used in construction, yet the security of building-regulation knowledge bases has received little study. This thesis reports a pre-registered experiment on one fully instrumented LightRAG system built on the UK Approved Documents. Using a 150-item benchmark labeled with safety consequences and tampering directions, it evaluates four attacks (text layer, graph layer, fabricated amendment narrative and a defense-aware adaptive attacker) together with a three-layer retrieval-graph-generation defense in a full factorial design. Text-level poisoning succeeded, with success rising with the budget; graph-level poisoning was less effective, contrary to the registered hypothesis. The full defense met the registered criterion and six of the seven configurations met its threshold, but those containing the generation layer did so by refusing 69-80 percent of poisoned queries, costing up to 74 points of clean accuracy, whereas provenance-based retrieval filtering cost no measurable clean accuracy in the configuration used. A second experimental batch showed that excluding a legitimate unregistered amendment caused no measurable loss of accuracy either, as its wording reached the generator through the graph's entity and relationship descriptions, the route the poison took, which no layer inspects. Interactions were strong, so no layer's contribution can be isolated. A reported zero attack success rate is not evidence of detection unless the refusal rate is reported with it: zero arises either because provenance filtering removes every document outside the manifest without judging its content, or because the system refuses. Layered defenses must therefore be evaluated factorially, and regulatory RAG assistants require corpus admission control and version-aware verification before they can support safety-critical decisions.",
+      "authors": [
+        "Yingyan He"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR"
+      ],
+      "published": "2026-11-20T11:08:17+00:00",
+      "link": "https://arxiv.org/pdf/2611.27460v1",
+      "tags": [
+        "keyword:in-car-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "knowledge base poisoning and graph-layer attacks on LightRAG with defense",
+      "llm_evidence_cn": "针对LightRAG的知识库投毒与图结构层攻击及防御",
+      "llm_evidence": "针对LightRAG的知识库投毒与图结构层攻击及防御",
+      "canonical_evidence": "针对LightRAG的知识库投毒与图结构层攻击及防御",
+      "llm_tldr_en": "A pre-registered factorial study poisons a LightRAG graph-based regulation knowledge base via text layer, graph layer, fabricated amendments and adaptive attackers, then tests a three-layer retrieval-graph-generation defense.",
+      "llm_tldr_cn": "该文针对图结构RAG知识库易被投毒却缺乏系统安全评测的问题，在基于英国批准文件的LightRAG系统上构建150条带安全后果标注的基准，设计文本层、图结构层、伪造修订叙事与自适应攻击四类攻击，并提出检索—图—生成三层协同防御，采用全因子实验验证。结果显示文本层投毒随预算增加而成功率上升，图结构层投毒反而弱于预期。该工作为知识库投毒、检索污染与错误传播的安全评测提供了可复用范式。",
+      "llm_tldr": "该文针对图结构RAG知识库易被投毒却缺乏系统安全评测的问题，在基于英国批准文件的LightRAG系统上构建150条带安全后果标注的基准，设计文本层、图结构层、伪造修订叙事与自适应攻击四类攻击，并提出检索—图—生成三层协同防御，采用全因子实验验证。结果显示文本层投毒随预算增加而成功率上升，图结构层投毒反而弱于预期。该工作为知识库投毒、检索污染与错误传播的安全评测提供了可复用范式。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.21851v1",
+      "source": "arxiv",
+      "title": "AR-WAM: efficient streaming world-action modeling for autonomous driving",
+      "abstract": "Autonomous driving requires anticipating how traffic will evolve while responding quickly to new observations. Video foundation models offer the first ability, but repeated history encoding and iterative video generation make them costly to use for driving. We present AR-WAM, an efficient streaming world-action model that combines autoregressive temporal modeling with single-pass future conditioning. Because its video backbone is causal, AR-WAM updates its visual context incrementally, reusing past computation and conditioning future prediction on observed motion. We further hypothesize that future features computed from recent observations can improve generalization in dynamic traffic without iterative video generation. AR-WAM therefore obtains these features in one forward pass and uses them to condition trajectory generation, and reinforcement learning then improves the policy through direct optimization of driving rewards. With a single front camera, AR-WAM achieves 91.5 PDMS after supervised training and 94.0 after reinforcement learning on NAVSIM-v1, outperforming the compared strong end-to-end world-action models. In a dynamic setting of continuous driving, supervised AR-WAM keeps its visual history across decisions and outperforms strong world-action baselines.",
+      "authors": [
+        "Baiting Luo",
+        "Shatadal Mishra",
+        "Ahmadreza Moradipari",
+        "Nejib Ammar"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-11-16T20:16:08+00:00",
+      "link": "https://arxiv.org/pdf/2611.21851v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "streaming world-action model producing driving actions for autonomous driving",
+      "llm_evidence_cn": "面向自动驾驶的流式世界-动作模型",
+      "llm_evidence": "面向自动驾驶的流式世界-动作模型",
+      "canonical_evidence": "面向自动驾驶的流式世界-动作模型",
+      "llm_tldr_en": "Autonomous driving needs traffic anticipation and fast response, but video foundation models are costly due to repeated encoding and iterative generation; AR-WAM combines autoregressive temporal modeling with single-pass future conditioning for efficient driving.",
+      "llm_tldr_cn": "自动驾驶需预测交通演化并及时响应，但视频基础模型因重复编码历史与迭代生成而代价高昂。作者提出AR-WAM流式世界-动作模型，结合自回归时序建模与单次未来条件化，因果视频骨干使其增量更新视觉上下文并复用历史计算。模型以近期观测计算的未来特征改善动态交通下的泛化，无需迭代视频生成。该工作为高效世界建模与驾驶动作生成提供新范式。",
+      "llm_tldr": "自动驾驶需预测交通演化并及时响应，但视频基础模型因重复编码历史与迭代生成而代价高昂。作者提出AR-WAM流式世界-动作模型，结合自回归时序建模与单次未来条件化，因果视频骨干使其增量更新视觉上下文并复用历史计算。模型以近期观测计算的未来特征改善动态交通下的泛化，无需迭代视频生成。该工作为高效世界建模与驾驶动作生成提供新范式。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.27804v1",
+      "source": "arxiv",
+      "title": "Generalist Action Critic: Harnessing Frontier Models in Autonomous Driving",
+      "abstract": "Frontier models have demonstrated remarkable general-purpose reasoning capabilities, opening new possibilities for intelligent decision making in the physical world. In autonomous driving, many recent approaches seek to leverage these capabilities through additional adaptation for action output, particularly in scenarios where existing models underperform. We introduce Generalist Action Critic (GAC), a zero-shot framework that combines frontier models' general-purpose reasoning with the planning competence of specialized driving models through an inference-time harness. In GAC, specialized planners generate multiple candidate trajectories and make an initial selection, while a frozen frontier model serves as an action critic that assesses the selected trajectory against scene evidence and either retains it or reselects from the available candidates. The harness combines camera images with spatial overlays, provides driving context and reasoning principles through textual instructions, and regulates the information available at each stage to support trajectory assessment and reselection. On HUGSIM, GAC raises DrivoR's HD-Score to 43.2, achieving state-of-the-art performance among methods trained without additional simulation data. GAC also consistently improves closed-loop driving safety across three planners, with relative HD-Score gains of up to 32.1%. Experiments on NAVSIM v1 further reveal how GAC improves planning performance by correcting up to 52.13% of eligible unsafe trajectory selections while introducing new failures in only 0.67% of originally high-quality selections. These results demonstrate the potential of harnessing frontier models to improve driving safety through inference-time cooperation with specialized planners.",
+      "authors": [
+        "Yun Yan",
+        "Shizhi Hu",
+        "Zhichao Li",
+        "Yang Guan",
+        "Shiqi Liu",
+        "Jiaxin Gao",
+        "Xiangteng Zhang",
+        "Wenbo Ding",
+        "Jiuhua Zhao",
+        "Hui Guo",
+        "Xintao Yan",
+        "Keqiang Li",
+        "Shengbo Eben Li"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-20T16:32:53+00:00",
+      "link": "https://arxiv.org/pdf/2611.27804v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "frontier model as action critic for autonomous driving decision making",
+      "llm_evidence_cn": "前沿大模型充当自动驾驶决策的动作评论家",
+      "llm_evidence": "前沿大模型充当自动驾驶决策的动作评论家",
+      "canonical_evidence": "前沿大模型充当自动驾驶决策的动作评论家",
+      "llm_tldr_en": "Driving models underperform in some scenarios while frontier models hold general reasoning; GAC uses specialized planners to propose trajectories and a frozen frontier model as an inference-time action critic to improve driving decisions zero-shot.",
+      "llm_tldr_cn": "现有自动驾驶模型在部分场景表现不足，前沿大模型的通用推理能力尚未被有效用于驾驶决策。作者提出GAC零样本框架，由专用规划器生成并初选多条候选轨迹，再由冻结的前沿模型充当动作评论家进行评估。该推理时增强结合了通用推理与专业规划能力，提升弱场景下的决策质量。该工作展示了前沿大模型作为推理评审增强自动驾驶决策的可行路径。",
+      "llm_tldr": "现有自动驾驶模型在部分场景表现不足，前沿大模型的通用推理能力尚未被有效用于驾驶决策。作者提出GAC零样本框架，由专用规划器生成并初选多条候选轨迹，再由冻结的前沿模型充当动作评论家进行评估。该推理时增强结合了通用推理与专业规划能力，提升弱场景下的决策质量。该工作展示了前沿大模型作为推理评审增强自动驾驶决策的可行路径。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.22374v1",
+      "source": "arxiv",
+      "title": "AutoE2E: Don't speak - Language free end-to-end autonomy A Real-Time Driving Model for L2++ ADAS and L4 Robotaxis",
+      "abstract": "AutoE2E is an open-source end-to-end driving model developed by the Autoware Foundation Robotaxi Working Group. It introduces a temporal bird's-eye-view (BEV) architecture that combines multi-camera perception, HD-map information and route conditioning to predict future vehicle motion. The evaluated model uses a pretrained camera-BEV backbone, temporal feature fusion and a lightweight recurrent trajectory planner. It contains approximately 79.9 million parameters, of which approximately 1.45 million are trainable in the evaluated configuration. The v1.0 release provides model checkpoints, training and evaluation code, and DataModelConsole, a dashboard for visualizing and inspecting model experiments. On the KITScenes validation benchmark, the fine-tuned checkpoint achieves an average displacement error (ADE) of 0.745 m and a final displacement error (FDE) of 2.020 m at a three-second prediction horizon. The paper also reports preliminary real-vehicle research conducted with the Technical University of Munich's EDGAR platform, alongside ongoing collaboration with the Karlsruhe Institute of Technology. AutoE2E v1.0 is an early open research release. Its quantitative evaluation is open-loop, and the model has not yet demonstrated validated closed-loop autonomous driving. The release is intended to provide the autonomous-driving community with an inspectable baseline for further research, experimentation and collaborative development.",
+      "authors": [
+        "Muhammad Zain Khawaja",
+        "Zaynab El Mawas",
+        "Ryota Yamada",
+        "Gabriela Cordova",
+        "Arseni Lysak",
+        "Intisar Chowdhury",
+        "Bharat Jayaprakash",
+        "Apostolos Georgiadis",
+        "Shri Harsha Adapala",
+        "Jatin Gautam",
+        "Christoph Bank",
+        "Alejandra Solarte Uscategui",
+        "Atanasko Boris Mitrev",
+        "Hassan Ali Ansari",
+        "Nishad Sahu"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-11-17T08:27:07+00:00",
+      "link": "https://arxiv.org/pdf/2611.22374v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "open-source end-to-end driving model from multi-camera BEV to motion",
+      "llm_evidence_cn": "多相机BEV端到端驾驶模型",
+      "llm_evidence": "多相机BEV端到端驾驶模型",
+      "canonical_evidence": "多相机BEV端到端驾驶模型",
+      "llm_tldr_en": "Introduces AutoE2E, an open-source end-to-end driving model using temporal BEV perception, HD-map and route conditioning to predict vehicle motion for L2++ ADAS and L4 robotaxis.",
+      "llm_tldr_cn": "端到端驾驶模型在落地时仍缺乏开放可复现的实现。作者发布AutoE2E，一个由Autoware基金会开发的开源端到端驾驶模型，采用时序鸟瞰图架构融合多相机感知、高清地图与路线条件来预测车辆运动，并配有轻量循环轨迹规划器。v1.0提供模型权重、训练评测代码与可视化面板。该工作为ADAS与Robotaxi提供可复现的端到端基线。",
+      "llm_tldr": "端到端驾驶模型在落地时仍缺乏开放可复现的实现。作者发布AutoE2E，一个由Autoware基金会开发的开源端到端驾驶模型，采用时序鸟瞰图架构融合多相机感知、高清地图与路线条件来预测车辆运动，并配有轻量循环轨迹规划器。v1.0提供模型权重、训练评测代码与可视化面板。该工作为ADAS与Robotaxi提供可复现的端到端基线。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.28509v1",
+      "source": "arxiv",
+      "title": "AlpaSafe: Risk-Aware Trajectory Selection for Vision-Language-Action Models in Autonomous Driving",
+      "abstract": "Reasoning-based driving vision-language-action (VLA) models propose multiple candidate trajectories at each decision, yet only one is executed. Standard evaluation scores the best candidate, assuming an oracle selector that deployment lacks, and leaves the risk of the executed candidate unexamined. Existing online evaluators typically close this gap with a purpose-trained scene or world model, often rolling out each candidate through it at inference time. We introduce AlpaSafe, a risk-aware trajectory selector that reuses the scene representation a frozen driving VLA computes while proposing its candidates. AlpaSafe reads the last hidden token of the VLA's prompt prefill. A lightweight head, trained on the closed-loop simulation outcomes of the candidates, fuses this token with each candidate trajectory and predicts a relative score and collision/offroad logits. A fixed rule removes candidates dominated on the two risk logits and selects the highest-scoring candidate among those remaining, adding neither rollouts nor VLA training. Experiments on 525 AlpaSim scenes show that AlpaSafe outperforms Alpamayo's default first-sample rule and uniform random selection in selected regret and top-1 agreement, and reduces the collision-at-fault or offroad rate from 6.41% and 6.10% to 4.93%. The selector has 1.7M parameters and takes 0.75 ms per decision.",
+      "authors": [
+        "Qiren Wang",
+        "Mingyu Guo",
+        "Weisong Shi"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-11-21T02:54:46+00:00",
+      "link": "https://arxiv.org/pdf/2611.28509v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "risk-aware trajectory selection reusing VLA scene representation for driving",
+      "llm_evidence_cn": "复用视觉-语言-动作场景表示的风险感知轨迹选择",
+      "llm_evidence": "复用视觉-语言-动作场景表示的风险感知轨迹选择",
+      "canonical_evidence": "复用视觉-语言-动作场景表示的风险感知轨迹选择",
+      "llm_tldr_en": "Introduces AlpaSafe, a risk-aware trajectory selector that reuses a frozen driving VLA model's scene representation and a lightweight head to pick the executed trajectory instead of assuming an oracle selector.",
+      "llm_tldr_cn": "推理式驾驶视觉-语言-动作模型每次决策会提出多条候选轨迹，但标准评测只给最优候选打分，忽略实际执行轨迹的风险。作者提出AlpaSafe，复用冻结模型在提示预填充阶段产生的场景表示，训练轻量选择头进行风险感知的轨迹选择。闭环仿真表明该方法提升了执行轨迹的安全性与合理性，为驾驶大模型部署提供了更贴近实际的选择机制。",
+      "llm_tldr": "推理式驾驶视觉-语言-动作模型每次决策会提出多条候选轨迹，但标准评测只给最优候选打分，忽略实际执行轨迹的风险。作者提出AlpaSafe，复用冻结模型在提示预填充阶段产生的场景表示，训练轻量选择头进行风险感知的轨迹选择。闭环仿真表明该方法提升了执行轨迹的安全性与合理性，为驾驶大模型部署提供了更贴近实际的选择机制。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.24192v1",
+      "source": "arxiv",
+      "title": "TrajWAM: Trajectory-Conditioned Future Learning for Vision-Language Driving",
+      "abstract": "World Action Models (WAMs) connect future scene prediction with action planning for autonomous driving. Each driving record pairs an executed ego trajectory with its observed future, providing a factual outcome for learning this connection. We present TrajWAM, a trajectory-conditioned WAM that improves vision-language driving through auxiliary bird's-eye-view (BEV) future learning. An ego-trajectory query conditions DINOv3-aligned BEV predictions from shared planner representations. Training combines factual reconstruction under the executed trajectory with one-sided feature separation under an unlabeled perturbed trajectory. Together, these objectives train the shared planner to generate driving waypoints. Native inference directly generates waypoints and bypasses the auxiliary future-prediction branch. On all 220 Bench2Drive routes, TrajWAM achieves 91.53 Driving Score and 75.45% Success Rate, exceeding a schedule-matched planning-only fine-tuning baseline by 5.31 Driving Score points and eight successful routes.",
+      "authors": [
+        "Xuerui Fang",
+        "Gulimila Kezierbieke",
+        "Chen Wangxing",
+        "Hui Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-11-18T10:28:56+00:00",
+      "link": "https://arxiv.org/pdf/2611.24192v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "trajectory-conditioned vision-language driving producing waypoints",
+      "llm_evidence_cn": "轨迹条件化的视觉语言驾驶生成路点",
+      "llm_evidence": "轨迹条件化的视觉语言驾驶生成路点",
+      "canonical_evidence": "轨迹条件化的视觉语言驾驶生成路点",
+      "llm_tldr_en": "World action models link future prediction with planning but underuse executed trajectories; TrajWAM conditions BEV future predictions on an ego-trajectory query and trains with factual reconstruction plus perturbed-trajectory separation to output driving waypoints.",
+      "llm_tldr_cn": "世界-动作模型连接未来场景预测与动作规划，但如何利用每条驾驶记录中的执行轨迹与观测未来尚待挖掘。作者提出TrajWAM轨迹条件化模型，用自车轨迹查询从共享规划器表示条件化BEV未来预测，并结合执行轨迹下的事实重建与扰动轨迹下的单侧特征分离训练。模型原生推理可直接生成驾驶路点。该工作为视觉语言驾驶的未来学习与规划提供有效范式。",
+      "llm_tldr": "世界-动作模型连接未来场景预测与动作规划，但如何利用每条驾驶记录中的执行轨迹与观测未来尚待挖掘。作者提出TrajWAM轨迹条件化模型，用自车轨迹查询从共享规划器表示条件化BEV未来预测，并结合执行轨迹下的事实重建与扰动轨迹下的单侧特征分离训练。模型原生推理可直接生成驾驶路点。该工作为视觉语言驾驶的未来学习与规划提供有效范式。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.24231v1",
+      "source": "arxiv",
+      "title": "What Survives the Shift from Text to Pixels? Conditional Protection against Prompt Injection in Image-Rendered Documents",
+      "abstract": "Multimodal language models increasingly answer questions over external documents, exposing them to indirect prompt injection: commands planted in untrusted content to hijack the response. Rendering untrusted content as page images lowers attack success on average, leaving open which injected operations survive rendering, at what utility cost, and whether failed image attacks reflect unread commands or commands read but not followed. We pair text and page-image versions of 191 English question-answering sources across six models, measuring marker appending, answer formatting, and answer replacement alongside clean Question-Answering utility. Rendering reduces append and format execution for every model, yet Qwen3-VL-8B still executes image-borne replacement at 77.96\\%. Protection also depends on target type, rendering settings, wording, and repetition, and a search over eight fixed attack candidates largely closes the image deficit in appending and formatting for Qwen and Gemini, though not for GPT-5-nano. Utility ratios on original questions range from 93.31\\% to 101.61\\%, but Qwen falls to 61.99\\% when answers combine two evidence spans. Illegibility cannot explain all failed attacks: models often transcribe and identify image-borne commands they do not execute, and trusted user authorization raises execution on unchanged pages. Inside Qwen, patching early attack-region states induces all three operations, more weakly in images. Attention blocking suggests why: a text command acts through its own positions, whereas visual encoding spreads an image command and its target across the instruction page. Rendering thus offers conditional protection, motivating evaluations that report security by model, operation, and attack budget alongside utility.",
+      "authors": [
+        "Haoyang Liu",
+        "Yinong Xu",
+        "Zhe Lang",
+        "Zhenyu Guan",
+        "Qianyun Zhang"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR",
+        "cs.AI"
+      ],
+      "published": "2026-11-18T11:08:07+00:00",
+      "link": "https://arxiv.org/pdf/2611.24231v1",
+      "tags": [
+        "keyword:in-car-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "indirect prompt injection defense in document QA via image rendering",
+      "llm_evidence_cn": "图像渲染下的间接提示注入防护",
+      "llm_evidence": "图像渲染下的间接提示注入防护",
+      "canonical_evidence": "图像渲染下的间接提示注入防护",
+      "llm_tldr_en": "Multimodal models answering over documents face indirect prompt injection; pairing text and page-image versions of 191 sources across six models shows rendering reduces append and format execution but at utility cost, clarifying which injected operations survive.",
+      "llm_tldr_cn": "多模态语言模型在对外部文档问答时面临间接提示注入风险，将不可信内容渲染为页面图像能否降低攻击成功率仍不明确。作者配对191个英文问答源的文本与图像版本，在六个模型上测量标记追加、格式修改与答案替换及干净问答效用。结果显示渲染普遍降低追加与格式执行，但存在效用代价，并区分了命令未被读取与读取未执行。该工作揭示了何种注入操作能穿透渲染，为条件性防护提供依据。",
+      "llm_tldr": "多模态语言模型在对外部文档问答时面临间接提示注入风险，将不可信内容渲染为页面图像能否降低攻击成功率仍不明确。作者配对191个英文问答源的文本与图像版本，在六个模型上测量标记追加、格式修改与答案替换及干净问答效用。结果显示渲染普遍降低追加与格式执行，但存在效用代价，并区分了命令未被读取与读取未执行。该工作揭示了何种注入操作能穿透渲染，为条件性防护提供依据。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.26242v1",
+      "source": "arxiv",
+      "title": "FastRoverVLA: Fast Vision-Language-Action Execution for Off-Road Autonomous Driving",
+      "abstract": "Off-road vision-language-action (VLA) models generate scene-conditioned plans, but frequent trajectory updates can repeatedly invoke expensive multimodal inference. Reusing a prediction reduces this demand while leaving its commands exposed to changes in vehicle motion. FastRoverVLA addresses this mismatch by decoupling visual plan generation from motion-conditioned execution. Its training-free interface maintains decoded plans between visual predictions. A speed-curvature action buffer is aligned with measured motion at each update, integrated into a local trajectory, and advanced by consuming the current action. The corrected remainder is written back to the buffer, preserving motion corrections across successive updates. A bounded refresh rule normalizes speed and curvature variations within a newly decoded plan and assigns a short or long reuse budget according to the resulting plan-roughness score. The interface requires neither backbone features nor an additional learned driving policy. Over a 3 s horizon, independent real-request evaluation achieves average displacement error (ADE) and final displacement error (FDE) of 0.328/0.596 m on ORAD-3D and 0.266/0.526 m on RELLIS-3D, reducing FDE by 18.0% and 36.7% at request rates of 6.0% and 4.8%, respectively. These runs retain lower errors across four backbones and both datasets and reduce Qwen3-VL request-processing cost by factors of 16.6 and 20.8 under serial replay, while mechanism and motion-only controls identify persistent state correction as the main source of the observed accuracy benefit. The source code and evaluation materials are publicly available at https://github.com/ADEPT-ORG/FastRoverVLA.",
+      "authors": [
+        "Changtao Zhao",
+        "Yingxue Guan",
+        "Li Wang",
+        "Shijie Zhao",
+        "Yuhang Zhang",
+        "Shengkai Zhang",
+        "Qing Wang",
+        "Ziying Song"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI"
+      ],
+      "published": "2026-11-19T15:23:14+00:00",
+      "link": "https://arxiv.org/pdf/2611.26242v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "vision-language-action model generating and executing driving plans for off-road autonomous driving",
+      "llm_evidence_cn": "面向越野自动驾驶的视觉-语言-动作模型，生成并执行驾驶规划",
+      "llm_evidence": "面向越野自动驾驶的视觉-语言-动作模型，生成并执行驾驶规划",
+      "canonical_evidence": "面向越野自动驾驶的视觉-语言-动作模型，生成并执行驾驶规划",
+      "llm_tldr_en": "FastRoverVLA decouples visual plan generation from motion-conditioned execution so costly multimodal inference is not re-run every trajectory update. A speed-curvature action buffer aligned with measured motion preserves corrections across updates, enabling fast, training-free plan execution for off-road driving.",
+      "llm_tldr_cn": "越野视觉-语言-动作模型每次轨迹更新都需重复昂贵的多模态推理，且复用预测会使指令暴露于车辆运动变化。作者提出FastRoverVLA，将视觉规划生成与运动条件执行解耦，用速度-曲率动作缓冲区与实测运动对齐并回写修正残差。该免训练接口在保持规划响应的同时降低推理开销，为自动驾驶规划到执行的衔接提供了高效方案。",
+      "llm_tldr": "越野视觉-语言-动作模型每次轨迹更新都需重复昂贵的多模态推理，且复用预测会使指令暴露于车辆运动变化。作者提出FastRoverVLA，将视觉规划生成与运动条件执行解耦，用速度-曲率动作缓冲区与实测运动对齐并回写修正残差。该免训练接口在保持规划响应的同时降低推理开销，为自动驾驶规划到执行的衔接提供了高效方案。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "vehicle control and actuation for automated driving",
+      "matched_requirement_id": "req-16",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.27174v1",
+      "source": "arxiv",
+      "title": "\"More Than You Expect!\": Leakage-Abuse Attacks on Encrypted Vector Search",
+      "abstract": "Vector databases support semantic search and retrieval-augmented generation, but embeddings, queries, and record labels may contain sensitive information. Although encrypted vector search protects these contents, some schemes expose records retrieved together across queries. We identify semantic neighborhood leakage, whereby co-retrieval relationships derived from access patterns reveal semantic categories of encrypted records and queries. We present SAGE (Semantic Access-pattern Graph Exploitation), a passive, persistent leakage-abuse attack that infers record labels and query categories from access patterns. SAGE builds a weighted co-retrieval graph and offers two variants requiring different auxiliary knowledge. SAGE-Dist matches anonymous spectral groups to semantic categories using estimated class proportions and refines labels via optimal transport, without known record labels. SAGE-Known combines graph-based label propagation with spectral-group anchor voting using a small set of known labels. We evaluate SAGE on four text and image datasets. With 1% known record labels, SAGE-Known achieves up to 84.3% mean record-label accuracy and outperforms the strongest corresponding baselines on all four datasets. With only estimated class proportions, SAGE-Dist achieves 66.9% record-label accuracy and 68.1% query-category accuracy on AG News, exceeding the strongest corresponding baselines by 21.8 and 41.9 percentage points, respectively, though performance varies across datasets. Experiments with a real-world DCPE implementation (Fuchsbauer et al., SCN'22) show that semantic leakage persists under encrypted approximate retrieval. These findings expose privacy risks even when vector contents remain protected.",
+      "authors": [
+        "Yang Zhang",
+        "Ruiqi He",
+        "Xiaoqian Sun",
+        "Siyi Lv",
+        "Zheli Liu"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR"
+      ],
+      "published": "2026-11-20T06:00:12+00:00",
+      "link": "https://arxiv.org/pdf/2611.27174v1",
+      "tags": [
+        "keyword:in-car-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "co-retrieval graph leakage attack on vector search for RAG",
+      "llm_evidence_cn": "针对RAG向量检索的共检索图泄漏攻击",
+      "llm_evidence": "针对RAG向量检索的共检索图泄漏攻击",
+      "canonical_evidence": "针对RAG向量检索的共检索图泄漏攻击",
+      "llm_tldr_en": "Encrypted vector search protects contents but co-retrieval access patterns still leak semantics; SAGE builds a weighted co-retrieval graph and passively infers record labels and query categories, exposing semantic neighborhood leakage in RAG backends.",
+      "llm_tldr_cn": "向量数据库支撑语义检索与检索增强生成，加密向量搜索虽保护内容，但共检索关系仍可能泄露记录与查询的语义类别。作者提出SAGE被动持久泄漏滥用攻击，构建加权共检索图并给出两种变体，从访问模式推断记录标签与查询类别。该工作揭示语义邻域泄漏风险，为RAG与向量数据库的隐私安全敲响警钟。",
+      "llm_tldr": "向量数据库支撑语义检索与检索增强生成，加密向量搜索虽保护内容，但共检索关系仍可能泄露记录与查询的语义类别。作者提出SAGE被动持久泄漏滥用攻击，构建加权共检索图并给出两种变体，从访问模式推断记录标签与查询类别。该工作揭示语义邻域泄漏风险，为RAG与向量数据库的隐私安全敲响警钟。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.30389v1",
+      "source": "arxiv",
+      "title": "AgentMoT: An Agentic Mixture-of-Transformers for End-to-End Autonomous Driving",
+      "abstract": "Driving models need to choose which capabilities to use and when to reconsider their decisions. We introduce AgentMoT, a Mixture-of-Transformers with built-in agent reasoning and system scheduling. Combinations of agent, world, and action experts form three jointly trained pathways for direct-action, vision-language-action, and world-action computation. The Router selects a native pathway, while the agent expert supplies reasoning and selects skills. Execution feedback raises wake-up requests, and the agent self-scheduler learns whether to reconsider the task decision or keep it. Mandatory requests invoke the agent directly. The relative-capability principle guides these choices by relating the benefit of additional computation or intervention to its cost. After open-loop initialization, dual-loop evolution trains the Router, agent, and self-scheduler from closed-loop experience while failure-driven updates refine skills and execution feedback. AgentMoT achieves state-of-the-art results on Bench2Drive v0.0.3 and v0.0.4, with 94.48/92.33 driving score and 85.45/82.73% success rate, respectively. With skills disabled, learned routing improves over the strongest fixed pathway by 1.79 driving-score points and 4.09 percentage points of success rate on v0.0.3. Ablation studies further show gains from closed-loop agent learning, two-view queries, and event-triggered wake-up.",
+      "authors": [
+        "Qihang Huang",
+        "Collister Chua",
+        "YuJie Yan",
+        "Shiyu Fang",
+        "Zhan Chen",
+        "Haoran Xu",
+        "Zirui Li",
+        "Chen Lv"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-23T09:50:57+00:00",
+      "link": "https://arxiv.org/pdf/2611.30389v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "agentic mixture-of-transformers with reasoning for end-to-end autonomous driving",
+      "llm_evidence_cn": "面向端到端自动驾驶的智能体混合变换器推理",
+      "llm_evidence": "面向端到端自动驾驶的智能体混合变换器推理",
+      "canonical_evidence": "面向端到端自动驾驶的智能体混合变换器推理",
+      "llm_tldr_en": "AgentMoT combines agent, world and action experts with a router and self-scheduler so driving models reason and decide when to reconsider decisions in end-to-end driving.",
+      "llm_tldr_cn": "端到端驾驶模型需要判断何时使用何种能力以及何时重新审视决策。本文提出AgentMoT，将智能体、世界与动作专家组合成直接动作、视觉语言动作与世界动作三条联合训练通路，由路由器选择原生通路，智能体专家提供推理并选择技能。执行反馈触发唤醒请求，自调度器学习是否重新决策。该框架借助相对能力原则协调计算与干预，提升了端到端驾驶的决策灵活性。",
+      "llm_tldr": "端到端驾驶模型需要判断何时使用何种能力以及何时重新审视决策。本文提出AgentMoT，将智能体、世界与动作专家组合成直接动作、视觉语言动作与世界动作三条联合训练通路，由路由器选择原生通路，智能体专家提供推理并选择技能。执行反馈触发唤醒请求，自调度器学习是否重新决策。该框架借助相对能力原则协调计算与干预，提升了端到端驾驶的决策灵活性。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.30438v1",
+      "source": "arxiv",
+      "title": "ROSE-Drive: Runtime Orchestration and System Evolution for Autonomous Driving",
+      "abstract": "End-to-end driving models have made substantial progress, yet reliable closed-loop driving in complex traffic remains challenging. Beyond improving individual models, system-level orchestration offers a complementary approach by coordinating driving capabilities and computation. We introduce ROSE-Drive (Runtime Orchestration and System Evolution), a model-agnostic framework that jointly orchestrates driving execution and computation. It coordinates frozen driving models with driving skills, perception tools, and feedback controllers. A distilled vision-language model (VLM) proposes driving tasks and scene relations. Shared physical state and persistent tasks support capability composition, task continuity, and adaptive scheduling. The orchestrator combines model and skill outputs across control channels, maintains task responsibility through handover, and uses execution feedback to select controllers, reuse valid motion references, and schedule model inference. Offline revisions use execution records to refine skills and their coordination through a stable task interface. Successive system stages inherit these revisions while model, perception, and VLM weights remain fixed. Evaluations with four driving models on Bench2Drive v0.0.3, Bench2Drive v0.0.4, and Fail2Drive show accumulated capability and transfer before target-benchmark revision. On held-out Longest6, driving score (DS) rises from 25 to 52 for AutoMoT and from 22 to 47 for SimLingo across system stages, while both systems skip new model inference on over 71% of control steps.",
+      "authors": [
+        "Qihang Huang",
+        "Zhidong Wang",
+        "Zirui Li",
+        "YuJie Yan",
+        "Jingsong Liang",
+        "Shiyu Fang",
+        "Collister Chua",
+        "Zhan Chen",
+        "Chen Lv"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-23T10:30:51+00:00",
+      "link": "https://arxiv.org/pdf/2611.30438v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "VLM-driven orchestration of driving tasks and scene relations",
+      "llm_evidence_cn": "VLM驱动的驾驶任务与场景关系编排",
+      "llm_evidence": "VLM驱动的驾驶任务与场景关系编排",
+      "canonical_evidence": "VLM驱动的驾驶任务与场景关系编排",
+      "llm_tldr_en": "Presents ROSE-Drive, a model-agnostic framework orchestrating frozen driving models, skills and tools, where a distilled VLM proposes driving tasks and scene relations for closed-loop driving.",
+      "llm_tldr_cn": "端到端驾驶在复杂交通中闭环可靠性不足，仅改进单模型难以应对。作者提出ROSE-Drive模型无关框架，编排冻结的驾驶模型、驾驶技能、感知工具与反馈控制器，并由蒸馏视觉语言模型提出驾驶任务与场景关系。共享物理状态与持久任务支撑能力组合与自适应调度。该工作展示了智能体式编排在自动驾驶决策支持中的潜力。",
+      "llm_tldr": "端到端驾驶在复杂交通中闭环可靠性不足，仅改进单模型难以应对。作者提出ROSE-Drive模型无关框架，编排冻结的驾驶模型、驾驶技能、感知工具与反馈控制器，并由蒸馏视觉语言模型提出驾驶任务与场景关系。共享物理状态与持久任务支撑能力组合与自适应调度。该工作展示了智能体式编排在自动驾驶决策支持中的潜力。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-25 ~ 2026-11-23</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-25</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>13</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-23 05:32:10 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-25 03:16:21 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读 1 篇、精读 0 篇，重点浏览了轨迹预测方向的高分论文《SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction》（8.0/10）。</p>
-<p>最值得看的是它把“演化社交交互图”与“空间推理适配器”结合来做轨迹预测，适合关注人群/智能体交互建模的读者优先阅读。</p>
-<p>下一步建议普通读者先读摘要与交互图构建部分，重点确认该方法在真实拥挤场景中的适用性与计算开销。</p>
+<p>今日筛读14篇论文，精读GraphRAG知识整合诊断研究《GRACE》（8.0/10），速读覆盖自动驾驶扩散规划、LightRAG投毒防御等方向。最值得关注的是GraphRAG中的受控证据干预，以及自动驾驶从端到端扩散规划到通用动作评论家的安全与决策进展。普通读者可先看《GRACE》理解知识整合评测思路，再按兴趣跟进自动驾驶或RAG安全防御。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -80,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GRACE: Controlled Evidence Interventions for Diagnosing and Improving Knowledge Integration in GraphRAG">GRACE: Controlled Evidence Interventions for Diagnosing and Improving Knowledge Integration in GraphRAG</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">13 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction">SRA: Spatial Reasoning Adapter via Evolving Social Interaction Graphs for Trajectory Prediction</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="FIRE-Drive: Feasibility-Informed Risk Evaluation for End-to-End Diffusion Planning">FIRE-Drive: Feasibility-Informed Risk Evaluation for End-to-End Diffusion Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Poisoning Attacks and Collaborative Defense Framework for LightRAG-Based Construction Regulation Knowledge">Poisoning Attacks and Collaborative Defense Framework for LightRAG-Based Construction Regulation Knowledge</span></li><li><span class="dpr-home-dashboard-paper-title" title="Generalist Action Critic: Harnessing Frontier Models in Autonomous Driving">Generalist Action Critic: Harnessing Frontier Models in Autonomous Driving</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">self-driving <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">self-driving <strong>7</strong></span><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>6</strong></span></div>
 </section>
 </div>
 

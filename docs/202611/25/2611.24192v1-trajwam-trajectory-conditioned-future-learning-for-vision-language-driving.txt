@@ -1,0 +1,2374 @@
+TrajWAM: Trajectory-Conditioned
+World Action Modeling for Vision–Language Driving
+Xuerui Fang1
+Gulimila Kezierbieke1,∗
+CHEN WANGXING2
+Hui Li3,∗
+1Xinjiang Agricultural University
+2ToReality (Hangzhou) Network Technology Co., Ltd.
+3Jiangnan University
+∗Corresponding authors: glml@xjau.edu.cn, lihui.cv@jiangnan.edu.cn
+Code and models:
+https://github.com/FangWD520/TrajWAM
+Abstract
+World Action Models (WAMs) connect future scene predic-
+tion with action planning for autonomous driving. Driv-
+ing records pair executed trajectories with observed fu-
+tures, leaving alternative trajectory queries unlabeled. We
+present TrajWAM, a trajectory-conditioned WAM that im-
+proves vision–language driving through auxiliary bird’s-
+eye-view (BEV) future learning. An ego-trajectory query
+conditions DINOv3-aligned BEV predictions from shared
+planner representations. Training combines factual recon-
+struction under the executed trajectory with one-sided fea-
+ture separation under an unlabeled perturbed trajectory.
+Joint optimization with waypoint supervision transfers these
+auxiliary learning signals to the shared planner. Native
+inference directly generates waypoints and bypasses the aux-
+iliary future-prediction branch. On all 220 Bench2Drive
+routes, TrajWAM achieves 91.53 Driving Score and 75.45%
+Success Rate, exceeding a schedule-matched planning-only
+fine-tuning baseline by 5.31 Driving Score points and nine
+successful routes.
+1. Introduction
+Autonomous driving requires recognizing the current scene
+and anticipating its evolution under ego actions. World Ac-
+tion Models (WAMs) connect observations and actions with
+future scene representations [27, 32]. Driving systems learn
+video, latent, or bird’s-eye-view (BEV) futures to support
+planning [11, 13, 28, 40]. When future prediction and plan-
+ning share parameters, observed futures also supervise the
+driving policy during training. This coupling supports direct
+waypoint generation at deployment.
+Representation-space supervision provides a compact in-
+terface for this coupling. DeepSight supervises DINOv3-
+aligned BEV futures within a driving VLM [36], and Latent-
+WAM trains auxiliary latent dynamics alongside a driving
+policy [26]. We study how an explicit future-trajectory query
+can strengthen this auxiliary supervision.
+Trajectory-agnostic supervision predicts future features
+from scene states. A future-waypoint query explicitly links
+these predictions to ego motion (Figure 1(a)). The result-
+ing training problem has asymmetric supervision: driving
+records supply the observed future for the executed trajec-
+tory, while alternative queries have unobserved outcomes.
+Our central question is: How can trajectory queries and
+observed futures jointly improve a vision–language driving
+policy?
+We introduce TrajWAM, a trajectory-conditioned WAM
+that trains a Qwen2.5-VL-3B driving planner with auxiliary
+BEV future supervision [1]. A four-waypoint ego trajectory
+modulates the shared VLM’s future-query states through
+feature-wise linear modulation (FiLM) [17]. A frozen read-
+out maps these states to DINOv3-aligned features at the
+current anchor and four future times [20]. The trajectory
+enters the readout after planner-logit computation, and the
+auxiliary losses backpropagate into shared planner layers.
+Native inference retains the fixed future-query tokens and
+directly generates reasoning and waypoints.
+Our joint objective combines factual reconstruction and
+perturbed-query separation (Figure 1(b)). Factual recon-
+struction aligns the executed-query prediction with observed
+DINOv3 targets. One-sided separation uses this prediction
+as a detached reference and encourages a distinct predic-
+tion under the perturbed query. Both objectives update the
+shared planner, coupling observed-future supervision with
+trajectory-query sensitivity.
+On all 220 Bench2Drive routes [7], TrajWAM achieves
+91.53 Driving Score and 75.45% Success Rate. It improves
+on schedule-matched planning-only continuation by 5.31 DS
+points and nine successful routes. Matched two-seed con-
+1
+arXiv:2611.24192v1  [cs.CV]  18 Nov 2026
+
+
+Figure 1. Motivation and overview of TrajWAM. (a) Trajectory-agnostic future supervision predicts future features and driving waypoints
+from shared scene representations. Introducing trajectory queries creates a supervision challenge: the executed query has an observed future,
+while alternative queries remain unlabeled. (b) Factual reconstruction and query separation jointly train the driving policy, which generates
+waypoints directly at inference. Upper right: reported Driving Score and ability comparisons.
+trols on 120 routes show gains from trajectory conditioning
+and separation. Correct trajectory pairing improves DS by
+4.25 over shuffled pairing. Prediction diagnostics on newly
+collected episodes connect these controls to reconstruction
+quality and executed-query benefits.
+Our contributions are:
+1. Trajectory-conditioned auxiliary training for vision–
+language driving. An external waypoint query condi-
+tions shared future-query states, coupling BEV supervi-
+sion with a policy that directly generates driving way-
+points.
+2. Joint learning from factual and unlabeled trajectory
+queries. Factual reconstruction anchors the observed
+outcome, and one-sided separation trains the readout to
+respond to changes in the trajectory query.
+3. Closed-loop gains supported by matched training con-
+trols. Full-set evaluation establishes planning perfor-
+mance; two-seed controls quantify the gains from trajec-
+tory conditioning, separation, and correct query pairing.
+Joint planning–prediction diagnostics relate these gains
+to reconstruction quality and query responses.
+2. Related Work
+World action models and video-generative priors.
+DreamZero [32] jointly models video and robot actions with
+a pretrained video-diffusion backbone. Drive-WM [28] syn-
+thesizes maneuver-conditioned multi-view driving videos for
+trajectory selection. GenCeption [25] studies transferable
+visual representations and vision–language alignment from
+video-generative pretraining.
+Representation-space futures in driving.
+LAW [11] pre-
+dicts perspective and BEV latents conditioned on ego tra-
+jectories. WoTE [13] and World4Drive [40] use candidate-
+dependent futures for online trajectory selection. UniDrive-
+WM [30], DriveWorld-VLA [4], VLA-World [24], and
+Latent-CoT-Drive [23] integrate future generation or latent
+imagination with VLM/VLA planning. DriveVLA-W0 [12]
+makes future-image prediction optional at inference, while
+HyWorldVLA [33] combines latent prediction with pixel
+reconstruction.
+2
+
+
+Planner-native semantic futures.
+DeepSight [36] pre-
+dicts DINOv3-aligned BEV futures alongside VLM reason-
+ing and planning. Latent-WAM [26] predicts latent transi-
+tions from scene and ego-state history, including commands,
+velocity, and acceleration, using EMA-encoder targets and
+omitting its dynamics module at inference. Building on
+DeepSight-style future supervision, TrajWAM introduces an
+external future-waypoint query into the VLM’s future states
+and jointly trains factual reconstruction and perturbed-query
+separation. Its training interface combines fixed DINOv3
+targets for the executed query with a separation objective for
+unlabeled queries.
+Training-time supervision and candidate evaluation.
+EgoWAM [10] compares pixel-, DINO-, and motion-
+targeted supervision. Fast-WAM [34] and SimWAM [38]
+bypass future prediction at inference, whereas Faster-
+WAM [37] retains sparse future conditioning.
+DA-
+WAM [41] addresses single-outcome driving logs by su-
+pervising the expert-matched candidate with future latents
+and all candidates with factor, utility, and ranking targets for
+online evaluation. TrajWAM uses perturbed-query separa-
+tion to train shared policy representations and deploys direct
+waypoint generation.
+3. Method
+3.1. Problem Setup and Base Planner
+TrajWAM trains an action-generating VLM with a trajectory-
+conditioned world readout. The readout and waypoint gen-
+erator share planner states. Factual future supervision and
+trajectory-query separation update the trainable planner lay-
+ers through this shared representation.
+At time t, the planner receives Xt = (Ot, st, rt, qfw),
+where Ot contains four historical front-camera frames and
+a current six-camera surround-view observation, st is the
+ego state, rt is the route/target instruction, and qfw is a fixed
+block of future-world query tokens. These tokens remain
+in the VLM sequence during training and inference. Their
+trajectory-conditioned readout operates during training. A
+Qwen2.5-VL-3B planner Pϕ produces hidden states
+Ht = Pϕ(Xt) ∈RL×D,
+D = 2048,
+(1)
+and autoregressively generates four future waypoints bAt =
+{(bak,1, bak,2)}4
+k=1. The inherited PID controller converts
+these waypoints into low-level control.
+We first train the Base Planner (Phase I) with token-
+level reasoning-and-waypoint supervision and a trajectory-
+agnostic DINOv3-aligned BEV future-representation objec-
+tive inspired by DeepSight [36]. Starting from the Base
+Planner (Phase I) checkpoint, TrajWAM introduces the tra-
+jectory address and jointly optimizes native waypoint gen-
+eration with trajectory-conditioned DINOv3-aligned BEV
+future-representation learning. Let
+T = {0, 0.5, 1.0, 1.5, 2.0} s,
+(2)
+denote the five supervised BEV times, comprising the current
+anchor and four future observations aligned to the current
+ego frame. The aligned images {B⋆
+t+τ}τ∈T supply frozen
+DINOv3 targets for auxiliary supervision.
+In Figure 2(a), green tokens supply future-query states to
+Latent FiLM, and the ActionEncoder supplies the trajectory
+embedding. The DINO block encodes observed BEV targets.
+3.2. Logged and Noisy Trajectory Queries
+Each training record supplies one realized ego trajectory
+A⋆
+t = [a⋆
+t,1, . . . , a⋆
+t,4] ∈R4×2, expressed in metres in the
+current ego frame, with coordinates ordered as [forward,
+lateral]. It supplies the factual trajectory query for auxiliary
+training. We construct a noisy alternative
+(A−
+t )k,1 = ρk(A⋆
+t )k,1,
+ρk ∼U(0.7, 1.3),
+(A−
+t )k,2 = (A⋆
+t )k,2 + ϵk,
+ϵk ∼N(0, 22),
+k ∈{1, . . . , 4}.
+(3)
+Forward distances are independently scaled, and lateral coor-
+dinates receive Gaussian noise. The pair {A⋆
+t , A−
+t } presents
+the same scene under two trajectory queries. The logged
+query receives observed-future supervision; the perturbed
+query supplies the feature-separation objective.
+3.3. Trajectory Address and Latent FiLM
+For either query A ∈{A⋆
+t , A−
+t }, the ActionEncoder flattens
+and normalizes its coordinates and maps them to the VLM
+hidden dimension:
+zt(A) = vec(A)/σ,
+σ = 10,
+et(A) = W2 GELU(W1zt(A) + b1) + b2 ∈RD.
+(4)
+Let M fw
+t,τ select the valid future-world query tokens at hori-
+zon τ and let Qt,τ = Ht[M fw
+t,τ]. The same sample-level
+address is broadcast over all valid tokens and all five hori-
+zons. Latent FiLM produces
+[∆γt(A), βt(A)] = Flat(et(A)),
+eQt,τ(A) = (1 + ∆γt(A)) ⊙Qt,τ + βt(A).
+(5)
+Zero-initializing the FiLM projection gives the identity trans-
+form. Trajectory conditioning is applied to the auxiliary
+readout after planner-logit computation.
+3.4.
+DINOv3-Aligned
+Prediction
+from
+Single-
+Outcome Logs
+The readout between Latent FiLM and Loss in Figure 2(a)
+uses a DINO-space projection V : RD →R1024, learned
+3
+
+
+T = t-0.5s, t-1s, ...
+T = t
+Vision 
+Encoder
+Latent FiLM
+VLM
+Text 
+Tokenizer
+trajectory-query pair
+Trajectory Encoding
+Future World Query
+Ego & Instruction
+Action
+Encoder
+DINO
+Loss
+Loss MSE
+Trajectory
+Logged
+Trajectory
+Noisy
+Trajectory 
+Reasoning tokens
+t
+t + 0.5s
+t + 1s
+t + 1.5s
+t + 2s
+(a) TrajWAM
+(b) trajectory-query pair
+(c) Latent FiLM
+Train & Infer
+Training only
+Trained
+last 4 layers
+Frozen
+Future
+ego poses
+alternative
+query
+Coord. 
+Perturbation
+Linear
+Future World
+Figure 2. Overview of TrajWAM. (a) Shared planning and trajectory-conditioned auxiliary learning. (b) Logged and perturbed trajectory
+queries. (c) FiLM conditioning. Sections 3.4–3.5 detail the readout and objectives. Solid arrows denote training and inference; dashed
+arrows denote training-only computation.
+with the Base Planner (Phase I) and frozen during TrajWAM
+training:
+bYt,τ(A) = V
+
+eQt,τ(A)
+
+,
+bYt(A) = {bYt,τ(A)}τ∈T .
+(6)
+A frozen DINOv3 ViT-L/16 teacher constructs the factual
+targets
+Y ⋆
+t,τ = sg
+
+DINOv3
+ B⋆
+t+τ
+
+Ω,
+τ ∈T ,
+(7)
+where Ωselects the CLS token and valid patch tokens; reg-
+ister tokens are excluded. “Loss MSE” in Figure 2(c) is
+computed after projection:
+Lfact = MSEτ,Ω
+
+bYt,τ(A⋆
+t ), Y ⋆
+t,τ
+
+.
+(8)
+The unlabeled query A−
+t is trained through the valid-token
+feature distance
+dsem(U, Z) = meanτ,Ω,c |Uτ,Ω,c −Zτ,Ω,c|,
+(9)
+where c ∈{1, . . . , 1024} indexes the raw, unnormalized
+DINO feature channels. We then use the one-sided separa-
+tion objective
+Lsep =
+h
+msem −dsem
+
+sg
+
+bYt(A⋆
+t )
+
+, bYt(A−
+t )
+i
++ ,
+(10)
+where [x]+ = max(x, 0). The factual prediction anchors
+the separation margin under stop-gradient; gradients flow
+through the perturbed prediction.
+3.5. Objective, Gradient Routing, and Native Infer-
+ence
+The auxiliary “Loss” in Figure 2(a) combines factual recon-
+struction and separation; the full objective includes planning
+supervision:
+L = Lrec + 2Lfact + λsepLsep,
+(11)
+where Lrec is token-level cross-entropy for reasoning and
+waypoint generation, msem is the DINO-space margin, and
+λsep weights separation. Both auxiliary losses update the
+ActionEncoder, latent FiLM, and final four trainable plan-
+ner layers. Factual reconstruction differentiates through the
+logged-query prediction; separation differentiates through
+the perturbed-query prediction and uses the logged predic-
+tion as a detached reference. The frozen DINO projection
+transmits gradients to its input states. The vision tower and
+multimodal projector remain frozen, and the frozen DINOv3
+teacher supplies targets under stop-gradient. The planning
+loss updates the trainable planner layers.
+Native inference runs autoregressive reasoning and way-
+point generation followed by the inherited PID controller.
+4
+
+
+The fixed future-query tokens remain in the prompt, and the
+auxiliary trajectory-conditioned readout is bypassed. On an
+RTX 5090, median generation takes 3.5086 s for TrajWAM
+and 3.4926 s for public DeepSight (Appendix E.3).
+4. Results
+4.1. Experimental Setup
+Phase I trains our in-house Base Planner (Phase I) from
+Qwen2.5-VL-3B using autoregressive reasoning/waypoint
+supervision and trajectory-agnostic DINOv3 future recon-
+struction, following the DeepSight-style recipe. Phase II
+adds trajectory conditioning and perturbed-query supervi-
+sion to this shared starting point.
+Phase II starts from this checkpoint and trains TrajWAM
+for 24 epochs on 226,656 Bench2Drive examples. We use
+eight A100 GPUs, BF16, an effective batch size of 64,
+AdamW with cosine decay and 10% warm-up, and train-
+ing seed 42 for the 220-route evaluation. Learning rates are
+2 × 10−5 for the last four planner layers and 2 × 10−4 for
+TrajWAM modules; no validation-based checkpoint selec-
+tion is used. Optimization details appear in Appendix A;
+checkpoint parameter counts appear in Appendix D.
+Model variants.
+Our in-house Base Planner (Phase I) ini-
+tializes all four Phase-II variants in Tables 11 and 3; each
+is independently fine-tuned (FT) for 24 epochs. Base Plan-
+ner (planning-only FT) optimizes reasoning and waypoint
+generation. Base Planner (unconditioned future FT) adds
+trajectory-agnostic factual DINOv3 reconstruction.
+Tra-
+jWAM w/o separation conditions factual reconstruction on
+the trajectory query, and TrajWAM adds the separation ob-
+jective. All four variants share the Phase-I DINOv3 training
+history. Table 1 compares them with published DeepSight
+results and other driving methods.
+Closed-loop evaluation covers all 220 routes in the
+Bench2Drive Base Set and reports the official Driving Score
+(DS) and strict Success Rate (SR). DS averages route comple-
+tion weighted by infraction penalties, and SR counts strictly
+successful routes. For the 220-route results in Tables 1, 2, 3,
+and 11, each Phase-II variant uses seed 42 and one complete
+simulator sweep. Table 4 uses seeds 42 and 43, with one
+sweep of the same fixed 120 routes per checkpoint. Prior-
+method scores come from their publications. Appendix E.1
+specifies the checkpoints, new episodes, and protocol for
+prediction diagnostics.
+4.2. Closed-Loop Planning and Phase-II Controls
+Overall closed-loop performance.
+TrajWAM achieves
+the highest DS (91.53) and SR (75.45%) among the meth-
+ods in Table 1. It exceeds the next-best DS of 89.15 from
+SparseDriveV2 by 2.38 points and the next-best SR of
+72.73% from DynVLA by 2.72 percentage points. TrajWAM
+also obtains 171.41 Efficiency and 15.27 Smoothness.
+Multi-ability performance.
+TrajWAM leads Merging
+(75.00%) and ties the highest Give Way score (50.00%) in
+Table 2. It ranks second in Overtaking (82.22%) and Traffic
+Sign (77.37%). Across the five abilities, its mean is 69.92%,
+second overall and 0.28 percentage points below DeepSight.
+Emergency Brake scores are 65.00% for TrajWAM, 78.33%
+for DeepSight, and 83.10% for GeRo-Qwen2.5VL.
+TrajWAM improves over the schedule-matched Base
+Planner (planning-only FT) control by 5.31 DS points and
+4.09 percentage points in SR, adding nine successful routes
+(Appendix Table 11). Table 3 compares the contributions of
+factual reconstruction, trajectory conditioning, and separa-
+tion under the shared Phase-II setup.
+Component ablation.
+The trajectory-agnostic Base Plan-
+ner (unconditioned future FT) reference reaches 85.34 DS
+and 73.18% SR (161/220), compared with 86.22 DS and
+71.36% SR (157/220) for Base Planner (planning-only FT).
+Adding trajectory conditioning yields TrajWAM w/o sep-
+aration with 89.34 DS and 74.55% SR (164/220): a gain of
+4.00 DS points and three successful routes over Base Plan-
+ner (unconditioned future FT). Adding separation further
+raises performance to 91.53 DS and 75.45% SR (166/220),
+contributing another 2.19 DS points and two successful
+routes.
+Multi-seed subset evaluation.
+The planning gains hold
+across both training seeds on a fixed 120-route subset cov-
+ering all 44 scenario types (Table 4). TrajWAM achieves
+88.45±0.34 DS and 68.75±0.59% SR across seeds 42 and
+43. Mean gains are 5.55 DS over planning-only FT, 2.05 DS
+over TrajWAM w/o separation, and 2.50 DS over matched
+additive conditioning (Appendix F). Across the four paired
+component comparisons, conditional 95% intervals lie above
+zero for DS and include zero for SR (Appendix Table 13).
+4.3. Future-Representation and Trajectory-Query
+Diagnostics
+We evaluate prediction quality and query correspondence
+using the same checkpoints as the matched planning controls.
+The evaluation comprises 374 windows from 15 newly col-
+lected episodes across nine maps; 371 windows have fixed,
+speed- and direction-matched alternative queries. All vari-
+ants and both training seeds share observations, targets, and
+query pairs (Appendix F.2).
+Correct trajectory–scene pairing improves training: rela-
+tive to within-group shuffled pairing, the complete method
+gains 4.25 DS across seeds 42 and 43, with a paired 95% in-
+terval of [2.64, 5.89]; SR increases by 1.67 percentage points
+(Appendix F.1). Its executed-query benefit is 6.00 × 10−5
+5
+
+
+Table 1. Bench2Drive Base Set closed-loop results. Venue reports conference/preprint and year; ∗denotes expert-feature distillation.
+Bold/underlined values mark the best/second-best listed results.
+Method
+Venue
+Paradigm
+Expert
+Closed-loop
+DS↑
+SR(%)↑Efficiency↑Smoothness↑
+TCP* [29]
+NeurIPS ’22
+E2E
+Think2Drive 40.70
+15.00
+54.26
+47.80
+ThinkTwice* [6]
+CVPR ’23
+E2E
+Think2Drive 62.44
+31.23
+69.33
+16.22
+DriveAdapter* [5]
+ICCV ’23
+E2E
+Think2Drive 64.22
+33.08
+70.22
+16.01
+VAD [9]
+ICCV ’23
+E2E
+Think2Drive 42.35
+15.00
+157.94
+46.01
+GenAD [39]
+ECCV ’24
+E2E
+Think2Drive 44.81
+15.90
+-
+-
+MomAD [21]
+CVPR ’25
+E2E
+Think2Drive 44.54
+16.71
+170.21
+48.63
+DriveTransformer [8]
+ICLR ’25
+E2E
+Think2Drive 63.46
+35.01
+100.64
+20.78
+DiffusionDrive [14]
+CVPR ’25
+E2E
+PDM-Lite
+77.68
+52.72
+-
+-
+SparseDriveV2 [22]
+ECCV ’26
+E2E
+Think2Drive 89.15
+70.00
+199.84
+18.32
+ReasonPlan [15]
+CoRL ’25
+VLM
+Think2Drive 64.01
+34.55
+180.64
+25.63
+ORION [2]
+ICCV ’25
+VLM
+Think2Drive 77.74
+54.62
+151.48
+17.38
+SimLingo [18]
+CVPR ’25
+VLM
+PDM-Lite
+85.94
+66.82
+244.18
+25.49
+AutoVLA [42]
+NeurIPS ’25
+VLM
+Think2Drive 78.84
+57.73
+146.93
+39.33
+DeepSight [36]
+ICML ’26
+VLM
+Think2Drive 86.23
+71.36
+201.71
+16.11
+UniDrive-WM [30]
+ECCV ’26
+WM
+Think2Drive 79.31
+56.42
+158.65
+27.93
+GeRo-Qwen2.5VL [31]
+CVPR ’26
+WM
+Think2Drive 79.60
+57.80
+159.66
+44.75
+DynVLA [19]
+ICML ’26
+WM
+Think2Drive 88.34
+72.73
+-
+-
+LVDrive [16]
+arXiv ’26
+WAM
+Think2Drive 80.71
+58.26
+155.77
+14.34
+TrajWAM (Ours)
+This work
+WAM
+Think2Drive 91.53
+75.45
+171.41
+15.27
+MSE, exceeding shuffled training by 5.70 × 10−5, with a
+paired interval of [0.50, 11.80] × 10−5 (Figure 3).
+Trajectory conditioning reduces future MSE from
+0.03110 to 0.02985 and improves DS by 4.10 over uncon-
+ditioned supervision. Adding separation further raises DS
+by 2.05, while MSE becomes 0.03020 (Table 17). Together,
+these controls support trajectory-aligned auxiliary supervi-
+sion for policy learning: conditioning improves both predic-
+tion and planning, and separation adds planning gains with
+higher aggregate MSE. Fixed-query responses vary across
+scenes (Appendix E.2).
+Qualitative closed-loop comparisons.
+Figure 4 compares
+three selected routes under matching scenario and weather
+configurations. TrajWAM slows for the highway cut-in
+and crossing traffic, then completes both routes; DeepSight
+records collisions and, in the second case, route deviation.
+At the nighttime intersection, TrajWAM proceeds through
+traffic while DeepSight remains stopped until blocked-agent
+termination.
+0
+4
+8
+12
+ΔMSE (×10−5)
+No separation
+Matched additive
+Shuffled pairing
+TrajWAM (correct)
+Correct − shuffled
+Figure 3. Executed-query benefits under different training variants,
+averaged over seeds 42 and 43 and 15 routes. Positive ∆MSE
+favors executed over mismatched queries on 371 fixed windows.
+Bars show conditional route-bootstrap 95% intervals; the bottom
+row directly compares correct and shuffled training.
+6
+
+
+Table 2. Bench2Drive multi-ability results (%). Venue and expert-feature distillation (∗) follow Table 1. Bold/underlined values mark the
+best/second-best listed results.
+Method
+Venue
+Paradigm
+Ability (%) ↑
+Merging Overtaking Emergency Brake Give Way Traffic Sign Mean
+TCP* [29]
+NeurIPS ’22
+E2E
+16.18
+20.00
+20.00
+10.00
+6.99
+14.63
+ThinkTwice* [6]
+CVPR ’23
+E2E
+27.38
+18.42
+35.82
+50.00
+54.23
+37.17
+DriveAdapter* [5]
+ICCV ’23
+E2E
+28.82
+26.38
+48.76
+50.00
+56.43
+42.08
+AD-MLP [35]
+arXiv ’23
+E2E
+0.00
+0.00
+0.00
+0.00
+4.35
+0.87
+UniAD-Base [3]
+CVPR ’23
+E2E
+14.10
+17.78
+21.67
+10.00
+14.21
+15.55
+VAD [9]
+ICCV ’23
+E2E
+8.11
+24.44
+18.64
+20.00
+19.15
+18.07
+DriveTransformer [8]
+ICLR ’25
+E2E
+17.57
+35.00
+48.36
+40.00
+52.10
+38.60
+SparseDriveV2 [22]
+ECCV ’26
+E2E
+66.25
+75.55
+75.00
+50.00
+71.57
+67.67
+ReasonPlan [15]
+CoRL ’25
+VLM
+37.50
+26.67
+33.30
+40.00
+45.79
+36.66
+ORION [2]
+ICCV ’25
+VLM
+25.00
+71.11
+78.33
+30.00
+69.15
+54.72
+SimLingo [18]
+CVPR ’25
+VLM
+60.00
+60.00
+78.33
+50.00
+77.89
+65.25
+DeepSight [36]
+ICML ’26
+VLM
+60.00
+91.11
+78.33
+50.00
+71.58
+70.20
+UniDrive-WM [30]
+ECCV ’26
+WM
+29.97
+74.64
+79.98
+40.00
+71.54
+59.23
+GeRo-Qwen2.5VL [31]
+CVPR ’26
+WM
+37.83
+72.81
+83.10
+50.00
+66.17
+61.98
+LVDrive [16]
+arXiv ’26
+WAM
+39.74
+69.89
+71.67
+20.00
+74.21
+54.90
+TrajWAM (Ours)
+This work
+WAM
+75.00
+82.22
+65.00
+50.00
+77.37
+69.92
+Table 3. Phase-II component ablation on 220 routes under the setup in Section 4.1. Factual DINO denotes target reconstruction, unconditioned
+in Base Planner (unconditioned future FT); Traj.-FiLM comprises the ActionEncoder and latent FiLM; Sep. denotes Equation 10. The Base
+Planner (planning-only FT) control is shared with Table 11.
+Model
+Factual DINO Traj.-FiLM Sep.
+DS↑
+SR↑
+Base Planner (planning-only FT)
+–
+–
+–
+86.22 71.36%
+Base Planner (unconditioned future FT)
+✓
+–
+–
+85.34 73.18%
+TrajWAM w/o separation
+✓
+✓
+–
+89.34 74.55%
+TrajWAM
+✓
+✓
+✓
+91.53 75.45%
+Table 4. Matched two-seed DS comparisons on the fixed 120-route subset. Summary values are mean ± sample standard deviation across
+seeds 42 and 43. All rows share the Phase-I initialization and 24-epoch training budget.
+Training variant
+Seed 42 DS ↑
+Seed 43 DS ↑
+Mean DS ± SD
+Planning-only FT
+82.64
+83.16
+82.90 ± 0.37
+Unconditioned future FT
+82.11
+82.49
+82.30 ± 0.27
+TrajWAM w/o separation
+86.28
+86.52
+86.40 ± 0.17
+TrajWAM (additive)
+86.07
+85.83
+85.95 ± 0.17
+TrajWAM (correct pairing)
+88.69
+88.21
+88.45 ± 0.34
+Shuffled pairing
+84.02
+84.38
+84.20 ± 0.25
+5. Conclusion
+TrajWAM turns observed futures and unlabeled trajectory
+queries into joint auxiliary supervision for vision–language
+driving. Factual reconstruction and one-sided separation
+train shared planner representations, and the deployed plan-
+ner directly generates waypoints. On all 220 Bench2Drive
+routes, it achieves 91.53 DS and 75.45% SR, improving
+on planning-only continuation by 5.31 DS points and nine
+successful routes. Matched training controls establish the
+contribution of trajectory conditioning, separation, and cor-
+7
+
+
+rect query pairing to these planning gains.
+8
+
+
+v = 15.7 m/s
+v = 10.1 m/s
+v = 1.0 m/s
+v = 16.6 m/s
+v = 8.0 m/s
+v = 3.1 m/s
+v = 5.0 m/s
+v = 1.2 m/s
+v = 9.1 m/s
+v = 5.9 m/s
+v = 4.5 m/s
+v = 7.7 m/s
+v = 3.9 m/s
+v = 8.5 m/s
+v = 8.6 m/s
+v = 0.0 m/s
+v = 0.0 m/s
+v = 0.0 m/s
+(a) Highway cut-in under low visibility
+DeepSight: vehicle collision; TrajWAM: successful completion
+(b) Blocked intersection
+DeepSight: collision + route deviation; TrajWAM: successful completion
+(c) Nighttime intersection
+DeepSight: blocked at 79.8 s; TrajWAM: successful completion
+TrajWAM
+t = 11.9 s
+t = 12.9 s
+t = 13.9 s
+DeepSight
+t = 11.3 s
+t = 12.3 s
+t = 14.2 s
+TrajWAM
+t = 7.0 s
+t = 8.3 s
+t = 12.9 s
+DeepSight
+t = 7.0 s
+t = 8.3 s
+t = 12.9 s
+TrajWAM
+t = 13.0 s
+t = 17.0 s
+t = 20.5 s
+DeepSight
+t = 21.8 s
+t = 50.8 s
+t = 79.8 s
+Figure 4. Selected closed-loop comparisons with DeepSight under matching route, scenario, and weather configurations. Each case shows
+TrajWAM above DeepSight. Recorded DeepSight outcomes are (a) vehicle collision, (b) collision and route deviation, and (c) blocked-agent
+termination; TrajWAM completes all three routes successfully. Arrows indicate chronological order within each row, with actual simulation
+times and speeds. Columns use nearby ego positions in (a), equal elapsed times in (b), and independent time sequences in (c) to show
+progression versus persistent standstill.
+9
+
+
+LLM Usage Statement
+GPT-6 was used solely to refine author-written text and code.
+The authors reviewed and verified all changes and take full
+responsibility for the manuscript.
+References
+[1] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge,
+Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun Tang,
+Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhaohai Li,
+Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren Fu, Yiheng
+Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen Cheng, Hang
+Zhang, Zhibo Yang, Haiyang Xu, and Junyang Lin. Qwen2.5-
+VL technical report. arXiv preprint arXiv:2502.13923, 2025.
+[2] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui,
+Dingkang Liang, Chong Zhang, Dingyuan Zhang, Hongwei
+Xie, Bing Wang, and Xiang Bai. Orion: A holistic end-
+to-end autonomous driving framework by vision-language
+instructed action generation. In 2025 IEEE/CVF International
+Conference on Computer Vision (ICCV), pages 24823–24834.
+IEEE, 2025.
+[3] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, et al.
+Planning-oriented autonomous driving.
+In
+2023 IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 17853–17862. IEEE, 2023.
+[4] Feiyang Jia, Lin Liu, Ziying Song, Caiyan Jia, Hangjun Ye,
+Xiaoshuai Hao, and Long Chen. DriveWorld-VLA: Unified
+latent-space world modeling with vision-language-action for
+autonomous driving. arXiv preprint arXiv:2602.06521, 2026.
+[5] Xiaosong
+Jia,
+Yulu
+Gao,
+Li
+Chen,
+Junchi
+Yan,
+Patrick Langechuan Liu, and Hongyang Li. Driveadapter:
+Breaking the coupling barrier of perception and planning
+in end-to-end autonomous driving.
+In 2023 IEEE/CVF
+International Conference on Computer Vision (ICCV), pages
+7919–7929. IEEE, 2023.
+[6] Xiaosong Jia, Penghao Wu, Li Chen, Jiangwei Xie, Conghui
+He, Junchi Yan, and Hongyang Li. Think twice before driv-
+ing: Towards scalable decoders for end-to-end autonomous
+driving. In 2023 IEEE/CVF Conference on Computer Vision
+and Pattern Recognition (CVPR), pages 21983–21994. IEEE,
+2023.
+[7] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and
+Junchi Yan. Bench2Drive: Towards multi-ability benchmark-
+ing of closed-loop end-to-end autonomous driving. In Ad-
+vances in Neural Information Processing Systems, pages 819–
+844. Curran Associates, Inc., 2024.
+[8] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan.
+Drivetransformer: Unified transformer for scalable end-to-
+end autonomous driving. In International Conference on
+Learning Representations, pages 67227–67243, 2025.
+[9] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen,
+Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and
+Xinggang Wang. Vad: Vectorized scene representation for ef-
+ficient autonomous driving. In 2023 IEEE/CVF International
+Conference on Computer Vision (ICCV), pages 8306–8316.
+IEEE, 2023.
+[10] Baoyu Li, Xinchen Yin, Mengying Lin, Yixin Zhang, and
+Danfei Xu. EgoWAM: World action models beyond pix-
+els with in-the-wild egocentric human data. arXiv preprint
+arXiv:2607.08436, 2026.
+[11] Yingyan Li, Lue Fan, Jiawei He, Yuqi Wang, Yuntao Chen,
+Zhaoxiang Zhang, and Tieniu Tan. Enhancing end-to-end au-
+tonomous driving with latent world model. In The Thirteenth
+International Conference on Learning Representations, 2025.
+[12] Yingyan Li, Shuyao Shang, Weisong Liu, Bing Zhan,
+Haochen Wang, Yuqi Wang, Yuntao Chen, Xiaoman Wang,
+Yasong An, Chufeng Tang, Lu Hou, Lue Fan, and Zhaoxiang
+Zhang. DriveVLA-W0: World models amplify data scaling
+law in autonomous driving. arXiv preprint arXiv:2510.12796,
+2025.
+[13] Yingyan Li, Yuqi Wang, Yang Liu, Jiawei He, Lue Fan, and
+Zhaoxiang Zhang. End-to-end driving with online trajec-
+tory evaluation via BEV world model. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision
+(ICCV), pages 27137–27146, 2025.
+[14] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng
+Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang,
+Qian Zhang, et al. Diffusiondrive: Truncated diffusion model
+for end-to-end autonomous driving. In 2025 IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition (CVPR),
+pages 12037–12047. IEEE, 2025.
+[15] Xueyi Liu, Zuodong Zhong, Yuxin Guo, Yun-Fu Liu, Zhiguo
+Su, Qichao Zhang, Junli Wang, Yinfeng Gao, Yupeng Zheng,
+Qiao Lin, et al. Reasonplan: Unified scene prediction and
+decision reasoning for closed-loop autonomous driving. arXiv
+preprint arXiv:2505.20024, 2025.
+[16] Xiaodong Mei, Diankun Zhang, Hongwei Xie, Guang Chen,
+Hangjun Ye, and Dan Xu. Lvdrive: Latent visual represen-
+tation enhanced vision-language-action autonomous driving
+model. arXiv preprint arXiv:2605.22089, 2026.
+[17] Ethan Perez, Florian Strub, Harm de Vries, Vincent Dumoulin,
+and Aaron Courville. FiLM: Visual reasoning with a general
+conditioning layer. Proceedings of the AAAI Conference on
+Artificial Intelligence, 32(1):3942–3951, 2018.
+[18] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski.
+Simlingo: Vision-only closed-loop autonomous driving with
+language-action alignment. In 2025 IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), pages
+11993–12003. IEEE, 2025.
+[19] Shuyao Shang, Bing Zhan, Yunfei Yan, Yuqi Wang, Yingyan
+Li, Yasong An, Xiaoman Wang, Jierui Liu, Lu Hou, Lue Fan,
+et al. Dynvla: Learning world dynamics for action reasoning
+in autonomous driving. arXiv preprint arXiv:2603.11041,
+2026.
+[20] Oriane Siméoni, Huy V. Vo, Maximilian Seitzer, Federico
+Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc
+Szafraniec, Seungeun Yi, Michaël Ramamonjisoa, Francisco
+Massa, Daniel Haziza, Luca Wehrstedt, Jianyuan Wang, Tim-
+othée Darcet, Théo Moutakanni, Leonel Sentana, Claire
+Roberts, Andrea Vedaldi, Jamie Tolan, John Brandt, Camille
+Couprie, Julien Mairal, Hervé Jégou, Patrick Labatut, and Pi-
+otr Bojanowski. DINOv3. arXiv preprint arXiv:2508.10104,
+2025.
+10
+
+
+[21] Ziying Song, Caiyan Jia, Lin Liu, Hongyu Pan, Yongchang
+Zhang, Junming Wang, Xingyu Zhang, Shaoqing Xu, Lei
+Yang, and Yadan Luo. Don’t shake the wheel: Momentum-
+aware planning in end-to-end autonomous driving. In 2025
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 22432–22441. IEEE, 2025.
+[22] Wenchao Sun, Xuewu Lin, Keyu Chen, Zixiang Pei, Xiang
+Li, Yining Shi, and Sifa Zheng. Sparsedrivev2: Scoring is all
+you need for end-to-end autonomous driving. arXiv preprint
+arXiv:2603.29163, 2026.
+[23] Shuhan Tan, Kashyap Chitta, Yuxiao Chen, Ran Tian, Yurong
+You, Yan Wang, Wenjie Luo, Yulong Cao, Philipp Krähen-
+bühl, Marco Pavone, and Boris Ivanovic. Latent chain-of-
+thought world modeling for end-to-end autonomous driving.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR), pages 39724–39733,
+2026.
+[24] Guoqing Wang, Pin Tang, Xiangxuan Ren, Guodongfang
+Zhao, Bailan Feng, and Chao Ma. Learning vision-language-
+action world models for autonomous driving. arXiv preprint
+arXiv:2604.09059, 2026.
+[25] Letian Wang, Chuhan Zhang, Rishabh Kabra, Jasper Ui-
+jlings, Steven Waslander, Andrew Zisserman, Joao Carreira,
+Kaiming He, Misha Andriluka, Eduard Gabriel Bazavan, An-
+drei Zanfir, and Cristian Sminchisescu. Video generation
+models are general-purpose vision learners. arXiv preprint
+arXiv:2607.09024, 2026. ECCV 2026 (author-reported).
+[26] Linbo Wang, Yupeng Zheng, Qiang Chen, Shiwei Li, Yichen
+Zhang, Zebin Xing, Qichao Zhang, Xiang Li, Deheng Qian,
+Pengxuan Yang, Yihang Dong, Ce Hao, Xiaoqing Ye, Junyu
+Han, Yifeng Pan, and Dongbin Zhao. Latent-WAM: Latent
+world action modeling for end-to-end autonomous driving.
+arXiv preprint arXiv:2603.24581v1, 2026.
+[27] Siyin Wang, Junhao Shi, Zhaoyang Fu, Xinzhe He, Feihong
+Liu, Chenchen Yang, Yikang Zhou, Zhaoye Fei, Jingjing
+Gong, Jinlan Fu, Mike Zheng Shou, Xuanjing Huang, Xipeng
+Qiu, and Yu-Gang Jiang. World Action Models: The next
+frontier in embodied AI. arXiv preprint arXiv:2605.12090,
+2026.
+[28] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen,
+and Zhaoxiang Zhang. Driving into the future: Multiview
+visual forecasting and planning with world model for au-
+tonomous driving. In Proceedings of the IEEE/CVF Confer-
+ence on Computer Vision and Pattern Recognition (CVPR),
+pages 14749–14759, 2024.
+[29] Penghao Wu, Xiaosong Jia, Li Chen, Junchi Yan, Hongyang
+Li, and Yu Qiao. Trajectory-guided control prediction for
+end-to-end autonomous driving: A simple yet strong baseline.
+Advances in Neural Information Processing Systems, 35:6119–
+6132, 2022.
+[30] Zhexiao Xiong, Xin Ye, Burhan Yaman, Sheng Cheng, Yiren
+Lu, Jingru Luo, Nathan Jacobs, and Liu Ren. UniDrive-WM:
+Unified understanding, planning and generation world model
+for autonomous driving. arXiv preprint arXiv:2601.04453,
+2026.
+[31] Rajeev Yasarla, Deepti Hegde, Shizhong Han, Hsin-Pai
+Cheng, Yunxiao Shi, Meysam Sadeghigooghari, Shweta Ma-
+hajan, Apratim Bhattacharyya, Litian Liu, Risheek Garrepalli,
+et al. Generative scenario rollouts for end-to-end autonomous
+driving. arXiv preprint arXiv:2601.11475, 2026.
+[32] Seonghyeon Ye, Yunhao Ge, Kaiyuan Zheng, Shenyuan Gao,
+Sihyun Yu, George Kurian, Suneel Indupuru, You Liang Tan,
+Chuning Zhu, Jiannan Xiang, Ayaan Malik, Kyungmin Lee,
+William Liang, Nadun Ranawaka, Jiasheng Gu, Yinzhen Xu,
+Guanzhi Wang, Fengyuan Hu, Avnish Narayan, Johan Bjorck,
+Jing Wang, Gwanghyun Kim, Dantong Niu, Ruijie Zheng,
+Yuqi Xie, Jimmy Wu, Qi Wang, Ryan Julian, Danfei Xu,
+Yilun Du, Yevgen Chebotar, Scott Reed, Jan Kautz, Yuke
+Zhu, Linxi “Jim” Fan, and Joel Jang. World action models are
+zero-shot policies. arXiv preprint arXiv:2602.15922, 2026.
+[33] Quanfu Yu, Xian Wu, Hao Xu, and Liulong Ma.
+Hy-
+WorldVLA: A vision-language-action model with hybrid
+world modeling for autonomous driving.
+arXiv preprint
+arXiv:2607.20988, 2026.
+[34] Tianyuan Yuan, Zibin Dong, Yicheng Liu, and Hang Zhao.
+Fast-WAM: Do world action models need test-time future
+imagination? arXiv preprint arXiv:2603.16666, 2026.
+[35] Jiang-Tian Zhai, Ze Feng, Jinhao Du, Yongqiang Mao, Jiang-
+Jiang Liu, Zichang Tan, Yifu Zhang, Xiaoqing Ye, and Jing-
+dong Wang. Rethinking the open-loop evaluation of end-
+to-end autonomous driving in nuscenes.
+arXiv preprint
+arXiv:2305.10430, 2023.
+[36] Lingjun Zhang, Changjie Wu, Linzhe Shi, Jiangyang Li, Ji-
+axin Liu, Lei Yang, Hang Zhang, Mu Xu, and Hong Wang.
+Deepsight: Long-horizon world modeling via latent states
+prediction for end-to-end autonomous driving. arXiv preprint
+arXiv:2605.10564, 2026.
+[37] Weiheng Zhao, Haoyi Jiang, Xin Shi, Liu Liu, Fan Huang,
+Zhizhong Su, Wei Sui, and Xinggang Wang. Faster-WAM:
+Efficient inference-time future conditioning for robust world
+action models. arXiv preprint arXiv:2608.04404, 2026.
+[38] Zongchuang Zhao, Xin Zhou, Tianyang Xu, Zhengyang Sun,
+Kaixuan Zhou, Honglin Li, Dingkang Liang, and Xiang Bai.
+SimWAM: A simple world action model for end-to-end au-
+tonomous driving. arXiv preprint arXiv:2608.07468, 2026.
+[39] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming Zhang,
+and Long Chen. Genad: Generative end-to-end autonomous
+driving. In European Conference on Computer Vision, pages
+87–104. Springer, 2024.
+[40] Yupeng Zheng, Pengxuan Yang, Zebin Xing, Qichao Zhang,
+Yuhang Zheng, Yinfeng Gao, Pengfei Li, Teng Zhang,
+Zhongpu Xia, Peng Jia, XianPeng Lang, and Dongbin Zhao.
+World4Drive: End-to-end autonomous driving via intention-
+aware physical latent world model. In Proceedings of the
+IEEE/CVF International Conference on Computer Vision
+(ICCV), pages 28632–28642, 2025.
+[41] Ruiguo Zhong, Benshan Ma, Xiaolong Chen, Lang Zhang,
+Mingyue Feng, Yaonong Wang, Pei Liu, and Jun Ma. DA-
+WAM: Decision-aligned future latents for driving world mod-
+els. arXiv preprint arXiv:2608.19085, 2026.
+[42] Zewei Zhou, Tianhui Cai, Seth Zhao, Yun Zhang, Zhiyu
+Huang, Bolei Zhou, and Jiaqi Ma.
+Autovla: A vision-
+language-action model for end-to-end autonomous driving
+with adaptive reasoning and reinforcement fine-tuning. Ad-
+vances in Neural Information Processing Systems, 38:27920–
+27956, 2026.
+11
+
+
+A. Additional Implementation Details
+DINO readout and query construction.
+Equations 4–6
+specify the DINO readout. The ActionEncoder uses σ = 10;
+FiLM is zero-initialized around the identity and broadcasts
+one trajectory code over all valid query tokens and five hori-
+zons. A frozen DINOv3 teacher supplies BEV supervision,
+using the same valid CLS-and-patch-token mask as the pre-
+diction. For A−
+t , the forward coordinate is independently
+scaled in [0.7, 1.3] and the lateral coordinate receives Gaus-
+sian noise with standard deviation 2 m, as stated in Equa-
+tion 3. The configuration uses msem = 0.05 and λsep = 0.5.
+Gradient routing.
+Let ϕadapt denote the final four train-
+able planner layers and θ the ActionEncoder and latent-FiLM
+parameters. The training gradients are
+∇ϕadaptL = ∇ϕadapt(Lrec + 2Lfact + 0.5Lsep) ,
+(12)
+∇θL = ∇θ(2Lfact + 0.5Lsep) ,
+∇θLrec = 0.
+(13)
+The external trajectory conditions the DINO readout after
+planner-logit computation. Both factual reconstruction and
+perturbed-query separation backpropagate through the DINO
+projection and FiLM to ϕadapt. Equations 7 and 10 identify
+the detached teacher targets and factual separation reference.
+Optimization.
+Training uses AdamW with cosine decay,
+10% warm-up, BF16, and an effective batch size of 64 across
+eight A100 GPUs. The 220-route evaluation uses training
+seed 42; the matched 120-route comparisons use seeds 42
+and 43. The final four planner layers use learning rate 2 ×
+10−5 and the ActionEncoder and latent FiLM use 2 × 10−4.
+These are the trainable components during adaptation.
+B. Additional Future-World Prediction Diag-
+nostics
+Figures 5 and 6 visualize TrajWAM’s feature predictions
+and trajectory-query responses on logged training exam-
+ples. Each panel spans t through t + 2 s in 0.5 s increments.
+From top to bottom, the rows show the frozen-DINOv3 tar-
+get Y ⋆
+t+τ, the prediction under the logged four-waypoint
+query A⋆
+t , the prediction under the perturbed query A−
+t ,
+the token-wise factual error 1 −cos(bYt+τ(A⋆
+t ), Y ⋆
+t+τ), and
+the query response 1 −cos(bYt+τ(A−
+t ), bYt+τ(A⋆
+t )), where
+τ ∈{0, 0.5, 1, 1.5, 2} s. The final row measures feature
+sensitivity to the trajectory query.
+Within each panel, a single PCA basis and color range
+are fitted jointly to the five factual DINOv3 targets and ap-
+plied unchanged to the targets and both prediction sequences.
+The underlying tensors have shape 16×16×1024. Factual
+error and query response are computed in the native 1024-
+dimensional feature space before PCA; nearest-neighbor
+enlargement is used for display.
+Examples cover adverse weather, nighttime driving, and
+both perturbation types. For each frame and perturbation
+type, seeds 2027–2042 generate 16 candidate queries. Can-
+didates are ranked by normalized feature-response RMS: the
+RMS difference between perturbed-query and logged-query
+predictions divided by the logged-query prediction RMS
+(denominator floor 10−12). Both RMS values average all
+five horizons, 256 spatial tokens, and 1024 channels before
+PCA. The displayed candidate is closest to the within-frame
+75th percentile of this score. Frames were selected from a
+nine-frame pool ranked by cross-seed median scores. Ta-
+ble 7 reports aggregate prediction metrics on the separately
+collected evaluation episodes described in Appendix E.1.
+C. Closed-Loop Failure Analysis
+We evaluate all 220 official route records, each with a
+unique route identifier.
+A strict success requires status
+Completed or Perfect and no infraction outside the
+ignored minimum-speed category. Table 5 summarizes the
+route outcomes.
+Of 190 destination-reaching routes, 24 fail strict success
+because of a non-minimum-speed infraction: nine route
+deviations, eight vehicle collisions, five outside-route-lane
+violations, one red-light violation, and one layout collision.
+The remaining 30 routes terminate as shown in Table 5.
+Across all 54 non-success routes, the most frequent route-
+level signals are route deviation (21), vehicle collision (13),
+and timeout (12). These signal counts overlap because a
+route may contain several infractions. The Wilson 95% in-
+terval for 166/220 is 69.36–80.67%, describing finite-route
+uncertainty for this sweep.
+D. Checkpoint Footprint
+The stored Base Planner (Phase I) and TrajWAM check-
+points contain 4,063,126,528 and 4,085,644,803 parameters,
+respectively, an increase of 22.52M. Table 6 reports their
+storage footprint and native execution paths.
+E. Additional Evaluation Details
+E.1. DINOv3 Feature-Prediction Protocol
+Episodes and sample selection.
+We collect new episodes
+with the frozen public DeepSight policy in CARLA 0.9.16.
+Five development routes are separate from the 15 evaluation
+routes, which span nine maps. For each evaluation route,
+a fixed quantile-based rule selects up to 25 valid windows
+from synchronized observations, including valid windows
+from failed episodes. Fourteen routes provide 25 windows
+and one provides 24, yielding N = 374. These episodes
+12
+
+
+Current front view
+Current BEV context
+−5
+0
+5
+lateral (m)
+0.0
+2.5
+5.0
+7.5
+10.0
+12.5
+forward (m)
+Logged A⋆
+t
+Noisy A−
+t
+DINOv3 target
+Prediction under A⋆
+Prediction under A−
+Factual prediction error
+1 −cos(A⋆
+t , target)
+(A−
+t vs. A⋆
+t )
+t
+t+0.5s
+t+1s
+t+1.5s
+t+2s̄
+e = 0.275̄
+e = 0.301̄
+e = 0.304̄
+e = 0.334̄
+e = 0.285̄
+s = 0.0018̄
+s = 0.0018̄
+s = 0.0018̄
+s = 0.0018̄
+s = 0.0019
+0.0
+0.1
+0.2
+0.3
+0.4
+1 −cos
+0.0000
+0.0005
+0.0010
+0.0015
+0.0020
+1 −cos
+Trajectory queries
+(logged query)
+(perturbed query;
+sensitivity only)
+Query sensitivity 1 −cos
+Current front view
+Current BEV context
+−4
+−2
+0
+2
+lateral (m)
+0
+2
+4
+6
+forward (m)
+Logged A⋆
+t
+Noisy A−
+t
+DINOv3 target
+Prediction under A⋆
+Prediction under A−
+Factual prediction error
+1 −cos(A⋆
+t , target)
+(A−
+t vs. A⋆
+t )
+t
+t+0.5s
+t+1s
+t+1.5s
+t+2s̄
+e = 0.203̄
+e = 0.205̄
+e = 0.206̄
+e = 0.202̄
+e = 0.206̄
+s = 0.0014̄
+s = 0.0015̄
+s = 0.0015̄
+s = 0.0015̄
+s = 0.0015
+0.0
+0.1
+0.2
+0.3
+1 −cos
+0.0000
+0.0005
+0.0010
+0.0015
+0.0020
+1 −cos
+Trajectory queries
+(logged query)
+(perturbed query;
+sensitivity only)
+Query sensitivity 1 −cos
+Figure
+5.
+Future-feature
+predictions
+under
+longitudinal
+deceleration
+perturbations.
+Top:
+rainy
+example
+from
+Accident_Town04_Route205_Weather23,
+frame
+51,
+perturbation
+seed
+2042.
+Bottom:
+snowy
+example
+from
+Accident_Town04_Route160_Weather3, frame 51, seed 2029.
+Columns span t through t + 2 s in 0.5 s increments.
+Rows show the factual DINOv3 target, predictions under the logged and perturbed queries, factual cosine error, and label-free query
+sensitivity. Appendix B describes the shared-PCA visualization and native-space metric computation.
+13
+
+
+Current front view
+Current BEV context
+−5
+0
+5
+10
+lateral (m)
+0.0
+2.5
+5.0
+7.5
+10.0
+12.5
+forward (m)
+Logged A⋆
+t
+Noisy A−
+t
+DINOv3 target
+Prediction under A⋆
+Prediction under A−
+Factual prediction error
+1 −cos(A⋆
+t , target)
+(A−
+t vs. A⋆
+t )
+t
+t+0.5s
+t+1s
+t+1.5s
+t+2s̄
+e = 0.179̄
+e = 0.195̄
+e = 0.201̄
+e = 0.189̄
+e = 0.199̄
+s = 0.0010̄
+s = 0.0010̄
+s = 0.0010̄
+s = 0.0010̄
+s = 0.0010
+0.0
+0.1
+0.2
+0.3
+1 −cos
+0.0000
+0.0005
+0.0010
+1 −cos
+Trajectory queries
+(logged query)
+(perturbed query;
+sensitivity only)
+Query sensitivity 1 −cos
+Current front view
+Current BEV context
+−5
+0
+5
+10
+lateral (m)
+0.0
+2.5
+5.0
+7.5
+10.0
+12.5
+15.0
+forward (m)
+Logged A⋆
+t
+Noisy A−
+t
+DINOv3 target
+Prediction under A⋆
+Prediction under A−
+Factual prediction error
+1 −cos(A⋆
+t , target)
+(A−
+t vs. A⋆
+t )
+t
+t+0.5s
+t+1s
+t+1.5s
+t+2s̄
+e = 0.432̄
+e = 0.233̄
+e = 0.209̄
+e = 0.214̄
+e = 0.200̄
+s = 0.0010̄
+s = 0.0010̄
+s = 0.0009̄
+s = 0.0008̄
+s = 0.0009
+0.0
+0.1
+0.2
+0.3
+0.4
+1 −cos
+0.00000
+0.00025
+0.00050
+0.00075
+0.00100
+1 −cos
+Trajectory queries
+(logged query)
+(perturbed query;
+sensitivity only)
+Query sensitivity 1 −cos
+Figure
+6.
+Future-feature
+predictions
+under
+lateral
+coordinate
+perturbations.
+Top:
+nighttime
+example
+from
+Accident_Town03_Route102_Weather20,
+frame
+99,
+perturbation
+seed
+2033.
+Bottom:
+rainy
+example
+from
+Accident_Town04_Route205_Weather23, frame 163, seed 2040.
+The columns, rows, and visualization procedure fol-
+low Figure 5.
+14
+
+
+Table 5. Mutually exclusive outcomes on all 220 routes. The four termination reasons partition the 30 incomplete routes.
+Outcome
+Routes
+Fraction
+Strict success
+166
+75.45%
+Completed with disqualifying infraction
+24
+10.91%
+Did not complete
+30
+13.64%
+Route deviation
+12
+5.45%
+Route timeout
+12
+5.45%
+Vehicle blocked
+5
+2.27%
+Agent crash
+1
+0.45%
+Table 6. Stored checkpoint footprint and native execution path for Base Planner (Phase I) and TrajWAM, using decimal units. Parameter
+counts and payloads include auxiliary tensors that are bypassed during native inference.
+Quantity
+Base Planner
+(Phase I)
+TrajWAM
+Parameters
+4.063B
+4.086B (+0.554%)
+Payload
+8.755GB
+8.800GB (+45.04MB)
+Native path
+Planner + PID
+Planner + PID
+are reserved for evaluation, with checkpoint weights and
+hyperparameters fixed throughout collection and scoring.
+Models and references.
+The external-reference compar-
+ison evaluates one checkpoint each for TrajWAM, public
+DeepSight, and an external additive reference (B). The 220-
+route Phase-II comparisons use our in-house Base Plan-
+ner (Phase I); public DeepSight supplies an additional pre-
+trained reference. B was independently fine-tuned from
+public DeepSight for one epoch using DINO and RGB fac-
+tual losses and RGB separation, with the RGB-to-planner
+gradient detached. These models provide prediction refer-
+ences with different training histories. For each model, a
+persistence baseline repeats its predicted current-time fea-
+tures at every future horizon. Repeating the teacher features
+from the actual current BEV adds a persistence reference
+with privileged BEV input.
+Targets and metrics.
+Future BEV targets follow the ex-
+ecuted poses and are aligned to the anchor ego frame. All
+models use identical target tensors from the same frozen DI-
+NOv3 teacher. Diagnostic metrics use the K = 256 spatial
+patch tokens, each with C = 1024 channels; training addi-
+tionally supervises the CLS token. Predictions and targets
+are converted to FP32 for scoring, with MSE computed on
+raw feature values. For sample n and offset τ, define
+mn,τ =
+1
+KC
+K
+X
+i=1
+C
+X
+c=1
+
+bYn,τ,i,c −Y ⋆
+n,τ,i,c
+2
+,
+cn,τ = 1
+K
+K
+X
+i=1
+bY ⊤
+n,τ,iY ⋆
+n,τ,i
+max
+
+∥bYn,τ,i∥2, ϵ
+
+max
+ ∥Y ⋆
+n,τ,i∥2, ϵ
+,
+ϵ = 10−8.
+(14)
+Let H = {0.5, 1.0, 1.5, 2.0} s and let Nr contain the se-
+lected windows of route r. The reported future MSE is
+MSEfuture = 1
+15
+15
+X
+r=1
+1
+|Nr|
+X
+n∈Nr
+1
+4
+X
+τ∈H
+mn,τ.
+(15)
+Future cosine uses the same aggregation with cn,τ. The four
+offsets in H define the future mean, and current-time metrics
+are reported separately. All scores are computed before PCA
+or image enlargement.
+Single-checkpoint paired trajectory queries.
+For each
+recipient window, the alternative query is drawn from a dif-
+ferent evaluation route, with speed difference at most 5 m/s,
+endpoint-direction difference at most 20◦, and a distinct
+waypoint sequence. The fixed random matching procedure
+finds an eligible donor for 371 windows. Factual-prediction
+metrics use all 374 windows; the paired-query analysis uses
+the 371 matched windows. Both queries are scored against
+the recipient’s factual target, measuring the benefit of pair-
+ing that target with its executed trajectory. We first aver-
+age paired differences within each route, then obtain 95%
+15
+
+
+Table 7. Single-checkpoint external-reference comparison on all 374 evaluation windows from 15 newly collected episodes. Metrics average
+the four future offsets and then routes equally. The public and additive models are prediction references with different training histories. The
+last row uses privileged actual current-BEV input.
+Model or reference
+Future MSE ↓
+Cosine ↑
+Public DeepSight
+0.02329
+0.82575
+TrajWAM
+0.03029
+0.76771
+External additive reference (B)
+0.02340
+0.82475
+Public DeepSight: repeat predicted t
+0.02463
+0.81594
+TrajWAM: repeat predicted t
+0.03110
+0.76099
+External additive reference: repeat predicted t
+0.02471
+0.81506
+Repeat actual teacher t (privileged)
+0.01635
+0.89266
+Table 8. Single-checkpoint per-offset prediction for the external-reference comparison on the same 374 windows. Each entry averages
+windows within a route and then the 15 routes equally; Table 7 averages the four future columns.
+Model
+Metric
+t
+t+0.5
+t+1.0
+t+1.5
+t+2.0
+Public DeepSight
+MSE ↓
+0.02378
+0.02330
+0.02317
+0.02335
+0.02333
+Cosine ↑
+0.82259
+0.82600
+0.82661
+0.82531
+0.82505
+TrajWAM
+MSE ↓
+0.03042
+0.03025
+0.03005
+0.03024
+0.03062
+Cosine ↑
+0.76726
+0.76843
+0.76949
+0.76784
+0.76509
+External additive reference
+MSE ↓
+0.02382
+0.02337
+0.02327
+0.02348
+0.02346
+Cosine ↑
+0.82208
+0.82529
+0.82565
+0.82413
+0.82393
+percentile intervals from 10,000 route resamples with seed
+20261109, keeping each route’s windows together.
+For the single TrajWAM checkpoint in Table 7, route-
+equal factual and mismatched MSEs are 0.030293741 and
+0.030349705, respectively: a relative increase of 0.185%.
+The mean paired difference is 5.5964 × 10−5, with a 95%
+interval of [0.3412, 12.5433]×10−5. The matched two-seed
+comparison appears in Appendix F.2.
+For
+the
+external
+additive
+reference,
+factual
+and
+mismatched-query MSEs on the same 371 windows are
+0.023404210 and 0.023402824.
+Its paired difference is
+−1.3866 × 10−6, with a 95% route-bootstrap interval of
+[−3.3161 × 10−6, 2.0289 × 10−7], which spans zero.
+E.2. Fixed-Query Responses and Readout Precision
+Using the single-checkpoint TrajWAM and external additive
+reference from Appendix E.1, we apply the same trajec-
+tory pair across scenes to measure how the query response
+depends on scene content. One pair is selected from devel-
+opment routes using trajectory metadata before inspecting
+predictions. Both queries must be within 5 m/s in speed and
+20◦in endpoint direction of an evaluation window’s executed
+query. This gives 252 eligible windows from 15 evaluation
+routes. Response energy and cross-scene variance use spa-
+tial DINO patches, with equal weight per route and equal
+weight per window within each route. Future values average
+the four horizons from 0.5 to 2.0 seconds; the current-time
+output at t = 0 is measured separately.
+For fixed queries a0, a1, the FiLM-conditioned linear
+readout has the analytic difference
+∆(x) = W [(γ(a1) −γ(a0)) ⊙h(x) + β(a1) −β(a0)] ,
+(16)
+where h(x) is the scene-dependent query state, W is the
+DINO projection, and γ = 1 + ∆γ follows Equation 5.
+FiLM couples trajectory modulation to h(x); bias-only con-
+ditioning gives a scene-independent analytic difference. We
+evaluate native BF16 predictions and an FP32 readout re-
+play. The replay casts the native hidden states, conditioning
+outputs, and loaded weights to FP32 for modulation and
+projection, retaining the same backbone outputs. Response
+energy is the mean squared difference, and variance is the
+mean squared deviation from its route-balanced cross-scene
+mean.
+TrajWAM produces scene-dependent query responses
+with FP32 readout arithmetic: its future cross-scene variance
+is 4.171457×10−6, while the additive reference has zero
+analytic variance. This behavior follows the scene–trajectory
+interaction term in Equation 16. The current-time and future
+columns in Table 9 show that this interaction operates across
+the supervised sequence.
+E.3. Native Planner Microbenchmark
+We profile TrajWAM and the public DeepSight checkpoint
+on one NVIDIA GeForce RTX 5090 using BF16, batch
+size one, and SDPA, with PyTorch 2.7.1+cu128 and Trans-
+formers 4.56.0. Both models receive the same four fixed
+16
+
+
+−10
+−5
+0
+5
+10
+15
+ΔMSE (×10−4)
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+Cumulative fraction of windows
+Figure 7. Single-checkpoint trajectory-pairing effects for the TrajWAM checkpoint in Table 7, across all 371 matched evaluation windows.
+Each window receives equal weight in the empirical cumulative distribution. We define ∆MSE = MSEmismatched −MSEexecuted,
+averaged over the four future offsets from 0.5 to 2.0 s. The dashed line marks zero; positive values indicate lower error with the executed
+query.
+Table 9. Single-checkpoint responses to the same trajectory pair
+across 252 windows, using the external-reference models from
+Appendix E.1. All entries are in units of 10−6. F is TrajWAM; B
+is the external additive reference. The FP32 rows use the analytic
+readout difference.
+Future
+t = 0
+Model
+Arithmetic
+Energy
+Variance
+Energy
+Variance
+F
+Native BF16
+7.2099
+4.6981
+6.7815
+4.4884
+F
+FP32 replay
+6.6529
+4.1715
+6.2456
+3.9822
+B
+Native BF16
+0.9000
+0.3505
+0.9000
+0.3517
+B
+FP32 replay
+0.5221
+0
+0.5221
+0
+observations, one from each of four development routes,
+and use the same native preprocessing and generation con-
+figuration. Each model receives one warm-up generation
+followed by three timed generations per observation, yield-
+ing 12 measurements per model. CUDA synchronization
+is used for timing. Generation includes autoregressive rea-
+soning and waypoint-token generation; file-to-waypoints
+timing additionally includes image preprocessing and way-
+point decoding. PID control is measured separately. These
+measurements exclude simulator execution, sensor capture,
+file writing, model loading, and warm-up.
+Both native prompts retain 1,305 future-query tokens. Na-
+tive inference bypasses the DINO teacher, DINO readout,
+ActionEncoder, FiLM, and auxiliary decoders. Auxiliary ten-
+sors remain resident and contribute to the reported memory
+Table 10. Native planner microbenchmark. Times are medians over
+12 measurements; memory is the peak allocated GPU memory. The
+DeepSight reference is its public checkpoint.
+Measurement
+DeepSight
+TrajWAM
+Generation (s)
+3.4926
+3.5086
+File to waypoints (s)
+3.7539
+3.7676
+PID (ms)
+0.1940
+0.1982
+Peak allocated memory (GiB)
+8.1813
+8.2217
+Mean output tokens
+96.25
+93.25
+footprint. All timed runs use the uninstrumented execution
+path. Table 10 reports generation and file-to-waypoint la-
+tency, PID time, peak allocated GPU memory, and mean
+output length for the four observations.
+F. Multi-Seed Closed-Loop Evaluation on a
+Stratified Subset
+Route selection.
+We evaluate a fixed subset of 120 routes
+from the same Bench2Drive 220-route set, which contains
+44 scenario types with five routes each. Scenario types are
+ordered by SHA256(seed|quota|scenario_type), using selec-
+tion seed 20261117. The first 32 types contribute three
+routes each and the remaining 12 contribute two, yielding
+32 × 3 + 12 × 2 = 120. Within these quotas, 1,024 candi-
+date subsets are generated. Eligible candidates cover all 12
+source maps and all starting-weather groups. The selected
+17
+
+
+Table 11. Schedule-matched Phase-II comparison on all 220 Bench2Drive routes. Models and objectives follow Section 4.1.
+Model
+DS↑
+SR (%)↑
+Base Planner (Phase I)
+85.94
+70.91%
+Base Planner (planning-only FT)
+86.22
+71.36%
+TrajWAM
+91.53
+75.45%
+candidate minimizes the combined deviation of map and
+weather-group proportions from the full set; ties are bro-
+ken by candidate index. Selection is determined entirely by
+route metadata. Scenario types define the strata; the overlap-
+ping driving-ability categories are reported separately in the
+full-set evaluation.
+Weather groups use initial sun altitude: night below 0◦,
+dawn/dusk from 0◦through 10◦, and day above 10◦. An
+adverse-weather tag denotes precipitation above zero, fog
+density at least 50, or wetness at least 50. The full-set/subset
+counts are 72/39 for day with adverse weather, 87/48 for
+other day weather, 44/24 for night with adverse weather, 9/5
+for other night weather, and 8/4 for dawn/dusk with adverse
+weather.
+Matched training variants.
+All variants use the same
+Phase-I initialization, training data, 24-epoch budget, opti-
+mizer, and loss weights. Planning-only FT uses Lrec; uncon-
+ditioned future FT adds 2Lfact without a trajectory query;
+TrajWAM w/o separation uses trajectory-conditioned factual
+reconstruction. The additive variant and full TrajWAM addi-
+tionally use 0.5Lsep. The additive variant replaces FiLM’s
+scale-and-shift modulation with additive conditioning. All
+five variants use training seeds 42 and 43. Each checkpoint,
+including both seeds of the shuffled-pairing control, is eval-
+uated on the same 120 routes. The matched additive vari-
+ant follows this common protocol in both closed-loop and
+prediction comparisons; the external additive reference in
+Appendix E.1 follows the separately stated training history.
+Paired component gains.
+Comparisons use shared train-
+ing seeds and route identities. Across seeds 42 and 43, the
+complete objective improves DS by 5.55 points and SR by
+4.17 percentage points over planning-only FT. Separation
+adds 2.05 DS points and 1.67 SR points over the trajectory-
+conditioned variant without separation. Across both seeds,
+trajectory conditioning adds 4.10 DS points and 0.83 SR
+points over unconditioned future supervision; full FiLM im-
+proves on additive conditioning by 2.50 DS points and 2.50
+SR points. The complete method improves on planning-
+only FT by 6.05 and 5.05 DS points at seeds 42 and 43,
+respectively. Its corresponding gains over the no-separation
+variant are 2.41 and 1.69 DS points. Thus, both evaluated
+training seeds preserve the ordering of planning-only FT,
+trajectory-conditioned factual reconstruction, and the com-
+plete objective.
+Conditional paired intervals.
+We use a scenario-stratified
+paired percentile bootstrap with 10,000 resamples and ran-
+dom seed 20261118. Within each of the 44 fixed scenario
+types, routes are sampled with replacement while retaining
+the original quota of two or three. Each resample uses iden-
+tical route indices for both models and all common training
+seeds. For comparisons using two seeds, paired route differ-
+ences are averaged over seeds before resampling. Training
+seeds and scenario categories remain fixed. The 2.5th and
+97.5th percentiles give 95% intervals conditional on these
+checkpoints and scenario strata. SR differences use 100
+times the difference of strict-success indicators. No finite-
+population correction is applied. Per-seed results separately
+describe the observed training-seed variation.
+Across the four comparisons in Table 13, mean DS and
+SR gains are positive. The conditional DS intervals are
+entirely above zero, while all SR intervals include zero.
+Scenario-balanced aggregation.
+Let ∆DSr be the paired
+DS difference on route r, averaged over the common training
+seeds, and let nh be the number of selected routes of scenario
+type h. We compute
+∆DSscenario = 1
+44
+44
+X
+h=1
+1
+nh
+X
+r∈h
+∆DSr.
+(17)
+Scenario-equal aggregation gives every scenario type the
+same weight. Route-equal aggregation averages the 120
+paired route differences uniformly. Both statistics use the
+same stratified bootstrap draws, with their respective weights
+applied in each resample. Table 14 compares the two ag-
+gregations. The complete objective improves over planning-
+only FT in 24 of 44 scenario types, ties in 16, and declines
+in four, with a scenario-equal gain of 5.55 DS points. Re-
+moving each scenario type in turn preserves positive gains
+for the seed scopes listed in Table 15.
+F.1. Training-Pairing Control
+The within-group shuffled-pairing control uses the complete
+architecture, with the same initialization, training budget,
+and objectives. It disrupts the association between trajectory
+18
+
+
+Table 12. Individual training-seed results on the same 120 routes. SR values and their paired differences are rounded after aggregation.
+Variant
+Training seed
+DS ↑
+SR (%) ↑
+Planning-only FT
+42
+82.64
+64.17
+Planning-only FT
+43
+83.16
+65.00
+Unconditioned future FT
+42
+82.11
+65.83
+Unconditioned future FT
+43
+82.49
+66.67
+TrajWAM w/o separation
+42
+86.28
+66.67
+TrajWAM w/o separation
+43
+86.52
+67.50
+TrajWAM (additive)
+42
+86.07
+66.67
+TrajWAM (additive)
+43
+85.83
+65.83
+TrajWAM (correct pairing)
+42
+88.69
+69.17
+TrajWAM (correct pairing)
+43
+88.21
+68.33
+Table 13. Paired gains on the 120-route subset. SR differences are percentage points. Intervals are conditional, scenario-stratified paired
+route-bootstrap intervals; each comparison uses only its listed common training seeds.
+Comparison
+Seeds
+Mean ∆DS
+95% CI
+Mean ∆SR
+95% CI
+Full −planning-only FT
+42, 43
++5.55
+[+3.62, +7.50]
++4.17
+[−0.83, +9.17]
+Full −no separation
+42, 43
++2.05
+[+0.54, +3.54]
++1.67
+[−2.92, +6.25]
+No separation −unconditioned
+42, 43
++4.10
+[+2.46, +5.81]
++0.83
+[−2.92, +5.00]
+Full −additive
+42, 43
++2.50
+[+1.03, +3.99]
++2.50
+[−1.67, +7.08]
+Table 14. Scenario-balanced analysis on the fixed subset. The first two rows average seeds 42 and 43; the last two use seed 42. Sign counts
+list positive, tied, and negative scenario-level mean DS differences. Intervals use the same conditional stratified route resampling with equal
+scenario weights.
+Comparison
+Seeds
+Route-equal ∆DS
+Scenario-equal ∆DS
+95% CI
+Signs (+/0/−)
+Full −planning-only FT
+42, 43
++5.55
++5.55
+[+3.42, +7.68]
+24 / 16 / 4
+Full −no separation
+42, 43
++2.05
++2.10
+[+0.46, +3.75]
+22 / 19 / 3
+No separation −unconditioned
+42
++4.17
++4.07
+[+2.14, +6.08]
+21 / 20 / 3
+Full −additive
+42
++2.62
++2.76
+[+1.28, +4.28]
+20 / 20 / 4
+queries and their recipient scenes while preserving planning
+supervision and recipient factual targets. Table 16 reports
+the two training seeds and their matched comparisons on
+the fixed 120 routes. Correct pairing improves DS by 4.67
+and 3.83 at seeds 42 and 43, respectively. The mean gain
+is 4.25 DS; the conditional paired interval is [2.64, 5.89].
+The mean SR gain is 1.67 percentage points, with interval
+[−2.50, 5.84].
+F.2. Matched Planning–Prediction Diagnosis
+Table 17 evaluates the checkpoints used in the two-seed
+closed-loop comparison. Future MSE and persistence use all
+374 windows from Appendix E.1. Persistence repeats each
+model’s predicted current-time features at the four future
+offsets. Query benefits use the same 371 matched windows,
+recipient observations, targets, executed queries, and mis-
+matched queries for every model and seed. At evaluation,
+the shuffled-training model also receives each recipient’s
+executed query. Metrics average future offsets and windows
+within routes, then the 15 routes and two seeds equally.
+Trajectory conditioning improves prediction quality, low-
+ering future MSE by 4.02% relative to unconditioned super-
+vision. Separation adds planning gains: DS rises from 86.40
+to 88.45, and future MSE increases from 0.02985 to 0.03020.
+The complete method improves both DS and future MSE
+over matched additive conditioning. Thus, the component
+controls associate conditioning with better reconstruction
+and planning, and separation with additional planning gains.
+Paired query benefits.
+For model m, seed s, and route
+r, let δm,s,r be the mean of mismatched minus executed
+MSE over the route’s matched windows and four future off-
+sets. We average seeds within each route, ¯δm,r = (δm,42,r +
+δm,43,r)/2, then average the 15 routes equally. Each of
+10,000 bootstrap replicates draws 15 routes with replacement,
+retaining all their windows and using identical route indices
+19
+
+
+Table 15. Leave-one-scenario-type-out analysis. Each range spans the 44 recomputed mean DS differences after removing one scenario type
+and renormalizing the remaining weights. These are sensitivity ranges. The first two rows average seeds 42 and 43; the last two use seed 42.
+Comparison
+Seeds
+Full-subset ∆DS
+Route-equal range
+Scenario-equal range
+Full −planning-only FT
+42, 43
++5.55
+[+5.05, +5.93]
+[+5.09, +6.02]
+Full −no separation
+42, 43
++2.05
+[+1.65, +2.60]
+[+1.69, +2.60]
+No separation −unconditioned
+42
++4.17
+[+3.77, +4.56]
+[+3.53, +4.52]
+Full −additive
+42
++2.62
+[+2.15, +3.06]
+[+2.34, +3.16]
+Table 16. Correct versus within-group shuffled training pairing on the fixed 120 routes. Both variants use seeds 42 and 43. SR and its
+differences are percentages and percentage points, respectively. The last row reports paired differences and conditional scenario-stratified
+route-bootstrap 95% intervals.
+Training / comparison
+Seed 42: DS / SR
+Seed 43: DS / SR
+Mean DS ± SD
+Mean SR ± SD
+Shuffled pairing
+84.02 / 66.67
+84.38 / 67.50
+84.20 ± 0.25
+67.08 ± 0.59
+TrajWAM (correct pairing)
+88.69 / 69.17
+88.21 / 68.33
+88.45 ± 0.34
+68.75 ± 0.59
+Correct −shuffled
++4.67 / +2.50
++3.83 / +0.83
++4.25 [2.64, 5.89]
++1.67 [−2.50, 5.84]
+Table 17. Matched two-seed planning–prediction diagnosis. DS is the mean on 120 closed-loop routes; future and persistence MSE use 374
+windows. Query gains and their conditional 95% intervals use 371 windows and are in units of 10−5. Unconditioned supervision has no
+trajectory-query comparison.
+Model
+Mean DS ↑
+Future MSE ↓
+Persistence MSE ↓
+Query gain ↑
+95% CI
+Unconditioned future FT
+82.30
+0.03110
+0.03170
+—
+—
+TrajWAM w/o separation
+86.40
+0.02985
+0.03055
++1.60
+[−0.60, +4.00]
+Matched additive
+85.95
+0.03055
+0.03115
++0.70
+[−1.00, +2.80]
+TrajWAM
+88.45
+0.03020
+0.03101
++6.00
+[+0.80, +12.50]
+and multiplicities across models and seeds. Percentiles 2.5
+and 97.5 give intervals conditional on the evaluated check-
+points. For correct minus shuffled training, each replicate
+averages the paired differences ¯δcorrect,r −¯δshuffled,r directly.
+Table 18 and Figure 3 report the results.
+G. Limitations
+Evaluation covers CARLA/Bench2Drive, with one training
+seed for the full set and two for all component and shuffled-
+pairing controls on the 120-route subset. Query diagnostics
+measure factual reconstruction and responses to alternative
+trajectories whose outcomes are unobserved; separation also
+acts on the current-time anchor. The public initializer’s pre-
+training route coverage is unknown. Further evaluation can
+measure alternative-action outcomes, training-seed variation,
+and real-world transfer.
+H. Ethics and Reproducibility
+Ethics statement
+All driving experiments use CARLA/Bench2Drive simula-
+tions. The study involves no human subjects or personal
+data.
+Reproducibility Statement
+Section 3 specifies the model and training objectives, Sec-
+tion 4.1 describes the experimental setup, and Appendices A
+and E provide implementation and evaluation details. The
+supplementary code archive provides the native model run-
+time, driving agent, PID controller, benchmark routes and
+scenarios, and scripts for multi-GPU closed-loop evaluation
+and metric aggregation. Its README and reproduction
+guide describe environment setup and evaluation using a
+complete trained TrajWAM checkpoint. The code archive
+does not include model weights. Appendix E.1 specifies the
+new-episode prediction protocol, including sample selection,
+target construction, and aggregation. Appendix F describes
+the stratified route subset and multi-seed comparisons.
+20
+
+
+Table 18. Executed-query benefits after correct or shuffled training pairing. All gains and conditional paired route-bootstrap 95% intervals
+are in units of 10−5 MSE, averaged over seeds 42 and 43.
+Training / comparison
+Mean query gain
+95% CI
+Shuffled pairing
++0.30
+[−1.20, +1.80]
+Correct pairing
++6.00
+[+0.80, +12.50]
+Correct −shuffled
++5.70
+[+0.50, +11.80]
+21

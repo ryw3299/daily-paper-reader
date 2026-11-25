@@ -1,0 +1,1106 @@
+1
+STA: A Split Temporal Adversary Method for
+Evaluating Robustness of Multimodal RL-based
+Driving Policies
+Shenghao Xiong, Xiaolin Chang,
+Abstract—Multimodal reinforcement learning (MRL) offers a
+promising paradigm for autonomous driving by jointly leveraging
+complementary sensor observations to learn effective decision-
+making policies. However, its effectiveness critically depends on
+temporal alignment across modalities, making temporal incon-
+sistency a fundamental vulnerability. Even subtle misalignment
+or latency can corrupt fused representations and ultimately
+lead to decision failures. Existing studies have explored ad-
+versarial attacks to induce cross-modal temporal inconsisten-
+cies, thereby enabling systematic evaluation of the temporal
+robustness of MRL policies. However, existing methods remain
+limited in generality, realism, and adaptivity. To address these
+limitations, we propose the Split Temporal Adversary (STA),
+which formulates multimodal temporal attacks as a unified
+decision process that jointly optimizes attack timing and modality
+selection under realistic policy-aware and budget-constrained
+settings. STA includes two mechanisms: a) a unified multimodal
+temporal perturbation mechanism that delays observations via
+historical states, removing the need for modality-specific noise;
+b) a split multimodal adversarial decision mechanism that jointly
+optimizes attack timing and modality selection through adaptive
+optimization while leveraging the victim policy’s clean actions
+to identify sensitive decision patterns. We provide a theoretical
+analysis of the induced distribution shift and a modality selection
+principle. Experiments in the CARLA simulator show that STA
+more than doubles the collision rate of the strongest baseline
+against PPO while using 17.8% fewer attack attempts, and that
+it generalizes to a VLM-based driving policy. These results reveal
+temporal consistency as a critical vulnerability, highlighting
+temporal robustness as essential for safe autonomous driving.
+Index Terms—Adversarial attacks, autonomous driving, mul-
+timodal reinforcement learning, temporal consistency.
+I. INTRODUCTION
+T
+He integration of multimodal perception with reinforce-
+ment learning (RL) has emerged as a promising paradigm
+for developing autonomous driving policies, as it enables
+vehicles to learn complex behaviors directly from high-
+dimensional sensor inputs [1]. However, its effectiveness de-
+pends on maintaining temporal consistency across heteroge-
+neous sensor inputs. This dependence inherently establishes
+temporal inconsistency itself as a core vulnerability, since
+any misalignment, latency jitter, or asynchrony among sensor
+modalities can directly corrupt the fused representations and
+impair decision-making reliability in multimodal decision-
+making systems. Therefore, rigorous temporal robustness as-
+Shenghao Xiong and Xiaolin Chang are with the School of Cyberspace
+Science and Technology, Beijing Jiaotong University, Beijing, China (e-mails:
+25115273, xlchang@bjtu.edu.cn).
+sessment is an essential prerequisite for ensuring the opera-
+tional safety and reliability of multimodal driving policies in
+safety-critical deployments [2], [3].
+Prior work has investigated adversarial attacks to expose
+vulnerability in multimodal driving policies [4], [5]. However,
+existing approaches exhibit three fundamental limitations
+that prevent them from effectively exposing this temporal
+consistency vulnerability. First, most attacks rely on modality-
+specific perturbations (e.g., image noise or LiDAR point per-
+turbations [6]–[10]), which are sensor-specific, lack a unified
+formulation, and inadequately assess temporal consistency
+vulnerability. Second, they overlook policy awareness and
+attack budgets, ignoring victim policy feedback and yielding
+unrealistic threat models [11]–[15]. Third, temporal pertur-
+bation methods rely on random modality selection or fixed
+injection schedules [16]–[18], lacking adaptive optimization
+over attack timing and modality selection.
+We identify two challenges in addressing these limitations:
+1) Challenge of modality universality. Heterogeneous
+sensors (e.g., cameras, LiDAR, CAN) exhibit distinct
+representations and temporal dynamics, creating a con-
+flict between modality-specific semantic validity and
+cross-modal temporal consistency [19], [20]. This hin-
+ders the design of a unified perturbation across modali-
+ties (addressing limitation 1).
+2) Challenge
+of
+adaptive
+multimodal
+adversarial
+decision-making. The effectiveness of temporal pertur-
+bations depends heavily on both the driving context [21]
+and the targeted sensor modality. Under sparse collision-
+based rewards and finite attack budgets, an adversary
+must jointly determine when to launch an attack and
+which modality to perturb, while estimating policy vul-
+nerability solely from observable interactions without
+access to internal policy states [22]. This coupling of
+attack timing, modality selection, and realistic adversar-
+ial constraints makes adaptive attack policy optimization
+particularly challenging (addressing limitations 2 and
+3).
+To address the above limitations and challenges, we propose
+the Split Temporal Adversarial (STA) method. To the best of
+our knowledge, STA is the first adversarial framework that
+enables unified temporal perturbation across heterogeneous
+sensor modalities while adaptively optimizing attack timing
+and modality selection under realistic attack constraints. STA
+consists of two core mechanisms:
+arXiv:2611.20765v1  [cs.CR]  16 Nov 2026
+
+
+2
+• A unified multimodal temporal perturbation mech-
+anism that maintains a history buffer and replaces the
+current observation of a selected modality with its n-step
+delayed counterpart, enabling modality-agnostic temporal
+attacks across cameras, LiDAR, and CAN signals (ad-
+dressing Challenge 1).
+• A split multimodal adversarial decision mechanism
+that decouples attack triggering and modality selection,
+enabling adaptive optimization of both when to attack
+and which modality to perturb under a gated learning
+scheme (addressing Challenge 2).
+We further analyze the distribution shift induced by tem-
+poral inconsistency, bound its propagation through a Lipschitz
+policy, and characterize modality sensitivity through the policy
+Jacobian. These results motivate adaptive selection of vulner-
+able modalities.
+Experiments in the CARLA simulator [23] show that STA
+achieves higher attack effectiveness with fewer attempts than
+the baseline methods and generalizes to a VLM-based driving
+policy. These results reveal that disruption of synchronized
+alignment across modalities is a critical vulnerability.
+The remainder of this paper is organized as follows. Section
+II reviews related work. Section III presents the preliminary
+concepts, Section IV presents the STA method, Section V
+describes the theoretical analysis, Section VI reports exper-
+imental results, and Section VII concludes the paper and
+discusses future directions.
+II. RELATED WORK
+Our work lies at the intersection of adversarial attacks on
+deep reinforcement learning, robustness evaluation of multi-
+modal autonomous driving systems, and temporal attacks in
+cyber-physical systems.
+A. Adversarial Attacks on Deep Reinforcement Learning
+Deep reinforcement learning (DRL) policies are highly
+vulnerable to adversarial perturbations. Early work [8] demon-
+strated that small observation perturbations can significantly
+degrade policy performance in Atari environments. Subse-
+quent studies improved attack effectiveness through policy-
+sensitive objectives [9], [10], [24], e.g., boosting success rates
+by 18.7% via policy-sensitive targeting [10]. More advanced
+formulations model attacker–victim interactions as sequential
+decision-making processes [25]–[27].
+These DRL attack methods operate in a step-wise manner,
+perturbing observations independently at each timestep. This
+design largely ignores long-term temporal dependencies and
+assumes unrestricted access to all modalities, limiting their
+applicability to multimodal driving scenarios. A growing body
+of work has begun to address these limitations by considering
+temporally correlated perturbations, yet such efforts remain
+largely confined to single-modality settings [28], [29].
+B. Robustness of Multimodal Driving Policies
+Modern autonomous driving systems rely heavily on multi-
+modal sensor fusion, introducing new attack surfaces across
+perception and decision-making pipelines. Prior work has
+shown that perturbations in one modality can propagate
+through fusion networks and significantly degrade downstream
+policy performance [4], [5].
+At the decision-making level, several works formulate ad-
+versarial driving as constrained optimization or reinforcement
+learning problems to induce unsafe behaviors [11], [13]–[15].
+In parallel, robustness evaluation and certification methods
+have been proposed to quantify safety under adversarial con-
+ditions [30]–[32].
+However, these studies primarily focus on spatial or
+scenario-level perturbations, and do not explicitly consider
+temporal inconsistency across heterogeneous modalities.
+C. Temporal Attacks and Time-Delay Vulnerability
+Temporal attacks have proven effective in cyber-physical
+systems, where injected delays destabilize control loops in
+power grids, sensor networks, and UAV formations [17],
+[33]–[35]. Translating this threat to autonomous driving,
+Chronos [18] first demonstrated that software-induced timing
+delays can degrade perception and planning. Subsequent work
+has explored broader forms of temporal attacks, including sen-
+sor spoofing with time shifts and delayed actuation commands.
+More broadly, recent studies on optimal attack scheduling in
+cyber-physical systems have shown that strategic timing can
+achieve greater disruption with fewer interventions, providing
+theoretical grounding for adaptive scheduling [36].
+However, existing temporal attacks on autonomous driving
+suffer from two persistent limitations. First, most are evaluated
+only at the perception level: DejaVu [16] showed that temporal
+misalignment between camera and LiDAR streams can reduce
+detection mAP by 88.5% with a single-frame delay, yet does
+not assess downstream impact on driving decisions; Slow-
+Perception [37] achieved a 97% collision rate, but its delay
+schedule is pre-determined rather than adaptively optimized.
+Second, existing approaches operate in an open-loop manner,
+with fixed or heuristic-driven delays that lack policy awareness
+and attack budget constraints.
+Consequently, while these works confirm temporal incon-
+sistency as a severe vulnerability, none addresses adaptive,
+policy-aware, budget-constrained temporal attack optimization
+that jointly selects when to attack and which modality to delay
+which our STA method directly fills.
+III. PRELIMINARY
+This section first discusses temporal inconsistency vulner-
+ability in multimodal perception systems in Section III-A.
+Then, Section III-B presents the formulation of the adversarial
+learning problem as a single-agent POMDP.
+A. Temporal Inconsistency Vulnerability
+Temporal consistency is a fundamental assumption in mul-
+timodal driving systems: observations from different sensor
+modalities are assumed to correspond, at the same timestamp,
+to a unified underlying environmental state. To achieve this,
+each modality typically maintains a finite FIFO buffer Qm
+
+
+3
+that stores the most recent messages, and a synchronization
+mechanism at the fusion layer matches cross-modal messages
+based on their timestamps. For a pair of messages from
+modalities m and l, a match is accepted if
+|t(i)
+m −t(j)
+l | ≤τ,
+(1)
+where t(i)
+m denotes the timestamp of the i-th message from
+modality m, and τ is a pre-defined tolerance threshold. The
+timestamp difference for accepted pairs is bounded by τ,
+which we refer to as the reported relative temporal mismatch
+(R-RTM).
+However, this alignment mechanism relies solely on times-
+tamp headers and does not verify the semantic content of the
+observations. As a result, it only guarantees that the reported
+timestamps are within tolerance, not that the observations
+correspond to the same physical instant. This creates a vulner-
+ability: if an adversary can manipulate the timestamps or delay
+the transmission of messages, the synchronizer may be induced
+to pair observations from different time steps, resulting in
+semantic relative temporal mismatch (S-RTM):
+∆(i,j)
+sem = |u(i)
+m −u(j)
+l |,
+(2)
+where u(i)
+m denotes the true acquisition time of the measure-
+ment. Under adversarial interference, ∆sem can be arbitrarily
+large even when the R-RTM remains within τ.
+We refer to the deviation between ∆sem and ∆rep as tem-
+poral inconsistency. When such inconsistency occurs across
+modalities, the fused observation no longer represents a single
+coherent environment state, potentially leading to erroneous
+downstream decisions.
+B. Problem Formulation as a POMDP
+We model the adversary–victim interaction as a POMDP
+M = ⟨S, O, A, T , R, γ⟩,
+(3)
+where the victim is part of the environment; S, O, and A
+are the latent state, adversarial observation, and action spaces;
+T and R are the transition and reward functions; and γ is
+the discount factor. The adversary learns π : O →∆(A) to
+maximize
+J(π) = Eπ
+"T −1
+X
+t=0
+γtrt
+#
+.
+(4)
+Section IV instantiates these elements with policy-aware ob-
+servations, split attack actions, and a finite budget.
+IV. SPLIT TEMPORAL ADVERSARY METHOD
+This section first overviews the proposed STA. Then, the
+two core mechanisms of STA are detailed.
+A. Overview
+We evaluate the temporal robustness of multimodal RL
+driving policies against adversarial temporal inconsistency,
+where an adversary selectively disrupts cross-modal alignment
+under a limited attack budget. We assume: (i) the driving
+policy πdriving is fixed during evaluation [8], [24]; (ii) temporal
+delays are bounded within horizon n [16], [18]; and (iii) all
+sensors operate at a fixed synchronized rate [4], [5]. The
+adversary has a finite budget B and aims to induce failures
+(e.g., collisions).
+Split Temporal Adversary (STA) consists of two coordinated
+mechanisms:
+1) Unified Multimodal Temporal Perturbation Mech-
+anism: maintains a multimodal history buffer and re-
+places the current observation of a selected modality
+with its delayed historical counterpart.
+2) Split Multimodal Adversarial Decision Mechanism:
+jointly optimizes attack triggering and modality selec-
+tion through a split decision architecture, while in-
+corporating policy-aware state information and attack
+budget constraints to learn adaptive attack strategies
+under sparse rewards.
+Together, these two mechanisms enable STA to generate
+adaptive, modality-agnostic temporal attacks under realistic
+adversarial constraints. We describe each mechanism in detail
+in the following subsections.
+B. Unified Multimodal Temporal Perturbation Mechanism
+This mechanism aims to operate uniformly across hetero-
+geneous sensor inputs by treating temporal inconsistency as a
+universal attack surface in multimodal reinforcement learning,
+instead of designing modality-specific noise functions. For
+instance, for a selected modality at time step t, the adversary
+replaces its current observation om
+t
+with a historical observa-
+tion om
+t−n retrieved from a fixed-length buffer of past states.
+This operation preserves intra-modality semantic consistency
+while introducing cross-modal temporal misalignment at the
+fusion level.
+1) Multimodal Observation Space: The driving agent per-
+ceives the environment through a multimodal observation
+space composed of visual and numerical inputs. At each
+discrete time step t, the clean observation is defined as:
+ot =
+
+o(v)
+t , o(n)
+t
+
+,
+(5)
+where o(v)
+t
+denotes the visual observation from a front-view
+RGB camera, and o(n)
+t
+represents a low-dimensional numerical
+state vector including vehicle dynamics and planned way-
+points.
+To obtain a compact representation, the driving policy
+encodes each modality into latent embeddings:
+z(v)
+t
+= fvis(o(v)
+t ),
+z(n)
+t
+= fnum(o(n)
+t
+),
+(6)
+which are concatenated into a unified representation:
+ht =
+h
+z(v)
+t
+; z(n)
+t
+i
+.
+(7)
+This early-fusion design directly operates on concatenated
+latent features for decision-making, without explicitly mod-
+eling cross-modal temporal alignment, which motivates the
+study of temporal inconsistency in multimodal reinforcement
+learning policies.
+
+
+4
+Fig. 1: Overview of the proposed Split Temporal Adversary (STA). At each time step, the adversary observes the current state
+and driving policy information, then decides whether to attack based on the attack budget and policy awareness. If activated, it
+selects which modality to manipulate (visual or numerical) and replaces the selected modality with a delayed observation from
+the history buffer. This creates cross-modal temporal misalignment that leads to erroneous control decisions by the driving
+policy.
+2) History Buffer: The adversary maintains a circular his-
+tory buffer Ht that stores the most recent n multimodal ob-
+servations. Each entry corresponds to a complete observation
+tuple:
+ot =
+
+o(v)
+t , o(n)
+t
+
+,
+(8)
+and the buffer is defined as:
+Ht = {ot−n+1, . . . , ot}.
+(9)
+This design maintains a shared temporal repository for
+all modalities, enabling the adversary to sample consistent
+historical states without maintaining separate modality-specific
+buffers.
+When a temporal attack is triggered on modality m, the
+adversary samples a past observation ot−k ∈Ht and extracts
+the corresponding modality component:
+o(m)
+t−k = Projm(ot−k),
+(10)
+where Projm(·) denotes modality projection.
+The extracted delayed observation o(m)
+t−k is then used in the
+temporal replacement operation (see Eq. (11)). This formula-
+tion enables modality-agnostic temporal sampling while pre-
+serving cross-modal alignment within each historical snapshot.
+3) Unified Delay Perturbation: Given an attack decision at
+time step t, STA applies a temporal replacement operator to
+the selected modality m. The perturbed observation is defined
+as:
+˜o(m)
+t
+=
+(
+o(m)
+t−n,
+if m is selected for attack at t,
+o(m)
+t
+,
+otherwise,
+(11)
+and the resulting multimodal observation becomes ˜ot
+=
+{˜o(m)
+t
+}M
+m=1.
+This operator defines a modality-agnostic temporal pertur-
+bation mechanism that replaces the current observation with
+a historical counterpart without introducing additive noise or
+modality-specific transformations. As a result, the attack effect
+is induced solely through cross-modal temporal misalignment
+at the fusion level.
+4) Semantic Plausibility vs. Temporal Inconsistency: Each
+delayed observation o(m)
+t−n is a valid sensor reading from a
+past time step and therefore remains semantically meaningful
+in isolation. However, the resulting multimodal observation
+˜ot combines signals originating from different time steps,
+leading to a violation of temporal consistency assumptions in
+multimodal fusion.
+Unlike additive perturbations that alter the content of indi-
+vidual modalities, the proposed delay-based attack preserves
+intra-modality semantics while introducing cross-modal tem-
+poral misalignment, which can destabilize decision-making in
+temporally sensitive driving policies.
+5) Fixed Temporal Delay Mechanism: We adopt a fixed
+temporal delay of n steps as the core perturbation strategy,
+where the selected modality is replaced with its corresponding
+historical observation from n time steps earlier.
+Formally, this corresponds to selecting the oldest accessible
+entry within the history buffer, ensuring a consistent and
+controllable temporal shift across all attack instances.
+This deterministic delay mechanism provides a stable and
+reproducible perturbation strength, and its impact on policy
+
+
+5
+behavior is further analyzed in Section V.
+C. Split Multimodal Adversarial Decision Mechanism
+Based on the POMDP formulation introduced in Section III,
+this mechanism instantiates the adversarial decision process
+for multimodal temporal attacks by augmenting the observa-
+tion space with policy-aware information and redesigning the
+action space into a split decision architecture. The resulting
+adversarial policy jointly determines when to launch an attack
+and which modality to perturb while operating under a finite
+attack budget.
+1) Policy-Aware Observation: The adversarial policy con-
+ditions its decisions on an augmented observation constructed
+from the multimodal observation defined in Section IV-B. The
+adversarial observation is defined as
+ˆot = (ot, uclean
+t
+, bt),
+(12)
+where ot denotes the multimodal observation, uclean
+t
+=
+πdriving(ot) is the clean action generated by the victim driving
+policy, and bt denotes the remaining attack budget.
+The clean action provides an estimate of the victim policy’s
+local decision tendency, while the remaining budget enables
+long-horizon planning under realistic resource constraints.
+2) Split Hierarchical Action Space: Given the policy-aware
+observation, the adversarial policy outputs a split decision
+consisting of an attack trigger and a modality selector:
+at = (atrig
+t
+, amod
+t
+),
+(13)
+where atrig
+t
+∈R determines whether an attack is executed,
+and amod
+t
+∈{1, 2} specifies the target modality.
+The effective attack trigger is obtained as
+˜atrig
+t
+= 1
+
+atrig
+t
+> 0 ∧bt > 0
+
+,
+(14)
+where bt is the remaining attack budget. When ˜atrig
+t
+= 1,
+the selected modality amod
+t
+is perturbed using the temporal
+replacement mechanism described in section IV-B.
+This factorization decouples attack triggering from modality
+selection, allowing each decision to be optimized indepen-
+dently while jointly forming a complete adversarial strategy.
+3) Budget-Aware Optimization: The remaining attack bud-
+get evolves according to
+bt+1 =
+(
+bt −1,
+if ˜atrig
+t
+= 1,
+bt,
+otherwise.
+(15)
+The adversary receives a sparse collision-based reward,
+radv
+t
+=
+(
+Rc,
+if a collision occurs at t,
+0,
+otherwise,
+(16)
+where a collision occurring within a horizon of T steps after
+an attack is regarded as a successful attack and receives reward
+Rc.
+The adversarial policy aims to maximize the expected
+discounted return
+J(πadv) = Eπadv
+"T −1
+X
+t=0
+γtradv
+t
+#
+.
+(17)
+To address the credit assignment problem introduced by the
+split action space, we adopt a gated optimization objective,
+Ladv = Ltrig + 1(˜atrig
+t
+= 1)Lmod,
+(18)
+where Ltrig and Lmod are the surrogate losses for the trigger
+and modality branches, respectively. The gating indicator
+ensures that the modality selector is updated only when an
+attack is executed, allowing optimization to focus on decision-
+critical interactions.
+4) Policy Optimization: The adversarial policy is optimized
+using Proximal Policy Optimization (PPO) [38]. During train-
+ing, trajectories are collected by interacting with the victim
+driving policy under the attack budget constraint, and the gated
+objective in Eq. (18) is optimized using the standard PPO
+clipped surrogate objective for both decision branches.
+D. Overall Workflow of Split Temporal Adversary (STA)
+Algorithm 1 summarizes the overall workflow of STA by
+integrating the two proposed mechanisms. At each interaction
+step, the unified multimodal temporal perturbation mechanism
+maintains the history buffer and performs temporal replace-
+ment on the selected modality, while the split multimodal
+adversarial decision mechanism constructs the policy-aware
+adversarial state and determines both attack triggering and
+modality selection under budget constraints. The adversarial
+policy is optimized using PPO, whereas the victim driving
+policy remains fixed throughout training.
+Following Fan et al. [21], we further adopt a trajectory
+cropping strategy to improve the training efficiency of the
+split adversarial policy under finite attack budgets. Once the
+budget bt is exhausted, the adversary can no longer execute
+further attacks, and the remaining interaction may not provide
+meaningful learning signals for the adversarial policy. To
+improve training efficiency, we truncate the episode at the
+point of budget exhaustion. If the final executed attack results
+in a collision, the episode is terminated immediately and the
+trajectory is stored for policy optimization. Otherwise, the
+environment is allowed to continue for up to T additional
+steps to capture delayed effects of previous attacks, and any
+collision occurring within this window is still considered
+as a valid adversarial success signal. This design ensures
+that STA focuses on learning effective attack timing under
+strict budget constraints while avoiding redundant trajectory
+collection after budget depletion, and is particularly important
+for PPO stability under sparse reward settings.
+V. THEORETICAL ANALYSIS
+Consider a multimodal system with M sensors. At time t,
+the state st generates modality-specific observations o(m)
+t
+∼
+O(m)(st). The policy π maps the synchronous tuple ot =
+(o(1)
+t , . . . , o(M)
+t
+) to action at and is assumed locally Lipschitz.
+A temporal adversary delays modality m by k steps, producing
+
+
+6
+Algorithm 1 Training Procedure of Split Temporal Adversary
+(STA)
+1: Input: Driving policy πdriving, delay horizon n, budget B
+2: Initialize adversary policy πadv and value network Vϕ
+3: for each episode do
+4:
+Reset environment; initialize history buffer H
+5:
+Set budget b ←B
+6:
+for t = 1 to Tmax do
+7:
+Observe ot from environment
+8:
+Compute uclean
+t
+= πdriving(ot)
+9:
+Form adversarial state ˆot = (ot, uclean
+t
+, b)
+10:
+Sample action at = (atrig
+t , amod
+t
+) ∼πadv(·|ˆot)
+11:
+Initialize ˜ot ←ot
+12:
+if atrig
+t
+> 0 and b > 0 then
+13:
+Retrieve o(amod
+t
+)
+t−n
+from H
+14:
+Replace ˜o(amod
+t
+)
+t
+←o(amod
+t
+)
+t−n
+15:
+b ←b −1
+16:
+end if
+17:
+Execute action ut = πdriving(˜ot) in environment
+18:
+Receive reward radv
+t
+and next observation ot+1
+19:
+Store transition (ˆot, at, radv
+t , ˆot+1)
+20:
+Update H ←H ∪{ot} (FIFO)
+21:
+end for
+22:
+Compute advantages using GAE
+23:
+Update πadv, Vϕ via PPO objective
+24: end for
+˜ot where ˜o(m)
+t
+= o(m)
+t−k and other modalities unchanged. We
+analyze the attack along three dimensions:
+1) Distribution shift (Proposition V.A);
+2) Perturbation propagation (Proposition V.B);
+3) Modality-wise sensitivity (Lemma V.A, Corollary V.A).
+A. Distribution Shift Induced by Temporal Inconsistency
+Proposition V.A (Distribution Shift Lower Bound). Let O(st)
+be the nominal joint distribution. Under a k-step delay on
+modality m, the perturbed distribution is
+P(m)
+˜ot
+= O(m)(st−k) × O(¬m)(st).
+(19)
+Then
+DTV
+ P˜ot, O(st)
+
+≥Est,st−k
+h
+DTV
+ O(m)(st−k), O(m)(st)
+i
+.
+(20)
+Proof. Only modality m is altered, so the total variation is at
+least the per-modality divergence. Restricting the supremum
+to sets of the form A = A(m) × O(¬m) directly yields
+DTV(O(m)(st−k), O(m)(st)); taking expectation over states
+gives the bound.
+Interpretation.
+Temporal
+perturbation
+creates
+a
+state-
+conditioned mismatch in the attacked modality. In rapidly
+evolving scenarios, ∥st −st−k∥can grow, amplifying the shift
+and degrading policy performance.
+B. Perturbation Propagation via Lipschitz Continuity
+Proposition V.B (Perturbation Propagation Bound). Assume
+π is L-Lipschitz. For the delayed observation ˜ot (modality m
+delayed by k),
+dA(π(˜ot), π(ot)) ≤L · dO(˜ot, ot).
+(21)
+If
+the
+observation
+metric
+is
+additive,
+dO(o, o′)
+=
+P
+i d(i)
+O (o(i), o′(i)), then only the attacked modality con-
+tributes:
+dO(˜ot, ot) = d(m)
+O (o(m)
+t−k, o(m)
+t
+) ≜∆m(t, k).
+(22)
+Proof. The Lipschitz condition directly gives the inequality.
+For the additive metric, ˜ot and ot differ only in modality m,
+so all other terms vanish.
+Interpretation. Attack impact is governed by policy sensi-
+tivity L and the temporal variation ∆m(t, k) of the delayed
+modality. This motivates selecting a delay that creates a sub-
+stantial temporal discrepancy while retaining a valid historical
+observation.
+C. Differential Impact Across Modalities
+We assume an early-fusion architecture: modality embed-
+dings zvis
+t , znum
+t
+are concatenated into ht, and π is differen-
+tiable.
+Lemma V.A (Local Linear Approximation). For a small
+perturbation δh,
+π(ht + δh) ≈π(ht) + J(ht) δh,
+(23)
+where J(ht) = [ ∂π
+∂zvis ,
+∂π
+∂znum ] is the Jacobian.
+Proof. Follows from Taylor’s theorem with continuity of J;
+the remainder is o(∥δh∥).
+Proposition
+V.C
+(Modality-wise
+Sensitivity).
+Attacking
+modality m yields
+∥π(˜ht) −π(ht)∥≈∥Jm(ht)(z(m)
+t−k −z(m)
+t
+)∥,
+(24)
+and in expectation,
+E[∥∆at∥] ≤E
+
+∥Jm(ht)∥·∥∆z(m)
+t
+∥
+
+,
+∆z(m)
+t
+= z(m)
+t−k−z(m)
+t
+.
+(25)
+Proof. From Lemma V.A, π(˜ht) −π(ht) ≈Jm(ht)∆z(m)
+t
+(only modality m changes). Taking norms and expectation
+yields the bound.
+Corollary V.A (Modality Selection Principle). A modality is
+more influential if it has larger local sensitivity ∥Jm∥and
+larger temporal variation E[∥∆z(m)
+t
+∥]. For modalities i, j,
+if ∥Ji∥> ∥Jj∥and temporal variations are comparable,
+attacking i induces larger expected action deviation.
+Interpretation. Attack effectiveness depends on both policy
+sensitivity and intrinsic temporal variation of each modality. In
+practice, numerical modalities often exhibit higher sensitivity
+due to direct influence on control signals (e.g., speed), explain-
+ing their elevated vulnerability under temporal misalignment.
+
+
+7
+TABLE I: Main results in Town02 dense traffic. CR: collision rate (%); ANA: average number of attacks. Mean ± variance
+over five seeds.
+Method
+PPO
+SAC
+DARRL
+CR (%)
+ANA
+CR (%)
+ANA
+CR (%)
+ANA
+Clean
+6.8 ± 0.000
+0
+2.8 ± 0.000
+0
+2.8 ± 0.000
+0
+RTA
+4.0 ± 0.001
+29.524 ± 0.310
+4.0 ± 0.000
+29.820 ± 0.052
+4.4 ± 0.000
+29.760 ± 0.090
+RTAM
+12.0 ± 0.001
+28.864 ± 0.136
+5.2 ± 0.000
+29.660 ± 0.050
+6.8 ± 0.001
+29.532 ± 0.141
+ADV
+16.8 ± 0.000
+29.396 ± 0.028
+16.8 ± 0.002
+29.532 ± 0.153
+32.2 ± 0.002
+28.932 ± 0.041
+Ours (STA)
+35.6 ± 0.001
+24.168 ± 0.478
+18.2 ± 0.001
+25.628 ± 0.136
+18.6 ± 0.001
+26.124 ± 0.174
+TABLE II: Results on the VLM-based driving policy in
+Town02 dense traffic (mean ± variance over five seeds).
+Method
+CR (%)
+ANA
+No Attack
+2.00 ± 0.00
+–
+RTA
+0.00 ± 0.00
+30.00 ± 0.31
+RTAM
+2.00 ± 0.00
+29.90 ± 0.14
+ADV
+2.00 ± 0.00
+29.95 ± 0.03
+STA (Ours)
+62.00 ± 0.00
+26.98 ± 0.47
+VI. EXPERIMENTS
+We evaluate whether STA (i) induces more safety-critical
+failures than spatial and random temporal baselines, (ii) uses a
+limited attack budget more efficiently, and (iii) transfers across
+victim-policy families.
+A. Experimental Setup
+We use a black-box threat model in which the adver-
+sary observes the victim’s output action but not its action
+distribution or parameters. Experiments use CARLA 0.9.13,
+Town02, dense traffic, and fixed clear weather. Victims receive
+an RGB image plus speed and waypoint states and output
+continuous steering and throttle. We evaluate PPO (trained
+for 440,000 steps), SAC (235,000 steps), and our CARLA
+reimplementation of DARRL [22]. Each victim is trained on
+clean observations and frozen before adversary training.
+STA is trained with PPO for 800,000 steps. Unless stated
+otherwise, the delay horizon is n = 10, the history-buffer
+length is 10, the attack budget is B = 30, and an episode lasts
+at most 50 steps. Experiments ran on Intel Xeon Gold 6230
+CPUs and NVIDIA RTX 4090 GPUs.
+a) Baselines.: We compare against the following base-
+lines:
+• Clean: Clean execution without any intervention.
+• RTA (Random Temporal Attack): Randomly selects
+timesteps to apply a fixed n-step delay to a random
+modality [37].
+• RTAM (Random Temporal Attack on all Modalities):
+Randomly selects timesteps to apply a fixed n-step delay
+to both numerical and visual modalities [16].
+• ADV (PGD-based Adversary): A learned attacker that
+applies PGD perturbations and adaptively decides when
+to attack [26].
+b) Evaluation Metrics.: We report collision rate (CR)
+and average number of executed attacks (ANA). Results ag-
+gregate 50 evaluation episodes for each of five independent
+seeds; the table reports the mean and variance across seeds.
+• Collision Rate (CR): The percentage of episodes that
+terminate in a collision. A higher CR indicates a more
+effective attack at inducing safety-critical failures.
+• Average Number of Attacks (ANA): The mean number
+of attacks executed per episode. When combined with
+a high CR, a lower ANA reflects superior strategic
+allocation of the limited attack budget.
+B. Main Results
+Table I shows that STA is the strongest attack on PPO and
+SAC while using fewer interventions than the baselines. The
+DARRL result also reveals policy-dependent vulnerability:
+temporal and spatial attacks expose different failure modes.
+On PPO, STA raises CR from 16.8% for the strongest
+baseline (ADV) to 35.6%, while reducing ANA from 29.396
+to 24.168 (17.8% fewer interventions). The random temporal
+baselines nearly exhaust the budget yet remain substantially
+less effective, supporting the value of policy-aware attack
+timing and modality selection.
+The outcome is policy-dependent. STA is also the strongest
+attack on SAC, although its advantage over ADV is smaller
+(18.2% versus 16.8%). DARRL instead remains more vulner-
+able to ADV (32.2%) than to STA (18.6%). Thus, robustness
+to spatial perturbations does not imply robustness to temporal
+inconsistency, and evaluation should cover both threat models.
+C. VLM-Based Driving Strategy Evaluation
+We also evaluate the VLM-based driving policy of [1] under
+the same Town02 configuration (B = 30, n = 10). STA
+delays image frames; the textual instruction is fixed at episode
+initialization and is therefore not attacked.
+As shown in Table II, the clean, random-delay, and PGD
+conditions yield 0–2% CR, whereas STA reaches 62% CR
+with 26.98 attacks per episode. This result suggests that policy-
+aware temporal disruption can expose failure modes beyond
+conventional RL policies, although broader evaluation across
+VLM architectures remains future work.
+VII. CONCLUSION AND FUTURE WORK
+In this work, we study temporal vulnerability in multimodal
+RL-based driving policies. Unlike existing works that focus
+on spatial perturbations, we introduce a threat model that
+leverages structured temporal misalignment to expose hidden
+
+
+8
+failure modes. We propose STA, a policy-aware and budget-
+constrained attack framework that selectively delays modality-
+specific observations, preserving per-modality semantic in-
+tegrity while inducing cross-modal inconsistency. In CARLA,
+STA achieves a 35.6% collision rate on PPO—more than
+double that of the strongest baseline—while requiring 17.8%
+fewer interventions. Its effectiveness on a VLM-based driving
+policy further suggests that temporal inconsistency is relevant
+beyond conventional RL. The policy-dependent results also
+show that resistance to spatial perturbations does not guarantee
+robustness against temporal inconsistency.
+Future work will explore more constrained black-box set-
+tings with limited query access, adaptive and learnable delay
+strategies, and extensions to richer sensor modalities such
+as LiDAR, radar, and GPS. We also plan to investigate the
+applicability of STA in real-world and multi-agent driving
+environments to better understand temporal vulnerability under
+practical deployment conditions.
+REFERENCES
+[1] Huang Z, Sheng Z, Qu Y, et al. Vlm-rl: A unified vision language models
+and reinforcement learning framework for safe autonomous driving[J].
+Transportation Research Part C: Emerging Technologies, 2025, 180:
+105321.
+[2] Qian H, Wang M, Zhu M, et al. A review of multi-sensor fusion in
+autonomous driving[J]. Sensors, 2025, 25(19): 6033.
+[3] Jalalipour S, Justo D, Rekabdar B. Understanding Adversarial Vulnera-
+bilities and Emergent Patterns in Multimodal RL[C]//2026 International
+Conference on Semantic Computing (ICSC). IEEE, 2026: 64-69.
+[4] Barach J. Cross-domain adversarial attacks and robust defense mecha-
+nisms for multimodal neural networks[C]//International Conference on
+Advanced Network Technologies and Intelligent Computing. Cham:
+Springer Nature Switzerland, 2024: 345-362.
+[5] Cheng Z, Choi H, Feng S, et al. Fusion is not enough: Single modal
+attacks on fusion models for 3D object detection[C]//International Con-
+ference on Learning Representations. 2024, 2024: 23905-23929.
+[6] Goodfellow I J, Shlens J, Szegedy C. Explaining and harnessing adver-
+sarial examples[J]. arXiv preprint arXiv:1412.6572, 2014.
+[7] Kurakin A, Goodfellow I J, Bengio S. Adversarial examples in the
+physical world[M]//Artificial intelligence safety and security. Chapman
+and Hall/CRC, 2018: 99-112.
+[8] Huang S, Papernot N, Goodfellow I, et al. Adversarial attacks on neural
+network policies[J]. arXiv preprint arXiv:1702.02284, 2017.
+[9] Sun J, Zhang T, Xie X, et al. Stealthy and efficient adversarial attacks
+against deep reinforcement learning[C]//Proceedings of the AAAI con-
+ference on artificial intelligence. 2020, 34(04): 5883-5891.
+[10] Li X, Li Y, Feng Z, et al. ATS-O2A: A state-based adversarial attack
+strategy on deep reinforcement learning[J]. Computers & Security, 2023,
+129: 103259.
+[11] He X, Lou B, Yang H, et al. Robust decision making for autonomous
+vehicles at highway on-ramps: A constrained adversarial reinforcement
+learning approach[J]. IEEE Transactions on Intelligent Transportation
+Systems, 2022, 24(4): 4103-4113.
+[12] He X, Yang H, Hu Z, et al. Robust lane change decision making for
+autonomous vehicles: An observation adversarial reinforcement learning
+approach[J]. IEEE Transactions on Intelligent Vehicles, 2022, 8(1): 184-
+193.
+[13] Sharif A, Marijan D. Adversarial deep reinforcement learning for
+improving the robustness of multi-agent autonomous driving poli-
+cies[C]//2022
+29th
+Asia-Pacific
+Software
+Engineering
+Conference
+(APSEC). IEEE, 2022: 61-70.
+[14] Cai X, Bai X, Cui Z, et al. Adversarial stress test for autonomous vehicle
+via series reinforcement learning tasks with reward shaping[J]. IEEE
+Transactions on Intelligent Vehicles, 2024.
+[15] Kulkarni A, Zhang S, Behl M. CRASH: Challenging reinforcement-
+learning based adversarial scenarios for safety hardening[J]. arXiv
+preprint arXiv:2411.16996, 2024.
+[16] Shahriar M H, Barat M M A, Sundar H, et al. Temporal Misalignment
+Attacks against Multimodal Perception in Autonomous Driving[J]. arXiv
+preprint arXiv:2507.09095, 2025.
+[17] Xiahou K S, Liu Y, Wu Q H. Robust load frequency control of power
+systems against random time-delay attacks[J]. IEEE Transactions on
+Smart Grid, 2020, 12(1): 909-911.
+[18] Li A, Wang J, Zhang N. Chronos: Timing interference as a new attack
+vector on autonomous cyber-physical systems[C]//Proceedings of the
+2021 ACM SIGSAC Conference on Computer and Communications
+Security. 2021: 2426-2428.
+[19] Feng D, Haase-Sch¨utz C, Rosenbaum L, et al. Deep multi-modal
+object detection and semantic segmentation for autonomous driving:
+Datasets, methods, and challenges[J]. IEEE Transactions on Intelligent
+Transportation Systems, 2020, 22(3): 1341-1360.
+[20] Liang J, Li G, Chen J, et al. A comprehensive review of adversarial
+attacks on autonomous driving: From single-modality to multi-sensor
+fusion[J]. Neurocomputing, 2026: 133884.
+[21] Fan J, Lei X, Chang X, et al. Less is more: A stealthy and efficient
+adversarial attack method for drl-based autonomous driving policies[J].
+IEEE Internet of Things Journal, 2025, 12(15): 30215-30227.
+[22] He X, Huang W, Lv C. Trustworthy autonomous driving via defense-
+aware robust reinforcement learning against worst-case observational
+perturbations[J]. Transportation Research Part C: Emerging Technolo-
+gies, 2024, 163: 104632.
+[23] Dosovitskiy A, Ros G, Codevilla F, et al. CARLA: An open urban
+driving simulator[C]//Conference on robot learning. PMLR, 2017: 1-16.
+[24] Pattanaik A, Tang Z, Liu S, et al. Robust deep reinforcement learning
+with adversarial attacks[J]. arXiv preprint arXiv:1712.03632, 2017.
+[25] Mo K, Tang W, Li J, et al. Attacking deep reinforcement learning with
+decoupled adversarial policy[J]. IEEE Transactions on Dependable and
+Secure Computing, 2022, 20(1): 758-768.
+[26] Domico K, Ferrand J C N, Sheatsley R, et al. Adversarial agents: Black-
+box evasion attacks with reinforcement learning[C]//Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition.
+2026: 647-655.
+[27] Behzadan V, Munir A. Adversarial reinforcement learning framework
+for benchmarking collision avoidance mechanisms in autonomous vehi-
+cles[J]. IEEE Intelligent Transportation Systems Magazine, 2019, 13(2):
+236-241.
+[28] Yang C H H, Qi J, Chen P Y, et al. Enhanced adversarial strategically-
+timed attacks against deep reinforcement learning[C]//ICASSP 2020-
+2020 IEEE International Conference on Acoustics, Speech and Signal
+Processing (ICASSP). IEEE, 2020: 3407-3411.
+[29] Zhao Y, Shumailov I, Cui H, et al. Blackbox attacks on reinforcement
+learning agents using approximated temporal information[C]//2020 50th
+Annual IEEE/IFIP International Conference on Dependable Systems and
+Networks Workshops (DSN-W). IEEE, 2020: 16-24.
+[30] Huang Z, Chu W, Li L, et al. Commit: Certifying robustness of multi-
+sensor fusion systems against semantic attacks[C]//Proceedings of the
+AAAI Conference on Artificial Intelligence. 2025, 39(17): 17528-17536.
+[31] Yin H, Zhao Z, Yan J, et al. Certified Robustness in Automated Driving
+Perception: A Review: H. Yin et al[J]. Automotive Innovation, 2025,
+8(4): 817-837.
+[32] Li J, Liu X, Wei S, et al. Towards Benchmarking and Assessing
+the Safety and Robustness of Autonomous Driving on Safety-critical
+Scenarios[J]. arXiv preprint arXiv:2503.23708, 2025.
+[33] Zhai W, Liu L, Ding Y, et al. ETD: An efficient time delay attack detec-
+tion framework for UAV networks[J]. IEEE transactions on information
+forensics and security, 2023, 18: 2913-2928.
+[34] Zhai W, Sun S, Liu L, et al. HOTD: A holistic cross-layer time-delay
+attack detection framework for unmanned aerial vehicle networks[J].
+Journal of Parallel and Distributed Computing, 2023, 177: 117-130.
+[35] Song X, Liu X, Shan H, et al. Time-delay robust safety control of
+connected vehicles under stochastic DoS attack[J]. IEEE Internet of
+Things Journal, 2025.
+[36] Song Y, Ye D. Optimal stealthy attack against stochastic event-based
+scheduling for remote state estimation in cyber-physical systems[J].
+International Journal of Robust and Nonlinear Control, 2022, 32(6):
+3511-3526.
+[37] Ma C, Wang N, Zhao Z, et al. Slowperception: Physical-world latency
+attack against visual perception in autonomous driving[J]. arXiv preprint
+arXiv:2406.05800, 2024
+[38] Schulman J, Wolski F, Dhariwal P, et al. Proximal policy optimization
+algorithms[J]. arXiv preprint arXiv:1707.06347, 2017.
