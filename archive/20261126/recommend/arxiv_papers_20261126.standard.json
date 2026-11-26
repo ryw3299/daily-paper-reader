@@ -1,0 +1,512 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-11-26T02:36:46.343624+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 3,
+    "deep_divecandidates": 1,
+    "deep_cap": 8,
+    "deep_selected": 1,
+    "quick_candidates": 10,
+    "quick_skim_target": 13,
+    "quick_selected": 10
+  },
+  "deep_dive": [
+    {
+      "id": "2611.32209v1",
+      "source": "arxiv",
+      "title": "XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving",
+      "abstract": "Memory-augmented large language model (LLM) driving agents can reuse past experience, yet previously learned corrections often fail to transfer when traffic conditions change. A key limitation is that existing memories mainly record observed outcomes, providing little evidence about alternative actions. We introduce XMind, a training-free framework that enables LLM-based driving to \"Think Twice\" through cross-memory reasoning. XMind integrates working memory of recent traffic states with episodic memory of critical risk events. The agent first makes an initial decision from the current context and then cross-checks it against retrieved historical experience. If a conflict arises, it makes a second decision guided by the retrieved evidence. To construct reliable episodic memory, XMind evaluates alternative actions through counterfactual rollouts under perturbed traffic conditions and stores the verified outcomes as structured risk capsules. These capsules are retrieved by jointly matching spatial risk patterns and scenario semantics. Across closed-loop highway simulations, XMind achieves success rates of 83.3-93.3%, exceeding the strong baseline by 6.6 percentage points on average. Evaluation on K-Risk further demonstrates lower decision risk on unseen real-world high-risk interactions. Ablation studies confirm the complementary benefits of working memory, risk-text retrieval, and counterfactual verification. Code is available at https://github.com/xiangxiangliuwo/XMind",
+      "authors": [
+        "Zuyi Guo",
+        "Xianjie Dai",
+        "Lei Yang",
+        "Xiaocong Zhao",
+        "Jingguang Li",
+        "Kitae Jang",
+        "Heye Huang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-11-24T08:55:02+00:00",
+      "link": "https://arxiv.org/pdf/2611.32209v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "memory-augmented LLM driving agent with cross-memory reasoning",
+      "llm_evidence_cn": "具备跨记忆推理的记忆增强LLM驾驶智能体",
+      "llm_evidence": "具备跨记忆推理的记忆增强LLM驾驶智能体",
+      "canonical_evidence": "具备跨记忆推理的记忆增强LLM驾驶智能体",
+      "llm_tldr_en": "XMind is a training-free framework enabling LLM driving agents to think twice, cross-checking initial decisions against working and episodic memory of risk events to improve decisions under changing traffic.",
+      "llm_tldr_cn": "针对记忆增强的LLM驾驶智能体在交通状况变化时难以迁移既有纠正经验、记忆只记录结果而缺少备选动作证据的问题，提出免训练框架XMind，融合近期交通状态的工作记忆与关键风险事件的情景记忆，先初步决策再与检索经验交叉校验，冲突时进行二次决策。该机制提升了变化路况下LLM驾驶智能体的决策可靠性与经验复用能力，为车载智能决策支持提供了可复用范式。",
+      "llm_tldr": "针对记忆增强的LLM驾驶智能体在交通状况变化时难以迁移既有纠正经验、记忆只记录结果而缺少备选动作证据的问题，提出免训练框架XMind，融合近期交通状态的工作记忆与关键风险事件的情景记忆，先初步决策再与检索经验交叉校验，冲突时进行二次决策。该机制提升了变化路况下LLM驾驶智能体的决策可靠性与经验复用能力，为车载智能决策支持提供了可复用范式。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2611.31063v1",
+      "source": "arxiv",
+      "title": "From Local Errors to System Failures: Modeling and Benchmarking Error Propagation in Multi-Agent LLM Systems",
+      "abstract": "In multi-agent systems (MAS) built on large language models (LLMs), errors can propagate through intermediate messages and compromise final answers. However, outcome-based evaluation obscures how agents amplify, attenuate, or correct these errors. We propose Response-Aware Error Propagation among Agents (REPA), a structural model that connects measured local responses to system-level error propagation. REPA separately estimates input assembly and agent processing across multiple error channels, while theoretical analysis relates local modeling errors to endpoint prediction error. Experiments span three Qwen base models, six MAS workflows, and ten knowledge and reasoning settings in ErrPropBench-10. REPA achieves a mean condition-level Spearman correlation of 0.84 across base models, compared with 0.47 for direct regression. Controlled experiments also demonstrate its utility for targeted recovery. REPA-guided retrieval-augmented generation (RAG) improves accuracy over no retrieval by an average of 19 percentage points with 16% additional tokens. By linking local agent behavior to system susceptibility, REPA provides an interpretable foundation for studying error propagation and developing targeted optimization in MAS.",
+      "authors": [
+        "Wenlong Yu",
+        "Bingxu Lu",
+        "Qilong Wang",
+        "Qinghua Hu",
+        "Qianru Sun"
+      ],
+      "primary_category": "cs.MA",
+      "categories": [
+        "cs.MA",
+        "cs.AI"
+      ],
+      "published": "2026-11-23T17:20:43+00:00",
+      "link": "https://arxiv.org/pdf/2611.31063v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "models and benchmarks error propagation in multi-agent LLM systems, supporting robustness evaluation for knowledge-enhanced agents",
+      "llm_evidence_cn": "建模并评测多智能体大模型系统的错误传播，支撑知识增强智能体鲁棒性评估",
+      "llm_evidence": "建模并评测多智能体大模型系统的错误传播，支撑知识增强智能体鲁棒性评估",
+      "canonical_evidence": "建模并评测多智能体大模型系统的错误传播，支撑知识增强智能体鲁棒性评估",
+      "llm_tldr_en": "REPA models how local errors in LLM multi-agent workflows propagate to system-level failures, separating input-assembly and agent-processing channels and introducing the ErrPropBench-10 benchmark across models, workflows and knowledge-reasoning settings.",
+      "llm_tldr_cn": "多智能体大模型系统中，局部错误会经中间消息逐级传播并导致最终答案失效，而仅看结果的评测无法揭示放大与纠正过程。作者提出REPA结构模型，分别刻画输入组装与智能体处理两类误差通道，并在理论上关联局部建模误差与端到端预测误差。在三种Qwen基座、六种多智能体流程与十个知识推理设置上构建ErrPropBench-10进行验证。该工作为多智能体系统的错误传播诊断与鲁棒性评测提供了可复用方法，可迁移到知识增强车载智能体的安全评估。",
+      "llm_tldr": "多智能体大模型系统中，局部错误会经中间消息逐级传播并导致最终答案失效，而仅看结果的评测无法揭示放大与纠正过程。作者提出REPA结构模型，分别刻画输入组装与智能体处理两类误差通道，并在理论上关联局部建模误差与端到端预测误差。在三种Qwen基座、六种多智能体流程与十个知识推理设置上构建ErrPropBench-10进行验证。该工作为多智能体系统的错误传播诊断与鲁棒性评测提供了可复用方法，可迁移到知识增强车载智能体的安全评估。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.25705v2",
+      "source": "arxiv",
+      "title": "STARK: Moving towards Personalized Agents That Truly Learn and Remember",
+      "abstract": "Long-term memory is essential for personalized agentic systems that interact with users over long time periods, yet current architectures only capture what happened while leaving the reasoning of why it happened to be derived later by underlying LLMs. These events can, however, convey not only what a user experienced but also how that experience shaped their behavioral patterns. We introduce STARK, a dual-graph memory architecture which treats these events not just as nodes but also as edges between behavioral insights. STARK maintains an Episodic Graph which records interactions as temporally, causally, and semantically linked episodes; and an Insight Graph which represents LLM-extracted behavioral signals scored by how many events support them, connected by the very events that led to them. At inference, behavioral knowledge is retrieved directly from insight nodes grounded by event-as-edges, eliminating repeated episodic traversal. The event-as-edge structure also naturally enables projecting the knowledge graph into a relational embedding space where cross-user transfer becomes possible under shared contextual circumstances, allowing the system to infer missing insights for cold-start users. Evaluations show that STARK improves by 1.48 judge score on LongMemEval information extraction and 0.93 on LoCoMo open domain questions over state of the art. On the public LongLaMP abstract-generation benchmark, cross-user transfer improves open-ended judge scores by 0.7 points and ROUGE-L by 3 at 5% graph sparsity.",
+      "authors": [
+        "Aryan Jain",
+        "Abhishek Jha",
+        "Anish Nediyanchath",
+        "Promod Yenigalla"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.IR"
+      ],
+      "published": "2026-11-19T08:19:28+00:00",
+      "link": "https://arxiv.org/pdf/2611.25705v2",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "dual-graph memory with nodes and edges enabling personalized agent behavior",
+      "llm_evidence_cn": "以节点与边构成的双图记忆支撑个性化智能体",
+      "llm_evidence": "以节点与边构成的双图记忆支撑个性化智能体",
+      "canonical_evidence": "以节点与边构成的双图记忆支撑个性化智能体",
+      "llm_tldr_en": "STARK introduces a dual-graph memory architecture with an episodic graph of linked interactions and an insight graph of LLM-extracted behavioral signals, supporting long-term personalized agents.",
+      "llm_tldr_cn": "针对长期个性化智能体只记录发生了什么、而将行为模式成因留待底层大模型推导的问题，提出STARK双图记忆架构，情景图以时间、因果与语义关联记录交互事件，洞察图表示由LLM抽取并按支持事件计分的行为信号。该结构使事件既作节点又作边，从而支撑长期个性化推理与记忆。其思路可迁移到车载座舱助手的个性化服务与主动提醒。",
+      "llm_tldr": "针对长期个性化智能体只记录发生了什么、而将行为模式成因留待底层大模型推导的问题，提出STARK双图记忆架构，情景图以时间、因果与语义关联记录交互事件，洞察图表示由LLM抽取并按支持事件计分的行为信号。该结构使事件既作节点又作边，从而支撑长期个性化推理与记忆。其思路可迁移到车载座舱助手的个性化服务与主动提醒。",
+      "llm_tags": [
+        "query:in-car-agent"
+      ],
+      "matched_query_tag": "query:in-car-agent",
+      "matched_query_text": "Find in car assistant systems where explicit graph nodes and relations enable clarification questions, proactive reminders, or personalized services.",
+      "matched_requirement_id": "req-12",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.29123v1",
+      "source": "arxiv",
+      "title": "Your Diffusion-Based Driving Planner Only Needs a Nudge",
+      "abstract": "Diffusion-based planners capture the multimodality of human driving behavior well, yet covariate shift in closed-loop driving can lead them to generate trajectories that result in collisions or road departures. Reinforcement learning (RL) finetuning offers a promising way to tackle this issue, but applying it to diffusion-based planners is complicated by their iterative denoising process and receding-horizon execution. We find that small adjustments to the planned trajectories can prevent many of these unsafe outcomes. Motivated by this observation, we propose PlanNudge, which preserves the learned planning capabilities of a pretrained diffusion-based planner by freezing it and trains a lightweight policy that we call the nudge policy. At each planning step, the nudge policy outputs a nudge, a two-dimensional adjustment of the speed and curvature of the plan from the frozen planner. The nudge policy is a multilayer perceptron that predicts the nudge in a single forward pass, and both dimensions directly change the motion of the vehicle, so standard off-policy RL can train it in closed-loop simulation. We evaluate PlanNudge on nuPlan, a large-scale autonomous driving benchmark based on real-world driving data. In all six settings, PlanNudge matches or exceeds the final scores of the previous state-of-the-art RL finetuning method while using about one sixth as many environment steps and less than one fifth as much model compute. We also provide guidelines for reward shaping, value learning, and exploration when using off-policy RL to post-train autonomous driving planners. Our results are reported with means and standard deviations over six training runs. Project page: https://zerlinwang.github.io/plannudge/",
+      "authors": [
+        "Zilin Wang",
+        "Guozheng Ma",
+        "Saeed Rahmani",
+        "Jiong Yang",
+        "Antyanta Bangunharcana",
+        "Yiluan Guo",
+        "Jakob Nicolaus Foerster",
+        "Shimon Whiteson"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-22T01:08:48+00:00",
+      "link": "https://arxiv.org/pdf/2611.29123v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Diffusion-based driving planner with RL nudge policy for safer closed-loop trajectories",
+      "llm_evidence_cn": "基于扩散模型的驾驶规划器，用强化学习轻推策略提升闭环安全性",
+      "llm_evidence": "基于扩散模型的驾驶规划器，用强化学习轻推策略提升闭环安全性",
+      "canonical_evidence": "基于扩散模型的驾驶规划器，用强化学习轻推策略提升闭环安全性",
+      "llm_tldr_en": "Diffusion planners can produce unsafe trajectories under closed-loop covariate shift. PlanNudge freezes the planner and trains a lightweight nudge policy that makes small trajectory corrections, preventing many collisions and road departures while preserving planning capability.",
+      "llm_tldr_cn": "扩散式驾驶规划器在闭环执行中会因协变量偏移生成碰撞或偏离道路的轨迹，而直接强化学习微调又受迭代去噪与滚动时域执行制约。作者提出PlanNudge，冻结预训练规划器并训练轻量级“轻推”策略，在每一步对规划轨迹做小幅修正。实验表明这种微小调整即可避免大量不安全结果，同时保留原有规划能力。该工作为扩散规划器提供了一种低成本、易部署的安全增强范式。",
+      "llm_tldr": "扩散式驾驶规划器在闭环执行中会因协变量偏移生成碰撞或偏离道路的轨迹，而直接强化学习微调又受迭代去噪与滚动时域执行制约。作者提出PlanNudge，冻结预训练规划器并训练轻量级“轻推”策略，在每一步对规划轨迹做小幅修正。实验表明这种微小调整即可避免大量不安全结果，同时保留原有规划能力。该工作为扩散规划器提供了一种低成本、易部署的安全增强范式。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "vehicle control and actuation for automated driving",
+      "matched_requirement_id": "req-16",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.29709v1",
+      "source": "arxiv",
+      "title": "Cache the Knowledge, Not Just the Prompt: Dynamic Datalog as the Action Language for LLM Agents",
+      "abstract": "An LLM agent that answers questions about a knowledge graph writes a program per question, and its tools evaluate each from scratch. We give the agent a Datalog REPL, a session over a dynamic Datalog engine, in which rules are inserted and retracted like facts while derived facts stay current. Prompt caching reuses the model's processing of what a session shares, and the Datalog REPL reuses the evaluation of it. On chains of questions over three knowledge graphs, agents reuse a relation that the REPL keeps in 179 of 180 cases, with two models, and write fewer output tokens: SQL and Python agents write 23 to 82% more. With SQL tables or a Python namespace, Claude Haiku 5.5 stores almost nothing for later questions, and a chain of seven questions at 13 million facts takes it a median of 48 and 56 s, against 31 s with the REPL. Claude Opus 5.5 matches the REPL by storing tables in SQL, and when the data changes it stores views, which are evaluated again at every read. A relation that the REPL keeps is read like a table and stays current like a view. Datalog is a niche language beside SQL and Python, and with thinking enabled the models answer as accurately with it.",
+      "authors": [
+        "Bruno Rucy Carneiro Alves de Lima",
+        "Victor Henrique Cabral Pinheiro"
+      ],
+      "primary_category": "cs.PL",
+      "categories": [
+        "cs.PL"
+      ],
+      "published": "2026-11-22T19:20:27+00:00",
+      "link": "https://arxiv.org/pdf/2611.29709v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "query:in-car-agent"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "LLM agent querying knowledge graphs with cached Datalog evaluation",
+      "llm_evidence_cn": "LLM智能体借助缓存Datalog求值查询知识图谱",
+      "llm_evidence": "LLM智能体借助缓存Datalog求值查询知识图谱",
+      "canonical_evidence": "LLM智能体借助缓存Datalog求值查询知识图谱",
+      "llm_tldr_en": "This work gives LLM agents a dynamic Datalog REPL as action language over knowledge graphs, so rule insertions and retractions reuse evaluation, cutting output tokens and reusing relations across question chains.",
+      "llm_tldr_cn": "针对LLM智能体回答知识图谱问题时每题重写程序并从零求值、导致重复计算与冗余输出的问题，为智能体提供动态Datalog REPL会话，规则可增删而派生事实保持最新，并配合提示缓存复用求值过程。在三个知识图谱的连续提问中关系复用达179/180，输出token显著少于SQL与Python智能体。该工作说明图查询求值缓存可提升知识增强智能体的效率与工具调用能力。",
+      "llm_tldr": "针对LLM智能体回答知识图谱问题时每题重写程序并从零求值、导致重复计算与冗余输出的问题，为智能体提供动态Datalog REPL会话，规则可增删而派生事实保持最新，并配合提示缓存复用求值过程。在三个知识图谱的连续提问中关系复用达179/180，输出token显著少于SQL与Python智能体。该工作说明图查询求值缓存可提升知识增强智能体的效率与工具调用能力。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.29947v1",
+      "source": "arxiv",
+      "title": "SAGE-Drive: Benefit-Aware Adaptive Reasoning for Autonomous Driving Planning",
+      "abstract": "Explicit reasoning enables autonomous vehicles (AVs) to interpret complex traffic interactions and support trajectory planning, but introduces additional computational demands. Determining when explicit reasoning can improve planning accuracy remains a key challenge, as its benefits vary across driving scenarios. To address this challenge, this study proposes Scene-Adaptive Gating of Explicit Reasoning for Driving (SAGE-Drive), a benefit-aware adaptive reasoning framework for autonomous driving planning. First, paired planning outcomes with and without explicit reasoning are analyzed to measure the reasoning benefit, i.e., the reduction in planning error achieved by explicit reasoning, which serves as the supervision label. SAGE-Drive then learns to predict these benefits using geometric features of the initial trajectory planned without reasoning and multimodal scene information, and invokes explicit reasoning only for the scenarios with the highest predicted benefits under a predefined reasoning budget. Experiments on 1,497 paired driving scenarios reveal that explicit reasoning improves planning accuracy in 53.5% of cases while degrading it in 46.5%, yielding a near-zero average benefit. On the test set, with a 20% reasoning budget, SAGE-Drive achieves an average displacement error (ADE) of 1.5191 m, compared with 1.5252 m for random selection. At a 35% budget, it achieves an ADE of 1.5148 m, close to the 1.5141 m obtained when reasoning is applied to every scenario. These findings establish the predicted reasoning benefit as an effective criterion for reasoning selection, allowing explicit reasoning to be invoked where it improves planning accuracy at a fraction of its computational cost.",
+      "authors": [
+        "Donglei Rong",
+        "Wenbin Yao",
+        "Congcong Bai",
+        "Xi Gao",
+        "Qiaoqiao Ren",
+        "Sheng Jin",
+        "Cheng Xu"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-23T03:10:09+00:00",
+      "link": "https://arxiv.org/pdf/2611.29947v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "adaptive explicit reasoning framework for autonomous driving planning",
+      "llm_evidence_cn": "面向自动驾驶规划的自适应显式推理框架",
+      "llm_evidence": "面向自动驾驶规划的自适应显式推理框架",
+      "canonical_evidence": "面向自动驾驶规划的自适应显式推理框架",
+      "llm_tldr_en": "SAGE-Drive learns when explicit reasoning benefits driving planning, gating reasoning by scenario to cut computation while preserving accuracy.",
+      "llm_tldr_cn": "显式推理能帮助自动驾驶车辆理解复杂交通交互并支撑轨迹规划，但会带来额外计算开销，且其收益随场景差异很大。作者提出SAGE-Drive，先通过配对比较有无显式推理的规划结果来度量推理收益并作为监督标签，再学习场景自适应的门控机制决定何时启用推理。实验表明该框架在保持规划精度的同时显著降低推理开销，为推理增强型驾驶决策提供了效率与准确性的折中方案。",
+      "llm_tldr": "显式推理能帮助自动驾驶车辆理解复杂交通交互并支撑轨迹规划，但会带来额外计算开销，且其收益随场景差异很大。作者提出SAGE-Drive，先通过配对比较有无显式推理的规划结果来度量推理收益并作为监督标签，再学习场景自适应的门控机制决定何时启用推理。实验表明该框架在保持规划精度的同时显著降低推理开销，为推理增强型驾驶决策提供了效率与准确性的折中方案。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.30739v1",
+      "source": "arxiv",
+      "title": "Coordinating Perception and Planning for Test-Time Adaptation in End-to-End Driving under Distribution Shifts",
+      "abstract": "End-to-end autonomous driving has achieved significant milestones, yet its reliance on the i.i.d. assumption renders it vulnerable to real-world distribution shifts. While Test-Time Adaptation (TTA) offers a promising paradigm for on-the-fly enhancement, its application to driving is hindered by two barriers: (i) multi-task adaptation dependency, where updates to upstream perception also affect downstream planning, while perception confidence alone does not directly assess these downstream effects; and (ii) continuous adaptation instability, where recursive online updates over long horizons cause compounding parameter drift. To address these challenges, we propose P2-TTA, a plug-and-play TTA framework for the continual adaptation of end-to-end driving models. P2-TTA coordinates adaptation through a joint objective combining perception entropy minimization with a retrospective temporal planning consistency objective derived from observed ego motion. To stabilize online updates, we use an EMA teacher as a moving parameter reference and reject candidate updates that increase historical planning loss. Extensive experiments across multiple models demonstrate that, by updating an average of 0.11 per mille of parameters with an average adaptation time of 19.9 ms on different backbones, P2-TTA achieves average recovery rates of 36.4%, 30.0%, and 9.3% for L2, collision rate, and PDMS, respectively, under severe distribution shifts. Under a shared perception-planning objective, P2-TTA achieves the highest L2 and collision recovery among the compared TTA baselines on UniAD.",
+      "authors": [
+        "Shiyu Fang",
+        "Yiming Cui",
+        "Qihang Huang",
+        "Zhan Chen",
+        "Collister Chua",
+        "Wenhui Huang",
+        "Peng Hang",
+        "Chen Lv",
+        "Jian Sun"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-11-23T14:18:41+00:00",
+      "link": "https://arxiv.org/pdf/2611.30739v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "test-time adaptation framework coordinating perception and planning in end-to-end driving",
+      "llm_evidence_cn": "在端到端驾驶中协同感知与规划的测试时自适应框架",
+      "llm_evidence": "在端到端驾驶中协同感知与规划的测试时自适应框架",
+      "canonical_evidence": "在端到端驾驶中协同感知与规划的测试时自适应框架",
+      "llm_tldr_en": "P2-TTA is a plug-and-play test-time adaptation framework for end-to-end driving that handles perception-planning adaptation dependency and long-horizon instability, improving robustness under real-world distribution shifts.",
+      "llm_tldr_cn": "端到端自动驾驶依赖独立同分布假设，在真实分布偏移下容易失效，而测试时自适应面临感知更新牵连规划、长时递归更新导致参数漂移两大障碍。作者提出P2-TTA即插即用框架，协同上游感知与下游规划进行自适应并抑制连续更新的不稳定性。该工作提升了端到端驾驶模型在分布偏移场景下的鲁棒性，为实车部署提供了通用增强手段。",
+      "llm_tldr": "端到端自动驾驶依赖独立同分布假设，在真实分布偏移下容易失效，而测试时自适应面临感知更新牵连规划、长时递归更新导致参数漂移两大障碍。作者提出P2-TTA即插即用框架，协同上游感知与下游规划进行自适应并抑制连续更新的不稳定性。该工作提升了端到端驾驶模型在分布偏移场景下的鲁棒性，为实车部署提供了通用增强手段。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.31240v1",
+      "source": "arxiv",
+      "title": "Pruning Autonomous Driving VLAs: What to Preserve for Reasoning and Action",
+      "abstract": "Reasoning vision-language-action (VLA) models for autonomous driving use chain-of-thought (CoT) reasoning to guide action generation, but incur substantial memory and computational costs. We study structured pruning for these models, focusing on preserving both scene understanding and trajectory prediction. Our analysis of Taylor importance in Alpamayo-1.5-10B shows that reasoning and trajectory objectives assign different importance to the same vision-language model (VLM) structures. In the action expert, MLP channels exhibit more stable importance rankings across denoising steps than query heads, and a small fraction of channels accounts for most of the measured importance. Based on these findings, we propose MoOP, which combines importance ranks from both objectives for VLM pruning and aggregates stepwise importance to select a fixed subset of expert MLP channels. At 24.0% total parameter reduction, VLM-only pruning with MoOP performs comparably to or slightly better than the strongest baselines in driving, while retaining 94.0% of the dense model's LingoQA score, far above all other methods. At a higher reduction of 30.0%, MoOP degrades much less than every other method, as it is the only one whose reasoning does not collapse. Removing 93.75% of expert MLP channels increases total parameter reduction to 39.4%, with nearly unchanged open-loop errors relative to VLM-only pruning and competitive closed-loop performance. The resulting model achieves a 1.37x end-to-end inference speedup and 36.6% lower peak memory than the dense model, without post-pruning fine-tuning.",
+      "authors": [
+        "Seongchan Kim",
+        "Soowon Son",
+        "Sangoh Kim",
+        "Hyunah Ko",
+        "Eunbeen Hong",
+        "Hyunkoo Lee",
+        "Sanghyun Lee",
+        "WonJun Moon",
+        "Kihong Kim",
+        "Dongyeon Son",
+        "Woongchan Nam",
+        "Seungryong Kim"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.LG",
+        "cs.RO"
+      ],
+      "published": "2026-11-23T18:59:52+00:00",
+      "link": "https://arxiv.org/pdf/2611.31240v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "structured pruning of driving VLA models preserving scene understanding and trajectory prediction",
+      "llm_evidence_cn": "保留场景理解与轨迹预测的驾驶VLA模型结构化剪枝",
+      "llm_evidence": "保留场景理解与轨迹预测的驾驶VLA模型结构化剪枝",
+      "canonical_evidence": "保留场景理解与轨迹预测的驾驶VLA模型结构化剪枝",
+      "llm_tldr_en": "Studies structured pruning of reasoning VLAs for autonomous driving, finding MLP channels more stable in importance, and proposes MoOP to cut cost while preserving understanding and trajectory prediction.",
+      "llm_tldr_cn": "推理型视觉语言动作模型通过思维链引导动作生成，但内存与计算开销巨大。本文研究结构化剪枝，分析推理与轨迹目标对同一模型结构赋予不同重要性，发现动作专家中MLP通道的重要性排序更稳定。据此提出MoOP方法保留关键结构，在降低开销的同时兼顾场景理解与轨迹预测，为高效端到端驾驶模型部署提供方案。",
+      "llm_tldr": "推理型视觉语言动作模型通过思维链引导动作生成，但内存与计算开销巨大。本文研究结构化剪枝，分析推理与轨迹目标对同一模型结构赋予不同重要性，发现动作专家中MLP通道的重要性排序更稳定。据此提出MoOP方法保留关键结构，在降低开销的同时兼顾场景理解与轨迹预测，为高效端到端驾驶模型部署提供方案。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.32216v1",
+      "source": "arxiv",
+      "title": "NativeDrive: Native Multimodal Foundations for Autonomous Driving",
+      "abstract": "Autonomous driving requires semantic understanding and fine-grained scene perception for precise action prediction. Vision-language-action models (VLAs) inherit semantic priors, but low-dimensional action labels provide limited structural supervision. Some studies extend VLAs with visual generation tasks or adopt video-based world-action models (WAMs), but both approaches introduce appearance-reconstruction overhead, which is less relevant to planning. Native multimodal models offer an alternative to unify understanding and generation within one backbone. On this basis, we propose NativeDrive, a native encoder-free multimodal driving framework adapting the unified backbone for policy learning and introduce a dense supervision task tailored to driving. The Native Action Interface reuses the understanding expert's token-prediction interface for the discrete policy and adapts the generation expert for continuous policy. Driving Semantic Editing reuses the generation expert's editing capability for dense scene-structure supervision during training, while inference runs only the selected planning policy. NativeDrive achieves competitive planning performance among unified understanding-and-generation models on NAVSIM v1 and v2, with ablations validating its components' effectiveness. Code will be released.",
+      "authors": [
+        "Zehua Fan",
+        "Qi Jiang",
+        "Wei Li",
+        "Kai Tang",
+        "Yue Jiang",
+        "Yujian Li",
+        "Bailin Li",
+        "Feng Gao",
+        "Yan Wang",
+        "Kun Zhan"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-24T08:59:01+00:00",
+      "link": "https://arxiv.org/pdf/2611.32216v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "end-to-end multimodal driving framework for scene understanding and action prediction",
+      "llm_evidence_cn": "面向场景理解与动作预测的端到端多模态驾驶框架",
+      "llm_evidence": "面向场景理解与动作预测的端到端多模态驾驶框架",
+      "canonical_evidence": "面向场景理解与动作预测的端到端多模态驾驶框架",
+      "llm_tldr_en": "Proposes NativeDrive, an encoder-free unified multimodal framework adapting a single backbone for driving policy learning with dense supervision for scene understanding and action prediction.",
+      "llm_tldr_cn": "自动驾驶需要语义理解与细粒度场景感知以精确预测动作，但现有视觉语言动作模型受低维动作标签监督有限。本文提出NativeDrive原生无编码器多模态驾驶框架，将理解与生成统一到单一骨干网络用于策略学习，并设计面向驾驶的稠密监督任务。该方法为端到端自动驾驶提供统一多模态基础，兼顾语义理解与动作预测。",
+      "llm_tldr": "自动驾驶需要语义理解与细粒度场景感知以精确预测动作，但现有视觉语言动作模型受低维动作标签监督有限。本文提出NativeDrive原生无编码器多模态驾驶框架，将理解与生成统一到单一骨干网络用于策略学习，并设计面向驾驶的稠密监督任务。该方法为端到端自动驾驶提供统一多模态基础，兼顾语义理解与动作预测。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.32510v1",
+      "source": "arxiv",
+      "title": "GeoVLDrive: Geometry-Grounded Vision-Language Reasoning for Autonomous Driving",
+      "abstract": "Vision-language-action (VLA) planners inherit semantic knowledge from pretrained vision-language models, but their reasoning is rarely grounded in 3D scene structure and its evolution over time. We introduce GeoVLDrive, a geometry-grounded VLA framework for 3D spatiotemporal reasoning and planning. Multi-layer features from a 3D foundation model augment the vision-language backbone through gated cross-attention. A structured latent chain of thought (CoT) organizes future scene geometry, key-agent motion, and meta-actions into ordered, separately supervised latent states. An action expert generates trajectory proposals from these states and multi-layer scene features, and ranks them using scene-grounded, interacting score tokens. We also introduce NAVSIM 3DQA to train and evaluate metric 3D spatial and motion understanding. GeoVLDrive achieves 91.8 PDMS on NAVSIM v1 and 90.9 EPDMS on NAVSIM v2. On NAVSIM 3DQA, the geometry-grounded backbone scores 89.2% overall, 4.6 percentage points above the fine-tuned Qwen3-VL-2B baseline. On LingoQA, the backbone achieves 68.6% Lingo-Judge accuracy.",
+      "authors": [
+        "JiaHui Huang",
+        "Songyan Zhang",
+        "Hanbing Li",
+        "Hanchao Leng",
+        "Kuiyuan Yang",
+        "Guang Chen",
+        "Hangjun Ye",
+        "Chen Lv"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-24T12:41:13+00:00",
+      "link": "https://arxiv.org/pdf/2611.32510v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "vision-language-action planner for autonomous driving reasoning and planning",
+      "llm_evidence_cn": "面向自动驾驶推理与规划的视觉-语言-动作规划器",
+      "llm_evidence": "面向自动驾驶推理与规划的视觉-语言-动作规划器",
+      "canonical_evidence": "面向自动驾驶推理与规划的视觉-语言-动作规划器",
+      "llm_tldr_en": "GeoVLDrive grounds vision-language-action driving planners in 3D scene geometry and temporal evolution via gated cross-attention and structured latent chain-of-thought.",
+      "llm_tldr_cn": "视觉-语言-动作规划器虽继承预训练语义知识，但其推理很少真正落到三维场景结构及其时序演化上。作者提出GeoVLDrive，用三维基础模型的多层特征经门控交叉注意力增强视觉语言主干，并以结构化潜在思维链组织未来场景几何、关键智能体运动与元动作，再由动作专家生成并排序轨迹提议。该框架提升了自动驾驶规划的三维时空推理能力与可解释性。",
+      "llm_tldr": "视觉-语言-动作规划器虽继承预训练语义知识，但其推理很少真正落到三维场景结构及其时序演化上。作者提出GeoVLDrive，用三维基础模型的多层特征经门控交叉注意力增强视觉语言主干，并以结构化潜在思维链组织未来场景几何、关键智能体运动与元动作，再由动作专家生成并排序轨迹提议。该框架提升了自动驾驶规划的三维时空推理能力与可解释性。",
+      "llm_tags": [
+        "query:kg-rag-agent"
+      ],
+      "matched_query_tag": "query:kg-rag-agent",
+      "matched_query_text": "large language model agents for autonomous driving and in-vehicle decision support",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.32964v1",
+      "source": "arxiv",
+      "title": "Benchmarking Evidence Sufficiency in Vision-Language Models for Autonomous Driving",
+      "abstract": "Reliable driving VLMs must do more than answer correctly or localize relevant scene actors: they must determine whether the available visual evidence is sufficient to support an answer. Existing evaluations largely treat grounding and answerability as separate measurements, making it difficult to distinguish well-supported predictions from those localized to relevant but insufficient evidence. We introduce DriveAnswer, a benchmark of 20,151 questions across seven reasoning families, that operationalizes this distinction using matched strong- and weak-evidence configurations. Each pair preserves the underlying scene fact and semantic answer while changing whether the observations support answering, making abstention the appropriate response under weak evidence. On the six-family evaluation, the strongest zero-shot baseline reaches 67.31% strong-evidence accuracy, yet only 21.55% of matched questions satisfy both answer-abstain behavior and complete grounding. With controlled adaptation, Gemma-4-12B reaches 63.29% on this joint capability, nearly tripling its zero-shot performance. Qwen3-VL-8B exhibits the same broad improvement in evidence-sensitive answering and grounding. These results show that semantic correctness, evidence sufficiency, and grounding are distinct capabilities that should be evaluated jointly.",
+      "authors": [
+        "Nhat Ha Nguyen",
+        "Sudipta Chowdhury",
+        "Lokesh Das"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-11-24T17:01:37+00:00",
+      "link": "https://arxiv.org/pdf/2611.32964v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "benchmark for evidence sufficiency and abstention in driving VLMs",
+      "llm_evidence_cn": "驾驶视觉语言模型证据充分性与弃答的基准评测",
+      "llm_evidence": "驾驶视觉语言模型证据充分性与弃答的基准评测",
+      "canonical_evidence": "驾驶视觉语言模型证据充分性与弃答的基准评测",
+      "llm_tldr_en": "Introduces DriveAnswer, a benchmark that separates well-supported driving VLM answers from ones grounded in insufficient evidence, making abstention the right response.",
+      "llm_tldr_cn": "可靠的驾驶视觉语言模型不仅要答对或定位场景主体，还需判断证据是否足以支撑回答。现有评测将定位与可答性割裂，难以区分有充分依据的预测与仅定位到相关但不足证据的回答。本文提出DriveAnswer基准，包含两万余问题与强弱证据配对配置，将弃答作为合理响应，推动驾驶智能体推理可靠性与弃答能力评测。",
+      "llm_tldr": "可靠的驾驶视觉语言模型不仅要答对或定位场景主体，还需判断证据是否足以支撑回答。现有评测将定位与可答性割裂，难以区分有充分依据的预测与仅定位到相关但不足证据的回答。本文提出DriveAnswer基准，包含两万余问题与强弱证据配对配置，将弃答作为合理响应，推动驾驶智能体推理可靠性与弃答能力评测。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

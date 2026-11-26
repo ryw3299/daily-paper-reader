@@ -1,0 +1,505 @@
+Title: NativeDrive: Native Multimodal Foundations for Autonomous Driving
+
+URL Source: https://arxiv.org/pdf/2611.32216v1
+
+Published Time: Wed, 25 Nov 2026 02:37:51 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# NativeDrive: Native Multimodal Foundations for Autonomous Driving 
+
+Zehua Fan 2,1,†, Qi Jiang 1,†, Wei Li 1, Kai Tang 1,4, Yue Jiang 1,‡, Yujian Li 1, Bailin Li 1, Feng Gao 2,
+
+Yan Wang 3,∗, Kun Zhan 1,∗
+
+1Li Auto, 2Shanghai Jiao Tong University, 3Institute for AI Industry Research (AIR), Tsinghua University, 4Zhejiang University 
+
+†Equal contribution , ‡Project leader , ∗Corresponding authors 
+
+Autonomous driving requires semantic understanding and fine-grained scene perception for precise action prediction. Vision-language-action models (VLAs) inherit semantic priors, but low-dimensional action labels provide limited structural supervision. Some studies extend VLAs with visual generation tasks or adopt video-based world-action models (WAMs), but both approaches introduce appearance-reconstruction overhead, which is less relevant to planning. Native multimodal models offer an alternative to unify understanding and generation within one backbone. On this basis, we propose NativeDrive, a native encoder-free multimodal driving framework adapting the unified backbone for policy learning and introduce a dense supervision task tailored to driving. The Native Action Interface reuses the understanding expert’s token-prediction interface for the discrete policy and adapts the generation expert for continuous policy. Driving Semantic Editing reuses the generation expert’s editing capability for dense scene-structure supervision during training, while inference runs only the selected planning policy. NativeDrive achieves competitive planning performance among unified understanding-and-generation models on NAVSIM v1 and v2, with ablations validating its components’ effectiveness. Code will be released. 
+
+Date: November 24, 2026 (a) Architectures Understanding Generation Action 
+
+VLM-Based Policy Video-Based Policy Discrete Unified Policy Native Unified Policy   
+
+> Trajectory Image Action Interface Generation Extension
+
+VLM Backbone   
+
+> Vision Encoder Image Text Tokens Trajectory Image Action Interface VAE Decoder
+
+Video Backbone    
+
+> VLM Backbone Image/Text Text Tokens VAE Encoder Image
+> Trajectory Image Action Interface Visual Detokenizer
+
+Unified Backbone    
+
+> Visual Tokenizer
+> Image Text Tokens Trajectory Image
+> Native Action Interface Patch Decoding Layer
+> Encoder-Free Unified Backbone
+> Understanding Generation
+
+Optional  
+
+> Text Tokens Image Patch Emb. Noisy Image Patch Emb.
+
+(b) Capabilities (c) NAVSIM v1 (d) NAVSIM v2                                                              
+
+> Method Pretrained Backbone Visual Target Train-Only Generation Action Interface Disc. Cont.
+> AutoVLA Understanding ✓×None —DriveVLA-W0-Qwen2.5-VL Understanding ✓✓Future Frame ✓
+> DriveWAM Generation ×✓Future Frame ×UNIVERSE Generation ×✓Future Frame ✓
+> DriveVLA-W0-Emu3 Unified ✓✓Current Frame ✓
+> ExploreVLA Unified ×✓Frame + Depth Map ✓
+> Vega Unified ×✓Future Frame ✓
+> NativeDrive Unified ✓✓Semantic Map ✓Single Prediction Best-of-6 PWM 88.1 Vega 87.9 89.8 DriveVLA-W0-Emu3 88.4 93.0 ExploreVLA 88.5 93.7 RL
+> NativeDrive 88.8 93.8
+> PDMS ↑
+> DriveVLA-W0-Emu3 86.1 PRE
+> ExploreVLA 88.8 RL
+> Vega 86.9 89.4
+> NativeDrive 88.5 93.3
+> EPDMS ↑
+> RL: Reinforcement Learning PRE: Pre-fix Scores of NAVSIM v2
+
+Figure 1 NativeDrive among driving foundation models. (a) Four backbone architectures and their action and visual-generation interfaces. (b) Key capabilities of representative methods. NativeDrive combines a unified backbone, discrete and continuous action interfaces, and training-only semantic editing. (c,d) Unified-model comparisons on NAVSIM v1 (PDMS) and v2 (EPDMS). 
+
+1arXiv:2611.32216v1 [cs.CV] 24 Nov 2026 1 Introduction 
+
+Autonomous driving requires models to integrate high-level semantic understanding with fine-grained scene perception for reliable driving actions [26; 11; 25]. Large pretrained models offer transferable priors for these tasks: vision-language models (VLMs) supply world knowledge and semantic understanding [41; 13], while video generation models provide motion and temporal dynamics priors for modeling environmental change [24]. Transferring these capabilities to driving policies requires a suitable action interface. Low-dimensional trajectory labels alone only weakly supervise learning scene structure [12]. The key question is how to design action interfaces that match the pretrained backbone’s modeling mechanisms and dense visual objectives that reflect driving requirements. Existing approaches primarily build driving policies on vision-language or video generation backbones. The VLM-based route, shown in the leftmost column of Fig. 1(a), transfers semantic knowledge and instruction understanding into planning through an action interface [41; 13; 35; 12]. Some methods introduce dense visual supervision by adding an external generation module [12] or extending the vocabulary with visual tokens [12; 35]. The video-based route, shown in the second column of Fig. 1(a), exploits pretrained motion and temporal dynamics priors by learning from future-scene generation and action prediction [28; 24; 17; 16]. Prior work uses attention masking to decouple action prediction from future visual tokens, enabling trajectory-only inference [16]. Both routes achieve competitive planning performance. However, understanding-oriented VLMs typically rely on an extended generation module and lack jointly pretrained understanding and generation foundations [12; 35]. Video generation backbones model appearance and dynamics [24], but future-frame reconstruction also captures visual details less relevant to planning [37]. Unified understanding-and-generation backbones provide another route to transfer both types of priors [39; 12; 23; 42]. In the 3rd column of Fig. 1(a), some approaches use unified backbones that natively model discrete visual and text tokens to predict future visual tokens [39; 12; 23], either reusing token prediction for discrete actions [39; 12] or extending a continuous trajectory prediction head [23]. Recently, native encoder-free architectures enable multimodal understanding and generation via direct image-patch embeddings and pixel prediction [8], reducing reliance on separate visual encoders and intermediate representation alignment. This design supports jointly developing action interfaces and visual supervision for driving. Building on this, we propose NativeDrive , jointly designing a policy interface and an auxiliary visual task around the backbone’s native modeling mechanisms. In the rightmost column of Fig. 1(a), we build discrete and continuous driving policies using the native mechanisms of the understanding and generation experts, respectively. We also use backbone generation for a driving-specific auxiliary visual task. NativeDrive combines these key attributes: a unified backbone, flexible action interfaces, and training-only visual task as illustrated in Fig. 1(b). Our contributions are: • We propose NativeDrive, which adapts a native unified multimodal backbone to driving policy learning by pairing discrete action prediction with either continuous trajectory generation or training-only semantic editing. • We design a Native Action Interface aligning two policy branches with the backbone’s native modeling mechanisms. The discrete branch uses the understanding expert to predict quantized action tokens, while the continuous branch adapts the generation expert into a lightweight action head. • We introduce Driving Semantic Editing, adapting the generation expert’s pretrained editing capability to produce semantic maps. This training-only task provides dense supervision on road layout and traffic participants without additional inference cost. • We investigate key design choices for adapting a unified multimodal model to autonomous driving, including action interface, visual task, and joint training. Comparisons and ablations demonstrate the feasibility and effectiveness of the proposed components. NativeDrive achieves 88.8 PDMS on NAVSIM v1 [6] and 88.5 EPDMS on NAVSIM v2. Under best-of-6 oracle evaluation, it achieves 93.8 PDMS and 93.3 EPDMS. 2Discrete Action Tokens Continuous Action Tokens (Optional)               
+
+> Navigation
+> Turn Right
+> Ego State
+> Velocity/Acc
+> Prompt
+> Task
+> Noise
+> Semantic Image Patches (Optional)
+> Learned Action Codebook
+> b=1 b=2 b=3
+> Road Person Car Truck Bus …Action
+> ……
+> Trajectory
+> τ= 0 τ= 1 …
+> Understanding Expert Lightweight Action Expert Generation Expert
+> Joint Masked Attention
+> Patch Embeddings Token Embeddings Action Embedding Patch Embeddings
+> Trainable Frozen Use either policy branch at inference. Figure 2 NativeDrive framework and policy configurations.
+
+Multi-view images and textual driving context form the shared input for three experts. The understanding expert predicts action tokens that index a learned action codebook for trajectory decoding. The lightweight action expert generates a continuous trajectory from noise, and the generation expert produces a semantic map through training-only Driving Semantic Editing. 
+
+## 2 Related Work 
+
+Unified multimodal models support understanding and content generation within one framework, enabling capabilities to transfer across modalities [2; 27; 29; 7]. Unified multimodal models can be grouped by whether they use discrete or continuous representations for visual generation. Chameleon [2] and Emu3 [27] autoregressively model both text and discrete image tokens, whereas Show-o [29] combines autoregressive language modeling with discrete diffusion for image generation. Continuous approaches generate images or videos in latent or pixel space. BAGEL [7] combines autoregressive language modeling with continuous image generation through modality-specific experts that share self-attention. Show-o2 [30] uses flow matching for both image and video generation. SenseNova-U1 [8] unifies visual understanding and generation in an encoder-free architecture with convolutional patch embeddings for input and direct pixel prediction for output. 
+
+Driving action interfaces typically use discrete token prediction or continuous trajectory generation. Discrete interfaces tokenize trajectories through per-dimension scalar quantization [3], motion-primitive clustering [41], or frequency-domain coding [12]. Doe-1 [39] builds on Lumina-mGPT [15] and discretizes displacement and yaw, while DrivingGPT [3] uses component-wise binning with a Llama-style autoregressive backbone. AutoVLA [41] constructs physical action tokens through K-disk clustering. DriveVLA-W0 [12] uses FAST [22] to tokenize trajectories in its Emu3 [27] and Qwen2.5-VL [1] variants. FAST applies a discrete cosine transform followed by quantization and byte-pair encoding. Continuous action interfaces use regression, diffusion, or flow matching. DriveVLA-W0 [12] also connects a lightweight action expert to the backbone through joint attention for query-based regression or flow matching. Vega [42] uses a compact action transformer to generate trajectories through diffusion. DriveWAM [24] and UNIVERSE [16] jointly model continuous trajectories and video latents within a generative backbone. Beyond driving, action representations in embodied policies [22; 9] can inform the design of action interfaces for driving policies. 
+
+Dense visual supervision for driving policies varies in task design, how visual generation is integrated, and whether action inference requires it. For task design, DriveVLA-W0 [12] and Vega [42] predict future images, FSDrive [35] generates future frames annotated with lane dividers and 3D object boxes, and ExploreVLA [23] jointly predicts future images and depth maps. To incorporate visual generation, DriveWAM [24] builds on a pretrained video generation backbone, while ImageWAM [37] reuses pretrained image editing for robot policy learning. DriveVLA-W0 [12] and FSDrive [35] extend understanding-oriented backbones with a generation module and an expanded visual vocabulary, respectively. At inference, FSDrive [35], DriveWAM [24], and ImageWAM [37] rely on visual generation for action prediction. DriveVLA-W0 [12], Vega [42], ExploreVLA [23], UNIVERSE [16], and Fast-WAM [34] can predict actions without visual generation. 3Frozen 
+
+> Train
+> Infer
+> Training · GT Token Construction
+> Inference · Pred. Token Decoding
+> GT Segment
+
+Encoder 
+
+> ❄
+
+Decoder        
+
+> ❄
+> Latent Vectors
+> Latent Vectors
+> Shared Codebook
+> ❄
+> GT Action Tokens
+> 12 37 64 08
+> Pred. Action Tokens
+> 12 29 64 41
+> CE loss
+> Pred. Segment
+> ❄Figure 3 Discrete Action Tokenization. Ground-truth trajectories are encoded and quantized into action tokens, while codebook lookup and decoding convert predicted action tokens into trajectories.
+
+## 3 Method 
+
+In this section, we explore native action adaptation and semantic supervision for driving with a unified multimodal backbone (Fig. 2). The Native Action Interface reuses the understanding expert for discrete action token prediction and adapts the generation expert into a lightweight continuous action head. The two training configurations depend on how the generation expert is reused. One jointly trains the discrete and continuous branches to study how discrete supervision supports continuous planning, while the other pairs the discrete branch with training-only Driving Semantic Editing for dense scene-structure supervision. 
+
+3.1 Framework 
+
+Native Multimodal Backbone. We adopt SenseNova-U1 [8] as our native multimodal backbone. Its encoder-free architecture uses lightweight convolutional patch embeddings for image input and direct pixel prediction for visual output. With multimodal understanding competitive with leading understanding-only models and strong visual generation capabilities, it provides a foundation for transferring both capabilities to driving. 
+
+Model Inputs and Outputs. At time t, the input is Ct = ( It, u t, s t), where It comprises multi-view visual observations from current and preceding frames. The navigation instruction ut and ego state st, including velocity and acceleration, are text-serialized and embedded with the system prompt. The primary output is a future ego trajectory: 
+
+Yt = {(xk, y k, ψ k)}Hk=1 , (1) where (xk, y k) and ψk denote the position and heading relative to the current ego pose, and H counts future waypoints. 
+
+Policy Configurations. NativeDrive supports two policies based on how the generation expert is reused. The understanding expert provides discrete action prediction in each. The first uses the generation expert for auxiliary semantic editing, while the second adapts it into a lightweight continuous action head. Section 3.4 describes training and inference for each configuration. 
+
+3.2 Native Action Interface  
+
+> 3.2.1 Discrete Policy Adaptation
+
+Action Tokenization. Following the local motion representation in driving action tokenization [41], we partition each trajectory into non-overlapping segments and express each in its starting ego coordinate frame. Consecutive displacements and wrapped heading increments form: 
+
+∆Y (b) = {(∆ xi, ∆yi, ∆ψi)}Li=1 , (2) where L counts motion samples per segment. We adopt a Perceiver-based encoder–decoder with vector quantization (VQ), originally for robot action sequences [9], and train it to tokenize driving trajectories 4through reconstruction. Let X(b) = Norm(∆ Y (b)). The encoder maps each segment to M latent vectors: 
+
+Z(b) = Eϕ(X(b)). (3) Each latent vector undergoes quantization by nearest-neighbor codebook lookup E = {ej }Kj=1 :
+
+q(b) 
+
+> i
+
+= arg min  
+
+> j∈{ 1,...,K }
+
+z(b) 
+
+> i
+
+− ej
+
+> 22
+
+. (4) Jointly decoding the selected code vectors reconstructs the normalized segment: 
+
+bX(b) = Dθ (eq(b)1
+
+, . . . , e q(b)
+
+> M
+
+). (5) We use M = 4 tokens per 1 s segment, latent dimension d = 512 , and codebook size K = 2048 . Tokenizer training uses reconstruction and commitment losses [9]: 
+
+Ltok = X(b) − bX(b) 22
+
++ βM
+
+> M
+
+X
+
+> i=1
+
+z(b) 
+
+> i
+
+− sg 
+
+
+
+eq(b)
+
+> i
+
+ 22
+
+, (6) where sg( ·) denotes the stop-gradient operator, and we set the commitment-loss weight to β = 0 .25 . Figure 3 illustrates how the pretrained tokenizer is used during policy learning and inference; its encoder, codebook, and decoder remain frozen in both stages. 
+
+Blockwise Autoregressive Prediction. We reuse the understanding expert’s native token prediction interface for discrete action prediction. Fine-grained tokenization yields long action sequences; we use blockwise autoregressive (BAR) prediction [18] to shorten decoding and reduce error accumulation. We predict B
+
+temporal blocks per trajectory sequentially and the M tokens within each block in parallel. During training, each block is conditioned on the observation context C and preceding ground-truth blocks Q(<b ). We minimize the cross-entropy averaged over all BM tokens: 
+
+Ldisc = − 1
+
+BM 
+
+> B
+
+X
+
+> b=1
+> M
+
+X
+
+> i=1
+
+log pθ
+
+
+
+q(b) 
+
+> i
+
+| C, Q (<b )
+
+. (7)  
+
+> 3.2.2 Continuous Policy Adaptation
+
+Lightweight Action Expert. We initialize a lightweight action expert from the generation expert to transfer pretrained capabilities for efficient action planning. Following the reduced-width action-expert design [34], we retain Transformer depth and attention-head layout while reducing the hidden and feed-forward widths, yielding a compact action expert. Appendix A details the layer-wise weight interpolation and expert dimensions for the FM-only configuration. We initialize weights by interpolating the generation weights to match the reduced dimensions, while randomly initializing the action input projection and output head. 
+
+Continuous Action Generation. We train the action expert with conditional flow matching [14] using the action-space v-loss: 
+
+Lcont = EMSE  vAθ , v A⋆
+
+ , (8) where vAθ and vA⋆ denote the predicted and target flow velocities for normalized motion increments. 
+
+3.3 Driving Semantic Editing 
+
+Task Design. We adapt SenseNova-U1’s instruction-guided editing priors [8] for semantic segmentation of driving scenes. This task preserves road layout and traffic-agent geometry without predicting future dynamics or textures, while providing structured supervision from pretrained visual editing priors [37]. Following SenseNova-U1 [8], we use x-prediction for semantic editing, with the clean semantic map as the target and supervision given by the pixel-space v-loss 
+
+Lsem = EMSE  vSθ , v S⋆
+
+ , (9) where vSθ and vS⋆ denote the predicted and target flow velocities for the semantic map. 5Images  Semantic Maps    
+
+> Current Frame Only Matched By Sample ID
+> Mask2Former
+> Rule-based
+> Filtering
+> Human Review
+> Annotation Pipeline Figure 4 Semantic editing data construction. Frozen Mask2Former [4] predictions are filtered with human review of both the filtering rules and resulting semantic maps.
+
+Data Construction. Figure 4 illustrates our offline annotation pipeline for front-camera images across the NAVSIM and Waymo datasets. A frozen Mask2Former [4] pretrained on Cityscapes [5] generates pseudo-labels for eight driving-relevant semantic categories. After removing small components and low-confidence pixels using rule-based filtering, rejected regions are rendered black. Retained labels are rendered with a fixed RGB palette to form spatially aligned image-semantic map pairs. Human review covers both the filtering rules and the resulting semantic maps, guiding iterative refinement of the rules and reprocessing of failed samples. To preserve original resolutions, inputs are padded to multiples of 32 before prediction and cropped afterward. They are accompanied by a fixed text prompt for instruction-guided editing, while samples without semantic targets omit the editing loss but retain applicable action losses. 
+
+3.4 Training and Inference 
+
+Both configurations use the attention mask in Fig. 5. Discrete action tokens A and generation tokens G
+
+attend to the observation context C but cannot attend to each other, and C cannot attend to either target. 
+
+Discrete Policy with Semantic Editing. We refer to this configuration as NativeDrive-D throughout the remainder of the paper. The understanding expert predicts discrete action tokens, while the generation expert uses semantic image tokens G for Driving Semantic Editing (Sec. 3.3). We jointly optimize the discrete policy and semantic editing losses, 
+
+Ltotal = Ldisc + λsem Lsem , (10) where λsem = 1 in practice. At inference, only the discrete policy branch runs. Given C, it predicts action tokens A blockwise, retrieves their vectors from the learned action codebook, and decodes them into the future trajectory. 
+
+Joint Discrete and Continuous Policies. We denote this configuration by NativeDrive-C , with G representing continuous action tokens. We initialize the shared vision and understanding modules and the token prediction head from a trained discrete policy, while the continuous action expert retains its initialization from the pretrained generation expert. We jointly optimize the discrete and continuous policy losses, 
+
+Laction = Ldisc + λcLcont , (11) where λc = 1 in our experiments. Both losses update the shared observation representation without Knowledge Insulation (KI) [10]. Table 4 evaluates the effects of KI and discrete policy initialization. At inference, only the continuous policy branch runs. Given the observation context C, the action expert denoises the continuous action tokens G from Gaussian noise to generate the future trajectory. 6Training Discrete Inference Continuous Inference   
+
+> TTIITTA1 A1 A2 A2 A3 A3 GG
+> Context C
+> TTIITTA1 A1 A2 A2 A3 A3
+> Context C
+> TTIITTGG
+> Context C G: Semantic patches OR continuous action tokens
+> Image Patches Text Tokens Discrete Action Blocks G: Semantic / Continuous Blocked
+
+Figure 5 Shared training mask and policy-specific inference masks. Both configurations share a training mask in which discrete action tokens A and generation tokens G attend to context C but cannot attend to each other. G represents either semantic image tokens or continuous action tokens. Discrete inference retains only C and A, while continuous inference retains only C and G.
+
+Table 1 Planning performance on NAVSIM v1. Methods are grouped by pretrained backbone family. NativeDrive-D achieves the highest PDMS among the listed SFT unified models without driving-domain backbone pretraining. Method  
+
+> Driving Pretraining
+
+Epochs NC ↑ DAC ↑ TTC ↑ Comf. ↑ EP ↑ PDMS ↑
+
+VLM-Based Policy 
+
+AutoVLA SFT [41] NeurIPS 2025 × 5 96.9 92.4 88.1 99.9 75.8 80.5 AutoVLA 6,RL [41] NeurIPS 2025 × 5 99.1 97.1 97.1 100.0 87.6 92.1 FSDrive [35] NeurIPS 2025 ✓ – 98.2 93.8 93.3 99.9 80.1 85.1 ReCogDrive IL [13] ICLR 2026 ✓ 200 98.1 94.7 94.2 100.0 80.9 86.5 DriveVLA-W0 (Qwen) [12] ICLR 2026 ✓ ≈ 1.9 98.3 93.5 94.8 100.0 79.1 85.3 
+
+Video-Based Policy 
+
+DriveLaW [28] arXiv 2025 ✓ ≈ 82 .0 99.0 97.1 96.7 100.0 81.3 89.1 DriveDreamer-Policy [40] arXiv 2026 × ≈ 31 .1 98.4 97.1 95.1 100.0 83.5 89.2 DriveWAM [24] NeurIPS 2026 × ≈ 46 .6 98.3 98.1 95.2 100.0 84.3 90.1 DriveVA [17] ECCV 2026 × ≈ 77 .7 99.0 97.3 98.4 100.0 83.2 90.5 UNIVERSE [16] NeurIPS 2026 × ≈ 77 .7 99.1 97.6 98.5 100.0 83.6 91.0 
+
+Unified Model 
+
+Vega [42] arXiv 2026 × ≈ 15 .5 98.9 95.3 96.1 100.0 81.6 87.9 Vega 6 [42] arXiv 2026 × ≈ 15 .5 99.2 96.6 96.9 100.0 83.4 89.8 PWM [38] NeurIPS 2025 ✓ 20 98.6 95.9 95.4 100.0 81.8 88.1 DriveVLA-W0(Emu3) [12] ICLR 2026 ✓ ≈ 1.9 98.7 96.2 95.5 100.0 82.2 88.4 DriveVLA-W0(Emu3) 6 [12] ICLR 2026 ✓ ≈ 1.9 99.3 97.4 97.0 99.9 88.3 93.0 ExploreVLA SFT [23] ECCV 2026 ✓ 25 98.7 96.2 95.7 100.0 82.3 88.5 ExploreVLA 6,RL [23] ECCV 2026 ✓ 30 99.4 98.9 98.3 99.7 88.3 93.7 
+
+NativeDrive-C Ours × 10 98.4 96.1 95.0 100.0 82.9 88.4 
+
+NativeDrive-C 6 Ours × 10 98.8 97.8 96.4 100.0 85.6 91.1 
+
+NativeDrive-D Ours × 5 98.5 96.6 95.2 100.0 83.2 88.8 
+
+NativeDrive-D 6 Ours × 5 99.2 98.7 97.7 99.8 89.2 93.8 
+
+Driving Pretraining : driving-domain pre-training before SFT; ≈: step-based NAVSIM-equivalent epochs. RL indicates reinforce-ment learning after supervised fine-tuning. 6 denotes best-of-6 evaluation. NativeDrive-D samples six trajectories per scene with temperature 1.1, top-p = 0 .95 , and no top-k truncation; NativeDrive-C uses six distinct Gaussian initializations and 10 Euler steps. For both, the oracle maximizes per-scene PDMS before averaging, with submetrics from the same selected trajectory. 
+
+74 Experiments 
+
+In this section, we compare NativeDrive with representative state-of-the-art planners, evaluate its key components through ablations, and present visualization results. 
+
+4.1 Experimental Settings 
+
+Datasets and Benchmarks. We evaluate NativeDrive on NAVSIM [6] using its official splits and protocols. We report PDMS on v1 and single-stage EPDMS on v2 navtest [21]. Each input includes current and preceding frames from the front, front-left, and front-right cameras, sampled 0.5 s apart. The current front-view image is resized to 720p, and all remaining images to 360p. We predict ten future waypoints over a 5 s horizon at 2 Hz. All experiments use these settings, unless otherwise specified. 
+
+Tokenizer and Policy Training. We train the VQ action tokenizer on trajectories sampled with equal probability from NAVSIM [6] and Waymo E2E [31]. For tokenizer training, we use AdamW [19] for 50,000 steps on 8 GPUs with a learning rate of 2 × 10 −4 and a global batch size of 16,384. For policy training, we fine-tune SenseNova-U1-8B-MoT-SFT [8] with AdamW, freezing the observation image embedding module and action tokenizer. We use a global batch size of 32, weight decay of 0.1, and a 50-step warm-up to a peak learning rate of 5 × 10 −5, followed by cosine decay to 10 −6. We train the discrete policy for 5 epochs on 8 H20 GPUs, with or without semantic editing. For joint training, we initialize the shared modules and token prediction head from the discrete-only checkpoint and the continuous action head from the pretrained generation expert, then train both branches for 10 epochs. 
+
+4.2 Main Results 
+
+NAVSIM v1. NativeDrive-C and NativeDrive-D score 88 .4 and 88 .8 PDMS on NAVSIM v1, respectively, rising to 91 .1 and 93 .8 under best-of-six oracle selection (Table 1). Without driving-domain backbone pretraining, NativeDrive-D leads the listed SFT unified models after just five policy-training epochs and achieves the highest listed best-of-six score. 
+
+NAVSIM v2. On NAVSIM v2 navtest , NativeDrive-D delivers strong performance among unified models under the post-fix protocol, achieving 88 .5 EPDMS in single-trajectory evaluation and an outstanding 93 .3
+
+EPDMS under best-of-six oracle selection. NativeDrive-C achieves competitive scores of 88 .1 and 91 .0 EPDMS under the same settings (Table 2). 
+
+4.3 Ablation Studies 
+
+We conduct ablation studies on the navtest set to evaluate discrete action representations, joint discrete– continuous policy training, and visual supervision. All settings remain fixed except the investigated factor. 
+
+Action Tokenization. Table 3 compares four discrete action representations under the same backbone and training settings. Cluster uses motion prototypes [41], FAST uses frequency-domain tokens [22], and Text XY represents waypoint coordinates as text [33]. Learned VQ achieves the highest PDMS of 88 .11 , outperforming the others. Across the four representations, gains in reconstruction fidelity do not always translate into comparable gains in PDMS. To further examine the effects of token budget and decoding strategy, we compare AR and BAR at 4 and 16 
+
+tokens/s and include a VQ+RVQ configuration at 4 + 4 tokens/s following ActionCodec [9]. As shown in Fig. 6, BAR outperforms AR by 0.48 and 4.24 PDMS points at the two budgets, respectively. The larger gain at 16 tokens/s suggests that parallel prediction within each block helps limit error accumulation in longer sequences. With BAR, increasing the budget from 4 to 16 tokens/s substantially raises reconstruction error and lowers PDMS by 0.42 points. Adding RVQ improves reconstruction but lowers PDMS to 84 .10 , suggesting that single-level VQ already provides sufficient fidelity and that predicting an extra block may hurt planning. Since reconstruction error alone does not reliably predict planning performance, we adopt single-level VQ with BAR at 4 tokens/s, which achieves the highest PDMS. 8Table 2 Planning performance on NAVSIM v2 navtest . Methods are grouped by pretrained backbone family, with pre-fix and post-fix scores reported separately. After five epochs of policy training without driving-domain backbone pretraining, NativeDrive-D achieves 88 .5 EPDMS and 93 .3 EPDMS under best-of-six oracle selection. Method NC DAC DDC TLC EP TTC LK HC EC EPDMS ∗
+
+> Pre-fix EPDMS Post-fix
+
+VLM-Based Policy 
+
+ReCogDrive [13] 98.3 95.2 99.5 99.8 87.1 97.5 96.6 98.3 86.5 83.6 –
+
+Video-Based Policy 
+
+Epona [36] a 97.1 95.7 99.3 99.7 88.6 96.3 97.0 98.0 67.8 – 85.1 DreamerAD [32] 98.0 97.2 99.5 99.8 87.8 97.4 97.5 98.3 72.4 – 87.7 DriveLaW [28] b 98.7 96.9 99.6 99.8 87.5 98.3 97.6 98.4 77.4 – 88.6 DriveDreamer-Policy [40] 98.4 97.1 99.5 99.9 87.9 97.7 97.6 98.3 79.4 – 88.7 
+
+Unified Model 
+
+DriveVLA-W0 [12] 98.5 99.1 98.0 99.7 86.4 98.1 93.2 97.9 58.9 86.1 –ExploreVLA RL [23] 98.8 96.2 99.6 99.8 87.1 98.2 97.8 98.3 86.8 – 88.8 Vega [42] 98.9 95.3 99.4 99.9 87.0 98.4 96.5 98.3 76.3 – 86.9 Vega 6 [42] 99.2 96.6 99.5 99.9 87.5 98.7 97.4 98.4 84.5 – 89.4   
+
+> NativeDrive-C Ours
+
+98.4 95.9 99.6 99.8 87.2 97.7 97.3 98.3 86.5 – 88.1   
+
+> NativeDrive-C 6Ours
+
+98.8 97.8 99.7 99.9 88.3 98.2 98.1 98.4 89.7 – 91.0   
+
+> NativeDrive-D Ours
+
+98.5 96.6 99.5 99.8 87.3 97.7 97.3 98.3 85.3 – 88.5   
+
+> NativeDrive-D 6Ours
+
+99.3 99.0 99.7 99.9 89.7 98.8 98.6 98.3 90.5 – 93.3         
+
+> EPDMS ∗and EPDMS denote evaluation before and after the official human-filter fix, respectively. 6denotes best-of-six evaluation. NC: no at-fault collision; DAC: drivable-area compliance; DDC: driving-direction compliance; TLC: traffic-light compliance; EP: ego progress; TTC: time-to-collision; LK: lane keeping; HC: history comfort; EC: extended comfort. a: results reported in DreamerAD [32]; b: results reported in RISE [20]. –: unavailable. NativeDrive-D 6: six samples per scene, temperature 1.3,top-p= 0 .95 , top-k= 50 ; the oracle maximizes corrected EPDMS per scene before averaging, with all submetrics taken from that same candidate. NativeDrive-C 6: the same as NAVSIM v1.
+
+Joint Policy Training. We evaluate how discrete supervision, gradient sharing, and policy initialization affect continuous planning (Table 4). Adding discrete supervision improves PDMS by 3.56 points (Exps. 1 and 3). Removing Knowledge Insulation (KI) [10] improves PDMS by 1.10 points (Exps. 2 and 3), possibly because both policy losses can refine shared observation features in the backbone’s unified representation space. Initializing from a trained discrete policy adds 0.40 points (Exps. 3 and 4). The best configuration, NativeDrive-C (Exp. 4), achieves 88 .40 PDMS, 3.96 points above the continuous-only baseline.   
+
+> Table 3 Discrete action representations on the NAVSIM test set.
+
+NC denotes the no-at-fault collision score, and ADE measures trajectory reconstruction error.                           
+
+> Representation NC ↑ADE (m) ↓PDMS ↑
+> Text XY 96.92 0.037 82.56 FAST 97.20 0.208 83.89 Cluster 97.91 0.049 86.59
+> Learned VQ Ours 98.39 0.014 88.11
+> Table 4Continuous and joint policy training.
+
+Exp. 1is the continuous-only baseline, and Exp. 4 corresponds to NativeDrive-C. Knowledge Insulation (KI) [10] blocks continuous-policy gradients to the understanding expert. Disc. Sup. and Disc. Init. denote discrete policy supervision and initialization from a trained discrete policy, respectively.                      
+
+> Exp. KI Disc. Sup. Disc. Init. Continuous PDMS ↑
+> 1×××84.44 2✓✓×86.90 (+2.46) 3×✓×88.00 (+3.56) 4×✓✓88.40 (+3.96)
+
+Visual Supervision. To assess how the choice of auxiliary visual task affects discrete planning, we compare an action-only baseline with three alternatives in Fig. 7: future-frame prediction, current-frame semantic editing, and future semantic prediction. Both future-prediction tasks use a 1 s horizon. All three tasks improve on the action-only baseline of 88 .11 PDMS. Current-frame semantic editing achieves the highest PDMS ( 88 .82 ), a gain of 0.71 points. At the same prediction horizon, future semantic prediction outperforms future-frame prediction ( 88 .67 vs. 88 .40 ), suggesting that supervision focused on scene structure is more useful for planning than detailed appearance reconstruction. Moving semantic supervision from the current frame to a future frame slightly reduces PDMS. This may reflect the limited emphasis on motion modeling during SenseNova-U1 9pretraining [8] and the absence of driving-specific pretraining for the generation task. PDMS ↑ 4-Token · AR 4-Token · BAR 4-Token · VQ + RVQ 16-Token · AR 16-Token · BAR   
+
+> 85.66 86.14 84.10 81.48 85.72
+> ADE (cm) ↓
+> 1.35 1.35 0.93 2.57 2.57
+> Figure 6 Token budget and decoding strategy.
+
+All experi-ments use 360p observations. PDMS measures planning performance, and ADE measures mean trajectory recon-struction error. PDMS ↑ Action Only Future Image · 1 s Current Semantics Future Semantics · 1 s 88.11 88.40 88.82 88.67   
+
+> Figure 7 Auxiliary visual tasks for the discrete policy.
+
+We compare NAVSIM v1 PDMS across supervision settings. Both future prediction tasks use a 1 s horizon. 
+
+4.4 Qualitative Visualization 
+
+Auxiliary Visual Prediction. Figure 8 compares 3 separately fine-tuned auxiliary-task variants’ visual outputs on shared NAVSIM validation scenes: current-frame semantic reconstruction, future semantic prediction, and future image prediction. Both future tasks use 1 s horizons. We visualize 3 shared scenes covering a left turn, a right turn, and dense traffic. Current-frame semantic predictions recover the broad road layout and prominent traffic participants. Future semantic predictions capture coarse changes in projected positions, while discrepancies remain in object boundaries, small participants, and class assignments. Future image predictions preserve recognizable scene appearance but differ in vehicle placement and scene geometry from the recorded future frames. These examples illustrate the distinct visual targets in Figure 7; the semantic targets emphasize driving-relevant structure, whereas image prediction additionally requires appearance synthesis. Action and visual generation tokens are mutually masked: visual prediction does not use predicted actions, and action prediction does not use generated visual tokens. (a) Left turn  
+
+> (b) Right turn
+> (c) Dense traffic
+> Input (t) Seg. GT (t) Seg. pred. (t) Seg. GT (t+1s) Seg. pred. (t+1s) RGB GT (t+1s) RGB pred. (t+1s)
+> Figure 8
+
+Auxiliary visual predictions on shared NAVSIM validation scenes: (a) left turn, (b) right turn, and (c) dense traffic. Rows correspond to the three scenes. From left to right: current front-camera image, current semantic target and prediction, semantic target and prediction at t + 1 s, and RGB target and prediction at t + 1 s. Each task uses its respective fine-tuned model. Semantic columns labeled “GT” contain offline pseudo-labels; RGB targets are recorded camera frames. 
+
+## 5 Conclusion 
+
+We presented NativeDrive, a driving framework transferring native multimodal understanding and generation to planning. Its Native Action Interface supports learned discrete action tokens and a continuous policy initialized from the generation expert, while Driving Semantic Editing provides structure-focused visual supervision during training. NAVSIM ablations demonstrate the benefits of learned action representations, blockwise prediction, joint policy training, and current-frame semantic supervision. NativeDrive plans without executing auxiliary visual generation at inference, providing a practical means to reuse unified multimodal priors for driving. 10 References 
+
+[1] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhaohai Li, Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren Fu, Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen Cheng, Hang Zhang, Zhibo Yang, Haiyang Xu, and Junyang Lin. Qwen2.5-VL technical report. arXiv:2502.13923, 2025. [2] Chameleon Team. Chameleon: Mixed-Modal Early-Fusion Foundation Models. arXiv preprint arXiv:2405.09818 ,2024. [3] Yuntao Chen, Yuqi Wang, and Zhaoxiang Zhang. DrivingGPT: Unifying Driving World Modeling and Planning with Multi-modal Autoregressive Transformers. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 2025. [4] Bowen Cheng, Ishan Misra, Alexander G. Schwing, Alexander Kirillov, and Rohit Girdhar. Masked-attention mask transformer for universal image segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022. [5] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo Rehfeld, Markus Enzweiler, Rodrigo Benenson, Uwe Franke, Stefan Roth, and Bernt Schiele. The cityscapes dataset for semantic urban scene understanding. In 
+
+Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2016. [6] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap Chitta. NAVSIM: Data-Driven Non-Reactive Autonomous Vehicle Simulation and Benchmarking. arXiv preprint arXiv:2406.15349 , 2024. [7] Chaorui Deng, Deyao Zhu, Kunchang Li, Chenhui Gou, Feng Li, Zeyu Wang, Shu Zhong, Weihao Yu, Xiaonan Nie, Ziang Song, Guang Shi, and Haoqi Fan. Emerging Properties in Unified Multimodal Pretraining. arXiv preprint arXiv:2505.14683 , 2025. [8] Haiwen Diao, Penghao Wu, Hanming Deng, Jiahao Wang, Shihao Bai, Silei Wu, Weichen Fan, Wenjie Ye, Wenwen Tong, Xiangyu Fan, Yan Li, Yubo Wang, Zhijie Cao, Zhiqian Lin, Zhitao Yang, Zhongang Cai, Yuwei Niu, Yue Zhu, Bo Liu, Chengguang Lv, Haojia Yu, Haozhe Xie, Hongli Wang, Jianan Fan, Jiaqi Li, Jiefan Lu, Jingcheng Ni, Junxiang Xu, Kaihuan Liang, Lianqiang Shi, Linjun Dai, Linyan Wang, Oscar Qian, Peng Gao, Pengfei Liu, Qingping Sun, Rui Shen, Ruisi Wang, Shengnan Ma, Shuang Yang, Siyi Xie, Siying Li, Tianbo Zhong, Xiangli Kong, Xuanke Shi, Yang Gao, Yongqiang Yao, Yves Wang, Zhengqi Bai, Zhengyu Lin, Zixin Yin, Wenxiu Sun, Ruihao Gong, Quan Wang, Lewei Lu, Lei Yang, Ziwei Liu, and Dahua Lin. SenseNova-U1: Unifying Multimodal Understanding and Generation with NEO-unify Architecture. arXiv preprint arXiv:2605.12500 , 2026. [9] Zibin Dong, Yicheng Liu, Shiduo Zhang, Baijun Ye, Yifu Yuan, Fei Ni, Jingjing Gong, Xipeng Qiu, Hang Zhao, Yinchuan Li, and Jianye Hao. ActionCodec: What Makes for Good Action Tokenizers. arXiv preprint arXiv:2602.15397 , 2026. [10] Danny Driess, Jost Tobias Springenberg, Brian Ichter, Lili Yu, Adrian Li-Bell, Karl Pertsch, Allen Z. Ren, Homer Walke, Quan Vuong, Lucy Xiaoyang Shi, and Sergey Levine. Knowledge insulating vision-language-action models: Train fast, run fast, generalize better. arXiv preprint arXiv:2505.23705 , 2025. [11] Yue Li, Meng Tian, Zhenyu Lin, Jiangtong Zhu, Dechang Zhu, Haiqiang Liu, Yueyi Zhang, Zhiwei Xiong, and Xinhai Zhao. Fine-Grained Evaluation of Large Vision-Language Models in Autonomous Driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 9431–9442, 2025. [12] Yingyan Li, Shuyao Shang, Weisong Liu, Bing Zhan, Haochen Wang, Yuqi Wang, Yuntao Chen, Xiaoman Wang, Yasong An, Chufeng Tang, Lu Hou, Lue Fan, and Zhaoxiang Zhang. DriveVLA-W0: World Models Amplify Data Scaling Law in Autonomous Driving. In International Conference on Learning Representations , 2026. [13] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. ReCogDrive: AReinforced Cognitive Framework for End-to-End Autonomous Driving. In International Conference on Learning Representations , 2026. [14] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maximilian Nickel, and Matt Le. Flow matching for generative modeling. In International Conference on Learning Representations , 2023. [15] Dongyang Liu, Yi Xin, Shitian Zhao, Le Zhuo, Weifeng Lin, Xinyue Li, Qi Qin, Guangtao Zhai, Xiaohong Liu, Hongsheng Li, Yu Qiao, and Peng Gao. Lumina-mGPT: Flexible photorealistic autoregressive text-to-image generation. International Journal of Computer Vision , 134(4), 2026. Article 141. [16] Mengmeng Liu, Diankun Zhang, Jiuming Liu, Jianfeng Cui, Hongwei Xie, Guang Chen, Hangjun Ye, Francesco Nex, Hao Cheng, and Michael Ying Yang. UNIVERSE: Unified Video Action Models for Autonomous Driving with Flexible Mask-Modulated Modality Generation. arXiv preprint arXiv:2607.05133 , 2026. [17] Mengmeng Liu, Diankun Zhang, Jiuming Liu, Jianfeng Cui, Hongwei Xie, Guang Chen, Hangjun Ye, Michael Ying 
+
+11 Yang, Francesco Nex, and Hao Cheng. DriveVA: Video Action Models are Zero-Shot Drivers. arXiv preprint arXiv:2604.04198 , 2026. [18] Yicheng Liu, Shiduo Zhang, Zibin Dong, Baijun Ye, Tianyuan Yuan, Xiaopeng Yu, Linqi Yin, Chenhao Lu, Junhao Shi, Luca Jiang-Tao Yu, Liangtao Zheng, Tao Jiang, Jingjing Gong, Xipeng Qiu, and Hang Zhao. FASTer: Toward Efficient Autoregressive Vision Language Action Modeling via Neural Action Tokenization. arXiv preprint arXiv:2512.04952 , 2025. [19] Ilya Loshchilov and Frank Hutter. Decoupled weight decay regularization. In International Conference on Learning Representations , 2019. [20] Hongbo Lu, Liang Yao, Chenghao He, Hao Han, Fan Liu, Wenlong Liao, Tao He, and Pai Peng. RISE: Adaptive Imagination for World Action Models. arXiv preprint arXiv:2608.20430 , 2026. [21] NAVSIM Contributors. NAVSIM: The Extended Predictive Driver Model Score (EPDMS). Official evaluation documentation, 2026. Accessed November 11, 2026. [22] Karl Pertsch, Kyle Stachowicz, Brian Ichter, Danny Driess, Suraj Nair, Quan Vuong, Oier Mees, Chelsea Finn, and Sergey Levine. FAST: Efficient Action Tokenization for Vision-Language-Action Models. arXiv preprint arXiv:2501.09747 , 2025. [23] Zihao Sheng, Xin Ye, Jingru Luo, Sikai Chen, and Liu Ren. ExploreVLA: Dense World Modeling and Exploration for End-to-End Autonomous Driving. arXiv preprint arXiv:2604.02714 , 2026. [24] Chen Shi, Jinrui Xu, Shaoshuai Shi, Kehua Sheng, Bo Zhang, and Li Jiang. DriveWAM: Video Generative Priors Enable Scalable World-Action Modeling for Autonomous Driving. arXiv preprint arXiv:2605.28544 , 2026. [25] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen, Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo, Andreas Geiger, and Hongyang Li. DriveLM: Driving with Graph Visual Question Answering. arXiv preprint arXiv:2312.14150 , 2023. [26] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, Xianpeng Lang, and Hang Zhao. DriveVLM: The Convergence of Autonomous Driving and Large Vision-Language Models. arXiv preprint arXiv:2402.12289 , 2024. [27] Xinlong Wang, Xiaosong Zhang, Zhengxiong Luo, Quan Sun, Yufeng Cui, Jinsheng Wang, Fan Zhang, Yueze Wang, Zhen Li, Qiying Yu, Yingli Zhao, Yulong Ao, Xuebin Min, Tao Li, Boya Wu, Bo Zhao, Bowen Zhang, Liangdong Wang, Guang Liu, Zheqi He, Xi Yang, Jingjing Liu, Yonghua Lin, Tiejun Huang, and Zhongyuan Wang. Emu3: Next-Token Prediction is All You Need. arXiv preprint arXiv:2409.18869 , 2024. [28] Tianze Xia, Yongkang Li, Lijun Zhou, Jingfeng Yao, Kaixin Xiong, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. DriveLaW: Unifying Planning and Video Generation in a Latent Driving World. arXiv preprint arXiv:2512.23421 , 2025. [29] Jinheng Xie, Weijia Mao, Zechen Bai, David Junhao Zhang, Weihao Wang, Kevin Qinghong Lin, Yuchao Gu, Zhijie Chen, Zhenheng Yang, and Mike Zheng Shou. Show-o: One Single Transformer to Unify Multimodal Understanding and Generation. arXiv preprint arXiv:2408.12528 , 2024. [30] Jinheng Xie, Zhenheng Yang, and Mike Zheng Shou. Show-o2: Improved Native Unified Multimodal Models. 
+
+arXiv preprint arXiv:2506.15564 , 2025. [31] Runsheng Xu, Hubert Lin, Wonseok Jeon, Hao Feng, Yuliang Zou, Liting Sun, John Gorman, Ekaterina Tolstaya, Sarah Tang, Brandyn White, Ben Sapp, Mingxing Tan, Jyh-Jing Hwang, and Dragomir Anguelov. WOD-E2E: Waymo Open Dataset for End-to-End Driving in Challenging Long-tail Scenarios. arXiv preprint arXiv:2510.26125 ,2025. [32] Pengxuan Yang, Yupeng Zheng, Deheng Qian, Zebin Xing, Qichao Zhang, Linbo Wang, Yichen Zhang, Shaoyu Guo, Zhongpu Xia, Qiang Chen, Junyu Han, Lingyun Xu, Yifeng Pan, and Dongbin Zhao. DreamerAD: Efficient Reinforcement Learning via Latent World Model for Autonomous Driving. arXiv preprint arXiv:2603.24587 , 2026. [33] Yuguang Yang, Zhewen Tan, Canyu Chen, Linlin Yang, Cheng Chi, Chunyang Liu, Kehua Sheng, Jinyu Yang, Baochang Zhang, Bo Zhang, Yan Wang, and Xianbin Cao. AutoVLA-D: Learn a Trajectory-Geometric Condition from Reasoning for Autonomous Driving VLA. arXiv preprint arXiv:2611.12382 , 2026. [34] Tianyuan Yuan, Zibin Dong, Yicheng Liu, and Hang Zhao. Fast-WAM: Do World Action Models Need Test-time Future Imagination? arXiv preprint arXiv:2603.16666 , 2026. [35] Shuang Zeng, Xinyuan Chang, Mengwei Xie, Xinran Liu, Yifan Bai, Zheng Pan, Mu Xu, and Xing Wei. FutureSightDrive: Thinking Visually with Spatio-Temporal CoT for Autonomous Driving. In Advances in Neural Information Processing Systems , 2025. [36] Kaiwen Zhang, Zhenyu Tang, Xiaotao Hu, Xingang Pan, Xiaoyang Guo, Yuan Liu, Jingwei Huang, Li Yuan, Qian Zhang, Xiao-Xiao Long, Xun Cao, and Wei Yin. Epona: Autoregressive Diffusion World Model for Autonomous Driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 27220–27230, 2025. [37] Yuyang Zhang, Wenyao Zhang, Zekun Qi, He Zhang, Haitao Lin, Jingbo Zhang, Yao Mu, Xiaokang Yang, Wenjun 
+
+12 Zeng, and Xin Jin. ImageWAM: Do World Action Models Really Need Video Generation, or Just Image Editing? 
+
+arXiv preprint arXiv:2606.19531 , 2026. [38] Zhida Zhao, Talas Fu, Yifan Wang, Lijun Wang, and Huchuan Lu. From Forecasting to Planning: Policy World Model for Collaborative State-Action Prediction. In Advances in Neural Information Processing Systems , 2025. [39] Wenzhao Zheng, Zetian Xia, Yuanhui Huang, Sicheng Zuo, Jie Zhou, and Jiwen Lu. Doe-1: Closed-Loop Autonomous Driving with Large World Model. arXiv preprint arXiv:2412.09627 , 2024. [40] Yang Zhou, Xiaofeng Wang, Hao Shao, Letian Wang, Guosheng Zhao, Jiangnan Shao, Jiagang Zhu, Tingdong Yu, Zheng Zhu, Guan Huang, and Steven L. Waslander. DriveDreamer-Policy: A Geometry-Grounded World-Action Model for Unified Generation and Planning. arXiv preprint arXiv:2604.01765 , 2026. [41] Zewei Zhou, Tianhui Cai, Seth Z. Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. AutoVLA: A Vision-Language-Action Model for End-to-End Autonomous Driving with Adaptive Reasoning and Reinforcement Fine-Tuning. In Advances in Neural Information Processing Systems , 2025. [42] Sicheng Zuo, Yuxuan Li, Wenzhao Zheng, Zheng Zhu, Jie Zhou, and Jiwen Lu. Vega: Learning to Drive with Natural Language Instructions. arXiv preprint arXiv:2603.25741 , 2026. 
+
+13 Appendix 
+
+## A Continuous Action Expert Adaptation 
+
+We retain the generation expert’s Transformer depth and attention configuration while reducing the hidden width from 4096 to 768 and the feed-forward intermediate width from 12288 to 3072. We replace its visual interfaces with an action input projection ( 3 → 768 ) and a velocity output head ( 768 → 3) for three-dimensional motion increments. Pretrained weights are adapted independently within each corresponding Transformer layer through sequential one-dimensional linear interpolation along the output and input axes, skipping unchanged dimensions, while the action input projection and output head are randomly initialized. The same continuous-expert architecture is used in joint discrete–continuous training; NativeDrive-C additionally uses discrete-policy checkpoint initialization (Table 4). 
+
+## B Supplementary Experiments and Results 
+
+Our supplementary experiments cover visual supervision integration and generative pretraining, robustness across training seeds, and evaluation on Waymo-E2E. 
+
+B.1 Generation Design and Initialization   
+
+> Table S1 Visual supervision integration and generative pre-training.
+
+PDMS on NAVSIM v1 navtest . Panels (a) and (b) compare supervision designs and generation-expert initialization, respectively, with other settings fixed.          
+
+> Configuration PDMS ↑
+> (a) Visual supervision integration
+> Extended visual vocabulary 88.28 External diffusion module 88.28
+> Native generation expert 88.82
+> (b) Generation-expert initialization
+> Random initialization 88.48
+> Pretrained initialization 88.82
+> Table S2 Sensitivity to training seeds on NAVSIM v1.
+
+Scores are PDMS ( ↑); the last column reports the mean and sample standard deviation across three seeds. Both future targets are 1 s ahead.                             
+
+> Supervision Seed 41 Seed 42 Seed 43 Mean ±s.d. Action only 88.21 88.11 88.37 88 .23 ±0.13
+> + Current semantic 88.44 88.82 88.65 88 .64 ±0.19
+> + Future semantic 88.39 88.67 88.45 88 .50 ±0.15
+> + Future image 88.47 88.40 88.62 88 .50 ±0.11
+
+Visual supervision integration. We compare three visual supervision designs. Extended visual vocabulary follows FSDrive [35] by adding discrete visual tokens for next-token prediction. External diffusion module follows DriveVLA-W0 [12] by attaching a latent diffusion module conditioned on the understanding expert’s visual features. Native generation expert reuses the backbone’s pretrained generation expert and existing visual interface. The first two designs achieve 88 .28 PDMS, while native generation achieves 88 .82 , a gain of 
+
+0.54 points (Table S1(a)), supporting native expert reuse for semantic supervision. 
+
+Generation-expert initialization. We compare pretrained and random initialization of the native semantic-generation expert while keeping its architecture and training settings fixed. In both cases, the understanding expert retains its pretrained initialization and remains trainable. Pretrained generation weights improve PDMS from 88 .48 to 88 .82 (+0 .34 ), supporting the benefit of generative pretraining for downstream planning (Table S1(b)). 
+
+B.2 Robustness Across Training Seeds 
+
+We repeat the visual-supervision ablation on NAVSIM v1 with training seeds 41, 42, and 43 to assess whether the gains persist across runs. Table S2 reports individual scores and their mean and sample standard deviation. All auxiliary visual tasks improve over action-only training across the evaluated seeds. Current semantic editing achieves the highest mean PDMS, exceeding the action-only baseline by 0.41 points, with positive gains at every seed supporting its consistent benefit to discrete planning. 14 Table S3 Open-loop planning on Waymo-E2E. RL denotes reinforcement learning; “–” indicates unavailable entries. Validation Test Method / configuration RL ADE@3s (m) ↓ ADE@5s (m) ↓ RFS ↑ ADE@3s (m) ↓ ADE@5s (m) ↓ RFS ↑
+
+Human driver [S6] – – – 8.13 – – –
+
+Conventional End-to-End Policy 
+
+VAD [S4] ICCV 2023 × 3.19 5.81 4.45 – – –UniAD [S2] CVPR 2023 × 6.50 10.81 5.78 – – –UniPlan [S1] Challenge Report 2025 × – – – 1.27 2.84 7.78 
+
+VLM-Based Policy 
+
+NaiveEMMA [31] arXiv 2025 × – – – 1.32 3.02 7.53 AutoVLA [41] NeurIPS 2025 ✓ – – – 1.35 2.96 7.56 NoRD [S5] CVPR 2026 ✓ – – – 1.25 2.89 7.71 HMVLM [S7] arXiv 2025 × – – – 1.33 3.07 7.74 MindVLA-U1 (SFT) [S3] arXiv 2026 × 0.89 2.11 7.92 – – –Qwen-Drive-1.0 (SFT) [S8] arXiv 2026 × 0.99 2.31 7.95 1.19 2.65 7.78 
+
+Unified Model 
+
+Action only (discrete) × 1.20 2.77 7.89 1.34 3.05 7.75 + Semantic editing (NativeDrive-D) × 1.17 2.65 7.83 1.34 2.93 7.75 + Joint FM (NativeDrive-C) × 1.12 2.45 7.95 1.26 2.70 7.86 
+
+B.3 Additional Waymo-E2E Experiments 
+
+We evaluate NativeDrive’s generalization to challenging long-tail scenarios on Waymo-E2E [31]. We compare its two variants with the action-only baseline and other representative methods. 
+
+Dataset and Evaluation. We report ADE at 3 and 5 s and Rater Feedback Score (RFS). Validation ADE follows the official protocol with predictions interpolated to 4 Hz, while test metrics are obtained from the official evaluation server. Given the limited training data, we jointly train on Waymo-E2E, NAVSIM, and nuScenes, keeping other training settings unchanged. 
+
+Comparison with Other Methods. NativeDrive-C performs best among our variants on both splits, improving validation/test RFS by 0.06 /0.11 and reducing ADE@5s by 0.32 /0.35 m over discrete action-only planning. Among the listed methods without RL, it achieves state-of-the-art RFS, with the highest test score of 7.86 
+
+and a tied highest validation score of 7.95 (Table S3). 
+
+Complementary Strengths of the Two Variants. NativeDrive-D provides larger planning gains on NAVSIM v1, while NativeDrive-C shows broader improvements on Waymo-E2E. This may reflect their complementary strengths in scene-structure perception and continuous trajectory refinement, respectively. 
+
+## Supplementary References 
+
+[S1] Lan Feng and Alexandre Alahi. Technical Report for UniPlan. CVPR Workshop on Autonomous Driving, Waymo Challenge Technical Report, 2025. [S2] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng Dai, Yu Qiao, and Hongyang Li. Planning-oriented Autonomous Driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2023. [S3] Yuzhou Huang, Benjin Zhu, Hengtong Lu, Victor Shea-Jay Huang, Haiming Zhang, Wei Chen, Jifeng Dai, Yan Xie, and Hongsheng Li. MindVLA-U1: VLA Beats VA with Unified Streaming Architecture for Autonomous Driving. arXiv preprint arXiv:2605.12624 , 2026. [S4] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. VAD: Vectorized Scene Representation for Efficient Autonomous Driving. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023. 
+
+15 [S5] Ishaan Rawal, Shubh Gupta, Yihan Hu, and Wei Zhan. NoRD: A Data-Efficient Vision-Language-Action Model that Drives without Reasoning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2026. [S6] Luke Rowe, Rodrigue de Schaetzen, Roger Girgis, Christopher Pal, and Liam Paull. Poutine: Vision-Language-Trajectory Pre-Training and Reinforcement Learning Post-Training Enable Robust End-to-End Autonomous Driving. arXiv preprint arXiv:2506.11234 , 2025. [S7] Daming Wang, Yuhao Song, Zijian He, Kangliang Chen, Xing Pan, Lu Deng, and Weihao Gu. HMVLM: Multistage Reasoning-Enhanced Vision-Language Model for Long-Tailed Driving Scenarios. arXiv preprint arXiv:2506.05883 , 2025. [S8] Xin Zhou, Zongchuang Zhao, Zhibo Yang, Mingsheng Li, Humen Zhong, Shuai Bai, Du Chu, Ruizhe Chen, Zhaohai Li, Jun Tang, Qiuyue Wang, Mingkun Yang, Jiazhao Zhang, Dayiheng Liu, Dingkang Liang, and Xiang Bai. Qwen-Drive-1.0: An Initial Step towards a Vision-Language Foundation Model for Autonomous Driving. 
+
+arXiv preprint arXiv:2609.00111 , 2026. 
+
+16

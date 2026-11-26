@@ -1,0 +1,924 @@
+Title: Your Diffusion-Based Driving Planner Only Needs a Nudge
+
+URL Source: https://arxiv.org/pdf/2611.29123v1
+
+Published Time: Tue, 24 Nov 2026 02:48:43 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Your Diffusion-Based Driving Planner Only Needs a Nudge 
+
+## Zilin Wang 1∗ Guozheng Ma 2 Saeed Rahmani 3 Jiong Yang 4
+
+## Antyanta Bangunharcana 4 Yiluan Guo 4† Jakob Nicolaus Foerster 1 Shimon Whiteson 11BOLD, University of Oxford 2Nanyang Technological University 
+
+3Delft University of Technology 4Motional (a) Open-loop finetuning from logs 
+
+> Diffusion-based planner
+
+plans without closed-loop scores  
+
+> logged state open-loop scores finetunes an iterative generator
+
+(b) Open-loop finetuning from rollouts 
+
+> Diffusion-based planner
+
+plans without closed-loop scores  
+
+> rollout state open-loop scores finetunes an iterative generator
+
+(c) Nudge the plan (ours) 
+
+> Diffusion-based planner Nudge policy
+
+plan closed-loop score nudged plan        
+
+> rollout state closed-loop score trains a one-step MLP
+> driving logs 0.9 0.7 0.0 0.0
+> closed-loop simulator 0.8 0.4 0.0 0.0 closed-loop simulator
+> nudges
+> 0.9
+> logged path plan (not driven) collision or off-road driven in closed loop
+
+Figure 1. Reinforcement learning for post-training diffusion-based planners. (a) Open-loop finetuning from logs updates the planner by scoring candidate plans sampled from a logged state without executing them. (b) Methods such as PlannerRFT [26] sample candidate plans at states visited during closed-loop rollouts but still update the planner using open-loop scores. (c) We freeze the diffusion-based planner and use a one-step MLP to nudge its plan. We execute the nudged plan in simulation and train the MLP using the resulting closed-loop score. Val14  Test14-hard  Test14-random  Model compute                                           
+
+> NR RNR RNR R(10 15 FLOPs)
+> Pretrained Planner 90.00 83.22 75.74 68.93 89.99 82.70 –
+> PlannerRFT 89.96 84.46 77.16 72.21 90.76 85.80 ≥ 710
+> PlanNudge (ours) 91.07 ±0.25 85.00 ±0.23 77.16 ±0.32 73.44 ±0.63 91.03 ±0.65 86.09 ±0.47
+> (+1.07) (+1.78) (+1.42) (+4.51) (+1.04) (+3.39)
+> 128
+> 010M 20M 30M 40M
+> steps 0
+> +1
+> +2
+> improv. on Val14 R  PlanNudge (ours)
+> PlannerRFT
+> 30× sample efficiency
+> (reported +1.52)
+> [26]
+
+Figure 2. Results on nuPlan. PlanNudge matches or exceeds the state-of-the-art PlannerRFT in all six settings with about one sixth of its environment steps and less than one fifth of its model compute. In our simulator, it reaches PlannerRFT’s reported Val14 R gain (+1.52 over its own score of the pretrained planner) after about 1.3 M steps, one thirtieth of 40 M. Mean and standard deviation over six runs. 
+
+## Abstract 
+
+Diffusion-based planners capture the multimodality of hu-man driving behavior well, yet covariate shift in closed-loop driving can lead them to generate trajectories that result in collisions or road departures. Reinforcement learning (RL) finetuning offers a promising way to tackle this issue, but ap-plying it to diffusion-based planners is complicated by their iterative denoising process and receding-horizon execution. We find that small adjustments to the planned trajectories 
+
+> ∗
+
+Work done during an internship at Motional. 
+
+> †
+
+Corresponding author: yiluan.guo@motional.com 
+
+can prevent many of these unsafe outcomes. Motivated by this observation, we propose PlanNudge, which preserves the learned planning capabilities of a pretrained diffusion-based planner by freezing it and trains a lightweight policy that we call the nudge policy. At each planning step, the nudge policy outputs a nudge, a two-dimensional adjust-ment of the speed and curvature of the plan from the frozen planner. The nudge policy is a multilayer perceptron that predicts the nudge in a single forward pass, and both dimen-sions directly change the motion of the vehicle, so standard off-policy RL can train it in closed-loop simulation. We evaluate PlanNudge on nuPlan, a large-scale autonomous 
+
+1arXiv:2611.29123v1 [cs.RO] 22 Nov 2026 driving benchmark based on real-world driving data. In all six settings, PlanNudge matches or exceeds the final scores of the previous state-of-the-art RL finetuning method while using about one sixth as many environment steps and less than one fifth as much model compute. We also provide guidelines for reward shaping, value learning, and explo-ration when using off-policy RL to post-train autonomous driving planners. Our results are reported with means and standard deviations over six training runs. Project page: 
+
+https://zerlinwang.github.io/plannudge/ .
+
+## 1. Introduction 
+
+Trajectory planning in autonomous driving requires antici-pating how other vehicles will move and deciding when to proceed or yield [39]. Human demonstrations of these inter-actions are often multimodal [60, 61]. A planner trained to predict a single trajectory with a mean squared error loss can average those maneuvers into a plan that follows neither [11]. Diffusion-based planners can represent these distinct maneu-vers by learning a distribution over trajectories conditioned on the traffic scene [28, 60]. They perform well in simula-tion [49, 60] and in real-world driving [61]. Despite their success, diffusion-based planners can still collide with other vehicles or leave the road in closed-loop driving [42, 60]. One contributing factor is covariate shift: a planner trained on logged demonstrations can encounter unfamiliar states as its own errors accumulate [40]. Rein-forcement learning (RL) post-training can help address this mismatch by allowing the planner to learn from the states it visits in closed-loop simulation, using rewards that reflect the consequences of its driven trajectories [12, 50, 55, 57]. However, applying RL to diffusion-based planners raises two difficulties. The first difficulty comes from iterative denoising: a plan comes from several denoising steps, so its likelihood is intractable. Policy-based methods therefore treat each denoising step as an action [32, 38], which mul-tiplies the horizon of the decision process by the number of denoising steps [5, 37, 38]. Value-based methods update policies by backpropagating the critic’s gradient through all denoising steps, which is costly and can destabilize training [21, 36, 54]. The second difficulty arises from receding-horizon execution. To remain responsive to changing traffic, a driving planner may generate a trajectory spanning several seconds but execute only a single control interval before replanning [22]. When the full trajectory is treated as the RL action, the environment provides feedback on the exe-cuted portion while the rest of the plan is superseded. This mismatch complicates value learning [5, 38]. The first difficulty can be addressed by casting iterative denoising as a Markov decision process, which enables pol-icy gradient training at the cost of a longer RL horizon [4, 38]. ReCogDrive [27] and DiffusionDriveV2 [62] use this for-mulation to finetune their planners on open-loop scores of plans sampled in logged states (Fig. 1a). PlannerRFT [26] addresses the resulting state distribution gap by training on states visited during closed-loop rollouts. Its exploration policy learns from rollout rewards, while its diffusion-based planner learns from open-loop plan scores (Fig. 1b). Scoring whole plans in open loop avoids the second difficulty, at the cost of a gap to the closed-loop score of the driven trajec-tory, since the tracker follows only a prefix of each plan [13]. It remains open whether RL can improve diffusion-based planners from closed-loop scores efficiently. All these methods finetune the diffusion-based planner itself, which is where both difficulties arise. This raises a natural question: can we post-train diffusion-based planners without finetuning them? As a first test, we keep the planner fixed and add small random adjustments to the speed and curvature of its plans (Sec. A). On nuPlan [22], at least one of 20 closed-loop trials avoids the failure in more than half of the scenarios that a pretrained Diffusion Planner [60] fails, while sampling the planner again avoids almost none. Based on this observation, we propose PlanNudge (Fig. 1c), which keeps the diffusion-based planner frozen and learns the adjustment with a nudge policy. At each planning step, the nudge policy outputs a two-dimensional nudge, a speed offset and a curvature offset, to adjust the plan. This design addresses both difficulties. For iterative de-noising, the diffusion-based planner is frozen and the nudge is generated in one forward pass, so the RL agent makes one decision per plan, whatever the number of denoising steps. For receding-horizon execution, the action space is small and both action dimensions change the executed portion of the plan. The critic assigns credit to two numbers that matter instead of to a whole plan of which only the beginning is driven. Freezing the planner also preserves its pretrained multimodal distribution over maneuvers, and a zero nudge recovers the sampled plan exactly. We train the nudge policy on closed-loop returns with off-policy RL. We evaluate PlanNudge on nuPlan [22], a closed-loop planning benchmark built on large-scale real driving logs. Compared with the state-of-the-art RL finetuning method PlannerRFT [26], starting from the same pretrained Dif-fusion Planner [60], PlanNudge matches or exceeds its re-ported scores in all six settings with 6.2 M environment steps, about one sixth of PlannerRFT’s reported 40 M, and with less than one fifth of its model compute, the floating-point operations of all network passes during RL training (Sec. I). We also demonstrate the effectiveness of PlanNudge on Hy-per Diffusion Planner (HDP) [61] with both reactive and non-reactive training traffic modes. Our results are means and standard deviations over six training runs. Our main contributions are: • We propose PlanNudge, which freezes the diffusion-based 2planner and trains a nudge policy with off-policy RL in closed loop. The nudge policy generates its action in a single forward pass, without iterative denoising, so the RL horizon stays short. The action has two dimensions, and both change the executed portion of the plan, which sim-plifies value learning under receding-horizon execution. • We demonstrate on nuPlan that PlanNudge matches or exceeds the previous state-of-the-art RL finetuning method in all six settings, with about one sixth of its environment steps and less than one fifth of its model compute. • We provide several guidelines for post-training au-tonomous driving planners with off-policy RL, covering reward shaping, value learning, and exploration. 
+
+## 2. Related work 
+
+Diffusion-based driving planners. Diffusion models [18] and flow matching [30] are widely used to generate robot actions [9] and vehicle trajectories [60]. Diffusion Plan-ner [60] generates the ego plan together with the future trajectories of the surrounding traffic participants, and Flow Planner [49] uses flow matching to model interactive be-havior. Both achieve strong closed-loop results on nuPlan. DiffusionDrive [28] denoises from anchor trajectories with a truncated schedule for end-to-end driving, and Hyper Dif-fusion Planner [61] scales diffusion-based planning to large real-world datasets and real-vehicle tests. These planners learn from logged demonstrations by imitation, which brings the known limitations of behavior cloning [10]. The imita-tion loss carries no notion of driving quality, so a plan that nearly hits another vehicle costs no more than one that keeps clear. The planner is trained only in logged states, so its own errors lead it into states that the logs never cover, where the errors compound (covariate shift) [40]. It can also rely on spurious cues in the scene instead of the causes of the demonstrated behavior (causal confusion) [14, 47]. Plans that look right in open loop therefore still end in collisions or off the road in closed loop [13, 42, 60]. Data augmenta-tion and auxiliary losses mitigate these limitations [7], but they cannot cover the states that the planner itself produces, which are only visited by closed-loop training. 
+
+RL post-training for diffusion-based driving planners. 
+
+RL post-training supplies the driving objective that imitation lacks: the planner is rewarded for the quality of its plans instead of their closeness to the log [19, 26, 27, 62]. Iterative denoising makes the likelihood of a plan intractable, so RL methods for diffusion models treat the denoising process as a Markov decision process [4, 32, 38], backpropagate a critic’s gradient through the denoising steps [54], or weight the de-noising objective by a reward [61]. Most driving methods apply them in logged states: they sample several plans per state and move the planner toward the plans that a learned reward model [19], human feedback [25], or rule-based tra-jectory scores [27, 31, 61] rank highest. Two gaps remain: the planner still never visits the states that its own driving produces (the state gap), and the score of a plan is not the outcome of executing its beginning and replanning (the re-ward gap). PlannerRFT [26] closes the state gap: an explo-ration policy trained in closed loop with PPO [41] guides the sampling, so the planner is updated in the states of its own rollouts. Its reward remains the open-loop score of a sampled plan, its planner is updated with policy gradient [4] and group-relative advantage [43], and its two policies are trained on-policy, which takes 40 M environment steps in its reported setup. PlanNudge closes both gaps with one policy: the reward is the closed-loop return of the driven trajectory, and a nudge policy learns from it with off-policy RL while the planner stays frozen, so RL makes one decision per planning step, not per denoising step. 
+
+Learning residual policies. Residual policy learning im-proves a fixed controller with a learned correction [20, 44]. Recent work trains such a residual on top of a pretrained robot policy with on-policy [1] or off-policy [2, 34, 53, 56] RL. A small residual policy brings large gains in manipula-tion. Motivated by the effect of small random adjustments (Sec. A), PlanNudge applies it to closed-loop trajectory plan-ning for the first time, to our knowledge. This application raises two challenges. First, a plan is a long sequence of waypoints, which is a large action space for a residual. Plan-Nudge therefore nudges only the speed and curvature of the plan, a two-dimensional action that changes the executed por-tion of the plan. Second, the downstream tracker filters out small per-step changes of the plan, so exploration uses tem-porally correlated noise and scripted speed events to reach the maneuvers that avoid failures. As the score of a drive arrives only at the end of an episode, PlanNudge also learns values with multi-step returns. Without multi-step returns or correlated noise, much of the gain is lost (Sec. 5.4). In addition, a dense safety penalty shapes the reward. 
+
+## 3. Preliminaries 
+
+3.1. Trajectory planning and diffusion models 
+
+We consider trajectory planning as a closed-loop receding-horizon procedure [22]. At each planning step t, the plan-ner receives a scene observation ot, containing information about the ego vehicle, the surrounding traffic participants, and the map. It produces a plan τt = ( w1 
+
+> t
+
+, . . . , w Ht ) of H
+
+future waypoints, each specifying a position and heading. A tracker converts the plan into control commands, which are applied for an interval ∆t before the planner receives ot+1 
+
+and replans. The planning horizon typically exceeds ∆t, so each plan is replaced before it is fully executed. Closed-loop performance is therefore evaluated on the driven trajectory, which results from tracking and successive replanning. 3Environment 
+
+Agent      
+
+> scene observation
+> Diffusion-based planner
+> Scene
+> encoder
+> Denoising
+> decoder ×K
+> noise
+> base plan
+> Plan transform
+> speed
+> offset
+> curvature
+> offset
+> nudged
+> plan
+> Closed-loop simulator
+> with nudges
+> no nudge
+> ego
+> state
+> pooled
+> features
+> beginning of
+> the base plan
+> Nudge policy μϕ
+> actor
+> bounded 2-D action
+> + exploration noise during data collection
+> store input and action
+> reward
+> Replay buffer
+> stored transitions
+> critic update
+> minimize n-step TD error
+> batch
+> Q-function Qψ
+> critic
+> actor update
+> maximize value
+> frozen
+> trained
+> inference
+> learning
+> waypoints
+
+Figure 3. Overview of PlanNudge. Starting from random noise, the frozen pretrained diffusion-based planner samples a base plan with K
+
+denoising steps. The nudge policy reads the ego state, the pooled scene features, and the beginning of the base plan, and outputs a bounded 2-D action, which the plan transform converts into a speed offset and a curvature offset of the base plan. The simulator follows the nudged plan for one replanning interval ∆t before it returns the next scene observation and the planner replans. Each transition is stored in a replay buffer. The diffusion-based planner is a part of the environment and is never called during RL agent updates. 
+
+A diffusion-based planner learns a conditional distribu-tion over trajectories from logged demonstrations. At each planning step t, it generates a trajectory by progressively transforming Gaussian noise into a plan conditioned on ot.For ODE-based sampling, this reverse generation process follows the probability-flow ODE [46], 
+
+dxt
+
+dt = f (t)xt − 12 g(t)2∇x log pt(xt | ot), t : 1 → 0,
+
+(1) initialized with x1 ∼ N (0, I). Here, t denotes the diffusion time, f and g are specified by the noise schedule, and the conditional score ∇x log pt(xt | ot) is estimated by the learned denoising network ϵθ (xt, t, o t) up to the scaling of the noise schedule. A numerical solver integrates this ODE in K steps, with one forward pass per step [33, 45]. 
+
+3.2. Off-policy reinforcement learning 
+
+We formulate closed-loop planning as a Markov decision process (S, A, P, r, γ ) whose state st ∈ S is the scene ob-servation ot, which we assume to be a Markov state. At each planning step t, which is one environment step, a pol-icy π(at | st) selects an action at ∈ A that determines the plan supplied to the tracker. The transition function 
+
+P (st+1 | st, a t) incorporates plan construction, tracking, vehicle dynamics, and the motion of the surrounding traffic participants. The reward rt = r(st, a t, s t+1 ) evaluates the resulting scene. The objective is to maximize the expected discounted return J(π) = Eπ [P∞ 
+
+> t=0
+
+γtrt].The action-value function Qπ (s, a ) is the expected dis-counted return conditioned on taking action a in state s
+
+and following π thereafter. Off-policy actor-critic meth-ods learn from transitions (st, a t, r t, s t+1 ) stored in a re-play buffer B. DDPG [29] and TD3 [16] learn a critic Qψ
+
+through temporal-difference updates and optimize a deter-ministic actor μϕ using the surrogate objective Jactor (ϕ) = 
+
+Es∼B [Qψ (s, μ ϕ(s))] . Its gradient is: 
+
+∇ϕJactor = Es∼B 
+
+h
+
+∇ϕμϕ(s) ∇aQψ (s, a )|a=μϕ(s)
+
+i
+
+. (2) Experience replay enables repeated optimization using pre-viously collected interactions, which improves sample ef-ficiency. Unlike on-policy RL, which can only learn from actions sampled by the current policy, off-policy RL also admits transitions whose actions are not from the actor: a scripted maneuver executed during data collection enters the critic update like any other transition, and the actor adopts it where the critic values it [3, 52]. This lets PlanNudge inject the maneuvers that avoid driving failures (Sec. 5.4). 
+
+## 4. PlanNudge 
+
+4.1. Nudging a frozen planner 
+
+As shown in Fig. 3, PlanNudge uses a nudge policy to nudge the plan from a frozen diffusion-based planner, which we call the base plan , before feeding it to the closed-loop simulator. A nudge is a bounded two-dimensional action, and a fixed 
+
+plan transform turns it into a speed offset and a curvature offset of the base plan. Specifically, at each planning step 
+
+t, the frozen planner generates a base plan ¯τt = Gθ (ot, x1)
+
+from sampled isotropic Gaussian noise x1. Gθ denotes the 
+
+K-step numerical solution of the ODE in Eq. (1). The nudge policy is a multilayer perceptron (MLP) that observes zt =
+
+4Table 1. Closed-loop scores on nuPlan, official devkit. Starting from the Diffusion Planner (DDIM), open-loop finetuning from logs and PlanNudge are implemented by us and reported as the mean and standard deviation over six runs, with the change in brackets. Bold denotes the highest result in each setting. Red: worse than the pretrained planner. Blue: an improvement of more than 1 point. Val14 Test14-hard Test14-random RL Type Method NR R NR R NR R steps Expert Log replay 93.53 80.32 85.96 68.80 94.03 75.86 –Imitation learning PLUTO [7] 88.89 78.11 70.03 59.74 89.90 78.62 –Diffusion Planner [60] 89.87 82.80 75.99 69.22 89.19 82.93 –Flow Planner [49] 90.43 83.31 76.47 70.42 89.88 82.93 –DFP [58] 90.33 79.97 76.91 63.56 90.69 81.96 –Diffusion Planner (DDIM) 90.00 83.22 75.74 68.93 89.99 82.70 –RL post-training Open-loop finetuning from logs 90.09 ±0.16 (+0.09) 
+
+84.35 ±0.20 (+1.13) 
+
+76.39 ±0.89 (+0.65) 
+
+70.42 ±0.20 (+1.49) 
+
+89.95 ±0.43 (−0.04) 
+
+85.02 ±0.23 (+2.32) –PlannerRFT [26] 89.96 84.46 77.16 72.21 90.76 85.80 40 M PlanNudge (ours) 91.07 ±0.25 (+1.07) 
+
+85.00 ±0.23 (+1.78) 
+
+77.16 ±0.32 (+1.42) 
+
+73.44 ±0.63 (+4.51) 
+
+91.03 ±0.65 (+1.04) 
+
+86.09 ±0.47 (+3.39) 6.2 M 
+
+(ft, e t, ¯τ 0: Tin  
+
+> t
+
+). Here, ft denotes the mean-pooled features of the pretrained frozen scene encoder. The ego state et is computed from the ego history in ot and holds the velocity, acceleration, steering angle, and yaw rate. The input ¯τ 0: Tin 
+
+> t
+
+is the first Tin seconds of the base plan. The policy then outputs the nudge in a single forward pass, and the fixed plan transform T applies it to the base plan: 
+
+at = μϕ(zt) = ( avt , a κt ) ∈ [−1, 1] 2, τt = T (¯ τt, a t).
+
+(3) The two components (avt , a κt ) are the normalized speed off-set and the normalized curvature offset. T ramps the speed offset up over a short initial window and then shifts the speed of the whole remaining plan, with braking clipped to prevent backward motion. It bends the path with the curvature offset over a short initial window and then keeps the shape of the remaining plan. A zero nudge returns the base plan exactly. See Sec. D.1 for details. 
+
+4.2. Training the nudge policy 
+
+We train the nudge policy from closed-loop interaction using TD3 [16]. The nudge policy μϕ is the actor and a Q-function 
+
+Qψ is its critic, together forming the agent . The frozen plan-ner, the transform T , and the simulator with its tracker form the environment (Fig. 3). Each transition (zt, a t, r t, z t+1 )
+
+is stored in a replay buffer B. Because the diffusion-based planner is part of the environment and zt already contains its outputs, updates never call any denoising process. In the critic update, the critic Qψ is updated with n-step temporal-difference learning. Given the Q-function as the surrogate objective, the actor is updated by maximizing the Q-value while penalizing large nudges: 
+
+L(ϕ) = Ez∼B 
+
+h
+
+− Qψ
+
+ z, μ ϕ(z) + λ W μ ϕ(z) 22
+
+i
+
+, (4) where W weights the two action components, and λ controls the penalty. In addition, the critic receives the remaining episode fraction ρt as privileged information to account for the finite horizon, an asymmetric input that the actor does not see. Both actor and critic are parameterized with SimBa [24]. REDQ [6] is used to mitigate overestimation. The actor’s output layer is initialized to zero, so its initial deterministic action preserves the base plan. We shape the reward by adding a small dense safety penalty to the terminal score of the nuPlan metrics. The penalty grows as the time to collision, the lateral clearance, or the time to the road boundary shrinks (Sec. C). For explo-ration, temporally correlated Ornstein–Uhlenbeck noise [29] is added to the nudge during data collection, so that the noise persists long enough to change the vehicle’s motion through the tracker. Additionally, scripted maneuvers, a brake or a push held for seconds, can be applied during exploration to supply the maneuvers that avoid driving failures. We call them speed events. For example, a push can be applied when the vehicle stays stopped although it should proceed, also known as the inertia problem [10]. 
+
+## 5. Experiments 
+
+5.1. Experimental setup 
+
+Benchmarks. We evaluate models on nuPlan [22] with the official devkit. nuPlan is a large-scale benchmark built on about 1,300 hours of real-world driving logs from four cities, and it is one of the most widely used closed-loop bench-marks for learned driving planners. Three scenario sets are used. Val14 [13] draws 1,118 scenarios from the validation split. Test14-hard [8] holds the 272 scenarios of the test split on which the rule-based planner PDM-Closed [13] scores lowest. Test14-random [8] draws 261 scenarios from the test split at random. Each scenario contains 20 frames of his-51 t = 3.0 s 2 t = 5.0 s 3 t = 7.0 s 4                    
+
+> drive ended at 7.0 s
+> t = 9.0 s
+> 0246810 12 14 time (s)
+> −0.1 0.0
+> speed o ff set (m/s)  Lower planned speed
+> 1234
+> 0246810 12 14 time (s) -0.004 -0.002 0.000
+> curvature o ff set (m −1) Steer right
+> 1234
+> Pretrained planner PlanNudge
+
+(a) A faster vehicle approaches from behind. PlanNudge slows down and steers right, and the vehicle overtakes on the left. 1 t = 7.9 s 2 t = 9.9 s 3 t = 11.9 s 4                    
+
+> drive ended at 11.9 s
+> t = 13.9 s
+> 0246810 12 14 time (s)
+> −0.2 0.0
+> speed o ff set (m/s) Lower planned speed
+> 1234
+> 0246810 12 14 time (s) 0.000 0.005 0.010
+> curvature o ff set (m −1)Steer left
+> 1234
+> Pretrained planner PlanNudge
+
+(b) Pedestrians at the right edge of the lane. The pretrained planner hits one of them. PlanNudge slows down and steers left, away from them. 
+
+Figure 4. Qualitative results under non-reactive (a) and reactive (b) traffic. Upper row: the pretrained planner, whose drive ends at the failure (red outline). Lower row: PlanNudge at the same times. Dashed: plans, drawn for their first 4 s. Solid: driven paths. Gray: the pretrained planner. Orange: PlanNudge. The curves show the speed and curvature offsets. The numbers 1 to 4 mark the times of the four snapshots on the curves. The red dashed line marks the pretrained planner’s failure. After it, the offsets return toward zero. 
+
+tory, one current frame, and 150 frames of future trajectory at 10 Hz, 171 frames in total. Each set runs in two traffic modes, which gives six evaluation settings. In non-reactive traffic (NR), the other traffic participants replay their logged trajectories. In reactive traffic (R), the vehicles among them follow the Intelligent Driver Model (IDM) [51] and react to the ego vehicle and other traffic participants. We name a setting by its set and its mode, for example Val14 R. We report a mean closed-loop score between 0 and 100 for each setting. Training, checkpoint selection, and the ablations of Sec. 5.4 run in a training environment built around the devkit’s own simulation. It runs nuPlan scenarios using the devkit’s LQR tracker, kinematic bicycle model, and reactive or non-reactive traffic. It scores the driven trajectory at the end of each episode with a vectorized implementation of the devkit’s metric definitions on cached map and scenario data, so many episodes run in parallel. We call it “our simulator”. 
+
+Training details and baselines. We apply PlanNudge to the official checkpoint of the Diffusion Planner [60], a state-of-the-art diffusion-based planner on nuPlan, sampled with 5 DDIM steps and an initial noise scale of 0.1. Our main baseline is PlannerRFT [26], the state-of-the-art RL post-training method for diffusion-based planners, which starts from the same pretrained model and uses the same sampling setting. The base plan spans 8 s, the nudge policy reads its first 2 s ( Tin = 2 s), and the planner replans every 0.1 s (∆t = 0 .1 s). We also implement an open-loop finetuning 6(a) Diffusion Planner             
+
+> 0+1 +2 +3 +4 +5 NR RNR RNR R
+> Val14 Test14-hard Test14-random
+> score change
+> (b) Hyper Diffusion Planner
+> NR RNR RNR R
+> Val14 Test14-hard Test14-random
+> trained with non-reactive traffic trained with reactive traffic
+
+Figure 5. PlanNudge on two planners and two training traffic modes, official devkit. Score change over the pretrained planner, mean and standard deviation over six runs. 
+
+from logs baseline (Sec. G) based on DiffusionNFT [59]. Methods that train autoregressive planners with RL [50, 57] are outside the scope of this paper, so we do not include them. Table 1 also lists other state-of-the-art imitation-learning methods. All our results are presented over six runs. Based on the score analysis in Sec. A, we call a scenario with a score below 50 a failure and one with a score above 90 a 
+
+pass . To build the training set, we drive the frozen planner on the training split of nuPlan in our simulator and score every drive. The training set holds its 4,698 failures and 4,698 passes with matched scenario types, 9,396 scenarios in total. The passes let the nudge policy learn to leave normal drives unchanged. Both the selection of these scenarios and the training use reactive traffic. Each run uses one NVIDIA L4 GPU. Hyperparameters are listed in Sec. D. 
+
+5.2. Main results 
+
+Comparison with the state of the art. We compare Plan-Nudge with other methods in Tab. 1. Open-loop finetuning from logs changes the NR scores little (+0.09 / +0.65 / −0.04) and stays below PlanNudge in all six settings. In contrast, PlanNudge achieves clear improvement over the pretrained Diffusion Planner on both the NR (+1.07 / +1.42 / +1.04) and the R settings (+1.78 / +4.51 / +3.39). Compared with Plan-nerRFT, PlanNudge achieves better or on-par performance in all six settings with about one sixth of the environment steps (6.2 M against 40 M). Sub-metric comparison on Test14-hard is shown in Sec. H. 
+
+Qualitative results. Figure 4 shows two scenarios (more results in Sec. J) that the pretrained planner fails and Plan-Nudge passes. In Fig. 4a, a faster vehicle approaches from the rear left, and the pretrained planner collides with it at 7.0 s. The nudge policy slows the vehicle down, with a speed offset of up to −0.17 m/s, and steers it to the right, with a curvature offset of up to −0.005 m −1, leaving the rear-left vehicle enough space to overtake. In Fig. 4b, the pretrained planner hits a pedestrian at 11.9 s. The nudge policy lowers the speed, with an offset of up to −0.36 m/s, and steers left, with an offset of up to 0.012 m −1, away from the pedestrians. 0 2 4 6 80+0.5 +1.0 +1.5 +2.0 change of the Val14 score  Val14 R 0 2 4 6 8Val14 NR 
+
+> PlanNudge (ours) terminal score only 1-step returns Gaussian noise
+> environment steps (M)
+
+Figure 6. Learning curves on Val14, our simulator. Change over the pretrained planner against environment steps for PlanNudge and variants, mean and standard deviation (band) over six runs. 
+
+5.3. Other planners and training traffic 
+
+PlanNudge is not tied to one planner or to one type of training traffic. In addition to the Diffusion Planner, we apply it to HDP [61], a second diffusion-based planner verified with real-vehicle tests, and we train with non-reactive or reactive traffic (Fig. 5). Every combination improves all six settings. The complete results are in Tab. 5. 
+
+5.4. How to post-train with off-policy RL 
+
+The final scores and the sample efficiency of PlanNudge in Sec. 5.2 show the potential of off-policy RL for post-training driving planners. However, as far as we know, there is no established practice for off-policy RL in autonomous driving planning. PlanNudge contains design choices beyond the nudge policy: what the reward scores, how far the return looks ahead under receding-horizon execution, how the ex-ploration noise passes through the tracker, and where the maneuvers that avoid failures come from. Some alternatives remove most of the gain, as the ablations below show. We ablate these choices one at a time. Results are the change over the pretrained planner over six runs in our simulator. Figure 6 shows the learning curves on Val14, and each para-graph below examines one variant with the quantity that shows its mechanism. Full results are in Tab. 6. 
+
+Shape the reward on the terms that matter. The closed-loop score only arrives at the end of the episode, which makes credit assignment hard. We add a small penalty at 
+
+Table 2. Change over the pretrained planner on Val14 with different reward functions, our simulator.                      
+
+> Terminal score + Safety penalty (ours) Change on Val14 NR RNR RCollision +0.3 +0.3 +0.5 +0.7 Time-to-collision +0.7 +0.5 +1.1 +1.0 Drivable +0.4 +0.8 +0.5 +0.9 Score +0.79 ±0.14 +1.62 ±0.13 +1.09 ±0.26 +1.78 ±0.27
+
+7(a) Q value − Monte Carlo return         
+
+> bias −0.6 −0.4 −0.2 0
+> 010 20 30 40 50 60 70 80 90+
+> steps remaining
+> (b) change over the frozen planner
+> score change 0+1 +2 +3 +4 +5 +6 NR RNR RNR R
+> Val14 Test14-hard Test14-random
+> 10-step (ours) 1-step
+
+Figure 7. Value learning with 1-step and 10-step returns, our simulator. (a) Bias of the critic, its Q-value minus the Monte Carlo return of its own drives on the unseen scenarios of Val14 R, in buckets of steps remaining. (b) Change over the pretrained planner. 
+
+every step when the vehicle comes close to another traffic par-ticipant or to the edge of the drivable area (Sec. C). Adding the safety penalty improves collision, time-to-collision, and drivable scores and yields a higher overall Val14 score in both traffic modes (Tab. 2). We recommend shaping the reward on the terms of the metric that matter most, safety here, and keeping the shaping small, so the terminal score still decides which drives count [23]. 
+
+Use multi-step returns. Even with the safety penalty, most of the reward arrives at the end of an episode of up to 150 steps. With 1-step targets the terminal signal reaches a state 
+
+m steps before the end only after m rounds of bootstrap-ping, each adding its own approximation error [48], and an 
+
+n-step target carries it n steps per update [15, 17]. As shown in Fig. 7, with 1-step instead of 10-step returns, the critic underestimates the return of the early steps on unseen sce-narios, whereas the 10-step critic stays close to the return over the whole episode with improved gain in every setting. 
+
+Use temporally correlated exploration noise. In Fig. 8, we replace the output of the nudge policy with a zero nudge plus exploration noise and rerun the 72 Val14 NR scenar-ios in which the pretrained planner failed. The correlated Ornstein–Uhlenbeck noise of PlanNudge saves far more fail-ures than independent Gaussian draws of the same size, and the planner sampled again without a nudge saves almost none. Independent draws barely move the vehicle, because the planner replans at every step and the tracker smooths the change, so the drive stays close to the planner’s own drive. Trained with independent noise, the policy learns a smaller curvature offset and its gain is lower in all settings (Tab. 6). 
+
+Add demonstrations of the maneuvers that avoid failures. 
+
+Two kinds of failures of the pretrained planner recur in both traffic modes. In one, the planner keeps waiting behind a vehicle that has moved on, known as the inertia problem of behavior cloning [10], which causes about a quarter of its failures in reactive traffic. In the other, the planner does not (a) failures saved at least once           
+
+> failures saved 0 % 20 % 40 % 60 % 80 %
+> 12510 20 50
+> tries
+> correlated (ours) independent draws planner re-sampled
+> (b) FDE from the planner's drive
+> FDE 00.1 m 0.2 m 0.3 m
+> 012345
+> seconds
+
+Figure 8. Different exploration noise, our simulator. The 72 Val14 NR failures of the pretrained Diffusion Planner are rerun with a zero nudge plus the noise at the training size. (a) Share of the failures that reach a score of at least 50 at least once. (b) Final displacement error (FDE) from the planner’s own drive. 
+
+slow down for a slower vehicle ahead. A stall is released by a push, a speed increase held for seconds, and the collision is avoided by a brake held for seconds. With a limited budget of environment steps, our agent may not explore the maneuver that these scenarios need. Off-policy RL can learn from any demonstration: the critic values a stored transition regardless of the policy that generated the action. We therefore execute a scripted push or brake, a speed event, in half of the collected episodes and store it like any other transition, so the critic learns the value of the maneuver and the actor adopts it where the critic values it. On Test14-hard R, the setting with the lowest scores, the events release more stalls, the progress gate rises only with them, and the score gains more. Scripted events are thus a targeted remedy for specific failures that exploration rarely solves. 
+
+## 6. Conclusion 
+
+We show that learning to nudge the plans of a pretrained diffusion-based planner is an effective alternative to fine-tuning it. Our proposed PlanNudge freezes the planner and trains a nudge policy on closed-loop scores. The policy generates a two-dimensional action in a single forward pass without iterative denoising, so the RL horizon stays short. Both dimensions change the executed portion of the plan, which simplifies value learning under receding-horizon ex-ecution. In all six nuPlan settings, PlanNudge matches or exceeds the final scores of the previous state-of-the-art RL finetuning method, with about one sixth of its environment steps and less than one fifth of its model compute. We believe 
+
+Table 3. The importance of speed events, our simulator. Change over the pretrained planner on Test14-hard R.               
+
+> Change on Test14-hard R Without events + Speed events (ours) Stalls released 9% 29% Progress gate −0.1 +0.9 Progress +0.2 +0.3 Collision +1.2 +1.7 Time-to-collision +1.9 +2.1 Score +3.25 ±0.34 +4.55 ±0.64
+
+8off-policy RL has great potential for post-training driving planners, and our guidelines on reward shaping, value learn-ing, and exploration are a first step toward an established practice, and we hope that future work builds on them. 
+
+Limitations. First, a nudge is a small, bounded change of the plan. PlanNudge therefore relies on a strong pre-trained planner and cannot repair a plan that needs a large change. Second, we evaluate PlanNudge on two diffusion-based planners that take structured scene inputs. It is open whether nudges are as effective for an end-to-end planner that operates directly on sensor data. Third, our closed-loop evaluation is limited to simulation. On-road tests are needed to show whether the gains on nuPlan carry over to real vehi-cle dynamics and real road users. 
+
+## 7. LLM Usage Statement 
+
+We used an LLM-based coding agent, Claude Code (An-thropic), under the direction of the authors. Code. The agent wrote and edited part of the training, evaluation, analysis, and plotting code. Experiments. The agent launched and monitored runs, kept the experiment records, and computed the reported statistics from the logs. Figures and tables. 
+
+The agent drew or edited the figures and typeset the tables. 
+
+Text. The agent helped to check grammar and improve writ-ing in all sections. The authors proposed the method, verified the results, reviewed all code, figures, and text, and take full responsibility for the content. 
+
+## Acknowledgments 
+
+Zilin Wang is funded by a generous grant from Waymo. Saeed Rahmani is partially funded by the Transport & Mobility Institute at Delft University of Technology. Jakob Nicolaus Foerster was partially supported by UKRI grant EP/Y028481/1 (originally selected for funding by the ERC). Jakob Nicolaus Foerster also received support from the JPMC Research Award and the Amazon Research Award. 
+
+## References 
+
+[1] Lars Ankile, Anthony Simeonov, Idan Shenfeld, Marcel Torne, and Pulkit Agrawal. From imitation to refinement – residual RL for precise assembly. In ICRA , 2025. 3 [2] Lars Ankile, Zhenyu Jiang, Rocky Duan, Guanya Shi, Pieter Abbeel, and Anusha Nagabandi. Residual off-policy RL for finetuning behavior cloning policies. In ICRA , pages 5789– 5796, 2026. 3 [3] Philip J Ball, Laura Smith, Ilya Kostrikov, and Sergey Levine. Efficient online reinforcement learning with offline data. In 
+
+International Conference on Machine Learning , pages 1577– 1594. PMLR, 2023. 4 [4] Kevin Black, Michael Janner, Yilun Du, Ilya Kostrikov, and Sergey Levine. Training diffusion models with reinforcement learning. In ICLR , 2024. 2, 3 [5] Kang Chen, Zhihao Liu, Tonghe Zhang, Zhen Guo, Si Xu, Hao Lin, Hongzhi Zang, Xiang Li, Quanlu Zhang, Zhaofei Yu, Guoliang Fan, Tiejun Huang, Yu Wang, and Chao Yu. πRL :Online RL fine-tuning for flow-based vision-language-action models. arXiv preprint arXiv:2510.25889 , 2025. 2 [6] Xinyue Chen, Che Wang, Zijian Zhou, and Keith Ross. Ran-domized ensembled double Q-learning: Learning fast without a model. In ICLR , 2021. 5 [7] Jie Cheng, Yingbing Chen, and Qifeng Chen. PLUTO: Push-ing the limit of imitation learning-based planning for au-tonomous driving. arXiv preprint arXiv:2404.14327 , 2024. 3, 5[8] Jie Cheng, Yingbing Chen, Xiaodong Mei, Bowen Yang, Bo Li, and Ming Liu. Rethinking imitation-based planners for autonomous driving. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 14123–14130, 2024. 5 [9] Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin Burchfiel, and Shuran Song. Diffu-sion policy: Visuomotor policy learning via action diffusion. In RSS , 2023. 3 [10] Felipe Codevilla, Eder Santana, Antonio M. López, and Adrien Gaidon. Exploring the limitations of behavior cloning for autonomous driving. In ICCV , 2019. 3, 5, 8 [11] Henggang Cui, Vladan Radosavljevic, Fang-Chieh Chou, Tsung-Han Lin, Thi Nguyen, Tzu-Kuo Huang, Jeff Schneider, and Nemanja Djuric. Multimodal trajectory predictions for autonomous driving using deep convolutional networks. In 
+
+2019 International Conference on Robotics and Automation (ICRA) , pages 2090–2096. IEEE, 2019. 2 [12] Marco Francis Cusumano-Towner, David Hafner, Alexander Hertzberg, Brody Huval, Aleksei Petrenko, Eugene Vinitsky, Erik Wijmans, Taylor W. Killian, Stuart Bowers, Ozan Sener, Philipp Kraehenbuehl, and Vladlen Koltun. Robust auton-omy emerges from self-play. In Forty-second International Conference on Machine Learning , 2025. 2 [13] Daniel Dauner, Marcel Hallgarten, Andreas Geiger, and Kashyap Chitta. Parting with misconceptions about learning-based vehicle motion planning. In CoRL , 2023. 2, 3, 5 [14] Pim de Haan, Dinesh Jayaraman, and Sergey Levine. Causal confusion in imitation learning. In Advances in Neural Infor-mation Processing Systems , 2019. 3 [15] William Fedus, Prajit Ramachandran, Rishabh Agarwal, Yoshua Bengio, Hugo Larochelle, Mark Rowland, and Will Dabney. Revisiting fundamentals of experience replay. In 
+
+ICML , 2020. 8 [16] Scott Fujimoto, Herke van Hoof, and David Meger. Address-ing function approximation error in actor-critic methods. In 
+
+ICML , 2018. 4, 5 [17] Matteo Hessel, Joseph Modayil, Hado van Hasselt, Tom Schaul, Georg Ostrovski, Will Dabney, Dan Horgan, Bilal Piot, Mohammad Azar, and David Silver. Rainbow: Combin-ing improvements in deep reinforcement learning. In AAAI ,2018. 8 [18] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-sion probabilistic models. In NeurIPS , 2020. 3 [19] Zhiyu Huang, Xinshuo Weng, Maximilian Igl, Yuxiao Chen, Yulong Cao, Boris Ivanovic, Marco Pavone, and Chen Lv. 
+
+9Gen-Drive: Enhancing diffusion generative driving policies with reward modeling and reinforcement learning fine-tuning. In ICRA , 2025. 3 [20] Tobias Johannink, Shikhar Bahl, Ashvin Nair, Jianlan Luo, Avinash Kumar, Matthias Loskyll, Juan Aparicio Ojea, Eu-gen Solowjow, and Sergey Levine. Residual reinforcement learning for robot control. In ICRA , 2019. 3 [21] Bingyi Kang, Xiao Ma, Chao Du, Tianyu Pang, and Shuicheng Yan. Efficient diffusion policies for offline re-inforcement learning. In NeurIPS , 2023. 2 [22] Napat Karnchanachari, Dimitris Geromichalos, Kok Seang Tan, Nanxiang Li, Christopher Eriksen, Shakiba Yaghoubi, Noushin Mehdipour, Gianmarco Bernasconi, Whye Kit Fong, Yiluan Guo, and Holger Caesar. Towards learning-based planning: The nuPlan benchmark for real-world autonomous driving. In ICRA , 2024. 2, 3, 5 [23] W. Bradley Knox, Alessandro Allievi, Holger Banzhaf, Fe-lix Schmitt, and Peter Stone. Reward (mis)design for au-tonomous driving. Artificial Intelligence , 316:103829, 2023. 8[24] Hojoon Lee, Dongyoon Hwang, Donghu Kim, Hyunseung Kim, Jun Jet Tai, Kaushik Subramanian, Peter R. Wurman, Jaegul Choo, Peter Stone, and Takuma Seno. SimBa: Sim-plicity bias for scaling up parameters in deep reinforcement learning. In ICLR , 2025. 5 [25] Derun Li, Changye Li, Yue Wang, Jianwei Ren, Xin Wen, Pengxiang Li, Leimeng Xu, Kun Zhan, Peng Jia, Xianpeng Lang, Ningyi Xu, and Hang Zhao. Learning personalized driv-ing styles via reinforcement learning from human feedback. 
+
+arXiv preprint arXiv:2503.10434 , 2025. 3 [26] Hongchen Li, Tianyu Li, Jiazhi Yang, Mingyang Shang, Gao-qiang Wu, Caojun Wang, Haochen Tian, Zengrong Lin, Zhi-hui Hao, Xianpeng Lang, Jia Hu, and Hongyang Li. Plan-nerRFT: Reinforcing diffusion planners through closed-loop and sample-efficient fine-tuning. In CVPR , pages 24929– 24938, 2026. 1, 2, 3, 5, 6, 13, 15 [27] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. ReCogDrive: A reinforced cognitive framework for end-to-end autonomous driving. In ICLR , 2026. 2, 3 [28] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang, Qian Zhang, and Xinggang Wang. DiffusionDrive: Truncated diffusion model for end-to-end autonomous driving. In CVPR ,2025. 2, 3 [29] Timothy P. Lillicrap, Jonathan J. Hunt, Alexander Pritzel, Nicolas Heess, Tom Erez, Yuval Tassa, David Silver, and Daan Wierstra. Continuous control with deep reinforcement learning. In ICLR , 2016. 4, 5 [30] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maxi-milian Nickel, and Matt Le. Flow matching for generative modeling. In ICLR , 2023. 3 [31] Haochen Liu, Tianyu Li, Haohan Yang, Li Chen, Caojun Wang, Ke Guo, Haochen Tian, Hongchen Li, Hongyang Li, and Chen Lv. Reinforced refinement with self-aware expan-sion for end-to-end autonomous driving. IEEE TPAMI , 48: 5774–5792, 2026. 3 [32] Jie Liu, Gongye Liu, Jiajun Liang, Yangguang Li, Jiaheng Liu, Xintao Wang, Pengfei Wan, Di Zhang, and Wanli Ouyang. Flow-GRPO: Training flow matching models via online RL. In NeurIPS , 2025. 2, 3 [33] Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan Li, and Jun Zhu. DPM-Solver++: Fast solver for guided sam-pling of diffusion probabilistic models. Machine Intelligence Research , 22:730–751, 2025. 4 [34] Guozheng Ma, Lu Li, Haoyu Wang, Zixuan Liu, Pierre-Luc Bacon, and Dacheng Tao. What makes value learning ef-ficient in residual reinforcement learning? In Forty-third International Conference on Machine Learning , 2026. 3 [35] Evgenii Nikishin, Max Schwarzer, Pierluca D’Oro, Pierre-Luc Bacon, and Aaron Courville. The primacy bias in deep reinforcement learning. In ICML , 2022. 15 [36] Seohong Park, Qiyang Li, and Sergey Levine. Flow Q-learning. In ICML , 2025. 2 [37] Michael Psenka, Alejandro Escontrela, Pieter Abbeel, and Yi Ma. Learning a diffusion model policy from rewards via Q-score matching. In ICML , 2024. 2 [38] Allen Z. Ren, Justin Lidard, Lars L. Ankile, Anthony Sime-onov, Pulkit Agrawal, Anirudha Majumdar, Benjamin Burch-fiel, Hongkai Dai, and Max Simchowitz. Diffusion policy policy optimization. In ICLR , 2025. 2, 3 [39] Nicholas Rhinehart, Rowan McAllister, Kris Kitani, and Sergey Levine. PRECOG: Prediction conditioned on goals in visual multi-agent settings. In 2019 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 2821–2830. IEEE, 2019. 2 [40] Stéphane Ross, Geoffrey Gordon, and Drew Bagnell. Areduction of imitation learning and structured prediction to no-regret online learning. In AISTATS , 2011. 2, 3 [41] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Rad-ford, and Oleg Klimov. Proximal policy optimization algo-rithms. arXiv preprint arXiv:1707.06347 , 2017. 3 [42] Khaled M. Seyam, Julian Wiederer, Samar Fathalah, Markus Braun, and Bin Yang. Model-aware generation of safety-critical scenes for robust end-to-end driving via distilled plan-ner surrogates. arXiv preprint arXiv:2610.35448 , 2026. 2, 3[43] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. DeepSeekMath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300 , 2024. 3 [44] Tom Silver, Kelsey Allen, Josh Tenenbaum, and Leslie Kaelbling. Residual policy learning. arXiv preprint arXiv:1812.06298 , 2018. 3 [45] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denoising diffusion implicit models. In ICLR , 2021. 4 [46] Yang Song, Jascha Sohl-Dickstein, Diederik P. Kingma, Ab-hishek Kumar, Stefano Ermon, and Ben Poole. Score-based generative modeling through stochastic differential equations. In ICLR , 2021. 4 
+
+10 [47] Liting Sun, Rebecca Roelofs, Ben Caine, Khaled S. Refaat, Ben Sapp, Scott Ettinger, and Wei Chai. CausalAgents: A ro-bustness benchmark for motion forecasting. In 2024 IEEE In-ternational Conference on Robotics and Automation (ICRA) ,pages 6820–6827. IEEE, 2024. 3 [48] Richard S. Sutton and Andrew G. Barto. Reinforcement Learn-ing: An Introduction . MIT Press, 2nd edition, 2018. 8 [49] Tianyi Tan, Yinan Zheng, Ruiming Liang, Zexu Wang, Kexin Zheng, Jinliang Zheng, Jianxiong Li, Xianyuan Zhan, and Jingjing Liu. Flow matching-based autonomous driving planning with advanced interactive behavior modeling. In 
+
+NeurIPS , 2025. 2, 3, 5 [50] Xiaolong Tang, Meina Kan, Shiguang Shan, and Xilin Chen. Plan-R1: Safe and feasible trajectory planning as language modeling. In ICLR , 2026. 2, 7 [51] Martin Treiber, Ansgar Hennecke, and Dirk Helbing. Con-gested traffic states in empirical observations and microscopic simulations. Physical Review E , 62(2):1805–1824, 2000. 6 [52] Mel Vecerik, Todd Hester, Jonathan Scholz, Fumin Wang, Olivier Pietquin, Bilal Piot, Nicolas Heess, Thomas Rothörl, Thomas Lampe, and Martin Riedmiller. Leveraging demon-strations for deep reinforcement learning on robotics prob-lems with sparse rewards. arXiv preprint arXiv:1707.08817 ,2017. 4 [53] Andrew Wagenmaker, Mitsuhiko Nakamoto, Yunchu Zhang, Seohong Park, Waleed Yagoub, Anusha Nagabandi, Abhishek Gupta, and Sergey Levine. Steering your diffusion policy with latent space reinforcement learning. In Conference on Robot Learning , 2025. 3 [54] Zhendong Wang, Jonathan J. Hunt, and Mingyuan Zhou. Dif-fusion policies as an expressive policy class for offline rein-forcement learning. In ICLR , 2023. 2, 3 [55] Zilin Wang, Saeed Rahmani, Daphne Cornelisse, Bidipta Sarkar, Alexander David Goldie, Jakob Nicolaus Foerster, and Shimon Whiteson. Learning to drive in new cities without human demonstrations. In The Fortieth Annual Conference on Neural Information Processing Systems , 2026. 2 [56] Xiu Yuan, Tongzhou Mu, Stone Tao, Yunhao Fang, Mengke Zhang, and Hao Su. Policy decorator: Model-agnostic online refinement for large policy model. In ICLR , 2025. 3 [57] Dongkun Zhang, Jiaming Liang, Ke Guo, Sha Lu, Qi Wang, Rong Xiong, Zhenwei Miao, and Yue Wang. CarPlanner: Consistent auto-regressive trajectory planning for large-scale reinforcement learning in autonomous driving. In CVPR ,2025. 2, 7 [58] Zehan Zhang, Yaoyi Li, Neng Zhang, and Jia Cai. Diffu-sion forcing planner: History-annealed planning with time-dependent guidance for autonomous driving. In CVPR , pages 39796–39805, 2026. 5 [59] Kaiwen Zheng, Huayu Chen, Haotian Ye, Haoxiang Wang, Qinsheng Zhang, Kai Jiang, Hang Su, Stefano Ermon, Jun Zhu, and Ming-Yu Liu. DiffusionNFT: Online diffusion reinforcement with forward process. In ICLR , 2026. 7, 15 [60] Yinan Zheng, Ruiming Liang, Kexin Zheng, Jinliang Zheng, Liyuan Mao, Jianxiong Li, Weihao Gu, Rui Ai, Shengbo Eben Li, Xianyuan Zhan, and Jingjing Liu. Diffusion-based plan-ning for autonomous driving with flexible guidance. In ICLR ,2025. 2, 3, 5, 6, 12, 15 [61] Yinan Zheng, Tianyi Tan, Bin Huang, Enguang Liu, Ruim-ing Liang, Jianlin Zhang, Jianwei Cui, Guang Chen, Kun Ma, Hangjun Ye, Long Chen, Ya-Qin Zhang, Xianyuan Zhan, and Jingjing Liu. Unleashing the potential of diffusion models for end-to-end autonomous driving. arXiv preprint arXiv:2602.22801 , 2026. 2, 3, 7, 14, 15 [62] Jialv Zou, Shaoyu Chen, Bencheng Liao, Zhiyu Zheng, Yue-hao Song, Lefei Zhang, Qian Zhang, Wenyu Liu, and Xing-gang Wang. DiffusionDriveV2: Reinforcement learning-constrained truncated diffusion modeling in end-to-end au-tonomous driving. arXiv preprint arXiv:2512.07745 , 2025. 2, 3, 16 
+
+11 Your Diffusion-Based Driving Planner Only Needs a Nudge 
+
+# Supplementary Material scenarios             
+
+> Val14 , official devkit
+> 0250 500 750 1,000
+> 59 45 to 55: 6
+> 050 90
+> NR
+> 0250 500 750 1,000
+> 120 45 to 55: 6
+> 050 90
+> RTest14-hard , official devkit
+> 050 100 150
+> 46 45 to 55: 3
+> 050 90 050 100 150
+> 59 45 to 55: 3
+> 050 90
+> Test14-random , official devkit
+> 050 100 150 200
+> 14 45 to 55: 4
+> 050 90 050 100 150 200
+> 26 45 to 55: 4
+> 050 90
+> score of the scenario, bins of 5 points (dashed: failure below 50, passing above 90)
+
+Figure 9. Scores of the frozen Diffusion Planner across the six evaluation settings. Columns correspond to the three scenario sets, evaluated using the official devkit with one run of the frozen planner. Rows correspond to non-reactive (NR) and reactive (R) traffic. Scores are grouped into bins of 5 points. The number above the first bar counts scenarios scoring exactly 0, and the label at the top counts scenarios scoring between 45 and 55. Dashed lines mark the failure threshold at 50 and the pass threshold at 90. 
+
+## A. Failure analysis 
+
+This section presents the failure analysis that motivates Plan-Nudge (Sec. 1). Unless otherwise stated, results are obtained using the frozen Diffusion Planner [60] on the 1,118 Val14 NR scenarios in our simulator. We classify a scenario as a failure if its closed-loop score is below 50. 
+
+Few scenarios lie near the failure threshold. We exam-ine the pretrained planner’s score distribution across all six evaluation settings. Figure 9 shows that few scenarios have scores near the threshold of 50. Most failures receive a score of 0 because at least one of the score’s four gating terms is zero. At this threshold, the planner fails in 72 Val14 NR scenarios in our simulator: 38 due to at-fault collisions, 16 due to drivable-area violations, and the remaining 18 due to low scores for other reasons. 
+
+Random nudges reveal opportunities to avoid failures. 
+
+We perturb each plan using the action space of PlanNudge (Sec. 4.1). The speed offset is bounded by 1 m/s, and the curvature offset at the beginning of the plan is bounded by 0.05 m −1, subject to the constraints of the plan transform (Sec. D.1). The nudges are random and temporally corre-lated across planning steps (Sec. 4.2). For each noise scale, we rerun each of the 72 failure scenarios 50 times, using new random nudges in each rollout. At a noise scale of 0.1 rela-tive to the action bounds, 53% of the initially failed scenarios achieve a score of at least 50 in at least one of 20 rollouts. This fraction increases with the noise scale (Fig. 10). By comparison, resampling the planner with new diffusion noise and no nudge avoids failure in only 2 of the 72 scenarios, even after 50 rollouts per scenario. Under the sampling configuration used here, resampling alone therefore rarely resolves these failures. 
+
+## B. Open-loop scores miss closed-loop failures 
+
+The planner makes a new plan at every planning step and the tracker follows the newest one, so the driven trajectory lies on none of the plans. A plan can therefore be safe in open loop while the drive fails in closed loop. We test this on the 54 failures of Sec. A by a collision or a road departure. In the open-loop test, the vehicle follows a plan as it is, without replanning and without a tracker, against the logged motion of the other traffic participants, over the whole plan of 8 s or failures saved at least once      
+
+> 0 % 25 % 50 % 75 % 100 %
+> 12510 20 50
+> drives
+> 0.3 0.1 (the training size) 0.03 planner sampled again
+
+Figure 10. Temporally correlated random nudges can avoid closed-loop failures. For each condition, we perform 50 closed-loop rollouts in our simulator for each of the 72 Val14 NR scenarios in which the frozen Diffusion Planner fails. For a rollout budget of 
+
+k, the curves show the fraction of these scenarios in which at least one of the k rollouts achieves a score of at least 50. Solid lines correspond to temporally correlated random nudges to the planned speed and curvature at three noise scales, expressed relative to the corresponding action bounds. The dashed line resamples the planner with new diffusion noise, without applying a nudge. 
+
+12 Table 4. Hyperparameters of PlanNudge.                                                                                           
+
+> Parameter Value Parameter Value Parameter Value
+> Nudge policy RL Data collection
+> Input: pooled encoder tokens 192 Critics M10 Environments 32 Input: ego state 10 Target subset |S| 2Episodes per iteration 32 Input: first 2 s of the plan 20 ×4Discount γ0.99 Episode length at most 150 steps Speed bound vmax 1.0 m/s n-step 10 Control rate 10 Hz Curvature bound κmax 0.05 m −1Batch size 2,048 Warm-up transitions 20,000 Lateral acceleration bound alat max 1.5 m/s 2Update-to-data ratio 0.0125 Iterations 2,240 Speed ramp tramp 1.1 s Learning rate, actor 1×10 −4Replay size 11 M transitions Curvature window Hκ15 steps Learning rate, critic 3×10 −4Exploration noise Ornstein–Uhlenbeck Network SimBa residual MLP Policy delay 2Exploration noise size 0.1 of the bound Residual blocks 2Polyak τ0.005 Exploration noise time constant 1.5 s Actor width 256 Target noise 0.2 Critic width 512 Target noise clip 0.5
+> Base planners Action penalty Critic resets
+> Sampler, HDP DPM-Solver++, order 2 Speed term 0.05 ( av)2Critic-only warm-up 1,250 updates Sampler, Diffusion Planner DDIM Curvature term 0.125 ( aκ)2Reset period 448 iterations Solver steps 5Updates after a reset 25,000 Initial noise scale 0.1
+
+up to the end of the scenario. In 15 of the 54 failures, the plan made 0.5 s before the failure has no collision and no road departure in this test, although the closed-loop drive fails 0.5 s later. The count is the same for a window of 4 s, the horizon of the reward of PlannerRFT [26] and of our open-loop baseline (Sec. G). An open-loop score misses these failures, while a score of the driven trajectory sees all of them. 
+
+## C. Reward 
+
+The episode reward combines a terminal score with a safety penalty at each step. At the end of the episode, the envi-ronment computes the closed-loop score S ∈ [0 , 100] of the driven trajectory using the nuPlan devkit’s metric definitions. The terminal score contribution is S/ 100 . An at-fault colli-sion or a departure more than 0.3 m beyond the drivable area terminates the episode with a terminal score contribution of zero. At every step t, the environment also adds the safety penalty 
+
+rm 
+
+> t
+
+= −0.02  pcol  
+
+> t
+
++ poff 
+
+> t
+
+. (5) Both penalty terms use ramp x0 (x) = clip  (x0 −
+
+x)/x 0, 0, 1, which is zero when x ≥ x0 and one when 
+
+x = 0 . The collision term is zero when the ego speed is below 0.05 m/s. Otherwise, it is the larger of ramp 2 s (TTC) 
+
+and ramp 0.5 m (gap) . Here, TTC is the time to collision with a traffic participant ahead, assuming constant velocities, and gap is the smallest distance to a traffic participant beside the ego vehicle. Traffic participants with which the ego vehi-cle has already made contact are excluded, as in the devkit’s at-fault collision rule. The drivable-area term is ramp 1 s (TTO) . Here, TTO 
+
+is the time for the vehicle corner closest to the drivable-area boundary to exceed the 0.3 m tolerance, assuming its current speed toward the boundary remains constant. We set 
+
+poff  
+
+> t
+
+= 0 when this outward speed is below 0.05 m/s. We choose the thresholds so that driving by the logged expert and by the planner in passing scenarios incurs almost no penalty. Evaluation uses the unshaped score S.
+
+## D. Implementation details 
+
+Table 4 lists the hyperparameters. 
+
+D.1. Plan transform 
+
+We implement the plan transform T shown in Fig. 3 in three steps. The transform applies a normalized nudge 
+
+a = ( av , a κ) ∈ [−1, 1] 2 to the base plan. We omit the planning-step index and use a bar for base-plan quantities and a tilde for adjusted quantities. For h = 1 , . . . , H , base waypoint h has position ¯ph = (¯ xh, ¯yh) and heading ¯θh in the current ego frame, with ¯p0 = 0. Consecutive waypoints are separated by δ = 0 .1 s. We define ¯dh = ¯ ph − ¯ph−1 as the displacement between consecutive waypoints, which we call step h, and ¯eh = (cos ¯θh, sin ¯θh) as the unit heading direction at waypoint h.
+
+Step 1 speed. The speed component av sets a speed offset that grows linearly to av vmax within the ramp time tramp =1.1 s and then stays constant, 
+
+∆vh = av vmax min 
+
+ hδ tramp 
+
+, 1
+
+
+
+, (6) with the speed bound vmax = 1 m/s. Let ¯sh = ¯ eh⊤ ¯dh be the forward length of base step h, the distance that the vehicle moves along its heading in this step. Without a limit, the 13 Table 5. PlanNudge on two planners and two training traffic modes, official devkit. PlanNudge rows: the mean over six training runs with its standard deviation after it, each run evaluated as its own policy and its score rounded to two decimals before averaging. In brackets, the change of the mean over the pretrained planner, whose Diffusion Planner row is the mean over six devkit runs with different sampling-noise seeds. The last column counts the environment steps of RL training up to the reported checkpoint. Val14 Test14-hard Test14-random RL Method NR R NR R NR R steps HDP [61] (our evaluation) 89.74 82.18 75.91 69.06 88.02 81.94 –PlanNudge, trained with non-reactive traffic 91.62 ±0.28 (+1.88) 
+
+83.41 ±0.15 (+1.23) 
+
+78.41 ±0.58 (+2.50) 
+
+69.77 ±0.44 (+0.71) 
+
+90.78 ±0.88 (+2.76) 
+
+83.36 ±0.36 (+1.42) 4.6 M PlanNudge, trained with reactive traffic 91.61 ±0.28 (+1.87) 
+
+83.49 ±0.24 (+1.31) 
+
+78.59 ±0.30 (+2.68) 
+
+70.46 ±0.27 (+1.40) 
+
+91.35 ±0.48 (+3.33) 
+
+83.94 ±0.48 (+2.00) 8.9 M Diffusion Planner, DDIM (our evaluation) 90.00 83.22 75.74 68.93 89.99 82.70 –PlanNudge, trained with non-reactive traffic 91.72 ±0.37 (+1.72) 
+
+84.47 ±0.28 (+1.25) 
+
+78.16 ±0.71 (+2.42) 
+
+72.00 ±0.92 (+3.07) 
+
+91.38 ±0.53 (+1.39) 
+
+85.37 ±0.51 (+2.67) 7.7 M PlanNudge, trained with reactive traffic 91.07 ±0.25 (+1.07) 
+
+85.00 ±0.23 (+1.78) 
+
+77.16 ±0.32 (+1.42) 
+
+73.44 ±0.63 (+4.51) 
+
+91.03 ±0.65 (+1.04) 
+
+86.09 ±0.47 (+3.39) 6.2 M 
+
+speed offset would change this length by ∆vhδ. A brake may reduce the forward length to zero and not below, so the applied change uh and the nudged step are 
+
+uh = max  ∆vhδ, − max(¯ sh, 0) ,
+
+˜dh = ¯dh + uh ¯eh. (7) For example, with ∆vhδ = −0.1 m, a step of 0.5 m becomes 0.4 m, and a step of 0.03 m becomes 0 m. 
+
+Step 2 curvature. The curvature component aκ sets a curvature offset 
+
+∆κ = aκ min 
+
+
+
+κmax , alat max 
+
+max(¯ v, v min )2
+
+
+
+, (8) where κmax = 0 .05 m−1 is the curvature bound and ¯v =
+
+> 110 δ
+
+P10  
+
+> j=1
+
+∥¯dj ∥ is the mean speed of the base plan over its first second, the length of its first ten steps divided by their duration. The second term keeps the added lateral acceleration below alat max = 1 .5 m/s 2 at high speed, and 
+
+vmin = 10 −3 m/s avoids a division by zero. A curvature offset turns the path by ∆κ per meter of traveled distance. The turn is applied over the first Hκ = 15 steps (1.5 s), so the heading offset at waypoint h is 
+
+φh = ∆ κ
+
+> min( h,H κ)
+
+X
+
+> j=1
+
+˜dj , (9) and it stays constant after step Hκ.
+
+Step 3 nudged plan. We construct the nudged plan by rotating each speed-adjusted displacement by its heading offset and adding it to the preceding nudged waypoint: 
+
+˜ph = ˜ ph−1 + R(φh) ˜dh, ˜θh = ¯θh + φh, (10) with ˜p0 = 0 and R(φ) the rotation by the angle φ. Because the heading offset is constant after step Hκ, the rest of the plan keeps its shape and is only rotated. For a zero nudge, 
+
+uh = 0 and φh = 0 , so the transform returns the base plan exactly. 
+
+D.2. Actor-critic updates 
+
+Episodes have a fixed maximum length, and the terminal score is received only at the end. To account for the depen-dence of value on the remaining time, we use an asymmetric actor-critic architecture: the critics receive the remaining episode fraction ρt = (150 − t)/150 , stored in each transi-tion, as a privileged input. The actor does not receive this input. The critics learn from n-step returns with n = 10 
+
+(Tab. 4). For a sampled segment of length ℓ ≤ n, truncated at the episode boundary, the critic target is 
+
+yt =
+
+> ℓ−1
+
+X
+
+> i=0
+
+γirt+i
+
++ γℓbt min  
+
+> j∈S
+
+Q ¯ψj (zt+ℓ, ρ t+ℓ, a ′),
+
+(11) where bt = 0 if the segment reaches the episode end and 
+
+bt = 1 otherwise. Both safety termination and the 15 s sce-nario boundary are terminal, with no bootstrapping. The set 
+
+S contains two target critics sampled without replacement at each update. The target action is a′ = clip( μ ¯ϕ(zt+ℓ) + 
+
+ϵ, −1, 1) , with clipped Gaussian noise ϵ. Each critic min-imizes the squared error to yt. The actor follows Eq. (4), whose penalty λ∥W a ∥22 is 0.05 ( av )2 + 0 .125 ( aκ)2 on the normalized action components. 14 Table 6. The six settings of every ablation row, our simulator. Diffusion Planner with the DDIM solver. Each cell: change over the pretrained planner, mean ± SD over runs, and in brackets the failures fixed (new score at least 50) / the other scenarios broken (new score below 50) per run. Six runs per row. Val14 Test14-hard Test14-random Variant NR R NR R NR RPlanNudge (ours) +1.09 ±0.26 (19.8 / 5.5) 
+
++1.78 ±0.27 (28.8 / 6.5) 
+
++1.63 ±0.27 (7.8 / 3.5) 
+
++4.55 ±0.64 (16.2 / 1.3) 
+
++1.17 ±0.58 (5.0 / 3.3) 
+
++3.45 ±0.52 (9.8 / 0.3) 
+
+(a) Reward 
+
+Terminal score only +0.79 ±0.14 (13.5 / 4.0) 
+
++1.62 ±0.13 (24.0 / 4.3) 
+
++1.64 ±0.42 (5.8 / 1.8) 
+
++3.57 ±0.81 (12.2 / 1.3) 
+
++1.14 ±0.72 (4.0 / 1.7) 
+
++3.38 ±0.28 (10.3 / 0.5) 
+
+(b) Value learning 
+
+1-step returns +0.08 ±0.12 (4.0 / 3.0) 
+
++0.34 ±0.28 (6.7 / 2.2) 
+
++0.65 ±0.25 (1.8 / 0.2) 
+
++0.70 ±0.30 (2.5 / 0.7) 
+
++0.44 ±0.30 (1.5 / 0.7) 
+
++0.93 ±0.73 (2.5 / 0.0) 
+
+(c) Exploration 
+
+Gaussian noise +0.52 ±0.11 (10.7 / 4.8) 
+
++1.11 ±0.15 (17.2 / 3.5) 
+
++1.45 ±0.48 (5.5 / 2.0) 
+
++2.78 ±0.75 (9.7 / 0.7) 
+
++0.42 ±0.55 (2.3 / 1.8) 
+
++1.96 ±0.69 (5.3 / 0.3) 
+
+No speed events +1.09 ±0.14 (20.3 / 7.3) 
+
++2.01 ±0.19 (29.7 / 5.3) 
+
++1.22 ±0.38 (7.2 / 4.3) 
+
++3.25 ±0.34 (11.7 / 1.5) 
+
++1.02 ±0.52 (4.5 / 3.5) 
+
++3.31 ±0.29 (9.8 / 0.7) 
+
+After a critic-only warm-up, we update the actor once every two critic updates. Target networks are updated using Polyak averaging. We periodically reinitialize the critics and their target networks while retaining the actor and replay buffer. Before resuming data collection, we fit the new critics to stored transitions [35]. The warm-up, reset schedule, and other settings are listed in Tab. 4. 
+
+D.3. Speed events 
+
+Speed events are enabled in each data-collection episode with probability 0.5. In these episodes, while a push or a brake is active, its value replaces the exploration noise added to the actor’s speed component. The curvature component always retains its exploration noise. A push starts when the vehicle has stood for 1 s, its base plan covers less than 0.2 m in the next second, and the IDM would accelerate the vehicle. Specifically, we apply the IDM to the ego vehicle with a standstill gap of 1 m and require an acceleration above 0.3 m/s 2. The push adds up to half of the speed bound and lasts while the IDM still gives this acceleration. A brake is held for a duration drawn uniformly from 2 to 5 s and lowers the planned speed by a quarter of the current speed, at most by the speed bound. The first hold starts with the episode. When a hold ends, the next hold starts at once with probability 0.5 and after a pause drawn from the same range otherwise. No brake acts during a push. The replay buffer stores the executed action of every step. 
+
+## E. Results on HDP 
+
+HDP [61] is the second planner to which we apply Plan-Nudge. Table 5 reports the six settings of both planners, each trained with non-reactive and with reactive traffic. Plan-Nudge improves the score of HDP in every setting. 
+
+## F. Details of the experiments 
+
+Table 6 reports results in all six evaluation settings for every variant in Sec. 5.4, evaluated at its selected checkpoint. 
+
+Selection of the checkpoint. A training-time evaluation scores Val14 R every 112 iterations in our simulator, and ev-ery row reports the last of the three consecutive checkpoints with the highest mean Val14 R gain over its runs, the rule that also selects the checkpoint of the reported runs. The other five settings play no part in the selection. 
+
+Stalls. A stall is a failure in which the episode reaches the end of the scenario and the progress gate of the score is zero, which means that the vehicle covers less than 20% of the expert’s progress. The pretrained planner has 16 stalls on Test14-hard R. A stall is released if the trained policy scores at least 50 in the scenario, and Tab. 3 reports the share of the released stalls, mean over six runs. 
+
+## G. Open-loop finetuning from logs 
+
+The row “Open-loop finetuning from logs” of Tab. 1 applies open-loop finetuning to the Diffusion Planner with the on-line objective of DiffusionNFT [59]. Each update takes 256 logged states from the training cache. In each state, the plan-ner samples one plan with the initial noise scale of 0.1 and 15 plans with the initial noise scale of 1.0. Each of the 15 plans is sampled with offset guidance using the guidance mecha-nism of the Diffusion Planner [60] that PlannerRFT [26] also 15 Table 7. Sub-metrics on Test14-hard, official devkit. Bold denotes the highest result of each column, excluding the log replay. Red: a change below zero. Blue: a change above 1 point. Method R score Collision TTC Drivable Progress gate Progress Speed Comfort NR score 
+
+Log replay 68.80 77.02 69.85 95.96 100.00 98.48 94.12 99.26 85.96 Pretrained planner 68.93 88.02 80.57 95.28 91.24 75.59 97.55 87.44 75.74 Open-loop finetuning from logs 70.42 ±0.20 (+1.49) 
+
+86.76 ±0.17 (−1.26) 
+
+79.29 ±0.30 (−1.28) 
+
+95.41 ±0.31 (+0.13) 
+
+94.24 ±0.19 (+3.00) 
+
+78.67 ±0.42 (+3.08) 
+
+97.53 ±0.13 (−0.02) 
+
+88.66 ±0.28 (+1.22) 
+
+76.39 ±0.89 (+0.65) 
+
+PlanNudge (ours) 73.44 ±0.63 (+4.51) 
+
+90.04 ±0.47 (+2.02) 
+
+83.58 ±0.68 (+3.01) 
+
+97.00 ±0.15 (+1.72) 
+
+93.32 ±0.43 (+2.08) 
+
+76.18 ±0.31 (+0.59) 
+
+97.58 ±0.05 (+0.03) 
+
+87.69 ±0.39 (+0.25) 
+
+77.16 ±0.32 (+1.42) 
+
+steers. The offset guidance moves the predicted trajectory sideways by a random offset of up to 2 m at every solver step. The reward of a plan is its nuPlan score over the 4 s horizon against the logged future. The objective normalizes the rewards within each state and updates all weights of the network. We train six runs for 30 updates each, until the score plateaus, and report the last checkpoint. 
+
+## H. Sub-metrics on Test14-hard 
+
+Table 7 breaks the Test14-hard R score into the devkit’s terms and adds the score of the same runs on Test14-hard NR. On Test14-hard R, open-loop finetuning from logs improves 
+
+Table 8. Estimated model FLOPs of RL training per run. Mea-sured with the FLOP counter of PyTorch on one scene. A backward pass counts as two forward passes. M, G, and P denote 10 6, 10 9,and 10 15 floating-point operations (FLOPs). PlanNudge: the set-tings of Tab. 4. PlannerRFT: its Table A1 (group size 8, 5 DDIM steps, 128 environments × 32 steps per iteration, GRPO mini-batch 4,096, 6 steps per epoch, 1 epoch). One mini-batch sample is taken as one candidate trajectory with its five denoising steps, as in Diffu-sionDriveV2 [62]. The exploration policy of PlannerRFT, whose size is not stated, and its PPO updates are not counted, which favors PlannerRFT.                       
+
+> Measured cost FLOPs Diffusion Planner, outside the denoising loop ( E)2.52 G Diffusion Planner, one DDIM step of the DiT decoder ( D)0.117 G Nudge agent, actor forward, one sample ( a)2.24 M Nudge agent, one critic forward, one sample ( c)8.68 M Per environment step GFLOPs PlanNudge: collection ( E+ 5 D+a)3.1 PlanNudge: updates (25.6 sample-updates per step) 10.6 PlanNudge: critic refits (three, amortized) 7.0 PlanNudge: total 20.7 PlannerRFT: collection ( E+ 8 ×5×D)7.2 PlannerRFT: GRPO update, forward and backward per denois-ing step 10.5 Over the budget PFLOPs PlanNudge, 6.18 M steps 128 PlannerRFT, 40 M steps 710
+
+the progress-gate, progress, and comfort scores by 3.00, 3.08, and 1.22 points, respectively. In contrast, its collision and time-to-collision scores fall by 1.26 and 1.28 points. PlanNudge improves every term, most on the safety terms (collision +2.02, time to collision +3.01, drivable area +1.72) and on the progress gate (+2.08). On Test14-hard NR, the gain of open-loop finetuning shrinks to +0.65, within its spread over runs, while PlanNudge keeps +1.42. 
+
+## I. Computational cost of RL training 
+
+PlannerRFT reports its hardware but not its training time, so we compare estimated model FLOPs per training run up to the reported checkpoint (Tab. 8). We calculate training totals from measured forward-pass costs, counting each backward pass as two forward passes. Under the accounting assump-tions in Tab. 8, PlannerRFT’s reported configuration requires approximately 5.6 times as many model FLOPs as Plan-Nudge. For PlanNudge, actor and critic updates, including critic refits, account for approximately 85% of model FLOPs, and calls to the frozen planner account for approximately 15%. 
+
+## J. More qualitative results 
+
+Figures 11 to 13 show three additional scenarios with non-reactive traffic, and Figs. 14 to 16 show three with reactive traffic. In each scenario, the pretrained planner fails and Plan-Nudge avoids failure. All examples use the same training run and visualization conventions as Fig. 4. 16 1 t = 4.6 s 2 t = 6.6 s 3 t = 8.6 s 4
+
+drive ended at 8.6 s 
+
+t = 10.6 s 
+
+0 2 4 6 8 10 12 14 time (s) 
+
+−0.05 0.00 0.05 
+
+> speed o ff set (m/s)
+
+Lower planned speed    
+
+> 1234
+
+0 2 4 6 8 10 12 14 time (s) 0.000 0.002 0.004 
+
+> curvature o ff set (m −1)
+
+Steer further left    
+
+> 1234
+> Pretrained planner PlanNudge
+
+Figure 11. A left turn, non-reactive traffic. The pretrained planner does not turn sharply enough and leaves the drivable area at 8.6 s. PlanNudge steers further left. 1 t = 2.9 s 2 t = 4.9 s 3 t = 6.9 s 4
+
+drive ended at 6.9 s 
+
+t = 8.9 s 
+
+0 2 4 6 8 10 12 14 time (s) 
+
+−0.2 
+
+−0.1 0.0    
+
+> speed o ff set (m/s)
+> 1234
+
+0 2 4 6 8 10 12 14 time (s) -0.003 -0.002 -0.001 0.000 
+
+> curvature o ff set (m −1)
+
+Steer right    
+
+> 1234
+> Pretrained planner PlanNudge
+
+Figure 12. A vehicle enters the ego vehicle’s lane from the left, non-reactive traffic. PlanNudge steers right. 1 t = 6.8 s 2 t = 8.8 s 3 t = 10.8 s 4
+
+drive ended at 10.8 s 
+
+t = 12.8 s 
+
+0 2 4 6 8 10 12 14 time (s) 
+
+−0.50 
+
+−0.25 0.00 
+
+> speed o ff set (m/s)
+
+Lower planned speed    
+
+> 1234
+
+0 2 4 6 8 10 12 14 time (s) 0.000 0.002 0.004    
+
+> curvature o ff set (m −1)
+> 1234
+> Pretrained planner PlanNudge
+
+Figure 13. A vehicle crosses ahead, non-reactive traffic. PlanNudge slows down to let it pass. 
+
+17 1 t = 6.4 s 2 t = 8.4 s 3 t = 10.4 s 4
+
+> drive ended at 10.4 s
+
+t = 12.4 s                  
+
+> 0246810 12 14 time (s)
+> −0.1 0.0 0.1
+> speed o ff set (m/s)
+> 1234
+> 0246810 12 14 time (s) 0.000 0.002 0.004
+> curvature o ff set (m −1)
+
+Steer left    
+
+> 1234
+> Pretrained planner PlanNudge
+
+Figure 14. A vehicle beside the ego in the right lane, reactive traffic. The pretrained planner collides with it at 10.4 s. PlanNudge steers left and passes it. 1 t = 7.9 s 2 t = 9.9 s 3 t = 11.9 s 4 t = 13.9 s                  
+
+> 0246810 12 14 time (s) 024
+> vehicle speed (m/s)
+> 1234
+> 0246810 12 14 time (s) 0.0 0.2
+> speed o ff set (m/s)
+
+Higher planned speed              
+
+> 1234
+> 0246810 12 14 time (s) -0.005 0.000 0.005
+> curvature o ff set (m −1)
+> 1234
+> Pretrained planner PlanNudge
+
+Figure 15. A queue departs at an intersection, reactive traffic. The pretrained planner follows too slowly. PlanNudge increases the planned speed. The left panel shows the vehicle speed in both drives, gray for the pretrained planner and orange for PlanNudge. 1 t = 9.7 s 2 t = 11.7 s 3 t = 13.7 s 4 t = 14.8 s                  
+
+> 0246810 12 14 time (s) 02
+> vehicle speed (m/s)
+> 1234
+> 0246810 12 14 time (s) 0.0 0.2
+> speed o ff set (m/s)
+
+Higher planned speed              
+
+> 1234
+> 0246810 12 14 time (s) -0.005 0.000 0.005
+> curvature o ff set (m −1)
+> 1234
+> Pretrained planner PlanNudge
+
+Figure 16. Starting from a standstill, reactive traffic. The pretrained planner barely moves until the end of the scenario. PlanNudge increases the planned speed and departs. The left panel shows the vehicle speed in both drives, gray for the pretrained planner and orange for PlanNudge. 
+
+18

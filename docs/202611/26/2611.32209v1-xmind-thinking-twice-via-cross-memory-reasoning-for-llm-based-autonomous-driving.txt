@@ -1,0 +1,594 @@
+Title: XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving
+
+URL Source: https://arxiv.org/pdf/2611.32209v1
+
+Published Time: Wed, 25 Nov 2026 02:37:12 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving 
+
+Zuyi Guo 1, Xianjie Dai 1, Lei Yang 2, Xiaocong Zhao 3, Jingguang Li 1, Kitae Jang 1, and Heye Huang 1,†
+
+1Korea Advanced Institute of Science and Technology 
+
+2Nanyang Technological University 
+
+3Tongji University 
+
+Abstract — Memory-augmented large language model (LLM) driving agents can reuse past experience, yet previously learned corrections often fail to transfer when traffic conditions change. A key limitation is that existing memories mainly record observed outcomes, providing little evidence about alternative actions. We introduce XMind, a training-free framework that enables LLM-based driving to “Think Twice” through cross-memory reasoning. XMind integrates working memory of recent traffic states with episodic memory of critical risk events. The agent first makes an initial decision from the current context and then cross-checks it against retrieved historical experience. If a conflict arises, it makes a second decision guided by the retrieved evidence. To construct reliable episodic memory, XMind evaluates alternative actions through counterfactual rollouts under perturbed traffic conditions and stores the verified outcomes as structured risk capsules. These capsules are retrieved by jointly matching spatial risk patterns and scenario semantics. Across closed-loop highway simulations, XMind achieves success rates of 83.3–93.3%, ex-ceeding the strong baseline by 6.6 percentage points on average. Evaluation on K-Risk further demonstrates lower decision risk on unseen real-world high-risk interactions. Ablation studies confirm the complementary benefits of working memory, risk– text retrieval, and counterfactual verification. Code is available at https://github.com/xiangxiangliuwo/XMind .
+
+Index Terms — Autonomous driving, large language models, cross-memory reasoning, counterfactual reasoning. 
+
+I. I NTRODUCTION 
+
+Recent advances have substantially improved autonomous driving performance in normal traffic scenarios, yet reliable decision-making in long-tail scenarios remains challenging. Because events such as abrupt braking, cut-ins, and dense multi-vehicle interactions are rare, the experience gained from such events can be particularly valuable. For large language model (LLM) driving agents, external memory provides a way to reuse such experience without updating model param-eters [1, 2]. Reliable experience reuse, however, raises two questions: what should be remembered from a past risk event, and when should that memory influence the current decision? 
+
+Existing LLM driving agents retrieve past experience and reflections to support decision-making [1, 3, 4], while RE-SPOND [5] further organizes memories using structured risk patterns. However, similar scenarios or risk layouts do not nec-essarily require the same maneuver. More importantly, existing memories mainly record the outcome of the executed action, 
+
+> †
+
+Corresponding author: heye.huang@kaist.ac.kr .Reflection-based memory  
+
+> Risk event LLM reflection
+
+Brake instead. Stored correction 
+
+?
+
+> No counterfactual test
+
+Suggested correction, unverified recovery Counterfactual tests 
+
+> Recoverable Dangerous
+
+? Uncertain 
+
+Working memory within episode 
+
+> !
+
+Episodic memory across episodes 
+
+> Risk capsule
+> Scene conditions Action evidence Reflection
+> Scenario-matched retrieval
+
+Decision revision  
+
+> Risk event
+> verify add to
+> Current scenario
+> verified memory
+> LLM reasoning
+
+XMind Tested correction, evidence-backed memory Safe action 
+
+> think twice
+
+Fig. 1. From reflection-based correction to “Think Twice” reasoning. Top: LLM reflection suggests a correction without counterfactual verification of recoverability. Bottom: XMind tests candidate actions under traffic perturba-tions and continuation policies, stores the resulting evidence in episodic risk capsules, and triggers “Think Twice” cross-memory reasoning when retrieved evidence disagrees with the initial decision. 
+
+providing little evidence about alternative actions. Counter-factual memories such as CounterMem [6] verify corrective actions and their applicability, but retain little information about the other actions available at the same critical state. Safety-critical driving therefore requires multi-action evidence that distinguishes recoverable, dangerous, and uncertain alter-natives under changing traffic conditions. A second challenge is deciding when retrieved experience should affect online reasoning. Existing memory-augmented agents typically use retrieved experience whenever a match is found, allowing weakly related memory to interfere with otherwise reasonable decisions. This motivates a selective mechanism in which memory is used only when it provides evidence that challenges the agent’s initial choice. To address these challenges, we propose XMind, a training-free cross-memory reasoning framework for LLM-based au-arXiv:2611.32209v1 [cs.AI] 24 Nov 2026 tonomous driving. XMind combines short-term working mem-ory of recent traffic states with long-term episodic memory of critical risk events, as illustrated in Fig. 1. In the offline phase, candidate actions at critical states are evaluated through counterfactual rollouts under traffic perturbations and stored as structured risk capsules. During online decision-making, the LLM first makes an initial decision from working memory and then cross-checks it against retrieved episodic evidence. When the two disagree, XMind triggers a second, evidence-guided decision, allowing the system to “Think Twice” while keeping the underlying LLM frozen. The primary contributions of this paper are as follows:  
+
+> •
+
+We propose XMind, a cross-memory reasoning frame-work that lets an LLM driving agent “Think Twice”: its initial decision from working memory is cross-checked against episodic risk memory, and disagreement triggers an evidence-guided revision.  
+
+> •
+
+We construct a counterfactually verified episodic risk memory, whose risk capsules record recoverable, danger-ous, and uncertain actions at decision-critical states and are retrieved through joint risk–text matching.  
+
+> •
+
+We validate XMind through closed-loop simulations, open-loop evaluation on K-Risk [7], and ablation studies, showing higher success rates than strong baselines and reduced risk on recorded high-risk events. II. R ELATED WORK 
+
+A. LLM-based Driving Agents 
+
+LLM driving frameworks use different representations and retrieval mechanisms to reuse past experience. DiLu [1] re-trieves prior reasoning traces and actions from scenario de-scriptions, while Agent-Driver [3] separates commonsense and driving memories. RAG-Driver [8] learns a shared retrieval space for visual and control features, LeapVAD [9] uses action-aware contrastive representations, and LiloDriver [10] incrementally associates scenarios with planning strategies for context-aware decision support. In contrast, XMind combines working memory with episodic risk memory and uses coun-terfactually verified evidence to revise decisions only when retrieved experience conflicts with the initial choice. Risk information can also be incorporated into the retrieval space. Driver risk field (DRF) [11] estimates perceived risk from a state-dependent spatial field combined with environ-mental costs. Driving safety field captures coupled driver– vehicle–road interactions [12] and yields dynamic risk maps when combined with the intentions of surrounding vehi-cles [13]. RiskNet [14] couples interaction fields with proba-bilistic behavior prediction to forecast risk in long-tail scenar-ios. SafeDrive [15] extends DRF to quantify coupled multi-agent risks for LLM driving reasoning, while RESPOND [5] encodes ego-centric spatial risk in a discrete matrix and retrieves experience through exact pattern matching. 
+
+B. Experience Memory and Reflection 
+
+Memory systems for language agents differ in the knowl-edge they store and the signals used to update it. Reason-ingBank [16] uses LLM assessments of trajectory outcomes to extract structured strategy entries from both successes and failures. EvolveR [17] maintains a principle repository through semantic deduplication and utility scoring, and combines ex-perience reuse with reinforcement learning policy updates. ECHO [18] rewrites trajectories in hindsight and compresses them into reusable experience. Driving memory also varies in its temporal scope and role in decision making. AD-Memo [19] retains information about objects and events within a driving episode to support subsequent decisions. In this work, XMind focuses on building knowledge for handling risks across episodes. It stores action outcomes and supporting rollout evidence at specific decision states, allowing the agent to consult the evidence behind past experience when making subsequent decisions. 
+
+C. Counterfactual Evaluation for Driving Decisions 
+
+Evaluating driving decisions in high-risk scenarios requires assessing not only whether collisions can be avoided, but also how alternative actions affect future outcomes. Nishiyama et al. [20] use counterfactual simulation to distinguish avoidable from unavoidable planner failures. FREA [21] approximates the ego vehicle’s feasible region and constrains adversar-ial background behavior, while WoTE [22] predicts action-conditioned futures with a BEV world model and evaluates candidate trajectories using a reward model. Recent work further studies counterfactual prediction in driving world mod-els, highlighting the difficulty of estimating futures under alternative ego actions [23]. Counterfactual evaluation can also provide supervision and reusable experience. CF-VLA [24] constructs counterfactual correction data through rollout, filtering, and labeling, while C-CoT [25] uses a meta-action evaluation tree to supervise safety reasoning. These methods mainly use counterfactual outcomes for training or correction. In contrast, XMind stores multi-action evaluation results as persistent episodic risk memory, allowing verified evidence to be retrieved across episodes and used to reconsider subsequent driving decisions. III. M ETHOD 
+
+XMind comprises working memory of recent traffic states and episodic memory of counterfactually verified risk ex-perience accumulated across episodes. As shown in Fig. 2, the offline phase builds risk capsules through counterfactual verification, while the online phase combines both memo-ries for cross-memory reasoning. The LLM remains frozen throughout. 
+
+A. Risk Representation and Working Memory 
+
+XMind makes decisions at the meta-action level. At decision step t, it selects at ∈ A , where A denotes the meta-action space for XMind. A low-level controller converts at into vehicle motion. The scenario encoder organizes the current observation into a structured frame: 
+
+ft = ( t, c, s et , Vt) , (1) Online decision Working memory Offline validation Risk-gated retrieval   
+
+> Risk level ≥1risk layout + text
+
+Initial think 
+
+a¹ 
+
+> yes
+
+Final action  
+
+> t-N+1
+
+… t Risk layout 0Context State ! Risk Critical-state search Counterfactual rollouts Anchor & write     
+
+> Backward search
+> !Collision: backtrack Otherwise: peak risk Recoverable Dangerous
+> ?Uncertain
+> �decision-critical state
+> �write only if recoverable + dangerous coexist
+> append capsule
+
+Structured text Interaction Scenario Information Extraction 
+
+short-term memory 
+
+Episodes End 
+
+counterfactual memory construction memory-guided selection 
+
+> LANE_RIGHT
+> LANE_LEFT FASTER
+> IDLE SLOWER
+> write
+
+Episodic memory 
+
+Risk capsule   
+
+> …keyframe + event window
+> taken →preferred
+> verified action explanation + provenance
+
+long-term memory 
+
+a* a¹ a* Think twice  
+
+> memory + context
+> low risk no match
+
+Execute Adjacent Vehicle Leading Vehicles Ego Vehicle 
+
+More evidence, continue to improve LLM frozen Fig. 2. Overview of XMind. Working memory provides recent traffic context and a spatial risk layout. Online decision-making uses risk-gated episodic retrieval to cross-check the initial decision, triggering “Think Twice” reasoning when the retrieved preferred action differs from the initial choice. Offline validation evaluates candidate actions at critical states through counterfactual rollouts, distinguishing recoverable, dangerous, and uncertain actions. The resulting evidence is stored as risk capsules in episodic memory for reuse across episodes. The LLM parameters remain frozen throughout the whole process. 
+
+where c denotes the scenario type, set is the ego state (identifier, position, longitudinal and lateral velocities, acceleration, and lane), and Vt denotes the surrounding vehicles. Surrounding vehicles are mapped to 11 ego-centric direc-tional slots, Vt = ( vdt )d∈D , including eight nearby directions and three additional forward slots. Each occupied slot stores 
+
+vdt = ( sjt , r t,j , ℓ t,j ), where sjt is the vehicle state, rt,j ∈ [0 , 1] 
+
+is its interaction risk with the ego vehicle, and ℓt,j is the corresponding risk level. Each slot retains the nearest relevant vehicle, and unoccupied slots are represented as null .We quantify pairwise interaction risk using DRF [11]. Un-like RESPOND [5], which uses normalized geometric overlap, we measure the fraction of the reference risk field contained in the overlap region: 
+
+rDRF  
+
+> t,j
+
+=
+
+P 
+
+> p∈Ωe∩Ωj
+
+Fref (p)
+
+P 
+
+> p∈Ωref
+
+Fref (p) . (2) Here, Fref is the risk field of the trailing vehicle, Ωref ∈{Ωe, Ωj } is its field region, and Ωe and Ωj denote the field regions of the ego vehicle and vehicle j, respectively. For longitudinal closing interactions, we additionally use time to collision (TTC) [26] to quantify the risk: 
+
+rTTC  
+
+> t,j
+
+=
+
+
+
+1, g ≤ 0,
+
+0, g > 0, ∆v ≤ 0,
+
+clip 
+
+ 6 − g/ ∆v
+
+3 , 0, 1
+
+
+
+, otherwise ,
+
+(3) where g is the longitudinal gap and ∆v is the closing speed. For critical longitudinal following scenarios where the lead vehicle’s speed is below 5 m /s and the ego vehicle’s closing speed exceeds 5 m /s, we set rt,j = rTTC  
+
+> t,j
+
+. Otherwise, we use 
+
+rt,j = rDRF  
+
+> t,j
+
+.The risk value is further discretized into three levels: 
+
+ℓt,j =
+
+
+
+0, rt,j < 0.5,
+
+1, 0.5 ≤ rt,j < 0.7,
+
+2, rt,j ≥ 0.7.
+
+(4) Levels 0, 1, and 2 indicate increasing risk. The continuous value preserves differences in vehicle interactions, and the discrete level is used to construct the spatial risk layout. The spatial risk layout is denoted by ρt = ρ(ft, b t) ∈{0, 1, 2}4×3, where bt contains the left and right road bound-aries read separately from the road network at time t. The four rows represent the additional forward positions, the immediate forward positions, lateral positions, and rear positions, while the three columns correspond to the left, ego, and right lanes. Occupied cells contain vehicle risk levels, whereas the ego and empty cells are set to 0. A missing adjacent lane is assigned level 2 to represent a lateral road constraint. The layout is used for episodic memory retrieval based on spatial risk similarity. To preserve recent changes in traffic conditions, consecutive structured frames form the working memory: 
+
+Wt = ( ft−N +1 , . . . , f t) , (5) where Wt denotes the working memory at decision step 
+
+t, and N is the number of retained decision frames. The frames are serialized into the decision prompt. Changes in vehicle positions, velocities, accelerations, and risks across these frames provide the model with temporal context for the current interaction. 
+
+B. Counterfactual Verification Based on Recoverability 
+
+Working memory records recent driving states, while offline counterfactual tests evaluate the recovery options available after different actions. Candidate state selection and memory construction are described in Section III-C. At a candidate decision step τ , let Aav ,τ ⊆ A denote the available actions. For each action a ∈ A av ,τ , we copy the state saved before action execution and apply traffic condition ξn.The action is executed for one decision interval, after which a continuation policy μ completes the rollout. The policy library Πcont contains IDM car following [27] and a policy that greedily minimizes risk. All actions share the same J = 4 traffic conditions ξn, where n = 1 , . . . , J .The first condition ξ1 leaves traffic unchanged. The remaining conditions apply multiplicative perturbations to the kinematic features of surrounding vehicles. Let zτ (a, ξ n, μ ) equal one if the ego vehicle collides during the rollout and zero otherwise. An action is recoverable under 
+
+ξn if at least one tested policy avoids collision: 
+
+Rec τ (a, ξ n) = 1 [∃μ ∈ Πcont : zτ (a, ξ n, μ ) = 0] ,qτ (a) = 1 − 1
+
+J
+
+> J
+
+X
+
+> n=1
+
+Rec τ (a, ξ n), (6) where 1[·] is the indicator function and qτ (a) is the fraction of tested conditions under which no policy avoids collision. When qτ (a) = 0 , every tested condition admits at least one collision-free continuation, although the successful policy may differ across conditions. For a given condition, the set of the policies that avoid collision is defined as: 
+
+Πok  
+
+> τ
+
+(a, ξ n) = {μ ∈ Πcont : zτ (a, ξ n, μ ) = 0 } . (7) Let k index samples taken at the end of each decision in-terval, and let rmax  
+
+> τ,k
+
+(a, ξ n, μ ) denote the maximum directional risk at that sample. When Πok  
+
+> τ
+
+(a, ξ n)̸ = ∅, the action risk is defined as the lowest peak risk among collision-free policies: 
+
+Rτ (a, ξ n) = min  
+
+> μ∈Πok
+> τ(a,ξ n)
+
+max  
+
+> k
+
+rmax  
+
+> τ,k
+
+(a, ξ n, μ ). (8) If Πok  
+
+> τ
+
+(a, ξ n) = ∅, we set Rτ (a, ξ n) = 1 .To compare risk and driving efficiency, we average the action risk and normalized longitudinal progress across traffic conditions: 
+
+brτ (a) = 1
+
+J
+
+> J
+
+X
+
+> n=1
+
+Rτ (a, ξ n),pτ (a) = 1
+
+J
+
+> J
+
+X
+
+> n=1
+
+∆xeτ (a, ξ n)
+
+vref Tcf 
+
+,
+
+(9) where ∆xeτ (a, ξ n) is the ego vehicle’s longitudinal displace-ment from the candidate state to the endpoint of the selected rollout. The reference speed is denoted by vref , and Tcf = 4 s 
+
+is the total rollout duration, including the initial action interval. The available actions are classified as recoverable, danger-ous, or uncertain: 
+
+A+ 
+
+> τ
+
+= {a ∈ A av ,τ : qτ (a) = 0 },
+
+A− 
+
+> τ
+
+= {a ∈ A av ,τ : qτ (a) ≥ η},
+
+A0 
+
+> τ
+
+= Aav ,τ \  A+ 
+
+> τ
+
+∪ A −
+
+> τ
+
+ ,η = 0 .5. (10) When A+ 
+
+> τ
+
+is nonempty, the preferred action balances progress against risk: 
+
+a∗ 
+
+> τ
+
+= arg max 
+
+> a∈A +
+> τ
+
+[pτ (a) − λbrτ (a)] , λ = 0 .5. (11) 
+
+C. Long-term Episodic Memory and Offline Validation 
+
+Episodic memory stores experience around critical deci-sions. During online execution, we retain snapshots taken before action execution in working memory. A separate snap-shot preserves the state at the episode’s maximum directional risk. At the end of the episode, the action tests described in Section III-B identify a memory anchor from these states. For an episode with a collision, let Cback denote the retained decision steps preceding the collision. We examine these steps in reverse order and select the latest one that admits a recoverable action: 
+
+τ ∗ = max τ ∈ C back : A+
+
+> τ
+
+̸ = ∅ . (12) If no such step exists in the retained window, no capsule is generated. For an episode without a collision, τ ∗ is the earliest decision step attaining the episode’s maximum directional risk. This state is verified only if its risk reaches level 1 or above. The selected state is stored only when it contains both recoverable and dangerous actions: 
+
+Write( τ ∗) = 1 A+ 
+
+> τ∗
+
+̸ = ∅ ∧ A − 
+
+> τ∗
+
+̸ = ∅ . (13) This condition retains states in which different actions produce distinct tested outcomes. For a collision episode, τ ∗ marks the latest point at which the collision could still be avoided. If no action at τ ∗ is dangerous, the action choice there was not decisive under the tested conditions, so the episode yields no capsule; earlier states are not searched because their connection to the collision is weaker. Each retained event is stored as a structured risk capsule: 
+
+mi =  fτ ∗ 
+
+> i
+
+, b i, ρ i, Hi, Ti,ataken  
+
+> i
+
+, a ∗ 
+
+> i
+
+, e i, Pi
+
+, (14) where τ ∗ 
+
+> i
+
+is the critical decision step, Hi and Ti store the observed event window and counterfactual action outcomes, respectively. ataken  
+
+> i
+
+is the executed action, and a∗ 
+
+> i
+
+= a∗  
+
+> τ∗
+> i
+
+is the preferred action from Equation (11). ei is a reflection generated by the frozen LLM from Hi and Ti, and Pi contains source metadata and verification settings. The capsule is then appended to persistent episodic memory for retrieval in later episodes: 
+
+M ′ 
+
+> E
+
+= ME ∪ { mi}, (15) where ME and M ′ 
+
+> E
+
+denote the memory before and after insertion, respectively. 
+
+D. Memory Retrieval and Online Decision Making 
+
+The applicability of a stored action outcome depends on the current scenario. Let πθ denote the driving policy implemented by the LLM, with frozen model parameters θ. The prompt Pt
+
+contains the system instructions, driving intent, and available actions. The model uses this prompt and working memory Wt
+
+to produce an initial action: 
+
+a(1)  
+
+> t
+
+= πθ (Pt, W t). (16) Retrieval starts when a surrounding vehicle reaches risk level 1 or higher. Candidate capsules must match the current scenario type and the direction of the highest-risk vehicle. Layout similarity sρ(ft, m i) compares directional risk distri-butions, while text similarity stext (ft, m i) measures semantic similarity between the scenario descriptions of ft and the capsule keyframe fτ ∗ 
+
+> i
+
+. The retrieval score combines both: 
+
+s(ft, m i) = w s ρ(ft, m i) + (1 − w)stext (ft, m i), (17) where w is the weight assigned to layout similarity. On straight road segments where left and right symmetry is assumed, retrieval considers both the original and mirrored forms of each capsule, which is used to match left–right reversed risk patterns. The capsule with the highest score provides memory evidence Bt, including action classes, the preferred action, risk, and reflection. If no capsule is matched or its preferred action agrees with the initial action, the initial action is retained. Otherwise, the model thinks twice using Pt,
+
+Bt, and Wt:
+
+at =
+
+(
+
+a(1)  
+
+> t
+
+, no match or action agrees ,πθ (Pt, B t, W t), otherwise . (18) The initial decision draws on the LLM’s existing knowledge and its reasoning about current traffic. Scenario matching and the disagreement condition control when episodic evidence is introduced, helping reduce interference from weakly related memories. When no match is found or the action agrees, the model skips the second decision call, avoiding additional input tokens and inference cost. IV. E XPERIMENTS 
+
+The evaluation follows three questions: (Q1) Does the mem-ory improve safety and efficiency over relevant baselines? (Q2) Does accumulation improve decisions on unseen real-data risk events? (Q3) Which mechanisms explain the difference? 
+
+A. Experimental Setup 
+
+We evaluate XMind in Highway-env [28], whose dis-crete meta-action space is A = {LANE_LEFT , IDLE ,
+
+LANE_RIGHT , FASTER , SLOWER } (Section III-A). The main experiments use three configurations with different traffic complexity: four lanes with density 2.5, five lanes with density 2.5, and five lanes with density 3.0. Each configuration is evaluated over 3 rounds of 30 episodes with different random seeds. Particularly, Q1 and Q3 use different test seeds to broaden the coverage of randomly generated traffic, so their results are not directly comparable. Each episode lasts 30 decision steps and succeeds if the ego vehicle completes all steps without collision. All experiments use GPT-6-Astra as the LLM backbone without fine-tuning. We report success rate (SR), success steps (SS), mean speed 
+
+¯v, mean minimum TTC TTC min , and token usage per decision step. SR is the proportion of successful episodes, and SS is the mean number of executed decision steps per episode. ¯v
+
+is averaged within each episode and then across episodes. 
+
+TTC min averages the minimum TTC over successful episodes. Input and output token counts are estimated per decision step. 
+
+B. Q1: Baseline Comparison 
+
+We compare XMind with DiLu [1], the single-agent variant of KoMA [4], and RESPOND [5]. Each method builds mem-ory with its reflection mechanism on shared seeds excluded from testing, and the memory is fixed during evaluation. 
+
+Safety metrics. Table I summarizes the comparison. XMind achieves success rates of 93.3%, 90.0%, and 83.3%, ranking first in all three configurations. Relative to RESPOND, its success rate is higher by approximately 6.6 to 6.7 percentage points, and its mean success steps increase across configu-rations. With five lanes and a traffic density of 3.0, XMind exceeds DiLu and KoMA in success rate by 36.6 and 23.3 percentage points, respectively. Within the fixed horizon of 30 decision steps, XMind completes a greater proportion of episodes without collision, with mean episode lengths closer to the horizon limit. With five lanes, increasing traffic density from 2.5 to 3.0 reduces the mean minimum TTC for all methods, indicating tighter temporal margins in denser traffic. XMind records mean minimum TTC values of 7.19, 5.62, and 4.44 s across the three configurations. Its successful trajectories therefore retain temporal margins of several seconds on average at their most critical approach points. 
+
+Efficiency and cost. Across the three traffic configurations, XMind’s mean speed ranges from 10.74 to 11.65 m/s, gen-erally below DiLu and KoMA and close to RESPOND. Although DiLu and KoMA achieve higher mean speeds, both have lower success rates and success steps than XMind. XMind does not lead in speed across all configurations, but it completes more episodes without collision and executes more decision steps on average. Compared with RESPOND, which also incorporates risk information, XMind achieves better episode completion at similar speed levels. These results TABLE I: Comparison of driving performance and token usage across highway scenarios with different lane counts and traffic densities.                                                                                
+
+> Bold and underlined values indicate the best and second best results, respectively. This convention applies to all subsequent tables. 4 lanes, density 2.5 5 lanes, density 2.5 5 lanes, density 3.0 Tokens/step Method SR ↑SS ↑¯v↑TTC min ↑SR ↑SS ↑¯v↑TTC min ↑SR ↑SS ↑¯v↑TTC min ↑Input ↓Output ↓
+> DiLu [1] 70.0 22.13 12.99 6.33 73.3 23.27 15.15 5.57 46.7 16.47 13.32 4.63 ≈2000 ≈60 KoMA ∗[4] 73.3 23.00 13.84 5.44 66.7 22.63 15.83 4.66 60.0 20.37 14.89 4.43 ≈5800 ≈200 RESPOND [5] 86.7 26.37 12.29 6.44 83.3 26.46 12.94 6.18 76.7 24.63 10.61 5.70 ≈1000 ≈50 XMind (ours) 93.3 28.13 10.74 7.19 90.0 27.53 11.65 5.62 83.3 25.77 10.98 4.44 ≈3100 ≈180
+> ∗Single-agent variant. Each method retains its own memory-construction mechanism, while all other experimental settings are kept identical across methods.
+> TABLE II: Counts of selected events across the K-Risk subsets.
+
+Event type highD [29] NGSIM [30] extreme [31] ∗
+
+Hard braking 42 35 38 Left cut in 23 30 -Right cut in 21 42 -
+
+Total 86 107 38 
+
+> ∗Events from ExpresswayA and FreewayB in CitySim.
+
+illustrate the tradeoff between completion without collision and driving speed. For token usage, XMind uses approximately 3,100 input tokens and 180 output tokens per decision step. XMind uses fewer tokens than KoMA, but its input and output token usage remains higher than that of DiLu and RESPOND. Part of this additional overhead comes from the second decision call triggered by disagreement. When the initial action differs from the preferred action in the first matched capsule, XMind calls the LLM again with memory evidence, increasing both input and output token usage for that decision step. 
+
+C. Q2: Experiments with Real Driving Data 
+
+To test whether accumulated experience improves decisions on unseen events, we use the highD [29], NGSIM [30], and extreme subsets of K-Risk [7]. The extreme subset includes events from ExpresswayA and FreewayB in CitySim [31]. After standardizing trajectory units and direction conventions, we select three types of interaction: sudden braking by the lead vehicle and vehicles cutting in from the left or right. Selection considers braking and lane changes, time headway (THW), TTC, and the ego vehicle’s response to retain interactions relevant to ego safety. Duplicate events are removed, and the resulting event counts are summarized in Table II. 
+
+Evaluation protocol. We compare Human, NoMem, and 30Mem at identical decision frames under the same counter-factual verification conditions. Human denotes the action ex-tracted from the recorded trajectory. NoMem retains working memory and disables episodic memory retrieval. The 30Mem setting uses 30 risk capsules, which are constructed exclusively from simulator episodes separate from the K-Risk evaluation events, with memory updates disabled during evaluation. 
+
+Risk reduction. The bar chart in Fig. 3 shows that NoMem reduces mean peak risk relative to Human by 1.68% on highD, 7.43% on NGSIM, and 2.01% on extreme, while 30Mem achieves reductions of 3.64%, 9.12%, and 1.76%,                            
+
+> TABLE III: Pairwise safety comparison against Human (%). Dataset Method Safer Similar Riskier highD (n= 319 )NoMem 15.36 77.12 7.52 30Mem 16.61 77.43 5.96 NGSIM (n= 468 )NoMem 32.05 54.70 13.25 30Mem 35.26 51.28 13.46 extreme (n= 138 )NoMem 21.01 68.84 10.15 30Mem 21.01 66.67 12.32
+> ndenotes valid paired decision frames. Similar outcomes do not require identical actions.
+
+respectively. Relative to the common Human baseline, the reduction achieved by 30Mem exceeds that of NoMem by 1.96 percentage points on highD and 1.69 percentage points on NGSIM. For a complementary safety comparison, we classify each method’s outcome against Human as safer, similar, or riskier. The comparison first uses the unrecoverability fraction. When the fractions are equal, it uses mean peak risk with an absolute tolerance of 0.05. Table III includes all valid paired decision frames. It shows that 30Mem is classified as safer than Human more often than riskier on all three datasets. Compared with NoMem, 30Mem increases the share of safer decisions on highD and NGSIM. The riskier share decreases on highD and rises slightly on NGSIM. On extreme, however, retrieved memory prompts two lane changes and one switch from 
+
+SLOWER to IDLE , increasing the mean peak risk slightly above that of NoMem. 
+
+Case study. The scenario and decision trace in Fig. 3 illus-trate how retrieved evidence informs reconsideration. Human changes to the left in the recorded scenario, whereas the agent’s initial decision without episodic evidence is SLOWER 
+
+in response to a front vehicle with risk 0.95. Retrieval re-turns capsule CAP000007 with high similarity, whose stored keyframe also contains a dominant front threat, with risk 0.91. In that stored event, LANE_RIGHT admits a collision-free continuation in all four tested traffic conditions, with a reported peak risk of 0.73, whereas all tested continuations collide for IDLE , FASTER , SLOWER , and LANE_LEFT . The capsule’s preferred action disagrees with the initial SLOWER 
+
+decision, triggering a second decision call. Using the retrieved evidence together with current observations, the agent selects 
+
+LANE_RIGHT . This example illustrates how counterfactual evidence from a related past event supports action revision TABLE IV: Working memory window. Window N SR (%) ↑ SS ↑
+
+1 73.3 23.53 3 80.0 25.27 5 80.0 25.67 
+
+without updating the LLM parameters. 
+
+D. Q3: Ablation Study 
+
+In this section, we compare working memory window sizes and conduct ablation studies to assess how memory components, retrieval methods, and counterfactual verification contribute to driving safety. 
+
+Working memory window. We compare working memory windows of N ∈ {1, 3, 5} decision frames on 15 seeds excluded from final evaluation. By Equation (5), the window includes the current frame, so N = 1 provides only ft. All settings share the same episodic memory ME , with updates disabled during evaluation. Table IV reports SR and SS. Both N = 3 and N = 5 
+
+reach an SR of 80 .0% , versus 73 .3% for N = 1 , suggesting that short-term temporal context improves decision reliability. Although the five-frame window slightly increases SS from 
+
+25 .27 to 25 .67 , it does not further improve SR. We therefore select N = 3 as a better trade-off between temporal context and token cost. 
+
+Component ablations. We conduct the component ablations under the configuration of five lanes and a traffic density of 3.0. We compare variants without working memory or coun-terfactual verification, together with an ablation of the retrieval methods. The variant without working memory receives only the current frame description. Text retrieval and risk retrieval rank capsules using stext (ft, m i) and sρ(ft, m i), respectively. Without counterfactual verification, the LLM generates the preferred action a∗ 
+
+> i
+
+through reflection on the observed episode, with the remaining components unchanged. We also compare experience collected from different scenarios with experience from scenarios matching the evaluation setting. All other vari-ants with episodic memory use different scenario experience and the number of capsules remains the same. Table V shows that working memory increases SR from 
+
+50 .0% to 66 .7% and SS from 17 .03 to 21 .40 , indicating that short-term temporal context alone already improves decision reliability. The full method achieves an SR of 83 .3% , com-pared with 73 .3% for text retrieval and 80 .0% for risk retrieval. This comparison supports combining scenario semantics with spatial risk information to retrieve more applicable experience. Removing counterfactual verification reduces SR from 83 .3% 
+
+to 78 .9% and SS from 25 .90 to 24 .54 , suggesting that re-flection without explicit outcome verification can produce less reliable action recommendations. The source of experience also affects performance. Using matched scenario experience increases SR from 83 .3% to 90 .0% and SS from 25 .90 to 
+
+27 .37 , showing that scene-relevant episodic memory provides stronger support for subsequent decisions. V. C ONCLUSION 
+
+We presented XMind, a cross-memory reasoning framework for LLM-based autonomous driving. It combines working memory with counterfactually verified episodic risk memory to support “Think Twice” decision-making. At critical states, XMind evaluates alternative actions and records whether they are recoverable, dangerous, or uncertain. When retrieved evi-dence disagrees with the initial decision, the agent reconsiders it with this evidence. In closed-loop highway simulation, XMind achieves the highest success rate in all three configura-tions without updating the LLM. Ablations confirm the bene-fits of working memory, risk–text retrieval, and counterfactual verification. On recorded K-Risk events, simulator-derived ex-perience reduces decision risk on highD and NGSIM, although its benefit remains limited on the extreme subset. Overall, XMind shows that verified past experience can complement current traffic context for more reliable LLM-based driving. Future work will extend memory coverage to longer horizons and more diverse traffic scenarios. VI. A CKNOWLEDGMENTS 
+
+This work was supported by the National Research Foun-dation of Korea (NRF) grant funded by the Korean gov-ernment (MSIT) under the project “Development of Risk-Enhanced Continual Learning for Embodied Intelligence in Long-Tail Environments” (Grant No. RS-2026-25595451) and by the Korea Institute of Science and Technology Information (KISTI) R&D program through the joint research project “De-velopment of the Next-Generation Integrated Wired/Wireless Communication Gateway (X-Gateway).” REFERENCES [1] L. Wen, D. Fu, X. Li, X. Cai, T. Ma, P. Cai, M. Dou, B. Shi, L. He, and Y. Qiao, “Dilu: A knowledge-driven approach to autonomous driving with large language models,” in International Conference on Learning Representations , vol. 2024, 2024, pp. 34 503–34 522. [2] N. Shinn, F. Cassano, A. Gopinath, K. Narasimhan, and S. Yao, “Re-flexion: Language agents with verbal reinforcement learning,” Advances in neural information processing systems , vol. 36, pp. 8634–8652, 2023. [3] J. Mao, J. Ye, Y. Qian, M. Pavone, and Y. Wang, “A language agent for autonomous driving,” arXiv preprint arXiv:2311.10813 , 2023. [4] K. Jiang, X. Cai, Z. Cui, A. Li, Y. Ren, H. Yu, H. Yang, D. Fu, L. Wen, and P. Cai, “Koma: Knowledge-driven multi-agent framework for autonomous driving with large language models,” IEEE Transactions on Intelligent Vehicles , 2024. [5] D. Chen, H. Huang, T. Chen, Z. Li, Y. Li, Y. Xu, and S. Chen, “Respond: Risk-enhanced structured pattern for llm-driven online node-level decision-making in autonomous driving,” Communications in Transportation Research , 2026. [6] H. Pu, R. Tang, and Y. Zhang, “Countermem: World-model ver-ified counter-factual memory for language agents,” arXiv preprint arXiv:2609.31874 , 2026. [7] H. Huang, J. Li, Z. Zhou, P. Liang, M. Wu, K. Jang, and J. Wang, “A knowledge-augmented dataset of high-risk driving scenarios with llm annotations for autonomous driving,” arXiv preprint arXiv:2607.07103 ,2026. [8] J. Yuan, S. Sun, D. Omeiza, B. Zhao, P. Newman, L. Kunze, and M. Gadd, “Rag-driver: Generalisable driving explanations with retrieval-augmented in-context learning in multi-modal large language model,”   
+
+> arXiv preprint arXiv:2402.10828 , 2024. [9] Y. Ma, T. Wei, N. Zhong, J. Mei, T. Hu, L. Wen, X. Yang, B. Shi, and Y. Liu, “Leapvad: A leap in autonomous driving via cognitive perception and dual-process thinking,” IEEE Transactions on Neural Networks and Learning Systems , 2025.
+
+1 Initial decision without memory 
+
+[System Message] e.g. You are a Large Language Model. Now you act as a mature driving assistant … 
+
+> [Scenario Description]
+
+[Reason] e.g. The front vehicle presents a high risk. Decelerate now to mitigate the close-front threat. 
+
+Action: SLOWER 
+
+2 Episodic risk memory retrieval 
+
+[Retrieval Prompt] e.g. Each capsule is a past situation similar to the current one. Find the matched one … RECOVERABLE: LANE_RIGHT - recommended. peak risk 0.73. safe in 4/4. DANGEROUS: IDLE, FASTER, SLOWER, LANE_LEFT - all tested continuations collide. 
+
+3 Memory-guided decision in round 2 
+
+[Retrieved Memory] CAP000007, similarity 0.93. LANE_RIGHT: safe in 4/4. 
+
+e.g. The matching episode identifies a recoverable right-lane alternative.  
+
+> [Reason*] e,g, The front vehicle is the highest risk. Decelerate in round 1 can avoid collision but is still risky.
+
+The matching memory reports collision under deceleration, idle, acceleration, and change to left. 
+
+Action: LANE_RIGHT LLM agent    
+
+> Baseline: Human = 0
+> 1.68 7.43 2.01 3.64 9.12 1.76 0510 highD NGSIM extreme Risk reduction (%) NoMem 30Mem
+> Human choice: change to the left. High risk.
+
+e.g. “id”: “ego”, “x”: 320.3, “y”: 1.0, “v”: 107.3, “a”: 1.0, “lane id”: 1 “id”: 1302, “direction”: “front”, “x”: 345.7, “y”: 1.2, “v”: 82.1, “a”: -0.2, “risk”: 0.95, “risk level”: 2 Call XMind for memory 
+
+[Capsule CAP000007] 
+
+UNCERTAIN: none. Explanation: the vehicle was only 10.2 m ahead and moving slower than ego, the left lane was blocked … Situation at its key frame: main risk from the front vehicle (risk 0.91), ego speed 89.2 km/h in lane 0. 
+
+> Final decision XMind choice: change to the right. Safe.
+
+The supplied observations and simulation evidence favor changing right to avoid the dominant front threat. Fig. 3. Risk reduction and memory-guided decision revision on K-Risk. The bar chart shows mean peak risk reduction relative to Human at paired critical frames (higher is better). The scenario contrasts the recorded Human left lane change with XMind’s right lane change. The decision trace shows an initial 
+
+SLOWER action, retrieval of a verified capsule, and a revised LANE_RIGHT decision. Prompt and reasoning excerpts are illustrative. 
+
+TABLE V: Ablation study with five lanes and a traffic density of 3.0. Text and Risk denote the two retrieval methods. Method Working Episodic Retrieval method Counterfactual SR (%) ↑ SS ↑
+
+memory memory Text Risk verification Without memory × × × × × 50.0 17.03 Working memory only ✓ × × × × 66.7 21.40 Text retrieval ✓ ✓ ✓ × ✓ 73.3 23.03 Risk retrieval ✓ ✓ × ✓ ✓ 80.0 24.83 w/o counterfactual verification ✓ ✓ ✓ ✓ × 78.9 24.54 XMind (different scenarios) ✓ ✓ ✓ ✓ ✓ 83.3 25.90 
+
+XMind (matched scenarios) ✓ ✓ ✓ ✓ ✓ 90.0 27.37 
+
+[10] H. Yao, P. Li, B. Jin, Y. Zheng, A. Liu, L. Mu, Q. Su, Q. Zhang, Y. Chen, and P. Li, “Lilodriver: A lifelong learning framework for closed-loop motion planning in long-tail autonomous driving scenarios,” 
+
+arXiv preprint arXiv:2505.17209 , 2025. [11] S. Kolekar, J. De Winter, and D. Abbink, “Human-like driving behaviour emerges from a risk-based driver model,” Nature communications ,vol. 11, no. 1, p. 4850, 2020. [12] J. Wang, H. Huang, K. Li, and J. Li, “Towards the unified principles for level 5 autonomous vehicles,” Engineering , vol. 7, no. 9, pp. 1313–1325, 2021. [13] H. Huang, J. Wang, C. Fei, X. Zheng, Y. Yang, J. Liu, X. Wu, and Q. Xu, “A probabilistic risk assessment framework considering lane-changing behavior interaction,” Science China Information Sciences , vol. 63, no. 9, p. 190203, 2020. [14] Q. Liu, H. Huang, S. Zhao, L. Shi, S. Ahn, and X. Li, “Risknet: interaction-aware risk forecasting for autonomous driving in long-tail scenarios,” Transportation Research Part E: Logistics and Transporta-tion Review , vol. 205, p. 104478, 2026. [15] Z. Zhou, H. Huang, B. Li, S. Zhao, Y. Mu, and J. Wang, “Safedrive: Knowledge-and data-driven risk-sensitive decision-making for au-tonomous vehicles with large language models,” Accident Analysis & Prevention , vol. 224, p. 108299, 2026. [16] S. Ouyang, J. Yan, I. Hsu, Y. Chen, K. Jiang, Z. Wang, R. Han, L. Le, S. Daruki, X. Tang et al. , “Reasoningbank: Scaling agent self-evolving with reasoning memory,” in International Conference on Learning Representations , vol. 2026, 2026, pp. 94 327–94 354. [17] R. Wu, X. Wang, J. Mei, P. Cai, D. Fu, C. Yang, L. Wen, X. Yang, Y. Shen, Y. Wang et al. , “Evolver: Self-evolving llm agents through an experience-driven lifecycle,” arXiv preprint arXiv:2510.16079 , 2025. [18] M. Y. Hu, B. Van Durme, J. Andreas, and H. Jhamtani, “Sample-efficient online learning in lm agents via hindsight trajectory rewriting,” arXiv preprint arXiv:2510.10304 , 2025. [19] K. Yan, X. Chen, Y. Cao, A. Naumann, P. Karkus, Y. Wang, J. Packer, A. Schwing, Y. Wang, B. Ivanovic et al. , “Vision-language-action autonomous driving agent with language-based memory,” arXiv preprint arXiv:2609.38641 , 2026. [20] D. Nishiyama, M. Y. Castro, S. Maruyama, S. Shiroshita, K. Hamzaoui, Y. Ouyang, G. Rosman, J. DeCastro, K.-H. Lee, and A. Gaidon, “Discovering avoidable planner failures of autonomous vehicles using counterfactual analysis in behaviorally diverse simulation,” in 2020 IEEE 23rd International Conference on Intelligent Transportation Systems (ITSC) . IEEE, 2020, pp. 1–8. [21] K. Chen, Y. Lei, H. Cheng, H. Wu, W. Sun, and S. Zheng, “FREA: Feasibility-guided generation of safety-critical scenarios with reasonable adversariality,” in 8th Annual Conference on Robot Learning , 2024. [22] Y. Li, Y. Wang, Y. Liu, J. He, L. Fan, and Z. Zhang, “End-to-end driving with online trajectory evaluation via bev world model,” in 
+
+2025 IEEE/CVF International Conference on Computer Vision (ICCV) .IEEE, 2025, pp. 27 137–27 146. [23] J. Zhang, C. Cui, Y. Xu, X. Ye, R. Zhang, and Z. Wang, “How can driving world models do counterfactual prediction?” arXiv preprint arXiv:2608.11601 , 2026. [24] Z. Peng, W. Ding, Y. You, Y. Chen, W. Luo, T. Tian, Y. Cao, A. Sharma, D. Xu, B. Ivanovic et al. , “Counterfactual vla: Self-reflective vision-language-action model with adaptive reasoning,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2026, pp. 4022–4031. [25] K. Tian, Y. Lian, K. Yang, X. Chen, and S. Li, “C-cot: Counterfactual chain-of-thought with vision-language models for safe autonomous driving,” arXiv preprint arXiv:2605.10744 , 2026. [26] J. C. Hayward, “Near miss determination through use of a scale of danger,” 1972. [27] M. Treiber, A. Hennecke, and D. Helbing, “Congested traffic states in empirical observations and microscopic simulations,” Physical review E ,vol. 62, no. 2, p. 1805, 2000. [28] E. Leurent, “An environment for autonomous driving decision-making,” https://github.com/Farama-Foundation/HighwayEnv, 2018. [29] R. Krajewski, J. Bock, L. Kloeker, and L. Eckstein, “The highd dataset: A drone dataset of naturalistic vehicle trajectories on german highways for validation of highly automated driving systems,” in 2018 21st international conference on intelligent transportation systems (ITSC) .IEEE, 2018, pp. 2118–2125. [30] U.S. Department of Transportation Federal Highway Administration, “Next generation simulation (NGSIM) vehicle trajectories and supporting data,” Dataset, ITS DataHub, 2016. [Online]. Available: https://doi.org/10.21949/1504477 [31] O. Zheng, M. Abdel-Aty, L. Yue, A. Abdelraouf, Z. Wang, and N. Mah-moud, “Citysim: A drone-based vehicle trajectory dataset for safety-oriented research and digital twins,” Transportation research record , vol. 2678, no. 4, pp. 606–621, 2024.

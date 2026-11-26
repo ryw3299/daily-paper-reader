@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-25</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-26</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>13</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>10</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-25 03:16:21 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-26 02:39:13 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日筛读14篇论文，精读GraphRAG知识整合诊断研究《GRACE》（8.0/10），速读覆盖自动驾驶扩散规划、LightRAG投毒防御等方向。最值得关注的是GraphRAG中的受控证据干预，以及自动驾驶从端到端扩散规划到通用动作评论家的安全与决策进展。普通读者可先看《GRACE》理解知识整合评测思路，再按兴趣跟进自动驾驶或RAG安全防御。</p>
+<p>今日精选 11 篇论文，精读 1 篇、速读 10 篇，重点聚焦自动驾驶中的跨记忆推理。最值得关注的是 XMind 通过“想两次”的跨记忆推理提升 LLM 自动驾驶决策（8.0/10），以及多智能体 LLM 系统中的错误传播建模与基准（7.0/10）。建议普通读者优先阅读这两篇，并顺带了解个性化智能体记忆学习与扩散规划器微调这两个方向。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -81,7 +81,7 @@
     <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GRACE: Controlled Evidence Interventions for Diagnosing and Improving Knowledge Integration in GraphRAG">GRACE: Controlled Evidence Interventions for Diagnosing and Improving Knowledge Integration in GraphRAG</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving">XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span></div>
 </section>
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">13 篇</strong>
+    <strong class="dpr-home-dashboard-count">10 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="FIRE-Drive: Feasibility-Informed Risk Evaluation for End-to-End Diffusion Planning">FIRE-Drive: Feasibility-Informed Risk Evaluation for End-to-End Diffusion Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Poisoning Attacks and Collaborative Defense Framework for LightRAG-Based Construction Regulation Knowledge">Poisoning Attacks and Collaborative Defense Framework for LightRAG-Based Construction Regulation Knowledge</span></li><li><span class="dpr-home-dashboard-paper-title" title="Generalist Action Critic: Harnessing Frontier Models in Autonomous Driving">Generalist Action Critic: Harnessing Frontier Models in Autonomous Driving</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="From Local Errors to System Failures: Modeling and Benchmarking Error Propagation in Multi-Agent LLM Systems">From Local Errors to System Failures: Modeling and Benchmarking Error Propagation in Multi-Agent LLM Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="STARK: Moving towards Personalized Agents That Truly Learn and Remember">STARK: Moving towards Personalized Agents That Truly Learn and Remember</span></li><li><span class="dpr-home-dashboard-paper-title" title="Your Diffusion-Based Driving Planner Only Needs a Nudge">Your Diffusion-Based Driving Planner Only Needs a Nudge</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">self-driving <strong>7</strong></span><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>5</strong></span><span class="dpr-home-dashboard-tag">self-driving <strong>4</strong></span><span class="dpr-home-dashboard-tag">in-car-agent <strong>1</strong></span></div>
 </section>
 </div>
 

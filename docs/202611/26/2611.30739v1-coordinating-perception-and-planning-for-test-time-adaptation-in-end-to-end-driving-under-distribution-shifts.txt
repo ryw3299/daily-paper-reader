@@ -1,0 +1,2760 @@
+Coordinating Perception and Planning for Test-Time Adaptation
+in End-to-End Driving under Distribution Shifts
+Shiyu Fang1
+Yiming Cui1
+Qihang Huang2
+Zhan Chen2
+Collister Chua2
+Wenhui Huang2
+Peng Hang1
+Chen Lv2
+Jian Sun1
+1Tongji University
+2Nanyang Technological University
+Abstract
+End-to-end autonomous driving has achieved significant
+milestones, yet its reliance on the i.i.d. assumption renders it
+vulnerable to real-world distribution shifts. While Test-Time
+Adaptation (TTA) offers a promising paradigm for on-the-
+fly enhancement, its application to driving is hindered by
+two barriers: (i) multi-task adaptation dependency, where
+updates to upstream perception also affect downstream plan-
+ning, while perception confidence alone does not directly
+assess these downstream effects; and (ii) continuous adap-
+tation instability, where recursive online updates over long
+horizons cause compounding parameter drift. To address
+these challenges, we propose P2-TTA, a plug-and-play TTA
+framework for the continual adaptation of end-to-end driv-
+ing models. P2-TTA coordinates adaptation through a joint
+objective combining perception entropy minimization with
+a retrospective temporal planning consistency objective de-
+rived from observed ego motion. To stabilize online updates,
+we use an EMA teacher as a moving parameter reference
+and reject candidate updates that increase historical plan-
+ning loss. Extensive experiments across multiple models
+demonstrate that, by updating an average of 0.11‰ of pa-
+rameters with an average adaptation time of 19.9 ms on dif-
+ferent backbones, P2-TTA achieves average recovery rates of
+36.4%, 30.0%, and 9.3% for L2, collision rate, and PDMS,
+respectively, under severe distribution shifts. Under a shared
+perception–planning objective, P2-TTA achieves the highest
+L2 and collision recovery among the compared TTA base-
+lines on UniAD.
+1. Introduction
+End-to-end autonomous driving has emerged as a prevalent
+paradigm, demonstrating remarkable proficiency and gener-
+alization potential across diverse driving scenarios [4, 13].
+However, the performance of such models relies heavily on
+the assumption that test and training data are independently
+and identically distributed (i.i.d.), which rarely holds in prac-
+tice [11, 43]. As shown in Figure 1(a), these models degrade
+sharply under various real-world distribution shifts; for in-
+stance, dense fog, brightness fluctuations, or Gaussian noise
+can cause error rates to surge under severe corruption. Exist-
+ing approaches address distribution shifts through domain
+adaptation (DA) [1, 34] or data augmentation [54, 67], but
+typically require access to target-domain data in advance,
+additional training, or a predefined corruption model. These
+requirements limit their applicability when test conditions
+change unexpectedly [10, 33]. This motivates equipping
+end-to-end autonomous driving models with the ability to
+adapt online at test time, requiring neither labeled data nor
+offline retraining.
+Test-time adaptation (TTA) offers a compelling alterna-
+tive by updating models on the fly using only unlabeled
+test samples [31, 53]. Early fully TTA (FTTA) methods
+adapt the model via lightweight self-supervised objectives
+[26, 42, 59]. Continual TTA (ConTTA) methods further ex-
+tend this by continuing to update model parameters across
+successive batches of test samples, introducing mechanisms
+to prevent forgetting [20, 39, 51]. Many established TTA
+methods have been developed for visual recognition, particu-
+larly image classification, where adaptation is usually guided
+by task-specific prediction signals. Applying such methods
+to end-to-end driving additionally requires considering the
+influence of perceptual updates on planning and the temporal
+dependence of successive observations.
+Adapting end-to-end driving models at test time poses
+two fundamental challenges for existing TTA methods. (i)
+Multi-task adaptation dependency. Existing entropy-based
+TTA methods primarily target image classification, where
+prediction confidence guides adaptation [35, 36, 53]. In
+end-to-end driving, upstream perception and downstream
+planning are coupled: degraded perceptual representations
+under distribution shifts can propagate to planning outputs,
+causing predicted ego motion to deviate from subsequently
+observed vehicle motion. (ii) Continuous adaptation insta-
+bility. Unlike conventional image classification, where test
+samples are often treated as independent prediction instances,
+1
+arXiv:2611.30739v1  [cs.RO]  23 Nov 2026
+
+
+a. Error surge under distribution shift
+UniAD
+SparseDrive
+DistillDrive
+ST-P3
+Error (L2) Increase Rate (%)
+Severe
+Parameter Drift 
+c. Continuous adaptation instability
+�
+Temporal Cumulative Error
+�0
+�1
+�2
+��
+Param Space
+�0 �1
+�2
+��
+Unstable
+Region
+b. Multi-task adaptation dependency
+Up-Downstream Coupled Objectives
+Adapt 
+on
+Planning
+Adapt 
+on 
+Perception
+×
+Model Collapse
+End-to-end 
+Driving Model
+Mild
+Figure 1. Motivation and core challenges. Distribution shifts cause severe performance degradation in end-to-end autonomous driving
+models, motivating adaptation that accounts for perception–planning dependencies and temporal stability.
+autonomous driving operates on temporally correlated obser-
+vation streams. Consequently, successive online updates may
+accumulate errors over time, increasing the risk of parameter
+drift.
+To address these challenges, we propose Perception–
+Planning Test-Time Adaptation (P2-TTA), a plug-and-play
+continual adaptation framework for end-to-end driving, en-
+abling models to continuously update parameters during
+inference. To coordinate these coupled tasks, P2-TTA com-
+bines perception entropy with temporal planning consistency
+in a joint adaptation objective. The two signals provide com-
+plementary guidance from perception confidence and ob-
+served ego motion. To mitigate unstable parameter changes,
+P2-TTA projects candidate updates around an EMA param-
+eter reference and accepts them only when a retrospective
+planning consistency criterion improves. Together, these
+mechanisms constrain parameter changes during online adap-
+tation. Extensive experiments on nuScenes and NAVSIM
+under various corruptions demonstrate that P2-TTA gener-
+alizes across various end-to-end models of diverse architec-
+tures, achieving the highest L2 and collision recovery among
+the compared TTA baselines on UniAD. Moreover, ablation
+studies further validate the contribution of each component,
+while efficiency analysis shows low additional adaptation
+overhead. In summary, our contributions are as follows:
+• We propose P2-TTA, a plug-and-play framework for end-
+to-end driving that enables diverse pretrained models to
+adapt at test time under severe distribution shifts.
+• We formulate a joint self-supervised objective that inte-
+grates upstream perception entropy with retrospective tem-
+poral planning consistency, guiding model updates toward
+more reliable end-to-end driving under distribution shifts.
+• We introduce a teacher-student architecture that combines
+EMA parameter anchoring with per-step update verifica-
+tion to constrain parameter changes during adaptation.
+• We demonstrate that P2-TTA updates an average of 0.11‰
+of parameters with an average adaptation time of 19.9 ms,
+achieving average recovery rates of 36.4%, 30.0%, and
+9.3% for L2, collision rate, and PDMS, respectively, under
+distribution shift.
+2. Related Work
+Domain Adaptation. DA addresses distribution shift by
+aligning features between the labeled source domain and the
+unlabeled target domain [14, 27, 45, 62], typically through
+moment matching [40], adversarial domain discrimination
+[15, 18, 52], or optimal transport [7], achieving strong per-
+formance when target data is available at training time. How-
+ever, DA methods require access to target domain data during
+training and often necessitate retraining—making them im-
+practical when the test distribution is unknown in advance.
+Test-Time Training. Test-Time Training (TTT) adapts
+models using self-supervised objectives on unlabeled test in-
+puts, without requiring target-domain data in advance [8, 49].
+Traditional approaches employ auxiliary tasks, such as rota-
+tion prediction [49] or noise-contrastive learning [37], which
+often require modifications to the training pipeline. More
+recently, Centaur [44] extends TTT to end-to-end driving
+by minimizing cluster entropy over direction-grouped can-
+didate trajectories. However, existing approaches primarily
+rely on task-specific adaptation signals without explicitly
+accounting for the coupling between upstream perception
+and downstream planning.
+Fully Test-Time Adaptation. FTTA requires no mod-
+ification to training, updating model parameters using un-
+supervised signals at test time [6, 35, 41, 53, 65]. Entropy
+minimization over model predictions has emerged as the
+dominant paradigm, with subsequent work introducing vari-
+ous mechanisms to improve update reliability and prevent
+2
+
+
+Table 1. Comparison of adaptation paradigms. Source Acc. denotes
+access to source-domain data during adaptation. Task and Frame
+denote cross-task and cross-frame adaptation. x is an unlabeled
+test sample; Lsup, Lalign, Laux, and Lself denote supervised,
+alignment, auxiliary, and self-supervised objectives. Shading marks
+P2-TTA.
+Method
+Phase
+Objective
+Source Acc. Task Frame
+DA
+Train
+Lsup + Lalign
+✓
+-
+-
+TTT
+Test + Train Lsup + Laux(xt)
+-
+-
+-
+FTTA
+Test
+Lself(xt)
+-
+-
+-
+ConTTA
+Test
+Lself(xt)
+✓
+-
+-
+P2-TTA (Ours)
+Test
+Lself(xt)
+-
+✓
+✓
+parameter drift [20, 51, 64]. Beyond entropy minimization,
+contrastive learning combined with pseudo-labeling also pro-
+vides adaptation signals [2]. Sustaining reliable adaptation
+across sequential inputs is studied in continual TTA.
+Continual Test-Time Adaptation. ConTTA extends
+FTTA to settings where the model must update over a se-
+quence of test samples, requiring adaptation without for-
+getting [36, 47, 57]. To prevent error accumulation, recent
+methods maintain an exponential moving average (EMA)
+model to generate stable pseudo-targets and stochastically
+restore a subset of parameters toward their pretrained values
+to preserve source knowledge [3, 46, 50, 61]. While these
+methods address sequential distribution shifts, they do not
+necessarily provide a planning-related supervision signal tai-
+lored to end-to-end driving. In particular, preserving param-
+eter stability and improving downstream trajectory quality
+are distinct objectives that should be evaluated separately.
+3. Problem Definition
+Table 1 summarizes existing adaptation paradigms and high-
+lights the two properties that existing TTA methods leave
+unaddressed. Current TTA methods share a common update
+rule: given an unlabeled test sample xs at step s, the affine
+normalization parameters in BatchNorm θBN are updated
+by minimizing a self-supervised objective Lself,
+θBN
+s
+= θBN
+s−1 −η∇θLself(xs; θBN
+s−1),
+(1)
+where η is the learning rate. Unlike a single-task predictor,
+an end-to-end driving model maps its input through percep-
+tion representations Zperc to a downstream planning output
+ˆYplan via a mapping fprog. Since autonomous driving pro-
+cesses inputs as a continuous sequence xt indexed by time
+t, the adaptation naturally targets LayerNorm parameters
+θLN, and the upstream-to-downstream dependency takes the
+form:
+ˆYplan = fprog
+ xt | Zperc(xt; θLN), θLN
+.
+(2)
+Under distribution shift, corruption in Zperc propagates
+through fprog, causing errors to cascade from perception
+to planning; conversely, shared parameters couple gradient
+signals back across tasks.
+Continual adaptation retains parameter changes across
+successive test inputs, but reliable driving adaptation also
+needs a planning-related signal derived from past and current
+observations. We denote the selected LayerNorm affine pa-
+rameters collectively by θt ≡θLN
+t
+and the EMA parameter
+reference by θ∗
+t . The proposed adaptation step consists of a
+candidate optimizer update followed by stabilization:
+gt = ∇θLjoint,t(θ)|θ=θt−1 ,
+θ′
+t = OptStep(θt−1, gt; η),
+θt = St(θ′
+t; θt−1, θ∗
+t−1).
+(3)
+Here gt is the gradient of the joint objective at the pre-update
+parameters; OptStep denotes one optimizer proposal (Adam
+in our experiments, with its internal optimizer state); and
+St denotes the data-dependent stabilization procedure con-
+sisting of projection and update acceptance, specified in
+Sec. 4. The time-indexed joint loss is defined below. The
+stabilization procedure uses only observations available by
+time t.
+4. Methodology
+To address the cross-task and cross-frame requirements in
+Eq. 3, P2-TTA introduces two complementary components.
+Taking into account the coupling relationship between up-
+stream perception and downstream planning, P2-TTA con-
+structs a joint self-supervised objective Ljoint to enable uni-
+fied cross-task coordination throughout the adaptation pro-
+cess. A teacher-student framework additionally constrains
+parameter updates and verifies them using temporal plan-
+ning consistency. P2-TTA updates only the affine parameters
+(γ, β) of selected LayerNorm modules. Given the architec-
+tural differences across driving models, the LayerNorm mod-
+ules selected for adaptation vary accordingly. Model-specific
+LayerNorm configurations are detailed in Appendix F.
+4.1. Joint Objective for Perception–Planning Coor-
+dination
+End-to-end autonomous driving models are inherently multi-
+task systems with highly interdependent components [5, 17,
+23]. During supervised training, task-specific labels provide
+reference signals for optimizing perception and planning.
+At test time, however, such labels are unavailable, motivat-
+ing a self-supervised adaptation objective that guides online
+parameter updates using unlabeled observations. While min-
+imizing perception entropy encourages confident predictions,
+it does not directly assess the effect of an update on down-
+stream planning. We therefore combine this upstream signal
+with a temporal planning consistency loss based on observed
+ego motion, enabling coordinated adaptation of perception
+3
+
+
+and planning:
+Ljoint,t(θ) = Lmm,t(θ) + λLtemp,t(θ),
+(4)
+Here Lmm,t(θ) measures perception-side uncertainty and
+Ltemp,t(θ) measures retrospective planning consistency us-
+ing ego motion observed at time t; λ controls their relative
+weight. When the time step and parameters are clear, we
+abbreviate these terms as Lmm, Ltemp, and Ljoint. Both
+objectives are evaluated using the same trainable LayerNorm
+parameter vector θ.
+Upstream Perception: Multi-modal Entropy Mini-
+mization. Under severe environmental perturbations—such
+as dense fog or sensor noise—the model’s perceptual dis-
+criminability degrades, causing the output probability dis-
+tributions to undergo a flattening effect that manifests as
+heightened predictive uncertainty [19, 38]. This flattening
+indicates that the latent embeddings have drifted into low-
+density regions of the source-domain manifold, making it
+difficult for the model to produce decisive categorical or
+attribute assignments.
+To quantify the uncertainty arising from the distortion
+of Zperc, we formalize the output process of the perception
+heads. At each time step t, the system generates N parallel
+perceptual responses (e.g., object detection, semantic occu-
+pancy) based on the latent features, where the normalized
+confidence qt,i for the i-th response is mapped via:
+qt,i(θ) = σ
+
+Φ(i)(Zperc(xt, Ht−1; θ))
+
+(5)
+Here σ(·) is the sigmoid function, Φ(i) denotes the selected
+perceptual output mapping, and Ht−1 is the historical con-
+text available at time t. The formulation below applies to the
+selected Bernoulli-type probability outputs. For each such
+output, we use binary entropy as an uncertainty measure:
+Lmm,t(θ) = 1
+N
+N
+X
+i=1
+Eent(qt,i(θ))
+(6)
+where Eent(q) = −q log q −(1−q) log(1−q). Minimizing
+Lmm,t encourages confident perceptual outputs, although
+confidence alone does not guarantee semantic correctness
+under distribution shift.
+Downstream Planning: Temporal Consistency Opti-
+mization. Crucially, solely minimizing perceptual entropy
+may lead to decisive but erroneous interpretations, as the
+model might confidently converge toward incorrect scene
+semantics. Moreover, under distribution shifts, degraded per-
+ceptual representations can propagate to planning outputs,
+causing the ego position predicted from a previous observa-
+tion to deviate from the position subsequently observed. To
+provide a planning-related feedback signal without requiring
+future trajectory labels, we exploit the temporal correspon-
+dence between consecutive observations: the ego position
+predicted from the previous-frame input for the current time
+should agree with the ego position observed at the current
+time.
+At time t, let Ihist
+t
+denote the available historical planning
+input and its context. We re-evaluate the corresponding ego-
+position prediction under parameters θ:
+ˆphist
+t
+(θ) = fplan(Ihist
+t
+; θ).
+(7)
+The prediction and the corresponding observed ego position
+pobs
+t
+are expressed in a common coordinate frame. Their
+consistency is measured by
+Ltemp,t(θ) =
+ˆphist
+t
+(θ) −pobs
+t
+2
+2.
+(8)
+The historical forward pass is re-evaluated as θ changes,
+while its inputs and observation reference remain fixed across
+parameter candidates. Together with perception entropy,
+this observed-motion constraint provides complementary
+guidance for coordinating perception and planning during
+adaptation.
+4.2. Teacher-Student Architecture for Cross-frame
+Stability
+Autonomous driving is inherently a continuous temporal
+process where environmental shifts are not isolated events
+but persistent perturbations. Despite the synergetic guid-
+ance imposed by our joint objective Ljoint, adaptation over
+continuous test streams faces the risk of error accumula-
+tion. Since each update is conditioned on previously adapted
+states, minor gradient biases at a single frame can gradu-
+ally compound, leading to severe parameter drift or even
+catastrophic model collapse.
+To constrain online updates, we use a teacher–student
+stabilization procedure St composed of EMA-centered pa-
+rameter projection and retrospective consistency-based up-
+date acceptance [12, 16, 28]. The EMA parameters θ∗
+t pro-
+vide a moving reference; the student moves through the
+states θt−1 →θ′
+t →ˆθt →θt, representing the pre-update,
+optimizer-proposed, projected, and accepted-or-reverted pa-
+rameter values. At the start of an independently adapted
+sequence, the EMA reference is initialized as θ∗
+0 = θ0.
+Student: Candidate Parameter Update. At time t, the
+student computes the gradient gt of the adaptation objective,
+as defined in Eq. 3, and proposes an optimizer update:
+θ′
+t = OptStep(θt−1, gt; η).
+(9)
+The operator OptStep represents one optimizer update, im-
+plemented with Adam in the experiments and including its
+internal optimizer state. The proposed parameters are not yet
+finalized: projection and the acceptance test follow before
+they can be used as the next student state.
+Teacher: Two-scale Stability Guidance. During contin-
+uous online adaptation, successive parameter updates may
+4
+
+
+accumulate errors over time, increasing the risk of parameter
+drift. We therefore use an EMA reference to constrain candi-
+date parameter updates and a consistency check against the
+previous-step planning prediction to determine whether each
+update should be retained.
+The EMA reference tracks the history of finalized student
+parameter values without participating in backpropagation.
+It is updated only after the acceptance decision for time t:
+θ∗
+t = αθ∗
+t−1 + (1 −α)θt,
+(10)
+where α controls the smoothing rate. The resulting teacher
+is a moving reference, rather than a fixed constraint around
+the pretrained initialization.
+Before accepting an update, the proposed student param-
+eters are projected into an L∞ball of radius r centered on
+the EMA reference from the previous step:
+ˆθt = ΠB∞(θ∗
+t−1,r)(θ′
+t).
+(11)
+Here Π performs elementwise clipping of the selected train-
+able parameters around θ∗
+t−1. The constraint bounds the
+deviation of each candidate from the moving teacher, but
+does not impose a global bound relative to the original pre-
+trained weights.
+After projection, a consistency-based acceptance check
+compares the same retrospective loss at the projected candi-
+date and at the pre-update student parameters. Both evalua-
+tions use Ihist
+t
+and pobs
+t
+from the same adaptation step; thus
+the comparison isolates the effect of the candidate parameter
+values rather than a change in evaluation inputs:
+θt =
+(ˆθt,
+Ltemp,t(ˆθt) < Ltemp,t(θt−1),
+θt−1,
+otherwise.
+(12)
+The decision is based on the retrospective planning-
+consistency proxy, not on ground-truth future trajectories or
+direct evaluation of collision safety. At each step, the student
+first proposes an optimizer update, then projects it using
+the previous EMA reference, applies the acceptance check,
+and finally updates the EMA teacher from the finalized θt
+according to Eq. 10. Rejected updates restore the pre-update
+parameters and Adam state. The next planning prediction
+uses the finalized student parameters.
+5. Experiments
+5.1. Experimental Setup
+We evaluate P2-TTA on nuScenes and NAVSIM using offi-
+cially released pretrained weights under two distinct adap-
+tation protocols. On nuScenes, parameters are updated se-
+quentially across recorded frames within a scene and reset
+at scene boundaries; the observed ego state is available only
+up to the current frame, and the evaluated planner does not
+control the recorded motion. We report L2 trajectory error
+and collision rate averaged over the 1s, 2s, and 3s predic-
+tion horizons. On NAVSIM, each independently evaluated
+sample uses three observations for a single adaptation step
+before its predicted plan is assessed by a non-reactive roll-
+out, and parameters are reset between samples. We report
+PDMS for NAVSIM. In both protocols, pobs
+t
+is drawn from
+recorded ego-state observations available no later than time t,
+without using future trajectory labels for adaptation. Recov-
+ery rate (RR) measures the fraction of corruption-induced
+degradation recovered relative to the unadapted clean and
+noisy references; mean RR averages per-model rates with
+positive clean-to-noisy degradation. Unless otherwise spec-
+ified, adaptation uses Adam with learning rate η = 0.01,
+EMA momentum α = 0.8, projection radius r = 0.005, and
+loss weight λ = 1. The default hyperparameters are shared
+across corruption types and remain fixed at test time. All
+experiments are conducted on NVIDIA A800 GPUs. All
+reported results are averaged over three runs with different
+random seeds.
+5.2. Main Results
+Under severity-5 Gaussian noise, Table 2 shows mean re-
+covery rates of 36.4% for L2 and 30.0% for collision rate
+across six end-to-end driving architectures. These gains
+span different modeling paradigms: the unified multi-task
+framework UniAD [22] recovers 29.5% and 34.8% of the
+L2 and collision-rate degradation, respectively; and the
+diffusion-based planner DiffusionDrive [32] achieves 15.0%
+and 28.6%. These examples support the applicability of our
+adaptation framework across multiple driving models under
+the evaluated distribution shift.
+To further evaluate the robustness of P2-TTA against a
+broader range of disturbances that may arise in real-world
+driving, we extend our evaluation beyond Gaussian noise
+to fog, snow, and brightness changes. Fog and snow pri-
+marily reduce scene visibility, whereas brightness changes
+alter illumination conditions. These visual corruptions are
+Table 2.
+nuScenes performance under severity-5 Gaussian
+noise. Results at severity 5, averaged over 1s, 2s, and 3s (AVG).
+SparseDrive reports endpoint scores on frames with a complete 3s
+future, with matched Clean/Noisy references. Shading marks TTA
+results; red values report recovery rates computed before display
+rounding.
+Model
+L2 (m)↓
+Col. (%)↓
+Clean Noisy
+TTA
+Clean Noisy
+TTA
+ST-P3 [21]
+3.28
+5.29 4.60(+34.3%) 1.61
+5.13 4.03(+31.3%)
+UniAD [22]
+0.94
+1.38 1.25(+29.5%) 0.29
+0.95 0.72(+34.8%)
+DistillDrive [63]
+0.58
+0.80 0.76(+18.2%) 0.07
+0.31 0.28(+12.5%)
+SparseDrive [48]
+1.13
+1.50 1.40(+26.5%) 0.30
+1.30 0.85(+45.5%)
+DiffusionDrive [32] 0.57
+0.77 0.74(+15.0%) 0.08
+0.29 0.23(+28.6%)
+CoIRL-AD [66]
+0.63
+0.65 0.63(+94.8%) 0.18
+0.25 0.23(+27.3%)
+5
+
+
+Table 3. Planning performance under visual and physical perturbations. Fog, snow, and brightness corruptions are evaluated at severity
+level 5. Physical combines GPS noise (1 m), yaw noise (2◦), and motion blur.
+Model
+Fog
+Snow
+Brightness
+Physical
+L2 (m)↓
+Col. (%)↓
+L2 (m)↓
+Col. (%)↓
+L2 (m)↓
+Col. (%)↓
+L2 (m)↓
+Col. (%)↓
+Noisy
+TTA
+Noisy
+TTA
+Noisy
+TTA
+Noisy
+TTA
+Noisy
+TTA
+Noisy
+TTA
+Noisy
+TTA
+Noisy
+TTA
+ST-P3 [21]
+5.77 3.78(+79.9%) 5.38 3.15(+59.2%) 7.69 6.54(+26.1%) 6.58 3.43(+63.4%) 4.06 3.76(+38.5%) 2.42 2.11(+38.3%) 3.94 3.82(+18.6%) 3.08 2.35(+49.3%)
+UniAD [22]
+1.03 1.00(+33.3%) 0.32 0.31(+33.3%) 1.18 1.13(+20.8%) 0.97 0.84(+19.1%) 0.98 0.97(+34.0%) 0.33 0.32(+18.2%) 1.68 1.25(+57.5%) 1.30 0.32(+97.4%)
+DistillDrive [63]
+0.63 0.61(+40.0%) 0.12 0.11(+20.0%) 0.97 0.87(+25.6%) 0.44 0.42(+5.4%) 0.60 0.60(+21.6%) 0.12 0.09(+62.5%) 1.14 1.13(+2.4%) 0.77 0.70(+9.1%)
+SparseDrive [48]
+0.63 0.62(+21.1%) 0.12 0.11(+25.0%) 0.85 0.80(+22.7%) 0.49 0.48(+2.4%) 0.82 0.75(+36.6%) 0.20 0.18(+16.5%) 1.26 1.21(+8.9%) 0.76 0.61(+21.2%)
+DiffusionDrive [32] 0.62 0.58(+80.0%) 0.12
+0.12(0.0%)
+1.03 0.94(+19.6%) 0.40 0.37(+9.4%) 0.75 0.72(+16.3%) 0.20 0.13(+57.9%) 1.00 0.99(+2.3%) 0.26 0.25(+5.5%)
+CoIRL-AD [66]
+0.64 0.63(+91.1%) 0.36 0.35(+2.4%) 0.64 0.64(+41.0%) 0.53 0.46(+19.6%) 0.66 0.66(+1.3%) 0.26
+0.26(0.0%)
+0.63 0.63(+42.5%) 0.19
+0.19(0.0%)
+generated using the imagecorruptions library. Beyond these
+visual corruptions, localization errors can also affect the re-
+liability of driving-model inputs. We therefore introduce
+a Physical setting that combines GPS position noise, yaw
+noise, and visual motion blur, simulating compound dis-
+turbances affecting both ego-state observations and camera
+inputs. Table 3 shows planning improvements across these
+conditions. Averaged over the six backbones evaluated under
+all four settings, L2 recovery is 57.6%, 26.0%, 24.7%, and
+22.0% for fog, snow, brightness, and physical perturbations,
+respectively; the corresponding collision recovery is 23.3%,
+19.9%, 32.2%, and 30.4%. These averages use valid positive
+clean-to-noisy gaps. The results show benefits across diverse
+disturbances for most evaluated backbones. Full per-horizon
+L2 and collision results are reported in Appendix B.
+While the preceding results quantify overall planning
+performance, they do not directly illustrate how adaptation
+affects individual predicted trajectories. To provide this per-
+spective, Figure 2(a) compares plans before and after TTA
+under severe Gaussian noise and fog. In the illustrated inter-
+sections and road-ending scenarios, the Before TTA plans
+exhibit abrupt bends, deviations from the road geometry, or
+paths directed toward surrounding vehicles. After adaptation,
+the predicted trajectories exhibit fewer abrupt deviations and
+align more closely with the ground-truth trajectories shown
+for comparison. Importantly, these ground-truth trajectories
+are used only for evaluation and visualization, rather than for
+test-time adaptation. P2-TTA relies solely on unlabeled test
+inputs and ego-state observations available up to the current
+time step. Figure 2(b) further illustrates the gradual recovery
+of planning within a single scene under brightness corrup-
+tion. As adaptation proceeds from frame 7 to 10 and then 15,
+the adapted trajectories become increasingly reasonable, ex-
+hibiting fewer abrupt deviations and better consistency with
+the local road geometry. Appendix G examines additional
+corrections and remaining failures.
+The above nuScenes results primarily assess planning
+through displacement and collision metrics computed on
+recorded driving data. To assess the effectiveness of adapted
+trajectories during simulated execution, we therefore fur-
+Table 4. NAVSIM performance under severity-5 Gaussian noise.
+∆denotes TTA −Noisy in score points. NC, DAC, TTC, and
+EP denote no-at-fault collisions, drivable-area compliance, time-to-
+collision, and ego progress. PDMS reports the adapted score.
+Planner
+∆NC ∆DAC ∆TTC
+∆EP
+PDMS↑
+DiffusionDrive [32] +0.80
++0.20
++1.20 +0.40
+78.9(+8.1%)
+WoTE [29]
++0.20
++0.30
++0.20 +0.30
+80.2(+4.9%)
+DriveLaW [58]
++0.10
++0.40
++0.40 +0.50
+79.8(+7.1%)
+DriveVLA-W0 [30]
+0.00
+0.00
++0.60
+0.00 86.4(+30.0%)
+GoalFlow [60]
++0.10
++0.40
++0.10 +0.10
+88.4(+9.0%)
+LTF [55]
++0.12
++0.16
++0.10 +0.18
+75.5(+1.6%)
+MeanFuser [56]
++0.30
++0.35
++0.49 +0.38
+76.1(+4.4%)
+ther evaluate P2-TTA on NAVSIM [9]. NAVSIM rolls out
+the model-predicted ego trajectory and evaluates its execu-
+tion outcomes using the aggregated Predictive Driver Model
+Score (PDMS), which assesses safety, feasibility, comfort,
+and progress. Under severity-5 Gaussian noise, Table 4
+summarizes changes in collision avoidance, drivable-area
+compliance, time-to-collision, and ego progress relative to
+the noisy baselines, together with the adapted PDMS. PDMS
+improves across all seven planners, with an average recovery
+of 9.3%. Unlike nuScenes, where adaptation accumulates
+across consecutive frames within each scene, NAVSIM al-
+lows only a single adaptation step before generating the final
+trajectory for rollout. Complete clean, noisy, and adapted
+scores for NAVSIM metrics are provided in Appendix A.
+To further evaluate P2-TTA in closed-loop driving, we
+present a UniAD case on Bench2Drive [24]. Under cor-
+rupted inputs, the unadapted model incurs a sideswipe col-
+lision during a cut-in interaction, whereas the adapted run
+completes the route without a recorded collision. Figure 3
+shows two rear-camera frames from the noisy run and the
+executed ego and cut-in vehicle paths from both runs in
+a shared BEV coordinate frame. Additional Bench2Drive
+results are provided in Appendix H.
+5.3. Ablation and Efficiency Analysis
+To validate the effectiveness of the proposed core modules,
+6
+
+
+Pretrained
+TTA
+GT
+GT
+TTA
+Pretrained
+(a) Trajectory comparisons under Gaussian noise (left) and fog (right).
+Frame 7
+Frame 10
+Frame 15
+(b) Trajectory evolution within one brightness-corrupted scene.
+Figure 2. Qualitative trajectory comparisons across scenarios. Ground Truth (blue), Before TTA (orange), and After TTA (purple) show
+corrections under Gaussian noise and fog in (a), and progressive within-scene adaptation under brightness in (b).
+Back View, Frame 572
+Back View, Frame 582
+-20
+-15
+-10
+-5
+0
+5
+10
+15
+-8
+-4
+0
+4
+8
+Lateral (m)
+BEV View
+Forward (m)
+Before TTA
+After TTA
+Figure 3. Closed-loop cut-in case on Bench2Drive with UniAD. Left and middle: rear-camera inputs from the noisy run. Right: a local
+BEV view of executed ego (solid) and cut-in vehicle (dotted) paths before TTA (orange) and after TTA (purple).
+we conduct component ablations under severe Gaussian
+noise. Table 5(a) first evaluates cross-task adaptation on
+UniAD, progressively adding Lmm, Ltemp, and the com-
+bined teacher–student mechanism St. Perception entropy
+and temporal planning consistency each achieve 4.5% colli-
+sion recovery when used alone. Combining them increases
+collision recovery to 21.2%, while matching the 13.6% L2
+recovery of temporal consistency alone. Thus, the largest
+benefit of combining these two objectives in this ablation
+appears in collision-related performance. With the same
+teacher–student stabilization enabled, our UniAD ablations
+in Table 5(a) reveal complementary trade-offs: temporal
+planning consistency improves trajectory accuracy while
+worsening collision performance, whereas perception en-
+tropy reduces collisions with little L2 recovery. Specifi-
+cally, temporal consistency achieves 20.2% L2 recovery but
+−6.3% collision recovery, while perception entropy achieves
+18.9% collision recovery with only 1.4% L2 recovery. Co-
+ordinating both objectives achieves 29.5% L2 recovery and
+34.8% collision recovery, increasing the latter by 13.6 per-
+centage points over the joint objective without stabilization.
+Notably, the full model consistently reduces both L2 error
+and collision rate across all three future planning horizons
+(1s, 2s, and 3s) compared with the unadapted model, sug-
+gesting that the benefits of adaptation extend beyond retro-
+spective ego-motion consistency to future trajectory plan-
+ning. Together, these results support the need to coordinate
+perception and planning during adaptation to improve both
+trajectory accuracy and collision performance. Appendix E
+provides additional ablation results on other models.
+With both perception entropy and temporal planning
+consistency enabled, Table 5(b) further examines the
+teacher–student mechanism by individually removing EMA
+anchoring, projection, or acceptance/rollback. All variants
+are evaluated against the same clean and noisy references as
+those in Table 5(a). Removing these components reduces
+7
+
+
+Table 5. Cross-task adaptation and teacher–student component
+ablations. UniAD [22] under severity-5 Gaussian noise.
+(a) Joint objective and combined stabilization.
+Component
+L2 (m)↓
+Col. (%)↓
+Lmm Ltemp St
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+-
+-
+-
+0.60 1.29 2.25
+1.38
+0.81 0.83 1.23
+0.95
+✓
+-
+-
+0.52 1.24 2.22 1.33(+11.4%) 0.70 0.91 1.15
+0.92(+4.5%)
+-
+✓
+-
+0.56 1.23 2.17 1.32(+13.6%) 0.81 0.80 1.15
+0.92(+4.5%)
+✓
+✓
+-
+0.52 1.25 2.19 1.32(+13.6%) 0.43 0.85 1.16 0.81(+21.2%)
+✓
+-
+✓0.59 1.29 2.24
+1.37(+1.4%)
+0.85 0.53 1.10 0.83(+18.9%)
+-
+✓
+✓0.55 1.20 2.12 1.29(+20.2%) 0.80 0.85 1.33
+0.99(-6.3%)
+✓
+✓
+✓0.51 1.15 2.09 1.25(+29.5%) 0.53 0.57 1.08 0.72(+34.8%)
+(b) Individual teacher–student component ablations. EMA, Proj., and Acc.
+denote EMA anchoring, projection, and update acceptance/rollback, respec-
+tively.
+Stabilization
+L2 (m)↓
+Col. (%)↓
+EMA Proj. Acc.
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+-
+✓
+✓
+0.56 1.23 2.17 1.32(+12.8%) 0.85 0.53 1.18 0.85(+15.2%)
+✓
+-
+✓
+0.56 1.21 2.15 1.31(+15.2%) 0.71 0.76 1.28
+0.92(+4.5%)
+✓
+✓
+-
+0.54 1.19 2.11 1.28(+21.5%) 0.73 0.80 1.35
+0.96(-1.5%)
+1–5
+6–10
+11–15
+16–20
+21–25
+26–30
+31–35
+Within-scene frame window
+-30
+-20
+0
+20
+40
+60
+L2 recovery (%)
+−27.5
+Full P2-TTA
+w/o Teacher–Student
+UniAD
+SparseDrive
+DistillDrive
+Figure 4. Within-scene L2 recovery with and without teacher–
+student stabilization.
+L2 recovery to 12.8%, 15.2%, and 21.5%, respectively, com-
+pared with 29.5% for the full method. Similarly, all three
+ablated variants exhibit inferior collision recovery, with the
+removal of acceptance/rollback even causing a slight degra-
+dation relative to the unadapted noisy model. These results
+demonstrate the complementary contributions of the three
+stabilization components to reliable test-time adaptation.
+To further evaluate the teacher–student mechanism dur-
+ing continual adaptation, Figure 4 compares L2 recovery
+with and without this mechanism. Different frame win-
+dows cover different driving situations, leading to fluctu-
+ations in recovery rates. Despite these fluctuations, recov-
+ery generally increases as within-scene adaptation proceeds,
+while the teacher–student mechanism further improves re-
+covery in most windows. Notably, on SparseDrive during
+Table 6. Comparison with other TTA methods on UniAD [22].
+L2 and collision rate at each prediction horizon under severity-5
+Gaussian noise. Underlining marks the strongest baseline recovery
+for each metric.
+Method
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+Without TTA
+0.60 1.29 2.25
+1.38
+0.81 0.83 1.23
+0.95
+Tent [53]
+0.56 1.22 2.16 1.31(+15.6%) 0.85 0.65 1.15 0.88(+10.5%)
+EATA [35]
+0.55 1.22 2.19 1.32(+13.5%) 0.55 0.52 1.15 0.74(+31.8%)
+EATA–E [35] 0.57 1.25 2.23
+1.35(+6.6%)
+0.55 0.52 1.13 0.73(+32.8%)
+SAR [36]
+0.56 1.22 2.16 1.31(+15.8%) 0.85 0.65 1.15 0.88(+10.5%)
+CoTTA [57]
+0.59 1.28 2.23
+1.37(+2.5%)
+0.81 0.52 1.13 0.82(+19.8%)
+Ours
+0.51 1.15 2.09 1.25(+29.5%) 0.53 0.57 1.08 0.72(+34.8%)
+Table 7. Parameter and TTA time efficiency. P2-TTA updates
+fewer than 0.23 ‰of parameters and has a mean adaptation time
+below 50 ms.
+Model
+Parameters
+Time (ms)
+Updated
+Total
+Ratio (‰) Mean
+Std
+UniAD [22]
+30.21K
+131.82M
+0.229
+47.21 18.31
+ST-P3 [21]
+1.18K
+10.83M
+0.109
+13.70
+8.10
+DiffusionDrive [32]
+8.70K
+92.04M
+0.095
+16.42 18.40
+SparseDrive [48]
+7.68K
+86.14M
+0.089
+17.68
+8.50
+DistillDrive [63]
+7.68K
+97.10M
+0.079
+16.37 13.12
+CoIRL-AD [66]
+1.54K
+51.45M
+0.030
+8.03
+3.95
+frames 21–25, recovery drops to −27.5% without the mech-
+anism, whereas the full method achieves 25.8%, illustrat-
+ing its ability to mitigate local performance degradation.
+These results further support the effectiveness of the teacher–
+student mechanism during continual adaptation.
+Table 6 further compares P2-TTA with representative
+TTA baselines on UniAD under severe Gaussian noise us-
+ing a shared adaptation objective. Our method achieves the
+highest recovery in both metrics, exceeding the respective
+strongest baselines by 13.7 and 2.0 percentage points in L2
+and collision recovery, respectively. Together with the com-
+ponent ablations, these results support the effectiveness of
+our overall adaptation framework under the shared objective.
+Appendix F.3 details the baseline implementations.
+Finally, Table 7 evaluates the overhead of online adap-
+tation. Across the six profiled models, P2-TTA updates
+an average of 0.11‰ of parameters and requires 19.9 ms
+per frame on average, supporting recovery within a small
+additional computational budget. This lightweight update
+recovers 30.0% of the collision-rate degradation on average.
+Among these models, UniAD has the highest adaptation cost
+and requires 47.21 ms per frame, supporting the practical
+use of P2-TTA across the evaluated architectures.
+8
+
+
+6. Conclusion
+In this paper, we presented P2-TTA, a plug-and-play contin-
+ual adaptation framework for end-to-end autonomous driv-
+ing, designed for cross-task and cross-frame adaptation. Its
+joint objective coordinates perception entropy minimization
+with temporal planning consistency, with ablations showing
+complementary gains in performance. An EMA-centered
+projection and consistency-based acceptance mechanism
+constrain individual parameter updates. Extensive evalua-
+tions across diverse driving architectures demonstrate that P2-
+TTA effectively mitigates severe distribution shifts, achiev-
+ing substantial reductions in displacement errors and colli-
+sion rates with low overhead.
+9
+
+
+LLM Usage Statement
+OpenAI Codex was used to assist with manuscript
+editing,
+including
+language
+polishing,
+LaTeX
+for-
+matting, and consistency checks.
+It was not used
+to generate experimental data or results.
+All AI-
+assisted content was reviewed and verified by the
+authors, who take responsibility for the final manuscript.
+References
+[1] Shai Ben-David, John Blitzer, Koby Crammer, and Fernando
+Pereira. Analysis of representations for domain adaptation.
+Advances in neural information processing systems, 19, 2006.
+1
+[2] Dian Chen, Dequan Wang, Trevor Darrell, and Sayna
+Ebrahimi. Contrastive test-time adaptation. In Proceedings
+of the IEEE/CVF conference on computer vision and pattern
+recognition, pages 295–305, 2022. 3
+[3] Guohao Chen, Shuaicheng Niu, Deyu Chen, Shuhai Zhang,
+Changsheng Li, Yuanqing Li, and Mingkui Tan. Cross-device
+collaborative test-time adaptation. Advances in Neural Infor-
+mation Processing Systems, 37:122917–122951, 2024. 3
+[4] Li Chen, Penghao Wu, Kashyap Chitta, Bernhard Jaeger,
+Andreas Geiger, and Hongyang Li. End-to-end autonomous
+driving: Challenges and frontiers. IEEE Transactions on
+Pattern Analysis and Machine Intelligence, 46(12):10164–
+10183, 2024. 1
+[5] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao
+Yu, Katrin Renz, and Andreas Geiger. Transfuser: Imita-
+tion with transformer-based sensor fusion for autonomous
+driving. IEEE transactions on pattern analysis and machine
+intelligence, 45(11):12878–12895, 2022. 3
+[6] Shuyang Chu, Jingang Shi, Xu Cheng, Haoyu Chen, Xin Liu,
+Jian Xu, and Guoying Zhao. To remember, to adapt, to pre-
+empt: A stable continual test-time adaptation framework for
+remote physiological measurement in dynamic domain shifts.
+In Proceedings of the 33rd ACM International Conference on
+Multimedia, pages 7307–7316, 2025. 2
+[7] Nicolas Courty, R´emi Flamary, Devis Tuia, and Alain Rako-
+tomamonjy. Optimal transport for domain adaptation. IEEE
+transactions on pattern analysis and machine intelligence, 39
+(9):1853–1865, 2016. 2
+[8] Karan Dalal, Daniel Koceja, Jiarui Xu, Yue Zhao, Shihao
+Han, Ka Chun Cheung, Jan Kautz, Yejin Choi, Yu Sun, and
+Xiaolong Wang. One-minute video generation with test-time
+training. In Proceedings of the Computer Vision and Pattern
+Recognition Conference, pages 17702–17711, 2025. 2
+[9] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng,
+Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski,
+Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap
+Chitta. NAVSIM: Data-driven non-reactive autonomous ve-
+hicle simulation and benchmarking. In Advances in Neural
+Information Processing Systems, pages 28706–28719, 2024.
+6
+[10] Christopher Diehl, Peter Karkus, Sushant Veer, Marco Pavone,
+and Torsten Bertram. Lord: Adapting differentiable driving
+policies to distribution shifts. In 2025 IEEE International
+Conference on Robotics and Automation (ICRA), pages 7036–
+7043. IEEE, 2025. 1
+[11] Tuong Do, Binh X Nguyen, Quang D Tran, Hien Nguyen,
+Erman Tjiputra, Te-Chuan Chiu, and Anh Nguyen. Reducing
+non-iid effects in federated autonomous driving with con-
+trastive divergence loss. In 2024 IEEE International Confer-
+ence on Robotics and Automation (ICRA), pages 2190–2196.
+IEEE, 2024. 1
+[12] Mario D¨obler, Robert A Marsden, and Bin Yang. Robust
+mean teacher for continual and gradual test-time adaptation.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, pages 7704–7714, 2023. 4
+[13] Shiyu Fang, Yiming Cui, Haoyang Liang, Chen Lv, Peng
+Hang, and Jian Sun. CoReVLA: A dual-stage end-to-end
+autonomous driving framework for long-tail scenarios via
+collect-and-refine. arXiv preprint arXiv:2509.15968, 2025. 1
+[14] Abolfazl Farahani, Sahar Voghoei, Khaled Rasheed, and
+Hamid R Arabnia. A brief review of domain adaptation.
+Advances in data science and information engineering: pro-
+ceedings from ICDATA 2020 and IKE 2020, pages 877–894,
+2021. 2
+[15] Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal
+Germain, Hugo Larochelle, Franc¸ois Laviolette, Mario March,
+and Victor Lempitsky. Domain-adversarial training of neural
+networks. Journal of machine learning research, 17(59):1–35,
+2016. 2
+[16] Taesik Gong, Jongheon Jeong, Taewon Kim, Yewon Kim,
+Jinwoo Shin, and Sung-Ju Lee. Note: Robust continual test-
+time adaptation against temporal correlation. Advances in
+Neural Information Processing Systems, 35:27253–27266,
+2022. 4
+[17] Sorin Grigorescu, Bogdan Trasnea, Tiberiu Cocias, and Gigel
+Macesanu. A survey of deep learning techniques for au-
+tonomous driving. Journal of field robotics, 37(3):362–386,
+2020. 3
+[18] Yongping He, Yuanqing Xia, Tijin Yan, Yufeng Zhan, Jiaru
+Song, and Zihang Feng. Unsupervised cross-domain attack
+traffic classifier for intelligent connected vehicle. IEEE Trans-
+actions on Industrial Electronics, 2025. 2
+[19] Dan Hendrycks and Thomas Dietterich. Benchmarking neural
+network robustness to common corruptions and perturbations.
+arXiv preprint arXiv:1903.12261, 2019. 4
+[20] Trung-Hieu Hoang, Duc M Vo, et al. Persistent test-time
+adaptation in recurring testing scenarios. Advances in Neural
+Information Processing Systems, 37:123402–123442, 2024.
+1, 3
+[21] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi
+Yan, and Dacheng Tao. St-p3: End-to-end vision-based au-
+tonomous driving via spatial-temporal feature learning. In
+European Conference on Computer Vision, pages 533–549.
+Springer, 2022. 5, 6, 8, S1, S2, S3, S4
+[22] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, et al. Planning-oriented autonomous driving. In Pro-
+ceedings of the IEEE/CVF conference on computer vision and
+pattern recognition, pages 17853–17862, 2023. 5, 6, 8, S1,
+S2, S3, S4
+10
+
+
+[23] Zhiyu Huang, Haochen Liu, and Chen Lv. Gameformer:
+Game-theoretic modeling and learning of transformer-based
+interactive prediction and planning for autonomous driving.
+In Proceedings of the IEEE/CVF International Conference
+on Computer Vision, pages 3903–3913, 2023. 3
+[24] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and
+Junchi Yan. Bench2Drive: Towards multi-ability benchmark-
+ing of closed-loop end-to-end autonomous driving. In Ad-
+vances in Neural Information Processing Systems, 2024. 6,
+S6
+[25] Xiyan Jiang, Xiaocong Zhao, Yiru Liu, Zirui Li, Peng Hang,
+Lu Xiong, and Jian Sun. A naturalistic trajectory dataset with
+dense interaction for autonomous driving. Scientific Data, 12
+(1):1084, 2025. S4
+[26] Adilbek Karmanov, Dayan Guan, Shijian Lu, Abdulmotaleb
+El Saddik, and Eric Xing. Efficient test-time adaptation of
+vision-language models. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 14162–14171, 2024. 1
+[27] Elyor Kodirov, Tao Xiang, Zhenyong Fu, and Shaogang Gong.
+Unsupervised domain adaptation for zero-shot learning. In
+Proceedings of the IEEE international conference on com-
+puter vision, pages 2452–2460, 2015. 2
+[28] Taeyeop Lee, Jonathan Tremblay, Valts Blukis, Bowen Wen,
+Byeong-Uk Lee, Inkyu Shin, Stan Birchfield, In So Kweon,
+and Kuk-Jin Yoon.
+Tta-cope: Test-time adaptation for
+category-level object pose estimation.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 21285–21295, 2023. 4
+[29] Yingyan Li, Yuqi Wang, Yang Liu, Jiawei He, Lue Fan, and
+Zhaoxiang Zhang. End-to-end driving with online trajectory
+evaluation via BEV world model. In Proceedings of the
+IEEE/CVF International Conference on Computer Vision,
+pages 27137–27146, 2025. 6, S2
+[30] Yingyan Li, Shuyao Shang, Weisong Liu, Bing Zhan,
+Haochen Wang, Yuqi Wang, Yuntao Chen, Xiaoman Wang,
+Yasong An, Chufeng Tang, Lu Hou, Lue Fan, and Zhaoxiang
+Zhang. DriveVLA-W0: World models amplify data scaling
+law in autonomous driving. In International Conference on
+Learning Representations, 2026. 6, S2
+[31] Jian Liang, Ran He, and Tieniu Tan. A comprehensive survey
+on test-time adaptation under distribution shifts. International
+Journal of Computer Vision, 133(1):31–64, 2025. 1
+[32] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng
+Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang,
+Qian Zhang, et al. Diffusiondrive: Truncated diffusion model
+for end-to-end autonomous driving. In Proceedings of the
+Computer Vision and Pattern Recognition Conference, pages
+12037–12047, 2025. 5, 6, 8, S1, S2, S3, S4
+[33] Andrey Malinin, Neil Band, German Chesnokov, Yarin Gal,
+Mark JF Gales, Alexey Noskov, Andrey Ploskonosov, Li-
+udmila Prokhorenkova, Ivan Provilkov, Vatsal Raina, et al.
+Shifts: A dataset of real distributional shift across multiple
+large-scale tasks. arXiv preprint arXiv:2107.07455, 2021. 1
+[34] Liangbo Ning, Zuowei Zhang, Weiping Ding, Dian Shao, and
+Yining Zhu. Multilevel distribution alignment for multisource
+universal domain adaptation. IEEE Transactions on Neural
+Networks and Learning Systems, 2025. 1
+[35] Shuaicheng Niu, Jiaxiang Wu, Yifan Zhang, Yaofo Chen,
+Shijian Zheng, Peilin Zhao, and Mingkui Tan. Efficient test-
+time model adaptation without forgetting. In International
+conference on machine learning, pages 16888–16905. PMLR,
+2022. 1, 2, 8, S5, S6
+[36] Shuaicheng Niu, Jiaxiang Wu, Yifan Zhang, Zhiquan Wen,
+Yaofo Chen, Peilin Zhao, and Mingkui Tan. Towards stable
+test-time adaptation in dynamic wild world. arXiv preprint
+arXiv:2302.12400, 2023. 1, 3, 8, S5, S6
+[37] David Osowiechi, Gustavo A Vargas Hakim, Mehrdad Noori,
+Milad Cheraghalikhani, Ali Bahri, Moslem Yazdanpanah,
+Ismail Ben Ayed, and Christian Desrosiers. Nc-ttt: A noise
+constrastive approach for test-time training. In Proceedings
+of the IEEE/CVF conference on computer vision and pattern
+recognition, pages 6078–6086, 2024. 2
+[38] Yaniv Ovadia, Emily Fertig, Jie Ren, Zachary Nado, David
+Sculley, Sebastian Nowozin, Joshua Dillon, Balaji Lakshmi-
+narayanan, and Jasper Snoek. Can you trust your model’s
+uncertainty? evaluating predictive uncertainty under dataset
+shift. Advances in neural information processing systems, 32,
+2019. 4
+[39] Hyewon Park, Hyejin Park, Jueun Ko, and Dongbo Min.
+Hybrid-tta: Continual test-time adaptation via dynamic do-
+main shift detection. In Proceedings of the IEEE/CVF Inter-
+national Conference on Computer Vision, pages 2877–2886,
+2025. 1
+[40] Xingchao Peng, Qinxun Bai, Xide Xia, Zijun Huang, Kate
+Saenko, and Bo Wang. Moment matching for multi-source
+domain adaptation. In Proceedings of the IEEE/CVF inter-
+national conference on computer vision, pages 1406–1415,
+2019. 2
+[41] Taki Hasan Rafi, Amit Agarwal, Hitesh L Patel, and Dong-
+Kyu Chae. Learning from unknown for open-set test-time
+adaptation. In Proceedings of the IEEE/CVF Winter Confer-
+ence on Applications of Computer Vision, pages 2993–3004,
+2026. 2
+[42] Jin Shin and Hyun Kim. L-tta: Lightweight test-time adapta-
+tion using a versatile stem layer. Advances in Neural Infor-
+mation Processing Systems, 37:39325–39349, 2024. 1
+[43] Youssef Shoeb, Azarm Nowzad, and Hanno Gottschalk. Out-
+of-distribution segmentation in autonomous driving: Prob-
+lems and state of the art. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR) Workshops, pages 4349–4359, 2025. 1
+[44] Chonghao Sima, Kashyap Chitta, Zhiding Yu, Shiyi Lan, Ping
+Luo, Andreas Geiger, Hongyang Li, and Jose M. Alvarez.
+Centaur: Robust end-to-end autonomous driving with test-
+time training. arXiv preprint arXiv:2503.11650, 2025. 2
+[45] Kihyuk Sohn, Sifei Liu, Guangyu Zhong, Xiang Yu, Ming-
+Hsuan Yang, and Manmohan Chandraker. Unsupervised do-
+main adaptation for face recognition in unlabeled videos. In
+Proceedings of the IEEE International Conference on com-
+puter vision, pages 3210–3218, 2017. 2
+[46] Damian S´ojka, Sebastian Cygert, Bartłomiej Twardowski,
+and Tomasz Trzci´nski. Ar-tta: A simple method for real-
+world continual test-time adaptation. In Proceedings of the
+IEEE/CVF International Conference on Computer Vision,
+pages 3491–3495, 2023. 3
+11
+
+
+[47] Junha Song, Jungsoo Lee, In So Kweon, and Sungha Choi.
+Ecotta: Memory-efficient continual test-time adaptation via
+self-distilled regularization. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 11920–11929, 2023. 3, S6
+[48] Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang, Hao-
+ran Wu, and Sifa Zheng.
+Sparsedrive: End-to-end au-
+tonomous driving via sparse scene representation. In 2025
+IEEE International Conference on Robotics and Automation
+(ICRA), pages 8795–8801. IEEE, 2025. 5, 6, 8, S1, S2, S3,
+S4
+[49] Yu Sun, Xiaolong Wang, Zhuang Liu, John Miller, Alexei
+Efros, and Moritz Hardt.
+Test-time training with self-
+supervision for generalization under distribution shifts. In
+International conference on machine learning, pages 9229–
+9248. PMLR, 2020. 2
+[50] Jiayao Tan, Fan Lyu, Chenggong Ni, Fuyuan Hu, Wei Feng,
+and Rui Yao. Exposing mixture and annotating confusion
+for active universal test-time adaptation. In The Fourteenth
+International Conference on Learning Representations, 2026.
+3
+[51] Mingkui Tan, Guohao Chen, Jiaxiang Wu, Yifan Zhang,
+Yaofo Chen, Peilin Zhao, and Shuaicheng Niu. Uncertainty-
+calibrated test-time model adaptation without forgetting.
+IEEE Transactions on Pattern Analysis and Machine Intelli-
+gence, 2025. 1, 3
+[52] Hui Tang and Kui Jia. Discriminative adversarial domain
+adaptation. In Proceedings of the AAAI conference on artifi-
+cial intelligence, pages 5940–5947, 2020. 2
+[53] Dequan Wang, Evan Shelhamer, Shaoteng Liu, Bruno Ol-
+shausen, and Trevor Darrell. Tent: Fully test-time adaptation
+by entropy minimization. arXiv preprint arXiv:2006.10726,
+2020. 1, 2, 8, S5, S6
+[54] Haotao Wang, Chaowei Xiao, Jean Kossaifi, Zhiding Yu,
+Anima Anandkumar, and Zhangyang Wang. Augmax: Ad-
+versarial composition of random augmentations for robust
+training. Advances in neural information processing systems,
+34:237–250, 2021. 1
+[55] Junli Wang, Zhihua Hua, Xueyi Liu, Zebin Xing, Haochen
+Tian, Kun Ma, Hangjun Ye, Guang Chen, Long Chen, and
+Qichao Zhang. Beyond imitation: Learning safe end-to-end
+autonomous driving from hard negatives.
+arXiv preprint
+arXiv:2605.19771, 2026. Source of the evaluated Beyond-
+Drive LTF* checkpoint. 6, S2
+[56] Junli Wang, Yinan Zheng, Xueyi Liu, Zebin Xing, Pengfei Li,
+Kun Ma, Hangjun Ye, Guang Chen, Guang Li, Long Chen,
+Zhongpu Xia, and Qichao Zhang. MeanFuser: Fast one-step
+multi-modal trajectory generation and adaptive reconstruction
+via MeanFlow for end-to-end autonomous driving. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 17884–17893, 2026. 6, S2
+[57] Qin Wang, Olga Fink, Luc Van Gool, and Dengxin Dai. Con-
+tinual test-time domain adaptation. In Proceedings of the
+IEEE/CVF conference on computer vision and pattern recog-
+nition, pages 7201–7211, 2022. 3, 8, S5
+[58] Tianze Xia, Yongkang Li, Lijun Zhou, Jingfeng Yao, Kaixin
+Xiong, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen,
+Hangjun Ye, Wenyu Liu, and Xinggang Wang. DriveLaW:
+Unifying planning and video generation in a latent driving
+world. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition, pages 39701–39712,
+2026. 6, S2
+[59] Zehao Xiao and Cees GM Snoek. Beyond model adaptation at
+test time: A survey. arXiv preprint arXiv:2411.03687, 2024.
+1
+[60] Zebin Xing, Xingyu Zhang, Yang Hu, Bo Jiang, Tong He,
+Qian Zhang, Xiaoxiao Long, and Wei Yin. GoalFlow: Goal-
+driven flow matching for multimodal trajectories genera-
+tion in end-to-end autonomous driving. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 1602–1611, 2025. 6, S2
+[61] Yanyu Ye, Wei Wei, Lei Zhang, Chen Ding, and Yanning
+Zhang. Domain consistency learning for continual test-time
+adaptation in image semantic segmentation. Pattern Recogni-
+tion, 165:111585, 2025. 3
+[62] Kaichao You, Mingsheng Long, Zhangjie Cao, Jianmin Wang,
+and Michael I Jordan.
+Universal domain adaptation.
+In
+Proceedings of the IEEE/CVF conference on computer vision
+and pattern recognition, pages 2720–2729, 2019. 2
+[63] Rui Yu, Xianghang Zhang, Runkai Zhao, Huaicheng Yan,
+and Meng Wang. Distilldrive: End-to-end multi-mode au-
+tonomous driving distillation by isomorphic hetero-source
+planning model. In Proceedings of the IEEE/CVF Interna-
+tional Conference on Computer Vision, pages 26188–26197,
+2025. 5, 6, 8, S1, S2, S3, S4
+[64] Yizhe Zhang, Shubhankar Borse, Hong Cai, and Fatih Porikli.
+Auxadapt: Stable and efficient test-time adaptation for tempo-
+rally consistent video semantic segmentation. In Proceedings
+of the IEEE/CVF winter conference on applications of com-
+puter vision, pages 2339–2348, 2022. 3
+[65] Bowen Zhao, Chen Chen, and Shu-Tao Xia.
+Delta:
+degradation-free fully test-time adaptation. arXiv preprint
+arXiv:2301.13018, 2023. 2
+[66] Xiaoji Zheng, Ziyuan Yang, Yanhao Chen, Yuhang Peng,
+Yuanrong Tang, Gengyuan Liu, Bokui Chen, and Jiang-
+tao Gong. CoIRL-AD: Collaborative-competitive imitation-
+reinforcement learning in latent world models for autonomous
+driving, 2025. 5, 6, 8, S1, S2, S3
+[67] Zhun Zhong, Liang Zheng, Guoliang Kang, Shaozi Li, and Yi
+Yang. Random erasing data augmentation. In Proceedings of
+the AAAI conference on artificial intelligence, pages 13001–
+13008, 2020. 1
+12
+
+
+Coordinating Perception and Planning for Test-Time Adaptation
+in End-to-End Driving under Distribution Shifts
+Supplementary Material
+Overview. Appendix A provides complete benchmark re-
+sults and clean-input and time-varying-corruption evalua-
+tions; Appendix B examines visual and physical robust-
+ness; Appendix C evaluates geographic shifts and strong
+interactions; Appendix D analyzes the loss weight; Ap-
+pendix E presents component ablations and within-scene
+continual adaptation; Appendix F details model configura-
+tions and TTA baselines; Appendix G analyzes qualitative
+cases and scenario-level errors; Appendix H reports closed-
+loop Bench2Drive results; and Appendix I discusses limita-
+tions and future work.
+A. Detailed Benchmark Results and Robustness
+Evaluations
+A.1. Complete Benchmark Scores
+Tables S1 and S2 expand the main nuScenes and NAVSIM
+results. Clean and Noisy denote unadapted scores; TTA
+denotes adaptation on the specified inputs. Blue shading
+marks TTA and red percentages denote recovery rates (RR).
+For a lower-is-better metric, recovery is defined as
+RR = Mcorrupted −Madapted
+Mcorrupted −Mclean
+× 100%.
+(13)
+Here, Mclean, Mcorrupted, and Madapted are the clean,
+noisy, and adapted scores. RR uses scores before display
+rounding and positive corruption-induced gaps; values above
+100% indicate performance exceeding the clean reference.
+A.2. Adaptation on Clean Inputs
+On clean inputs, adaptation reduces L2 and collision rate by
+1.9% and 3.4% on average across five models (Table S3).
+A.3. Temporally Evolving Corruption
+We increase contrast-corruption severity over 10 frames and
+decrease it over the next 10, retaining adapted parameters
+throughout. Table S4 shows mean L2 and collision reduc-
+tions of 9.6% and 15.5% across five models, supporting
+adaptation under changing visual conditions.
+B. Robustness under Visual and Physical Per-
+turbations
+Tables S5–S9 expand Table 3. Cross-corruption averages
+use the six common backbones and positive clean-to-noisy
+gaps.
+Table S1. Complete nuScenes results under severity-5 Gaussian
+noise. Clean is the unadapted reference; TTA uses corrupted inputs.
+Setting
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+Clean
+1.72 3.26 4.86
+3.28
+0.42 1.16 3.26
+1.61
+Noisy
+2.51 5.22 8.13
+5.29
+0.89 5.08 9.42
+5.13
+TTA
+2.29 4.57 6.95 4.60(+34.3%) 0.46 3.88 7.76 4.03(+31.3%)
+UniAD [22]
+Clean
+0.44 0.88 1.51
+0.94
+0.13 0.20 0.53
+0.29
+Noisy
+0.60 1.29 2.25
+1.38
+0.81 0.83 1.23
+0.95
+TTA
+0.51 1.15 2.09 1.25(+29.5%) 0.53 0.57 1.08 0.72(+34.8%)
+DistillDrive [63]
+Clean
+0.28 0.55 0.91
+0.58
+0.00 0.03 0.18
+0.07
+Noisy
+0.36 0.75 1.29
+0.80
+0.06 0.24 0.65
+0.31
+TTA
+0.34 0.71 1.22 0.76(+18.2%) 0.06 0.20 0.57 0.28(+12.5%)
+SparseDrive [48]
+Clean
+0.40 1.03 1.95
+1.13
+0.02 0.12 0.76
+0.30
+Noisy
+0.50 1.36 2.62
+1.50
+0.08 0.76 3.07
+1.30
+TTA
+0.49 1.27 2.43 1.40(+26.5%) 0.10 0.49 1.95 0.85(+45.5%)
+DiffusionDrive [32]
+Clean
+0.27 0.54 0.90
+0.57
+0.03 0.04 0.16
+0.08
+Noisy
+0.34 0.72 1.25
+0.77
+0.02 0.18 0.68
+0.29
+TTA
+0.32 0.68 1.21 0.74(+15.0%) 0.06 0.15 0.48 0.23(+28.6%)
+CoIRL-AD [66]
+Clean
+0.29 0.59 1.00
+0.63
+0.06 0.10 0.37
+0.18
+Noisy
+0.30 0.61 1.04
+0.65
+0.10 0.15 0.49
+0.25
+TTA
+0.28 0.59 1.01 0.63(+94.8%) 0.10 0.15 0.44 0.23(+27.3%)
+B.1. Fog Corruption
+Under severity-5 fog, mean L2 and collision recovery reach
+57.6% and 23.3% across six models (Table S5).
+B.2. Snow Corruption
+Snow causes the largest average degradation among the three
+visual corruptions. Adaptation recovers 26.0% of L2 and
+19.9% of collision degradation (Table S6).
+B.3. Brightness Corruption
+Under brightness changes, mean L2 and collision recovery
+reach 24.7% and 32.2% (Table S7), extending the gains to
+illumination shifts.
+B.4. Concurrent Perturbation Severity on UniAD
+We combine GPS and yaw noise with motion blur to test
+adaptation when both visual inputs and observed-motion
+feedback are corrupted.
+GPS and yaw magnitudes are standard deviations of zero-
+mean Gaussian errors. Perturbations are keyed by sample
+token and seed, matching the noisy baseline and TTA. Con-
+secutive noisy positions are differenced and transformed into
+S1
+
+
+Table S2. NAVSIM results under severity-5 Gaussian noise.
+Scores use a 0–100 scale. NC, DAC, TTC, and EP denote no-at-
+fault collisions, drivable-area compliance, time-to-collision, and
+ego progress; PDMS is the aggregate score. Shading marks TTA.
+Setting
+NC↑
+DAC↑
+TTC↑
+EP↑
+PDMS↑
+DiffusionDrive [32]
+Clean
+99.2
+96.1
+94.8
+81.8
+88.0
+Noisy
+90.4
+94.8
+80.0
+76.7
+78.1
+TTA
+91.2(+9.1%) 95.0(+16.0%)
+81.2(+8.1%)
+77.1(+7.8%)
+78.9(+8.1%)
+WoTE [29]
+Clean
+99.4
+96.2
+96.5
+82.3
+89.9
+Noisy
+95.7
+93.3
+88.8
+73.2
+79.7
+TTA
+95.9(+5.4%) 93.6(+10.4%)
+89.0(+2.6%)
+73.5(+3.3%)
+80.2(+4.9%)
+DriveLaW [58]
+Clean
+99.0
+95.0
+96.5
+79.8
+89.0
+Noisy
+95.7
+91.8
+87.2
+74.8
+79.1
+TTA
+95.8(+3.0%) 92.2(+12.5%)
+87.6(+4.3%) 75.3(+10.0%)
+79.8(+7.1%)
+DriveVLA-W0 [30]
+Clean
+98.4
+95.3
+96.2
+80.9
+87.1
+Noisy
+98.6
+93.4
+94.8
+80.8
+86.1
+TTA
+98.6
+93.4(0.0%) 95.4(+43.0%)
+80.8(0.0%) 86.4(+30.0%)
+GoalFlow [60]
+Clean
+98.4
+98.3
+93.9
+85.2
+91.4
+Noisy
+97.9
+96.7
+92.9
+83.7
+88.1
+TTA
+98.0(+20.0%) 97.1(+25.0%) 93.0(+10.4%)
+83.8(+6.9%)
+88.4(+9.0%)
+LTF [55]
+Clean
+98.29
+97.08
+94.60
+83.01
+88.77
+Noisy
+93.02
+89.51
+84.74
+71.19
+75.25
+TTA
+93.15(+2.3%) 89.68(+2.2%) 84.84(+1.0%) 71.37(+1.5%) 75.46(+1.6%)
+MeanFuser [56]
+Clean
+98.26
+97.41
+94.46
+83.29
+89.02
+Noisy
+92.08
+90.82
+82.82
+72.88
+75.54
+TTA
+92.39(+4.9%) 91.17(+5.2%) 83.31(+4.2%) 73.25(+3.6%) 76.13(+4.4%)
+Table S3. Adaptation on clean nuScenes inputs. Both settings
+use the original images without synthetic corruption.
+Setting
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+Before 1.72 3.26 4.86 3.28 0.42 1.16 3.26 1.61
+TTA
+1.64 3.11 4.67 3.14 0.31 1.20 3.26 1.59
+UniAD [22]
+Before 0.44 0.88 1.51 0.94 0.13 0.20 0.53 0.29
+TTA
+0.43 0.87 1.51 0.94 0.13 0.20 0.51 0.28
+DistillDrive [63]
+Before 0.28 0.55 0.91 0.58 0.00 0.03 0.18 0.07
+TTA
+0.28 0.54 0.90 0.57 0.00 0.03 0.18 0.07
+SparseDrive [48]
+Before 0.31 0.60 0.99 0.63 0.01 0.05 0.18 0.08
+TTA
+0.31 0.58 0.98 0.62 0.00 0.04 0.20 0.08
+DiffusionDrive [32]
+Before 0.27 0.54 0.90 0.57 0.03 0.04 0.16 0.08
+TTA
+0.26 0.53 0.88 0.56 0.02 0.04 0.14 0.07
+Table S4. Planning under temporally evolving contrast corrup-
+tion. Parameters persist across severity changes.
+Setting
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+Noisy
+3.47 6.72 10.28
+6.82
+0.41 4.94 9.47
+4.94
+TTA
+2.76 5.58 8.60 5.65(+33.2%) 0.21 2.67 5.76 2.88(+61.9%)
+UniAD [22]
+Noisy
+0.55 1.15 2.01
+1.24
+0.56 0.48 0.78
+0.61
+TTA
+0.50 1.05 1.87 1.14(+32.6%) 0.41 0.56 0.68 0.55(+17.9%)
+DistillDrive [63]
+Noisy
+0.37 0.77 1.31
+0.82
+0.01 0.09 0.49
+0.20
+TTA
+0.34 0.72 1.25 0.77(+19.7%) 0.02 0.10 0.43 0.18(+10.5%)
+SparseDrive [48]
+Noisy
+0.38 0.78 1.33
+0.83
+0.00 0.08 0.42
+0.17
+TTA
+0.34 0.70 1.20 0.75(+41.7%) 0.02 0.09 0.36 0.16(+11.5%)
+DiffusionDrive [32]
+Noisy
+0.38 0.78 1.33
+0.83
+0.01 0.09 0.49
+0.20
+TTA
+0.34 0.73 1.25 0.77(+21.8%) 0.02 0.10 0.43 0.18(+11.4%)
+Table S5. Complete planning results under severity-5 fog cor-
+ruption.
+Setting
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+Noisy
+2.75 5.74 8.81
+5.77
+0.38 5.00 10.77
+5.38
+TTA
+1.98 3.77 5.58 3.78(+79.9%) 0.64 2.70 6.12 3.15(+59.2%)
+UniAD [22]
+Noisy
+0.47 0.96 1.66
+1.03
+0.17 0.32 0.47
+0.32
+TTA
+0.45 0.92 1.62 1.00(+33.3%) 0.17 0.31 0.45 0.31(+33.3%)
+DistillDrive [63]
+Noisy
+0.30 0.60 0.99
+0.63
+0.03 0.08 0.25
+0.12
+TTA
+0.29 0.58 0.97 0.61(+40.0%) 0.02 0.07 0.25 0.11(+20.0%)
+SparseDrive [48]
+Noisy
+0.31 0.60 0.98
+0.63
+0.00 0.07 0.28
+0.12
+TTA
+0.30 0.59 0.97 0.62(+21.1%) 0.02 0.06 0.26 0.11(+25.0%)
+DiffusionDrive [32]
+Noisy
+0.29 0.58 0.98
+0.62
+0.02 0.09 0.25
+0.12
+TTA
+0.27 0.55 0.92 0.58(+80.0%) 0.02 0.09 0.24
+0.12(0.0%)
+CoIRL-AD [66]
+Noisy
+0.30 0.60 1.02
+0.64
+0.30 0.26 0.51
+0.36
+TTA
+0.29 0.59 1.00 0.63(+91.1%) 0.29 0.25 0.51
+0.35(+2.4%)
+the previous planning frame using the noisy orientation and
+native axis conventions.
+Noise enters UniAD through can bus, and SparseDrive,
+DistillDrive, and nuScenes DiffusionDrive through lidar-to-
+global poses. ST-P3 uses corrupted ego-motion inputs and
+displacement references. These perturbations affect state
+inputs and temporal feedback; evaluation trajectories, object
+annotations, label-construction poses, and camera calibration
+remain clean.
+On UniAD, GPS standard deviations of 0.2, 0.5, 1, 2, and
+4 m are paired with yaw deviations of 0.5◦, 1◦, 2◦, 5◦, and
+10◦; motion blur uses imagecorruptions. Table S8
+shows improvement in both metrics at severities 1–3, with
+57.5%–72.1% L2 recovery.
+S2
+
+
+Table S6. Complete planning results under snow corruption.
+Setting
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+Noisy
+3.67 7.67 11.72
+7.69
+2.88 8.23 8.64
+6.58
+TTA
+2.97 6.54 10.12 6.54(+26.1%) 1.03 3.09 6.17 3.43(+63.4%)
+UniAD [22]
+Noisy
+0.44 1.10 2.00
+1.18
+0.38 1.13 1.41
+0.97
+TTA
+0.42 1.04 1.93 1.13(+20.8%) 0.48 0.68 1.34 0.84(+19.1%)
+DistillDrive [63]
+Noisy
+0.46 0.92 1.53
+0.97
+0.19 0.53 0.58
+0.44
+TTA
+0.40 0.82 1.38 0.87(+25.6%) 0.19 0.48 0.58 0.42(+5.4%)
+SparseDrive [48]
+Noisy
+0.42 0.81 1.33
+0.85
+0.19 0.44 0.84
+0.49
+TTA
+0.38 0.75 1.24 0.80(+22.7%) 0.09 0.43 0.90 0.48(+2.4%)
+DiffusionDrive [32]
+Noisy
+0.47 0.98 1.65
+1.03
+0.04 0.22 0.95
+0.40
+TTA
+0.42 0.88 1.51 0.94(+19.6%) 0.07 0.23 0.80 0.37(+9.4%)
+CoIRL-AD [66]
+Noisy
+0.30 0.61 1.03
+0.64
+0.35 0.43 0.81
+0.53
+TTA
+0.29 0.60 1.02 0.64(+41.0%) 0.27 0.38 0.74 0.46(+19.6%)
+Table S7. Complete planning results under brightness corrup-
+tion.
+Setting
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+Noisy
+2.10 4.00 6.05
+4.06
+0.62 2.01 4.63
+2.42
+TTA
+1.95 3.73 5.61 3.76(+38.5%) 0.58 1.54 4.23 2.11(+38.3%)
+UniAD [22]
+Noisy
+0.46 0.91 1.57
+0.98
+0.23 0.30 0.45
+0.33
+TTA
+0.44 0.89 1.55 0.97(+34.0%) 0.24 0.28 0.44 0.32(+18.2%)
+DistillDrive [63]
+Noisy
+0.28 0.56 0.95
+0.60
+0.04 0.09 0.23
+0.12
+TTA
+0.27 0.56 0.95 0.60(+21.6%) 0.00 0.05 0.21 0.09(+62.5%)
+SparseDrive [48]
+Noisy
+0.39 0.77 1.30
+0.82
+0.00 0.20 0.42
+0.20
+TTA
+0.35 0.70 1.19 0.75(+36.6%) 0.00 0.18 0.36 0.18(+16.5%)
+DiffusionDrive [32]
+Noisy
+0.36 0.71 1.20
+0.75
+0.00 0.18 0.42
+0.20
+TTA
+0.34 0.68 1.15 0.72(+16.3%) 0.00 0.09 0.30 0.13(+57.9%)
+CoIRL-AD [66]
+Noisy
+0.31 0.62 1.04
+0.66
+0.15 0.17 0.47
+0.26
+TTA
+0.31 0.62 1.04 0.66(+1.3%) 0.15 0.17 0.47
+0.26(0.0%)
+L2 recovery drops to 3.9% and −0.3% at severities 4
+and 5, respectively, while collision recovery remains 52.4%
+at severity 5. Severe localization errors therefore limit the
+usefulness of motion feedback for trajectory accuracy.
+B.5. Compound Perturbations across Architectures
+At severity 3 (1 m GPS noise, 2◦yaw noise, and motion blur),
+six architectures achieve mean L2 and collision recovery
+of 22.0% and 30.4% over positive corruption-induced gaps
+(Table S9).
+Table S8. UniAD under concurrent localization noise and mo-
+tion blur.
+Severity (GPS/yaw)
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+1 (0.2 m/0.5◦)
+0.77 1.53 2.55
+1.62
+0.47 0.19 1.89
+0.85
+2 (0.5 m/1◦)
+0.94 1.77 2.83
+1.85
+0.68 0.24 2.74
+1.22
+3 (1 m/2◦)
+0.92 1.63 2.48
+1.68
+0.70 0.24 2.96
+1.30
+4 (2 m/5◦)
+1.35 2.31 3.24
+2.30
+0.98 0.43 3.84
+1.75
+5 (4 m/10◦)
+2.43 4.16 5.57
+4.05
+1.73 1.17 5.15
+2.68
+1 (0.2 m/0.5◦)
+0.50 1.04 1.88 1.14(+70.4%) 0.13 0.07 0.50 0.23(+110.1%)
+2 (0.5 m/1◦)
+0.57 1.10 1.91 1.19(+72.1%) 0.15 0.08 0.64 0.29(+100.0%)
+3 (1 m/2◦)
+0.77 1.37 1.62 1.25(+57.5%) 0.23 0.07 0.65 0.32(+97.4%)
+4 (2 m/5◦)
+1.33 2.25 3.16 2.25(+3.9%) 0.70 0.23 3.37 1.43(+21.7%)
+5 (4 m/10◦)
+2.44 4.17 5.58 4.06(-0.3%) 1.36 0.83 2.10 1.43(+52.4%)
+Table S9. Concurrent localization and visual perturbations at
+severity 3.
+Model
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+ST-P3 [21]
+2.00 3.90 5.93
+3.94
+0.79 3.17 5.27
+3.08
+UniAD [22]
+0.92 1.63 2.48
+1.68
+0.70 0.24 2.96
+1.30
+DistillDrive [63]
+0.62 1.11 1.70
+1.14
+0.20 0.68 1.42
+0.77
+SparseDrive [48]
+0.69 1.23 1.87
+1.26
+0.19 0.63 1.45
+0.76
+DiffusionDrive [32] 0.54 0.98 1.49
+1.00
+0.00 0.24 0.55
+0.26
+CoIRL-AD [66]
+0.28 0.59 1.01
+0.63
+0.07 0.11 0.39
+0.19
+ST-P3 [21]
+1.93 3.78 5.75 3.82(+18.6%) 0.60 2.39 4.07 2.35(+49.3%)
+UniAD [22]
+0.77 1.37 1.62 1.25(+57.5%) 0.23 0.07 0.65 0.32(+97.4%)
+DistillDrive [63]
+0.61 1.10 1.68 1.13(+2.4%) 0.15 0.61 1.35 0.70(+9.1%)
+SparseDrive [48]
+0.66 1.16 1.80 1.21(+8.9%) 0.00 0.58 1.26 0.61(+21.2%)
+DiffusionDrive [32] 0.53 0.97 1.48 0.99(+2.3%) 0.00 0.24 0.52 0.25(+5.5%)
+CoIRL-AD [66]
+0.28 0.58 1.01 0.63(+42.5%) 0.07 0.11 0.39 0.19(0.0%)
+C. Generalization under Out-of-Distribution
+Conditions
+C.1. Cross-City Transfer
+We train SparseDrive exclusively on Boston data, which ac-
+counts for 55.8% of the nuScenes training set, using 100
+epochs for Stage 1 and 10 epochs for Stage 2. We then eval-
+uate the model in Holland Village, One-North, and Queen-
+stown in Singapore without synthetic corruption. Boston
+serves as the source-domain reference in Table S10.
+Both metrics improve in all three target towns, with 9.9%–
+35.6% L2 recovery and 8.0%–45.5% collision recovery rel-
+ative to Boston (Table S10).
+Table S10. Cross-city transfer on SparseDrive. Results use
+SparseDrive [48]; RR takes the unadapted Boston scores as its
+reference.
+Location
+L2 (m)↓
+Col. (%)↓
+Before
+TTA
+Before
+TTA
+Boston (Clean)
+0.61
+—
+0.01
+—
+Holland Village
+1.32
+1.25(+9.9%)
+0.51
+0.47(+8.0%)
+One-North
+1.06
+0.90(+35.6%)
+0.45
+0.25(+45.5%)
+Queenstown
+1.08
+0.98(+21.3%)
+0.10
+0.06(+44.4%)
+S3
+
+
+C.2. Strong-Interaction Scenarios
+Following Jiang et al. [25], we mine strong-interaction
+scenes comprising less than 5% of Singapore test data. The
+Boston-trained SparseDrive model is evaluated on clean in-
+puts and four visual corruptions.
+Table S11 shows gains under every input condition. Av-
+eraging scores over the four corruptions, L2 and collision
+rate decrease by 7.3% and 49.8% relative to the matched
+unadapted scores.
+Table S11. Planning on strong-interaction scenes. Before and
+TTA use the same input condition; AVG excludes Clean.
+Condition
+L2 (m)↓
+Col. (%)↓
+Before TTA Before TTA
+Clean
+0.84
+0.78
+1.15
+0.29
+Gaussian
+0.98
+0.95
+1.09
+0.44
+Fog
+0.86
+0.74
+0.51
+0.09
+Snow
+0.93
+0.86
+1.40
+0.89
+Brightness
+0.81
+0.77
+0.19
+0.18
+AVG
+0.90
+0.83
+0.80
+0.40
+D. Sensitivity to the Loss Weight
+We test λ ∈{0.1, 0.3, 1, 3, 10} in Eq. 4 on UniAD under
+severity-5 Gaussian noise, fixing other settings. All tested
+weights improve both metrics; λ = 1 gives the lowest L2
+and tied lowest collision rate, while λ = 10 weakens the
+gains (Table S12).
+Table S12. Sensitivity to the perception–planning loss weight on
+UniAD. Bold marks the best reported scores.
+Setting
+L2 (m)↓
+Col. (%)↓
+Without TTA
+1.38
+0.95
+λ = 0.1
+1.28
+0.72
+λ = 0.3
+1.27
+0.72
+λ = 1
+1.25
+0.72
+λ = 3
+1.27
+0.82
+λ = 10
+1.32
+0.93
+Across five architectures, λ = 1 is best in seven of ten
+model–metric combinations, and λ = 3 in the remaining
+three (Table S13), supporting 1 as a shared default.
+E. Extended Component Ablation Studies
+We extend the main UniAD ablation (Table 5) to ST-P3 and
+SparseDrive under severity-5 Gaussian noise.
+E.1. Ablation on ST-P3
+On ST-P3, the joint objective improves both metrics over ei-
+ther loss alone. Stabilization further raises L2 recovery from
+27.9% to 34.3%, with 31.3% collision recovery (Table S14).
+Table S13. Best loss weight across architectures. Each column
+gives the best tested weight for its metric.
+Model
+Best λ (L2)
+Best λ (Col.)
+ST-P3 [21]
+1
+1
+UniAD [22]
+1
+1
+DistillDrive [63]
+3
+3
+SparseDrive [48]
+3
+1
+DiffusionDrive [32]
+1
+1
+Table S14. Component ablation on ST-P3. Notation follows
+Table 5.
+Component
+L2 (m)↓
+Col. (%)↓
+Lmm Ltemp St
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+-
+-
+- 2.51 5.22 8.13
+5.29
+0.89 5.08 9.42
+5.13
+✓
+-
+- 2.39 4.74 7.16 4.76(+26.4%) 0.66 4.13 7.66 4.15(+27.8%)
+-
+✓
+- 2.39 4.74 7.19 4.77(+25.9%) 0.71 3.96 7.93 4.20(+26.4%)
+✓
+✓
+- 2.38 4.70 7.12 4.73(+27.9%) 0.66 3.86 7.49 4.00(+32.1%)
+✓
+✓
+✓2.29 4.57 6.95 4.60(+34.3%) 0.46 3.88 7.76 4.03(+31.3%)
+E.2. Ablation on SparseDrive
+Table S15 examines objective combinations on SparseDrive.
+The full method improves both average metrics over the
+joint-loss variant, achieving 26.7% L2 recovery and 27.3%
+collision recovery.
+Table S15. Component ablation on SparseDrive under severity-
+5 Gaussian noise. Notation follows Table 5.
+Component
+L2 (m)↓
+Col. (%)↓
+Lmm Ltemp St
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+-
+-
+- 0.36 0.73 1.25
+0.78
+0.06 0.27 0.90
+0.41
+✓
+-
+- 0.36 0.71 1.20 0.75(+20.0%) 0.06 0.22 0.77 0.35(+18.2%)
+-
+✓
+- 0.36 0.71 1.19 0.75(+20.0%) 0.13 0.22 0.64 0.33(+24.2%)
+✓
+✓
+- 0.35 0.71 1.20 0.75(+20.0%) 0.06 0.23 0.76 0.35(+18.2%)
+✓
+✓
+✓0.36 0.70 1.16 0.74(+26.7%) 0.10 0.22 0.64 0.32(+27.3%)
+E.3. Within-Scene Continual Adaptation
+Table S16 expands Figure 4, comparing the full method with
+removal of St while retaining both losses. Frames 1–5 have
+zero RR.
+Recovery fluctuates with driving conditions but generally
+increases during adaptation. The full method gives higher
+RR after frames 1–5 on UniAD and SparseDrive, and from
+frames 11–15 on DistillDrive. In SparseDrive frames 21–25,
+it achieves 25.83% RR versus −27.53% without St, illus-
+trating reduced local degradation.
+F. Implementation Details and Task Coupling
+F.1. Scope of Normalization Adaptation
+Only selected normalization scale and bias tensors are
+adapted: LayerNorm in transformer models and BatchNorm
+S4
+
+
+Table S16. Teacher–student stabilization during within-scene
+continual adaptation. L2 is in meters and RR is in percent. Bold
+marks better adapted scores; ties are unbolded. Dashes denote
+unavailable L2 values.
+(a) UniAD
+Frames Noisy L2
+Full P2-TTA
+w/o St
+L2↓
+RR↑
+L2↓
+RR↑
+1–5
+2.6554
+2.655
+0.00
+2.655
+0.00
+6–10
+1.2891
+1.228 16.57 1.245 11.95
+11–15
+1.3711
+1.275 22.37 1.311 14.10
+16–20
+1.3905
+1.280 21.93 1.324 13.24
+21–25
+1.3996
+1.280 23.04 1.328 13.69
+26–30
+1.4308
+1.286 26.97 1.338 17.29
+31–35
+1.4343
+1.301 27.02 1.335 20.07
+(b) SparseDrive
+Frames Noisy L2
+Full P2-TTA
+w/o St
+L2↓
+RR↑
+L2↓
+RR↑
+1–5
+1.7575
+1.757
+0.00
+1.757
+0.00
+6–10
+1.5492
+1.440 25.35 1.475
+17.30
+11–15
+1.5653
+1.361 45.14 1.406
+35.16
+16–20
+1.4286
+1.280 40.27 1.337
+24.75
+21–25
+1.3325
+1.283 25.83 1.385 −27.53
+26–30
+1.3984
+1.276 42.17 1.377
+7.35
+31–35
+1.4347
+1.280 45.71 1.325
+32.54
+(c) DistillDrive
+Frames Noisy L2
+Full P2-TTA
+w/o St
+L2↓
+RR↑
+L2↓
+RR↑
+1–5
+0.900
+—
+0.00
+—
+0.00
+6–10
+0.783
+0.747 24.22 0.731 31.51
+11–15
+0.793
+0.713 39.75 0.725 33.88
+16–20
+0.756
+0.704 43.80 0.726 33.84
+21–25
+0.715
+0.681 53.87 0.717 37.59
+26–30
+0.736
+0.698 46.39 0.750 22.84
+31–35
+0.737
+0.688 50.75 0.694 47.98
+in ST-P3. Table S17 counts affine scalars, excluding running
+statistics, optimizer states, and EMA copies.
+Table S17. Normalization parameter budgets for the profiled
+models. Component counts are exact numbers of selected affine
+scalars. Shared/perception includes shared feature-processing mod-
+ules. ST-P3 uses BatchNorm; the other rows use LayerNorm.
+Model
+Shared/perc. Planning
+Total Table 7
+UniAD
+25,088
+5,120 30,208 30.21K
+ST-P3
+256
+928
+1,184
+1.18K
+DiffusionDrive
+6,144
+2,560
+8,704
+8.70K
+SparseDrive
+6,144
+1,536
+7,680
+7.68K
+DistillDrive
+6,144
+1,536
+7,680
+7.68K
+CoIRL-AD
+0
+1,536
+1,536
+1.54K
+F.2. Model-Specific Adaptation on nuScenes
+All models use observed ego motion for temporal consis-
+tency; parameter counts are in Table S17.
+UniAD links perception and planning through BEV-query
+transformers. Entropy uses ten-class sigmoid scores from six
+classification branches; selected LayerNorm modules cover
+the perception transformer, ego-state embedding, classifica-
+tion branches, and planning attention/fusion.
+ST-P3 uses dense spatiotemporal BEV features. Entropy
+uses softmax vehicle/pedestrian segmentation probabilities;
+adaptation targets BatchNorm affine parameters in segmen-
+tation heads and planning channel-reduction blocks, with
+running statistics fixed.
+SparseDrive, DistillDrive, and nuScenes Diffusion-
+Drive use sparse perception with ego planning, multi-mode
+planning distillation, and diffusion trajectory decoding, re-
+spectively. Entropy uses sigmoid object scores from six
+detection refinement stages. Selected LayerNorm modules
+lie in detection classification branches, the planning-anchor
+encoder, and the respective planning classification branches.
+CoIRL-AD combines imitation and reinforcement learn-
+ing in a latent world model. Its imitation pathway lacks
+a trained probabilistic perception head, so adaptation uses
+temporal consistency alone. LayerNorm parameters in way-
+point attention are adapted, with the reinforcement-learning
+branch frozen.
+F.3. Implementation Details of TTA Baselines
+The main baselines share our objective and loss weight
+(Eq. 4), selected UniAD LayerNorm parameters, and per-
+scene reset rule.
+Perception entropy uses ten-class sig-
+moid scores from six classification branches, averaged over
+branches, queries, and classes; temporal consistency uses
+recomputed historical plans and observed ego motion.
+Tent [53] directly minimizes the shared objective.
+EATA [35] retains reliability/diversity filtering and EWC;
+EATA–E removes EWC. SAR [36] retains reliability
+filtering, sharpness-aware updates, and model recovery.
+CoTTA [57] retains its EMA teacher and stochastic source
+restoration.
+F.4. Baselines with Their Original Adaptation Ob-
+jectives
+Table S18 evaluates the original perception-entropy objec-
+tives on UniAD under severity-5 Gaussian noise, with-
+out temporal planning consistency. Tent, EATA, EATA–E,
+and SAR adapt perception-branch LayerNorm parameters;
+EcoTTA adapts its lightweight perception modules. Each
+retains its own update mechanism.
+The strongest recoveries are 9.1% for L2 and 16.7%
+for collisions, versus 15.8% and 32.8% under the shared
+perception–planning objective in Table 6. This compari-
+son supports accounting for downstream planning during
+S5
+
+
+adaptation.
+Table S18. TTA baselines with their original adaptation ob-
+jectives on UniAD. L2 error and collision rate at each prediction
+horizon under severity-5 Gaussian noise.
+Method
+L2 (m)↓
+Col. (%)↓
+1s
+2s
+3s
+AVG
+1s
+2s
+3s
+AVG
+Without TTA
+0.60 1.29 2.25
+1.38
+0.81 0.83 1.23
+0.95
+Tent [53]
+0.58 1.28 2.24 1.37(+2.3%) 0.81 0.96 1.05
+0.94(+1.5%)
+EcoTTA [47]
+0.60 1.29 2.24
+1.38(0.0%)
+0.83 0.83 1.13
+0.93(+3.0%)
+EATA [35]
+0.55 1.26 2.23 1.35(+6.8%) 0.76 0.75 1.01 0.84(+16.7%)
+EATA–E [35] 0.53 1.25 2.23 1.34(+9.1%) 0.71 0.91 1.05
+0.89(+9.1%)
+SAR [36]
+0.56 1.27 2.24 1.36(+4.5%) 0.76 0.78 1.05 0.86(+13.6%)
+G. Case Study and Error Correlation Analysis
+G.1. Qualitative Success and Failure Cases
+Case1
+Case2
+Case3
+Case4
+Figure S1. Qualitative trajectory comparisons before and after
+TTA. Ground Truth (blue), Before TTA (orange), and After TTA
+(purple) denote the reference, pretrained, and adapted trajectories,
+respectively. Cases 1–2 illustrate successful corrections; Cases 3–4
+show remaining failures.
+In Figure S1, Cases 1–2 show closer alignment with
+ground truth under Gaussian noise and brightness corruption.
+Case 3, using a non-default configuration, overshoots to the
+opposite side of the reference; Case 4 becomes smoother but
+has higher L2 error, showing that smoothness and displace-
+ment accuracy can disagree.
+(a) Absolute L2 Improvement
+(b) Relative L2 Improvement
+Figure S2. Scenario-level L2 changes under severe Gaussian
+noise. Absolute (a) and relative (b) reductions are plotted against
+the unadapted L2 error. Blue and orange points denote improved
+and degraded scenarios, respectively; fitted trends and correlation
+statistics summarize the relationship with initial error.
+G.2. Scenario-Level Error Analysis
+Figure S2 relates absolute and relative L2 reductions to un-
+adapted errors under severity-5 Gaussian noise. Larger initial
+errors tend to accompany larger reductions, although some
+scenarios deteriorate after adaptation.
+H. Closed-Loop Evaluation on Bench2Drive
+Table
+S19
+evaluates
+five
+models
+on
+the
+ten-route
+Bench2Drive [24] DEV10 subset under severity-5 Gaussian
+noise. Clean and Noisy are unadapted controls on matched
+routes; TTA uses corrupted inputs. When several configura-
+tions are available, we report the one with highest adapted
+Driving Score.
+Driving Score (DS) combines route completion and in-
+fraction penalties; SR and Col. are percentages of successful
+routes and routes with collisions. RR follows Appendix A.1;
+dashes indicate zero clean-to-noisy gaps.
+DS improves on all five models. TransFuser++ reduces
+collision rate from 70% to 40%, and SimLingo improves
+DS, SR, and collision rate. These results complement the
+UniAD cut-in case in Figure 3 with quantitative closed-loop
+evidence.
+S6
+
+
+Front View, Frame 103
+Front View, Frame 113
+­20
+­15
+­10
+­5
+0
+5
+10
+15
+­8
+­4
+0
+4
+8
+Lateral (m)
+BEV View
+Forward (m)
+Before TTA
+After TTA
+Front View, Frame 990
+Front View, Frame 1000
+­20
+­15
+­10
+­5
+0
+5
+10
+15
+­8
+­4
+0
+4
+8
+Lateral (m)
+BEV View
+Forward (m)
+Before TTA
+After TTA
+Figure S3. Additional closed-loop cases on Bench2Drive. Top: pedestrian crossing. Bottom: road departure. Each row shows two
+front-camera frames and the executed trajectories in BEV. Orange and purple denote Before TTA and After TTA, respectively.
+Table S19. Closed-loop results on Bench2Drive. Results on the
+ten-route DEV10 subset under severity-5 Gaussian noise.
+Setting
+DS↑
+SR (%)↑
+Col. (%)↓
+DriveTransformer
+Clean
+55.34
+30
+50
+Noisy
+38.74
+30
+70
+TTA
+43.74(+30.09%)
+30(—)
+70(0%)
+TCP-traj
+Clean
+54.56
+20
+60
+Noisy
+52.14
+20
+70
+TTA
+56.01(+159.88%)
+30(—)
+60(+100%)
+SparseDriveV2
+Clean
+82.57
+60
+20
+Noisy
+40.56
+10
+80
+TTA
+45.28(+11.25%)
+10(0%)
+80(0%)
+TransFuser++
+Clean
+73.42
+40
+30
+Noisy
+50.01
+20
+70
+TTA
+59.34(+39.85%)
+20(0%)
+40(+75.00%)
+SimLingo
+Clean
+89.00
+70
+20
+Noisy
+68.63
+40
+40
+TTA
+74.24(+27.56%)
+60(+66.67%)
+30(+50.00%)
+Figure S3 presents two additional closed-loop cases on
+Bench2Drive. In the pedestrian-crossing case, P2-TTA en-
+ables earlier deceleration to yield to the crossing pedestrian.
+In the road-departure case, the unadapted vehicle leaves the
+road, whereas the adapted vehicle remains within the road
+boundaries. These examples illustrate corrections in both
+interaction handling and road adherence during closed-loop
+execution.
+I. Limitations and Future Work
+Future work will study when to trigger, pause, and resume
+adaptation using unlabeled signals, and how to adjust up-
+date step sizes dynamically to balance adaptation speed and
+stability under changing conditions.
+S7

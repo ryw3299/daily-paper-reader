@@ -1,0 +1,185 @@
+{
+  "date": "20261126",
+  "date_label": "",
+  "generated_at": "2026-11-26 02:39:13 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.32209v1",
+      "route": "202611/26/2611.32209v1-xmind-thinking-twice-via-cross-memory-reasoning-for-llm-based-autonomous-driving",
+      "title": "XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving",
+      "section": "deep",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 8.0,
+      "evidence": "具备跨记忆推理的记忆增强LLM驾驶智能体",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.31063v1",
+      "route": "202611/26/2611.31063v1-from-local-errors-to-system-failures-modeling-and-benchmarking-error-propagation-in-multi-agent-llm-systems",
+      "title": "From Local Errors to System Failures: Modeling and Benchmarking Error Propagation in Multi-Agent LLM Systems",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "建模并评测多智能体大模型系统的错误传播，支撑知识增强智能体鲁棒性评估",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.25705v2",
+      "route": "202611/26/2611.25705v2-stark-moving-towards-personalized-agents-that-truly-learn-and-remember",
+      "title": "STARK: Moving towards Personalized Agents That Truly Learn and Remember",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "in-car-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "以节点与边构成的双图记忆支撑个性化智能体",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.29123v1",
+      "route": "202611/26/2611.29123v1-your-diffusion-based-driving-planner-only-needs-a-nudge",
+      "title": "Your Diffusion-Based Driving Planner Only Needs a Nudge",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "self-driving"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "基于扩散模型的驾驶规划器，用强化学习轻推策略提升闭环安全性",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.29709v1",
+      "route": "202611/26/2611.29709v1-cache-the-knowledge-not-just-the-prompt-dynamic-datalog-as-the-action-language-for-llm-agents",
+      "title": "Cache the Knowledge, Not Just the Prompt: Dynamic Datalog as the Action Language for LLM Agents",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "LLM智能体借助缓存Datalog求值查询知识图谱",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.29947v1",
+      "route": "202611/26/2611.29947v1-sage-drive-benefit-aware-adaptive-reasoning-for-autonomous-driving-planning",
+      "title": "SAGE-Drive: Benefit-Aware Adaptive Reasoning for Autonomous Driving Planning",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向自动驾驶规划的自适应显式推理框架",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.30739v1",
+      "route": "202611/26/2611.30739v1-coordinating-perception-and-planning-for-test-time-adaptation-in-end-to-end-driving-under-distribution-shifts",
+      "title": "Coordinating Perception and Planning for Test-Time Adaptation in End-to-End Driving under Distribution Shifts",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "self-driving"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "在端到端驾驶中协同感知与规划的测试时自适应框架",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.31240v1",
+      "route": "202611/26/2611.31240v1-pruning-autonomous-driving-vlas-what-to-preserve-for-reasoning-and-action",
+      "title": "Pruning Autonomous Driving VLAs: What to Preserve for Reasoning and Action",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "self-driving"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "保留场景理解与轨迹预测的驾驶VLA模型结构化剪枝",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.32216v1",
+      "route": "202611/26/2611.32216v1-nativedrive-native-multimodal-foundations-for-autonomous-driving",
+      "title": "NativeDrive: Native Multimodal Foundations for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "self-driving"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向场景理解与动作预测的端到端多模态驾驶框架",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.32510v1",
+      "route": "202611/26/2611.32510v1-geovldrive-geometry-grounded-vision-language-reasoning-for-autonomous-driving",
+      "title": "GeoVLDrive: Geometry-Grounded Vision-Language Reasoning for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向自动驾驶推理与规划的视觉-语言-动作规划器",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    },
+    {
+      "paper_id": "2611.32964v1",
+      "route": "202611/26/2611.32964v1-benchmarking-evidence-sufficiency-in-vision-language-models-for-autonomous-driving",
+      "title": "Benchmarking Evidence Sufficiency in Vision-Language Models for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "驾驶视觉语言模型证据充分性与弃答的基准评测",
+      "first_seen_at": "2026-11-26 02:39:13 UTC",
+      "updated_at": "2026-11-26 02:39:13 UTC"
+    }
+  ]
+}
