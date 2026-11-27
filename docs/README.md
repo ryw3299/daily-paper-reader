@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-26</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-27</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>10</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-26 02:39:13 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-27 02:51:30 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精选 11 篇论文，精读 1 篇、速读 10 篇，重点聚焦自动驾驶中的跨记忆推理。最值得关注的是 XMind 通过“想两次”的跨记忆推理提升 LLM 自动驾驶决策（8.0/10），以及多智能体 LLM 系统中的错误传播建模与基准（7.0/10）。建议普通读者优先阅读这两篇，并顺带了解个性化智能体记忆学习与扩散规划器微调这两个方向。</p>
+<p>今日速读 6 篇，全部集中在自动驾驶视觉-语言-动作模型方向，其中 3 篇重点篇目已标注评分。</p>
+<p>最值得看的是两篇 7.0 分工作：VLG-Drive 把视觉-语言与几何先验统一进驾驶框架，Commit2Drive 则把感知落地的语言决策当作“承诺”来约束轨迹规划。</p>
+<p>普通读者可先读这两篇的摘要与方法图建立直觉，再翻《Attention Is Not Relevance》——它提醒注意力权重并不等于因果重要性，正好帮你带着批判眼光看前两篇。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +80,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving">XMind: Thinking Twice via Cross-Memory Reasoning for LLM-Based Autonomous Driving</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">10 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="From Local Errors to System Failures: Modeling and Benchmarking Error Propagation in Multi-Agent LLM Systems">From Local Errors to System Failures: Modeling and Benchmarking Error Propagation in Multi-Agent LLM Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="STARK: Moving towards Personalized Agents That Truly Learn and Remember">STARK: Moving towards Personalized Agents That Truly Learn and Remember</span></li><li><span class="dpr-home-dashboard-paper-title" title="Your Diffusion-Based Driving Planner Only Needs a Nudge">Your Diffusion-Based Driving Planner Only Needs a Nudge</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving">VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models">Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Attention Is Not Relevance: Challenging the Causality of Attention in Autonomous Driving">Attention Is Not Relevance: Challenging the Causality of Attention in Autonomous Driving</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>5</strong></span><span class="dpr-home-dashboard-tag">self-driving <strong>4</strong></span><span class="dpr-home-dashboard-tag">in-car-agent <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">self-driving <strong>5</strong></span><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span></div>
 </section>
 </div>
 

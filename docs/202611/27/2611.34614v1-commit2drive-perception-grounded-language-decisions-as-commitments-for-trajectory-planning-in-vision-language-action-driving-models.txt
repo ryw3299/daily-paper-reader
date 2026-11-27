@@ -1,0 +1,1496 @@
+Title: Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models
+
+URL Source: https://arxiv.org/pdf/2611.34614v1
+
+Published Time: Thu, 26 Nov 2026 03:29:05 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+# Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models 
+
+## Zikai Zhang Hubert P. Shum Toby Breckon †
+
+## Department of Computer Science, Durham University 
+
+{zikai.zhang, hubert.shum, toby.breckon }@durham.ac.uk optional 
+
+(a) Consistency between language decision and action 
+
+Question: What actions should the car be taking? 
+
+T1 T1 
+
+decision: keep 
+
+18 m in 3 s 
+
+action: stop 
+
+after 7 m 
+
+decision = action stop line 
+
+VLM-based E2E 
+
+VLM-based E2E methods 
+
+Mismatch in decision-action, contradictory text 
+
+Perception: “… its color is red, indicating that the vehicle should stop and wait .” 
+
+Behavior: “You should accelerate 
+
+and lanefollow.” 
+
+contradicts the perception 
+
+Action: “The car should be 
+
+<maintain_moderate_speed> …” 
+
+but the action stops within 7 m 
+
+Consistent decision, action and text 
+
+Perception: “Traffic light: red ,affects ego.” 
+
+Behavior: “You should stop and go straight. The traffic light affecting the ego vehicle is red .” 
+
+agrees with the perception 
+
+Action: “The car should be 
+
+MindDrive                   
+
+> token: stop slow keep accel expert m/s
+> 0123 s 0123 s
+> Does the output follow the token?
+> MindDrive ours % of 3,434 frames
+> 050 100
+> 27
+> 100
+> stop
+> 30
+> 100
+> slow
+> 30
+> 99
+> keep
+> 28
+> 99
+> accel
+> How far apart are two candidates?
+> 010 20 m
+> density (log)  MindDrive: mean 0.51 m
+> ours: mean 8.38 m
+
+(c) Comparison of different VLA paradigms 
+
+(i) Independent outputs 
+
+OmniDrive, ORION VLM Driving decision Trajectory 
+
+(ii) Decision as an index 
+
+MindDrive, DriveMA 
+
+Decision Expert Action Expert Trajectory 
+
+Decision Expert 
+
+> commit
+
+(d, θ) Trajectory 
+
+> Rule-based decider
+
+hidden state Commit2Drive 
+
+Commit2Drive (ours) 
+
+admissible: 
+
+stop, slow 
+
+<commit> ...” (d, θ) = (stop, 7 m)      
+
+> lookup stop slow keep accel +θcode z
+
+and the action stops within 7 m 
+
+(b) How does the language decision select a candidate trajectory? 
+
+Commit2Drive (ours) 
+
+> 0510
+> expert: stop
+> accel keep slow stop
+> one motion for all tokens
+> accel keep slow stop
+> four motions, one per token
+> decision tokens with semantics
+> separation of two candidate trajectories
+> parallel outputs, no connection index without semantics, no constraint
+
+(iii) Decision as a consistency constraint 
+
+Commit2Drive (ours) 
+
+extensible to rule-based decisions 
+
+code z
+
+Figure 1. Comparison of Commit2Drive with existing VLA driving models. (a) Existing VLM-based models state a decision that contradicts their own action, while the decision and the action of Commit2Drive are consistent. (b) The decision tokens of MindDrive lead to nearly the same trajectory, while those of Commit2Drive lead to distinct motions. (c) Paradigms of VLA models: independent outputs, the decision as an index, and the decision as a consistency constraint (ours). 
+
+## Abstract 
+
+Vision-Language-Action (VLA) models introduce language reasoning into end-to-end autonomous driving. They out-put a language decision together with a trajectory, which makes the planner more interpretable. However, in exist-ing methods the language decision is either an independent output or an index that selects among similar candidate tra-jectories, and its annotations are not verified against the trajectory. As a result, the language decision and the trajec-tory are often inconsistent in closed-loop driving. To address 
+
+†Corresponding author. 
+
+this, we propose Commit2Drive, a framework that imposes the language decision as a consistency constraint on trajec-tory planning. The decision is a commitment, a maneuver class with a continuous parameter that one deterministic rule reads from any trajectory, and it is grounded in facts reported by the perception of the model itself. A Maneu-ver Bank maps the commitment to a code with a kinematic meaning, and consistency losses train the planner to execute every admissible decision of a scene, so that the trajectory follows the decision. An automatic data pipeline supplies the supervision. Decisions are labeled from the future motion of the expert, counterfactual executions train the decision 
+
+1arXiv:2611.34614v1 [cs.CV] 25 Nov 2026 and the trajectory together, and rule-based functions with a Vision-Language Model (VLM) generate, review and re-fine the language annotations. The code is a lookup that involves no hidden state of the language model, so Com-mit2Drive is extensible to rule-based decisions, which the same planner executes without retraining. Commit2Drive uses a 0.5B language model and runs closed-loop inference online on a single consumer graphics card. On Bench2Drive, Commit2Drive reaches a Driving Score (DS) of 78.50 and a Success Rate (SR) of 55.91% with a lightweight model, which is competitive with the state of the art, and greatly reduces the language-action inconsistency. Code will be released soon. 
+
+## 1. Introduction 
+
+Autonomous driving requires a model to understand com-plex traffic scenes and to plan safe trajectories. Traditional End-to-End (E2E) methods [3, 15, 23, 24] integrate percep-tion, prediction and planning into one differentiable network and map sensor inputs directly to trajectories. These meth-ods have made great progress, but they work as black boxes and give no explanation for the trajectory they output. With the rapid progress of Vision-Language Models (VLMs) in visual understanding and reasoning, recent work extends them to Vision-Language-Action (VLA) models for driv-ing [9, 10, 18, 39, 46, 64]. A VLA model outputs chain-of-thought reasoning or a language decision together with the trajectory. This paradigm improves generalization with the world knowledge of the VLM, and it lets human drivers understand the decisions of the model. Most current VLA models produce the two outputs in parallel (Fig. 1c). OmniDrive [48] lets the language head output both the language decision and the trajectory as text [18, 35, 46, 55]. Text tokens are discrete and carry no notion of numerical distance, so waypoints generated token by token are not precise enough [9]. ORION [9] improves on this design and predicts the waypoints with a separate nu-merical planner [32, 39, 50]. Combined with Reinforcement Learning (RL) post-training on the trajectory [10, 32], this design alleviates the above problem to some extent. How-ever, neither design constrains the two outputs, which are often inconsistent [34, 37, 59]. On Bench2Drive [22], the decision stated by MindDrive contradicts its own planned trajectory on the vast majority of the frames (Fig. 1a and Tab. 2). This is because the language annotations of the training data are not checked against the expert trajectory, and no explicit constraint links the decision to the trajec-tory. The trajectory is usually the more accurate of the two (Sec. 4.2), because subsequent training, including RL post-training, mainly rewards the trajectory and neglects the language decision. As a result, the language decision becomes redundant, and the interpretability that the VLA paradigm promises is greatly limited. Recent methods such as MindDrive [10] and DriveMA [62] attempt to solve this problem, but they align the two outputs only in form and do not effectively constrain their consistency. The decision token of MindDrive selects among candidate trajectories that fall into the same maneuver class on most frames, so it is an index without a meaning (Fig. 1b). DriveMA considers the future motion of the expert only in the labels of the language decision and does not resolve the contradictions inside the chain-of-thought reasoning. A data pipeline that enforces the consistency of the whole annotation is still missing. To address this challenge, we propose Commit2Drive, a VLA framework that imposes the language decision as a consistency constraint on trajectory planning (Fig. 1c). Specifically, the language decision is stated as a commitment ,which consists of a maneuver class, such as slow down, and a target value, such as the speed to reach. Facts reported by the perception of the model rule out the decisions that the scene does not allow. A Maneuver Bank then maps the commitment to a code with a kinematic meaning, and the planner generates the trajectory conditioned on this code. To make the planner follow the decision, we design consis-tency losses that supervise every admissible decision of a scene, with the expert trajectory for the decision of the ex-pert and a counterfactual execution for each alternative. To provide the supervision, we build an automatic data pipeline in which rule-based functions and a VLM generate, review and refine the language annotations. In addition, the map-ping takes only a decision as input, so the framework is extensible to mature rule-based decision modules, which can be plugged in without modification. Extensive experi-ments on the closed-loop Bench2Drive benchmark show that Commit2Drive, with a lightweight 0.5B language model, is competitive with the state of the art, reaching a Driving Score (DS) of 78.50 and a Success Rate (SR) of 55.91%, and reduces the inconsistency between the language decision and the planned trajectory to 1.8%. Our main contributions are summarized as follows: • We propose Commit2Drive, a language-constrained plan-ning framework for VLA autonomous driving models. By introducing a Maneuver Bank and consistency losses, Commit2Drive turns the language decision from a mode in-dex into a semantic constraint that the trajectory is trained to satisfy, substantially improving the consistency between language decisions and planned trajectories. • We introduce an automatic data pipeline that combines rule-based functions with a VLM to generate, review and refine language annotations, reducing their reasoning con-tradictions. To the best of our knowledge, it is the first to ground counterfactual reasoning in the facts of visual perception and to train the language decision and the tra-jectory on it together, so that the two outputs of the model stay consistent. 2• Extensive experiments demonstrate the effectiveness of Commit2Drive, achieving 78.50 DS and 55.91% SR on the Bench2Drive benchmark with a lightweight 0.5B language model. The lookup of the Maneuver Bank also decouples the language decision from the hidden states of the lan-guage model, which makes the framework extensible to rule-based decisions. 
+
+## 2. Related Work 
+
+We review E2E driving and language-action consistency. 
+
+2.1. End-to-End Autonomous Driving 
+
+E2E autonomous driving learns perception, prediction and planning in one differentiable network that maps sensor in-puts to trajectories [3, 13, 15, 24, 51]. UniAD [15] and VAD [24] unify several tasks on bird’s-eye-view represen-tations, and GenAD [61] and DiffAD [49] model planning as a generative problem. However, these models lack the reasoning ability and common sense that complex scenar-ios require, so recent methods build driving models on VLMs [30, 33, 43, 63]. DriveGPT4 [55], EMMA [18] and OmniDrive [48] output control signals or trajectories as text. Senna [25] and DriveVLM [46] pair a VLM with a separate planner, and ORION [9] links the VLM to a generative plan-ner with a planning token. AutoVLA [64], ReCogDrive [32] and AlphaDrive [26] are further optimized with RL. Mind-Drive [10] uses a Decision Expert and an Action Expert that share one language model, and optimizes its language decisions with trajectory-level rewards in online RL. 
+
+2.2. Language-Action Consistency 
+
+The explanation of a model need not reflect the computation behind its prediction [19, 29, 47]. In driving, prior works align textual explanations or reasoning with the predicted actions [17, 27, 28]. SimLingo [39] trains the planner on simulated alternative futures to follow language instructions. Alpamayo-R1 [50] rewards the consistency between reason-ing and action in RL post-training, and CF-VLA [38] revises its meta-actions by counterfactual reflection. DriveMA [62] labels meta-actions from the future motion of the expert, generates the meta-action before the trajectory and rewards their agreement. Audits find the reasoning of driving VLMs and VLA models often ungrounded or weakly coupled to the trajectory [34, 37, 53], and run-time monitors flag or reject such mismatches [52, 59]. These methods measure or en-courage consistency through data, losses and rewards, while guaranteed constraints rely mainly on rule-based executors and shields outside VLA planners [1, 5, 14, 40, 41]. 
+
+## 3. Method 
+
+In this section, we present Commit2Drive in detail. As illus-trated in Fig. 2, following MindDrive [10], Commit2Drive comprises a Decision Expert and an Action Expert, which share one VLM and differ only in their Low-Rank Adapta-tion (LoRA) [12] parameters. The Decision Expert serves as the language decision head and states the driving decision, while the Action Expert serves as the trajectory execution head and generates the trajectory. We first formulate tra-jectory planning under a language consistency constraint (Sec. 3.1). We then introduce the consistent language-action mapping, which maps the language decision to a code with a kinematic meaning through a Maneuver Bank and trains the Action Expert with consistency losses to follow it (Sec. 3.2). Next, the counterfactual decision-action data pipeline pairs every admissible decision of a scene with a trajectory, and reviews and refines the language annotations (Sec. 3.3). Finally, the mapping makes Commit2Drive extensible to rule-based decisions, which drive the same Action Expert (Sec. 3.4). 
+
+3.1. Problem Formulation 
+
+We formulate end-to-end autonomous driving as generating a set of N candidate trajectories A and determining the opti-mal trajectory a∗ from the surrounding visual information 
+
+V and the language instruction L:
+
+A = {ai}Ni=1 , ai ∼ πg (a | V, L ),a∗ = arg max 
+
+> a∈A
+
+πg (a | V, L ), (1) where ai is a trajectory of future waypoints and πg is the trajectory generation policy. MindDrive [10] further models the selection of a∗ as a decision process of the VLA model and introduces a selection policy πd:
+
+a∗ = arg max 
+
+> a∈A
+
+πd(a | V, L )
+
+| {z }
+
+> selection
+
+· πg (a | V, L )
+
+| {z }
+
+> generation
+
+. (2) From Eq. (2), the optimal trajectory depends on two policies, 
+
+πd and πg . However, the two policies are connected only by an index. The language decision selects one candidate, and no term requires this candidate to follow the decision. To solve this problem, we make the language decision d explicit and insert a consistency constraint between the two policies: 
+
+a∗ = arg max 
+
+> a∈A, d ∈D
+
+πd(d | V, L )
+
+| {z }
+
+> selection
+
+· IΦ( a) = d| {z }
+
+> consistency constraint
+
+· πg (a | V, L, d )
+
+| {z }
+
+> generation
+
+, (3) where d ∈ D is the language decision, D is the decision space, I[·] is the indicator function, Φ( a) denotes the decision that the trajectory a realizes, and the generation policy πg
+
+is conditioned on d. The decision d, which abbreviates the commitment of Sec. 3.2, is selected first, and the trajectory is generated under it (Eq. (7)). We relax the indicator into 3Language decision                                
+
+> Perception
+> Action
+> Instruction L
+> perception facts F
+> “Traffic light: red, affects ego.
+> Objects: car 19 m ahead, …”
+> Text
+> Tokenizer
+> multi-view images V
+> Vision
+> Encoder
+> Detection heads
+> Decision Expert
+> selection πd
+> Action Expert
+> generation πg
+> LLM LoRA
+> <commit>
+> “The car should stop within 17 m .”
+> STOP · 17 m SLOW KEEP ACCEL
+> red light commitment (d,θ)
+> Rule-based function r(s)
+> Consistent Language-Action Mapping
+> STOP
+> SLOW
+> KEEP
+> ACCEL
+> +
+> +
+> +
+> +
+> E[d]+ψ(d,γ(θ), γ(v0))
+> Maneuver Bank
+> dθ
+> z
+> G
+> 0
+> 5
+> m/s
+> 3 s
+> ŵ
+> Lground +Lsem +Lexec
+> Consistency losses
+> hafusion fSpeed
+> branch g
+> a
+> path branch
+> red light
+> path points
+> speed waypoints
+> consistency constraint Φ(a) = d
+> trainable
+> frozen
+
+Figure 2. Overview of Commit2Drive. From the perception facts F and the instruction L, the Decision Expert ( πd) outputs the language decision as a commitment (d, θ ) inside the admissible set. The Maneuver Bank encodes (d, θ ) into the code z and decodes a nominal speed profile ˆw; both are fused into the speed branch of the Action Expert ( πg ), whose trajectory a is trained to satisfy the consistency constraint 
+
+Φ( a) = d. Consistency losses train this mapping, and a rule-based function r(s) can issue the commitment. 
+
+the consistency losses of Sec. 3.2 and do not enforce it at inference, so the constraint is learned and not guaranteed (Sec. 4.2). 
+
+3.2. Consistent Language-Action Mapping 
+
+To satisfy Eq. (3), the language decision and the action must be consistent, and the language decision must constrain the action directly. This requires the language decision to carry semantics that the action can follow. However, in existing methods the decision reaches the action only as an index, which carries no semantics. We therefore introduce a Ma-neuver Bank, which gives the language decision a kinematic meaning and maps it to the action, and consistency losses, which train the Action Expert to follow it. 
+
+Maneuver Bank. The Decision Expert implements the selection policy πd. Its prompt carries a set of perception facts F , short sentences rendered from the detection heads of the model, which define the admissible set DF ⊆ D of the decisions that are safe and legal in the scene. At a special token <commit> , the Decision Expert states the decision as a sentence and outputs it as a commitment c = ( d, θ ), a parameterized action [11, 36], where d ∈ D F is one of four speed decisions, STOP , SLOW , KEEP and ACCEL , and θ is its target value, the stopping distance for STOP and the end speed otherwise. Both forms are supervised by the same label, which is read from the expert trajectory. The Maneuver Bank then maps the commitment to the action. It stores one learnable entry for each decision, and the decision d looks up its entry. The target value θ and the current speed v0 are encoded with Fourier features [45], passed through ψ together with d and added to the entry, which forms the commitment code z. A grounding head decodes z into a nominal speed profile ˆw, and both are fused into the speed branch of the Action Expert, which implements the generation policy πg . The Maneuver Bank is summarized as: input: c = ( d, θ ), v0,
+
+lookup: z = E[d] + ψ d, γ (θ), γ (v0),
+
+output: ˆw = G(z, v 0),a = g ha + f ([ ha; z; ˆ w; v0]) ,
+
+(4) where E[d] is the entry of decision d, γ denotes the Fourier features, ψ and f are Multi-Layer Perceptrons (MLPs), G
+
+is the grounding head, ha is the hidden state of the Action Expert, g is its speed branch, and a is the generated trajectory, one per admissible decision in the set A of Eq. (1). The lookup involves no hidden state of the language model, so the Action Expert receives exactly what the decision says. 
+
+Consistency losses. A conditioned planner can still ignore its condition. On expert data, the decision is a function of the scene, so the planner can reproduce the expert from ha
+
+alone. We therefore supervise every admissible decision of a scene. For each k ∈ D F , the target ¯ak is the expert trajec-tory if k is the decision of the expert, and a counterfactual execution of k in the same scene otherwise (Sec. 3.3). Given the commitment (k, θ k) read from ¯ak, the Maneuver Bank outputs the profile ˆwk and the Action Expert generates ak.We define three consistency losses: 
+
+Lground = ˆwk − w(¯ ak) 1,
+
+Lsem = m − ρk( ˆ wk)
+
+> +
+
+,
+
+Lexec = λp ak − ¯ak 1 + m − ρk(w(ak)) 
+
+> +
+
++ Θ( ak) − θk ,
+
+(5) where w(·) is the speed profile of a trajectory, ρk(·) is the signed distance of a speed profile to the boundary of decision 4Figure 3. Counterfactual decision-action data pipeline. From a raw log frame, rule-based functions generate the decision label, the counterfactual executions, the admissible set and the perception facts. A VLM and human experts review them; flagged records are fixed at the rule and regenerated, or refined .
+
+k under Φ, [x]+ = max( x, 0) , m is a margin, Θ( ·) reads the target value of a trajectory, and λp is a weight. The ground-ing loss Lground ties the code to the motion that executes it. The semantic loss Lsem requires the decoded profile to be read back as decision k. The execution loss Lexec teaches the Action Expert what to generate under decision k, requires the output to be read back as k with a hinge that relaxes the indicator of Eq. (3), and requires its target value to be the commanded one. The same scene now has different targets under different decisions, and only the decision tells them apart. The total consistency loss is: 
+
+Lcons = 1
+
+|D F |
+
+X
+
+> k∈D F
+
+ Lground + Lsem + Lexec 
+
+. (6) 
+
+3.3. Counterfactual Decision-Action Data Pipeline 
+
+The mapping above needs supervision that existing datasets do not provide. Their language annotations are not clearly tied to the action. A decision label often does not describe what the expert does next, and the reasoning text can con-tradict the scene or itself. Moreover, counterfactual data has not yet been used to train the language decision and the action together. To fill this gap, we build a counterfactual decision-action data pipeline. As shown in Fig. 3, rule-based functions generate the records of every frame, and a VLM reviews and refines the language annotations. The pipeline runs automatically on the raw logs of Bench2Drive [22]. 
+
+Generate. With one decision and one trajectory per scene, a model can produce both from the scene alone, without the trajectory following the decision. We therefore pair every admissible decision of a scene with a trajectory, and rule-based functions write four records for every frame. (i) 
+
+Decision label : the commitment ( ¯d, ¯θ) is read from the next 3 s of the expert trajectory and rendered as the decision sentence, so the label and the trajectory agree by construction. (ii) Counterfactual executions : for every other decision k,the path of the expert is re-timed with a speed profile of decision k, which gives a trajectory ¯ak with Φ(¯ ak) = k. It is rolled out against the logged motion of the other agents on an occupancy grid [13] and marked infeasible if it collides. (iii) Admissible set : DF keeps the decisions whose execution is feasible and that no traffic rule forbids. KEEP and ACCEL 
+
+are forbidden when the stop line of a red light or of a stop sign is within reach. (iv) Perception facts : the fact sentences, rendered from the logged scene by the templates that are used at inference. With these records, the admissible set tells the Decision Expert which decisions are admissible, and the counterfactual executions tell the Action Expert what each of them looks like (Eq. (5)). 
+
+Review and refine. A language annotation is a short chain of reasoning, and its contradictions are also learned by the model. A VLM [2] therefore takes two roles. As a blind reviewer, it judges whether a decision sentence contradicts the scene, whether a fact sentence invents or omits an object, and whether an alternative decision is safe and legal. As an editor, it revises reasoning text that contradicts itself. Errors that originate in a rule or a template are corrected at their source, and the records are regenerated and reviewed again. Finally, human experts check a random sample of the records. The resulting dataset covers the base set of Bench2Drive (Sec. C of the supplementary material). 
+
+3.4. Extensibility to Rule-Based Decisions 
+
+The mapping of Sec. 3.2 connects a coarse-grained decision to a fine-grained action. The Action Expert reads the deci-sion only through the code of Eq. (4), which involves no hidden state of the language model. The language decision and the action are therefore separable, and the Action Ex-pert does not depend on the source of the decision. Mature rule-based decision modules, such as traffic-rule logic, safety rules [41] and rule-based planners [6], already decide at this granularity. Their output can be written as a commitment and executed by the same Action Expert without modification or retraining: 
+
+a∗ = arg max 
+
+> a∈A
+
+IΦ( a) = d · πg (a | V, L, d ),d =
+
+(
+
+arg max k∈D F πd(k | V, L ), (language) 
+
+r(s), (rule) ,
+
+(7) where the first line is the action side of Eq. (3), which de-pends on the decision only through d, r is a rule-based func-tion, and s is the scene state that it reads from perception, 5such as the state of the traffic light or the time to collision. The two cases give the source of d: the Decision Expert, or the rule-based function whenever it issues a decision. Rules can therefore be added or exchanged without any change to the model. 
+
+## 4. Experiments 
+
+We evaluate Commit2Drive and ablate its components. 
+
+4.1. Experimental Settings 
+
+We detail the dataset, metrics, model and training. 
+
+Dataset. We train and evaluate Commit2Drive on Bench2Drive [22], a closed-loop benchmark for end-to-end autonomous driving based on the CARLA simulator [7]. We adopt the official base set of 1000 clips, with 950 for training and 50 for open-loop validation. The clips are annotated by our data pipeline (Sec. 3.3), which yields 234,769 training and 12,806 validation frames. Closed-loop evaluation uses the official 220 short routes across 44 interactive scenarios. 
+
+Metrics. For closed-loop evaluation, we adopt DS, SR and Multi-Ability. Following Bench2Drive [22], SR is the pro-portion of routes completed within the time limit, DS is the route completion penalized by traffic infractions, and Multi-Ability evaluates five advanced urban driving skills. To measure the consistency between the language decision and the trajectory, we further report the say-do gap: 
+
+SD = 1
+
+NfNf
+
+X
+
+> t=1
+
+IΦ( at)̸ = dt
+
+, (8) where Nf is the number of frames, dt is the decision stated at frame t and at is the planned trajectory. The say-exec gap replaces at by the executed trajectory. 
+
+Model Setting. We set the number of speed waypoints to 
+
+Ns = 6 , a future 3 s trajectory sampled at 2 Hz. The decision space of the Decision Expert includes 4 speed decisions, each with a continuous target value. Φ reads a trajectory as STOP 
+
+if its end speed is below 0.5 m/s, as SLOW or ACCEL if its speed changes by more than 1 m/s, and as KEEP otherwise. The Maneuver Bank has 4 entries of dimension 64 and uses Fourier features with 4 frequencies, and its grounding head decodes Ns speed values. The fusion MLP has a hidden size of 512 and a zero-initialized output layer. In the consistency losses, we set m = 0 .3 m/s and λp = 3 .
+
+Training Process. All models are trained on 4 NVIDIA A100 graphics cards. We employ the pretrained EVA-02-L [8] as the vision encoder and the lightweight Qwen2-0.5B [56] as the base Large Language Model (LLM). Com-mit2Drive is trained in two stages, Imitation Learning (IL) and online RL, both following MindDrive [10]. Only the Action Expert is initialized from the released checkpoint of MindDrive, which gives the trajectory generation a prior. This Action Expert has been trained by IL alone, as the on-line RL of MindDrive updates only its Decision Expert and value network. In the IL stage, the Decision Expert is fine-tuned with LoRA to state the decision, and the Maneuver Bank, the fusion MLP and the speed branch are then trained with Lcons , while all other modules are frozen. Closed-loop evaluation runs online on a single RTX 4090, and every measured result is the median over multiple random seeds. 
+
+4.2. Main Results 
+
+We compare Commit2Drive with representative methods of the traditional E2E paradigm and the VLA paradigm on Bench2Drive. Tab. 1 lists the results, and we find that: 
+
+1) Commit2Drive delivers competitive closed-loop and open-loop performance with a lightweight model. With the Qwen2-0.5B language model, Commit2Drive achieves 76.50 DS and 50.00% SR after IL, and 78.50 DS and 55.91% SR after online RL. Among the VLA models with the same lightweight LLM, it surpasses ORION [9] (72.89 DS, 45.83% SR) and is comparable to MindDrive [10], which reports 75.85 DS after IL and 78.04 DS after online RL. Sim-Lingo [39] reaches 85.07 DS with a model of similar size, but it is trained on its own dataset and not on the base set. Re-produced on our RTX 4090 ( ‡ in Tab. 1), MindDrive reaches 73.24 DS and 46.59% SR, and Commit2Drive improves over it by 5.26 DS and 9.32% SR. In Multi-Ability, it achieves a mean of 59.48%. In open loop, Commit2Drive obtains an average L2 error of 0.685 m after IL, close to MindDrive (0.69 m) and ORION with the same LLM (0.67 m), and 0.60 m after online RL. 
+
+2) The language decision of Commit2Drive is consis-tent with its trajectory. Tab. 2 compares the say-do gap of Eq. (8). MindDrive and ORION are evaluated from their released checkpoints, and their stated decisions are mapped to D (Sec. C of the supplementary material). The decision stated by MindDrive differs from its planned trajec-tory on 83.5% of the frames and from the executed trajectory on 69.6%. On the open-loop validation frames, where the expert is available, its say-do gap is 66.4%, and the lan-guage decision is wrong in 71% of these conflicts and the trajectory in 13%. In contrast, Commit2Drive reduces the say-do gap to 1.8% in closed loop on Dev10, a ten-route subset of Bench2Drive, and to 0.4% on the open-loop val-idation frames. With the decision forced to another value, the trajectory of Commit2Drive follows it on at least 99% of the frames, against 27% to 30% for MindDrive (Fig. 1b), which shows that the decision determines the trajectory. The say-exec gap of Commit2Drive is 17.2 points below that of MindDrive but remains 52.4%. With a say-do gap of 1.8%, this remainder is the gap between the plan of one step and the motion executed under re-planning, which the consistency constraint does not cover. The say-exec gap of 6Table 1. Closed-loop and multi-ability results on Bench2Drive , in the protocol and layout of MindDrive [10]. C/L: camera/LiDAR. 
+
+> ∗
+
+: expert feature distillation. §: trained on its own dataset instead of the base set. DS: driving score; SR: success rate; M: merging; O: overtaking; EB: emergency brake; GW: give way; TS: traffic sign. Avg. L2 is averaged over 2 s at 2 Hz as in UniAD [15]. Upper blocks: as published. Best among the methods trained on the base set in bold. ‡: evaluated by us on a single RTX 4090 with the official evaluator under one simulator build, median over multiple random seeds; the baselines are the released checkpoints, with reproduced numbers in italics. †:Action Expert initialized from the released MindDrive checkpoint, in which it is trained by IL only. Method LLM Reference Modality Scheme Closed-loop Ability (%) ↑ Open-loop DS ↑ SR (%) ↑ M O EB GW TS Mean Avg. L2 ↓
+
+Traditional end-to-end paradigm 
+
+TCP-traj ∗ [51] – NeurIPS 22 C IL 59.90 30.00 8.89 24.29 51.67 40.00 46.28 34.22 1.70 ThinkTwice ∗ [21] – CVPR 23 C IL 62.44 31.23 27.38 18.42 35.82 50.00 54.23 37.17 0.95 DriveAdapter ∗ [20] – ICCV 23 C&L IL 64.22 33.08 28.82 26.38 48.76 50.00 56.43 42.08 1.01 UniAD-Base [15] – CVPR 23 C IL 45.81 16.36 14.10 17.78 21.67 10.00 14.21 15.55 0.73 VAD [24] – ICCV 23 C IL 42.35 15.00 8.11 24.44 18.64 20.00 19.15 18.07 0.91 GenAD [61] – ECCV 24 C IL 44.81 15.90 – – – – – – –MomAD [44] – CVPR 25 C IL 44.54 16.71 – – – – – – 0.87 WoTE [31] – ICCV 25 C&L IL 61.71 31.36 – – – – – – –DriveTransformer-L [23] – ICLR 25 C IL 63.46 35.01 17.57 35.00 48.36 40.00 52.10 38.60 0.62 DiffAD [49] – arXiv 25 C IL 67.92 38.64 30.00 35.55 46.66 40.00 46.32 38.79 1.55 PGS [16] – NeurIPS 25 C IL 78.08 48.64 35.00 73.33 55.00 60.00 43.68 53.40 0.77 DriveDPO [42] – NeurIPS 25 C Offline RL 62.02 30.62 – – – – – – –Raw2Drive [58] – NeurIPS 25 C Online RL 71.36 50.24 43.35 51.11 60.00 50.00 62.26 53.34 –
+
+Vision-language-action paradigm 
+
+Drive-π0 [57] PaliGemma-3B arXiv 25 C IL 60.45 30.00 29.35 36.58 48.83 40.00 54.45 41.84 0.56 DriveMoE [57] PaliGemma-3B arXiv 25 C IL 74.22 48.64 34.67 40.00 65.45 40.00 59.44 47.91 0.38 
+
+ORION [9] Vicuna-7B ICCV 25 C IL 77.74 54.62 25.00 71.11 78.33 30.00 69.15 54.72 0.68 ORION [9] Qwen2-0.5B ICCV 25 C IL 72.89 45.83 26.32 62.22 55.55 50.00 63.30 51.37 0.67 UniDrive-WM [54] Vicuna-7B arXiv 26 C IL 79.22 56.36 29.81 74.04 79.84 40.00 71.30 59.01 0.64 ReCogDrive [32] Qwen2.5-7B ICLR 26 C Offline RL 71.36 45.45 29.73 20.00 69.09 20.00 71.34 42.03 –MindDriver [60] Qwen2.5-3B CVPR 26 C Offline RL 65.48 39.55 – – – – – – –AutoVLA [64] Qwen2.5-3B NeurIPS 25 C Offline RL 78.84 57.73 – – – – – – –SimLingo § [39] InternVL2-1B CVPR 25 C IL 85.07 67.27 – – – – – – –MindDrive [10] Qwen2-0.5B ECCV 26 C IL 75.85 49.30 30.26 66.67 60.00 33.33 56.91 49.44 0.69 MindDrive [10] Qwen2-0.5B ECCV 26 C Online RL 78.04 55.09 32.89 75.56 68.33 50.00 57.89 56.94 0.69 
+
+Reproduced on a local RTX 4090 
+
+ORION ‡ Vicuna-7B ICCV 25 C IL 75.40 49.55 22.78 57.78 73.33 40.00 65.26 51.83 0.69 
+
+MindDrive ‡ Qwen2-0.5B ECCV 26 C Online RL 73.24 46.59 28.48 60.00 63.33 35.00 61.05 49.57 0.69 
+
+Commit2Drive †‡ Qwen2-0.5B – C IL 76.50 50.00 30.38 66.67 61.67 40.00 57.37 51.22 0.685 
+
+Commit2Drive †‡ Qwen2-0.5B – C Online RL 78.50 55.91 32.91 75.56 70.00 60.00 58.95 59.48 0.60 Table 2. Say-do consistency on Bench2Drive. Say-do: Eq. (8); say-exec: the same with the executed trajectory. Lon.: speed decision; Yield: yielding action ( STOP or SLOW ). ORION outputs no speed token. Commit2Drive: Dev10. Say-do (%) ↓ Say-exec (%) ↓
+
+Method Lon. Yield Lon. Yield ORION [9] – 23.8 – 65.7 MindDrive [10] 83.5 19.8 69.6 59.9 
+
+Commit2Drive 1.8 (−81.7) 0.8 (−19.0) 52.4 (−17.2) 39.8 (−20.1) 
+
+SimLingo is 21.0% at a say-do gap of 49.3% (Sec. E.2 of the supplementary material). 
+
+4.3. Qualitative Results 
+
+Fig. 4 compares MindDrive and Commit2Drive on a pedestrian-crossing scenario of the Bench2Drive closed-loop evaluation. MindDrive states that it maintains a slow or mod-erate speed in all five frames, while its speed waypoints accelerate, and it hits the pedestrian 0.4 s after the last frame. We further examine the semantics of the decision on a subset of 3,434 validation frames (Fig. 1b). The seven candidate trajectories behind the speed tokens of MindDrive are nearly identical. On 86% of the frames they fall into the same deci-sion, two candidates end only 0.51 m apart on average, and the output follows its token on fewer than one third of them. In Commit2Drive, the four decisions of a scene yield distinct trajectories, 8.38 m apart on average, and the output follows the stated decision on at least 99% of the frames. 
+
+4.4. Ablation Studies 
+
+We ablate Commit2Drive and test its extensibility to rules. 
+
+Bank, data and consistency losses. Tab. 3 ablates the Ma-neuver Bank, the counterfactual data and the consistency losses of Commit2Drive. The counterfactual data matters most. With supervision on the decision of the expert only, the say-do gap rises from 2.0% to 25.0% and the DS falls by 2.9, so the Action Expert follows the decision less reliably. Further ablations are listed in Sec. E.3 of the supplementary 7T=0.00s  T=1.00s  T=2.00s  T=3.00s  T=3.50s                                                  
+
+> MindDrive  V=4.53m/s
+> Say: Maintain Slow Speed
+> Do: Accelerate
+> V=3.67m/s
+> Say: Maintain Slow Speed
+> Do: Accelerate
+> V=5.10m/s
+> Say: Maintain Moderate Speed
+> Do: Accelerate
+> V=5.12m/s
+> Say: Maintain Slow Speed
+> Do: Accelerate
+> V=4.37m/s
+> Say: Maintain Slow Speed
+> Do: Accelerate
+> Hits pedestrian
+> 0.4 s later
+> Commit2Drive  V=4.48m/s
+> Say: Keep Speed
+> Do: Keep Speed
+> V=5.13m/s
+> Say: Slow Down
+> Do: Slow Down
+> V=2.85m/s
+> Say: Stop
+> Do: Stop
+> V=0.03m/s
+> Say: Stop
+> Do: Stop
+> V=0.11m/s
+> Say: Stop
+> Do: Stop
+> Yields to pedestrian
+> MindDrive  Stop Slow Down / Slow Down Rapidly Maintain Slow / Moderate / Fast Speed Speed Up Say: selected speed token pedestrian
+> 0
+> 5
+> 10
+> 0123 s
+> m/s
+> Say Say
+> 5 m
+> 2 of 7 tokens realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say
+> Say
+> 1 of 7 tokens realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 1 of 7 tokens realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 1 of 7 tokens realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 1 of 7 tokens realized
+> Commit2Drive
+> Stop Slow Down Keep Speed Accelerate Say: stated decision pedestrian
+> 0
+> 5
+> 10
+> 0123 s
+> m/s
+> Say Say
+> 5 m
+> 4 of 4 decisions realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 4 of 4 decisions realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 4 of 4 decisions realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 2 of 2 decisions realized
+> 0
+> 5
+> 10
+> 0123 s
+> Say Say
+> 2 of 2 decisions realized
+
+Figure 4. Qualitative comparison on Bench2Drive , closed-loop route 11381 of the 220 official routes (scenario VehicleTurningRoutePedes-trian , Town12). Blue and green points are the predicted path points and speed waypoints. Say is the stated decision and Do the decision realized by the speed waypoints. MindDrive, from our log of its released checkpoint, hits the pedestrian 0.4 s after the last frame. Bottom rows: speed over the next 3 s and top view of the candidate trajectory of every speed token or decision; those of MindDrive are recomputed by replaying the logged frames. Table 3. Ablation of Commit2Drive. Each row removes one component: the Maneuver Bank (the decision is passed as an index), the counterfactual data (only the decision of the expert is supervised) or the consistency losses (Eq. (6)). L2: open-loop error at 3 s. Variant Say-do (%) ↓ L2 (m) ↓ DS ↑ SR (%) ↑
+
+Commit2Drive 2.0 1.19 76.5 50.00 w/o Maneuver Bank 15.0 (+13.0) 1.22 (+0.03) 75.2 (−1.3) 48.18 (−1.82) 
+
+w/o counterfactual data 25.0 (+23.0) 1.20 (+0.01) 73.6 (−2.9) 46.82 (−3.18) 
+
+w/o consistency losses 8.0 (+6.0) 1.21 (+0.02) 75.6 (−0.9) 48.64 (−1.36) 
+
+Table 4. Latency breakdown with rule-based decisions. Median model time per step in ms on a single RTX 4090, without simulator and control, on the Dev10 subset of Bench2Drive. Perception: vision encoder and perception heads. Decision: output of the language decision. Planner: output of the trajectory. Method Perception ↓ Decision ↓ Planner ↓ Total ↓
+
+ORION [9] 165.6 79.6 5.8 251.1 
+
+MindDrive [10] 185.3 34.5 26.3 246.2 
+
+Commit2Drive 189.8 35.5 33.1 259.8 + rule-triggered 177.0 5.4 33.0 216.7 
+
+material. 
+
+Extensibility to rule-based decisions. We test the extensi-bility of Sec. 3.4 by plugging two rule-based functions into Commit2Drive without retraining. A traffic-light rule de-cides STOP or SLOW at a red light that governs the ego lane, and a collision-avoidance rule decides STOP when a hazard is within the time-to-collision threshold. A triggered rule issues the decision in place of the Decision Expert (Eq. (7)), and the Action Expert is unchanged. On Dev10, the DS changes from 53.09 to 51.57 with the rules active. In Tab. 4, a rule-issued decision takes 5.4 ms instead of 35.5 ms, and perception accounts for most of the latency of every model. 
+
+## 5. Conclusion 
+
+In this paper, we introduce Commit2Drive, a VLA frame-work that imposes the language decision as a consistency constraint on trajectory planning. A Maneuver Bank maps the language decision to a code with a kinematic mean-ing, and consistency losses train the Action Expert to fol-low it. An automatic data pipeline, in which rule-based functions and a VLM generate, review and refine the an-notations, supplies the supervision. Extensive experiments on Bench2Drive demonstrate that Commit2Drive, with a lightweight 0.5B language model, is competitive with the state of the art and greatly reduces the inconsistency be-tween the language decision and the planned trajectory. The framework is also extensible to existing rule-based meth-ods, whose decisions drive the same Action Expert without retraining. 
+
+Limitations and Future Work. This work addresses only the say-do gap inside the model, and its driving performance exceeds the baseline by a small margin. The say-exec gap, which lies between the model and the physical execution of 8its plan, remains unsolved and is left to future work. We hope that it brings new inspiration to the autonomous driving community on the consistency between language decisions and trajectories. 
+
+## LLM Usage Statement 
+
+We used an LLM-based assistant (Claude, Anthropic) to polish the language of the manuscript, to detect writing errors, to help draft the figures, and to help write and run code for the experiments. The research idea, the method, the experiments and the writing of the paper are primarily the work of the authors, who checked all text, code and results and take full responsibility for the content. 
+
+## References 
+
+[1] Mohammed Alshiekh, Roderick Bloem, R¨ udiger Ehlers, Bet-tina K¨ onighofer, Scott Niekum, and Ufuk Topcu. Safe rein-forcement learning via shielding. In AAAI , 2018. 3 [2] Shuai Bai et al. Qwen3-VL technical report. arXiv preprint arXiv:2511.21631 , 2025. 5, 13, 15 [3] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao Yu, Katrin Renz, and Andreas Geiger. TransFuser: Imitation with transformer-based sensor fusion for autonomous driv-ing. IEEE Transactions on Pattern Analysis and Machine Intelligence , 45(11):12878–12895, 2023. 2, 3 [4] Jacob Cohen. A coefficient of agreement for nominal scales. 
+
+Educational and Psychological Measurement , 20(1):37–46, 1960. 21 [5] Erfei Cui, Wenhai Wang, Zhiqi Li, Jiangwei Xie, Haoming Zou, Hanming Deng, Gen Luo, Lewei Lu, Xizhou Zhu, and Jifeng Dai. DriveMLM: Aligning multi-modal large language models with behavioral planning states for autonomous driv-ing. Visual Intelligence , 3:22, 2025. 3 [6] Daniel Dauner, Marcel Hallgarten, Andreas Geiger, and Kashyap Chitta. Parting with misconceptions about learning-based vehicle motion planning. In CoRL , 2023. 5 [7] Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen Koltun. CARLA: An open urban driving simulator. In CoRL , 2017. 6, 19, 20 [8] Yuxin Fang, Quan Sun, Xinggang Wang, Tiejun Huang, Xin-long Wang, and Yue Cao. EVA-02: A visual representation for neon genesis. Image and Vision Computing , 149:105171, 2024. 6, 16, 18 [9] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui, Dingkang Liang, Chong Zhang, Dingyuan Zhang, Hongwei Xie, Bing Wang, and Xiang Bai. ORION: A holistic end-to-end autonomous driving framework by vision-language instructed action generation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 24823– 24834, 2025. 2, 3, 6, 7, 8, 15, 21, 22, 23, 24 [10] Haoyu Fu, Diankun Zhang, Zongchuang Zhao, Jianfeng Cui, Hongwei Xie, Bing Wang, Guang Chen, Hangjun Ye, Dingkang Liang, and Xiang Bai. MindDrive: A vision-language-action model for autonomous driving via online reinforcement learning. In ECCV , 2026. arXiv:2512.13636. 2, 3, 6, 7, 8, 12, 13, 15, 17, 18, 19, 21, 22, 23 [11] Matthew Hausknecht and Peter Stone. Deep reinforcement learning in parameterized action space. In ICLR , 2016. 4 [12] Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. LoRA: Low-rank adaptation of large language models. In In-ternational Conference on Learning Representations (ICLR) ,2022. 3 [13] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi Yan, and Dacheng Tao. ST-P3: End-to-end vision-based autonomous driving via spatial-temporal feature learning. In 
+
+Computer Vision – ECCV 2022 , pages 533–549, 2022. 3, 5, 14, 21, 22 [14] Songqiao Hu, Zeyi Liu, Shuang Liu, Jun Cen, Zihan Meng, Shihefeng Wang, Xiang Li, and Xiao He. VLSA: Vision-language-action models with plug-and-play safety constraint layer. In IROS , 2026. 3 [15] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng Dai, Yu Qiao, and Hongyang Li. Planning-oriented autonomous driv-ing. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) , pages 17853– 17862, 2023. 2, 3, 7, 21 [16] Yi Huang, Zhan Qu, Lihui Jiang, Bingbing Liu, and Hongbo Zhang. Prioritizing perception-guided self-supervision: A new paradigm for causal modeling in end-to-end autonomous driving. In Advances in Neural Information Processing Sys-tems (NeurIPS) , 2025. 7 [17] Zhijian Huang, Tao Tang, Shaoxiang Chen, Sihao Lin, Zequn Jie, Lin Ma, Guangrun Wang, and Xiaodan Liang. Mak-ing large language models better planners with reasoning-decision alignment. In Proc. European Conf. Computer Vision (ECCV) , pages 73–90, 2024. 3 [18] Jyh-Jing Hwang, Runsheng Xu, Hubert Lin, Wei-Chih Hung, Jingwei Ji, Kristy Choi, Di Huang, Tong He, Paul Covington, Benjamin Sapp, Yin Zhou, James Guo, Dragomir Anguelov, and Mingxing Tan. EMMA: End-to-end multimodal model for autonomous driving. Transactions on Machine Learning Research , 2025. 2, 3 [19] Alon Jacovi and Yoav Goldberg. Towards faithfully inter-pretable NLP systems: How should we define and evaluate faithfulness? In ACL , 2020. 3 [20] Xiaosong Jia, Yulu Gao, Li Chen, Junchi Yan, Patrick Langechuan Liu, and Hongyang Li. DriveAdapter: Breaking the coupling barrier of perception and planning in end-to-end autonomous driving. In ICCV , 2023. 7 [21] Xiaosong Jia, Penghao Wu, Li Chen, Jiangwei Xie, Conghui He, Junchi Yan, and Hongyang Li. Think twice before driving: Towards scalable decoders for end-to-end autonomous driving. In CVPR , 2023. 7 [22] Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and Junchi Yan. Bench2Drive: Towards multi-ability bench-marking of closed-loop end-to-end autonomous driving. In 
+
+NeurIPS Datasets and Benchmarks Track , 2024. 2, 5, 6, 13, 20 [23] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan. DriveTransformer: Unified transformer for scalable end-to-end autonomous driving. In ICLR , 2025. 2, 7, 20 
+
+9[24] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. VAD: Vectorized scene representation for ef-ficient autonomous driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 8340–8350, 2023. 2, 3, 7 [25] Bo Jiang, Shaoyu Chen, Bencheng Liao, Xingyu Zhang, Wei Yin, Qian Zhang, Chang Huang, Wenyu Liu, and Xinggang Wang. Senna: Bridging large vision-language models and end-to-end autonomous driving. arXiv preprint arXiv:2410.22313 ,2024. 3 [26] Bo Jiang, Shaoyu Chen, Qian Zhang, Wenyu Liu, and Xing-gang Wang. AlphaDrive: Unleashing the power of VLMs in autonomous driving via reinforcement learning and reasoning. 
+
+arXiv preprint arXiv:2503.07608 , 2025. 3 [27] Bu Jin, Xinyu Liu, Yupeng Zheng, Pengfei Li, Hao Zhao, Tong Zhang, Yuhang Zheng, Guyue Zhou, and Jingjing Liu. ADAPT: Action-aware driving caption transformer. In ICRA ,2023. 3 [28] Jinkyu Kim, Anna Rohrbach, Trevor Darrell, John Canny, and Zeynep Akata. Textual explanations for self-driving vehicles. In Proceedings of the European Conference on Computer Vision (ECCV) , pages 563–578, 2018. 3 [29] Tamera Lanham, Anna Chen, Ansh Radhakrishnan, Benoit Steiner, Carson Denison, Danny Hernandez, Dustin Li, Esin Durmus, Evan Hubinger, Jackson Kernion, et al. Measuring faithfulness in chain-of-thought reasoning. arXiv preprint arXiv:2307.13702 , 2023. 3 [30] Peizheng Li, Zhenghao Zhang, David Holtz, Hang Yu, Yutong Yang, Yuzhi Lai, Rui Song, Andreas Geiger, and Andreas Zell. SpaceDrive: Infusing spatial awareness into VLM-based autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 40096–40107, 2026. 3 [31] Yingyan Li, Yuqi Wang, Yang Liu, Jiawei He, Lue Fan, and Zhaoxiang Zhang. End-to-end driving with online trajectory evaluation via BEV world model. In ICCV , 2025. 7 [32] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. ReCogDrive: A reinforced cognitive framework for end-to-end autonomous driving. In ICLR , 2026. arXiv:2506.08052. 2, 3, 7, 21 [33] Yuechen Luo, Fang Li, Shaoqing Xu, Zhiyi Lai, Lei Yang, Qi-mao Chen, Ziang Luo, Zixun Xie, Shengyin Jiang, Jiaxin Liu, Long Chen, Bing Wang, and Zhi-xin Yang. AdaThinkDrive: Adaptive thinking via reinforcement learning for autonomous driving. In Proceedings of the IEEE International Conference on Robotics and Automation (ICRA) , 2026. 3 [34] Gabriel Manalu, Saad Wazir, Thao Do, Seongah Kim, Hyeon-taek Hwang, Tolcha Yalew Kidane, and Daeyoung Kim. Measuring the reasoning-action coupling in driving vision-language-action models through counterfactuals. arXiv preprint arXiv:2610.30953 , 2026. 2, 3 [35] Jiageng Mao, Yuxi Qian, Junjie Ye, Hang Zhao, and Yue Wang. GPT-Driver: Learning to drive with GPT. arXiv preprint arXiv:2310.01415 , 2023. 2 [36] Warwick Masson, Pravesh Ranchod, and George Konidaris. Reinforcement learning with parameterized actions. In AAAI ,2016. 4 [37] Nicanor Mayumu, Xiaoheng Deng, and Patrick Mukala. Is VLA reasoning faithful? Probing safety of chain-of-causation in autonomous driving models. arXiv preprint arXiv:2605.17268 , 2026. 2, 3 [38] Zhenghao Peng, Wenhao Ding, Yurong You, Yuxiao Chen, Wenjie Luo, Thomas Tian, Yulong Cao, Apoorva Sharma, Danfei Xu, Boris Ivanovic, Boyi Li, Yan Wang, and Marco Pavone. Counterfactual VLA: Self-reflective vision-language-action model with adaptive reasoning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4022–4031, 2026. 3 [39] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski. SimLingo: Vision-only closed-loop autonomous driving with language-action alignment. In CVPR , 2025. 2, 3, 6, 7, 12, 15, 21, 22, 23, 24 [40] Hao Sha, Yao Mu, Yuxuan Jiang, Li Chen, Chenfeng Xu, Ping Luo, Shengbo Eben Li, Masayoshi Tomizuka, Wei Zhan, and Mingyu Ding. LanguageMPC: Large language models as decision makers for autonomous driving. arXiv preprint arXiv:2310.03026 , 2023. 3 [41] Shai Shalev-Shwartz, Shaked Shammah, and Amnon Shashua. On a formal model of safe and scalable self-driving cars. 
+
+arXiv preprint arXiv:1708.06374 , 2017. 3, 5 [42] Shuyao Shang, Yuntao Chen, Yuqi Wang, Yingyan Li, and Zhaoxiang Zhang. DriveDPO: Policy learning via safety DPO for end-to-end autonomous driving. In NeurIPS , 2025. 7 [43] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song, Steven L. Waslander, Yu Liu, and Hongsheng Li. LMDrive: Closed-loop end-to-end driving with large language models. In CVPR ,2024. 3 [44] Ziying Song, Caiyan Jia, Lin Liu, Hongyu Pan, Yongchang Zhang, Junming Wang, Xingyu Zhang, Shaoqing Xu, Lei Yang, and Yadan Luo. Don’t shake the wheel: Momentum-aware planning in end-to-end autonomous driving. In CVPR ,2025. 7 [45] Matthew Tancik, Pratul P. Srinivasan, Ben Mildenhall, Sara Fridovich-Keil, Nithin Raghavan, Utkarsh Singhal, Ravi Ra-mamoorthi, Jonathan T. Barron, and Ren Ng. Fourier features let networks learn high frequency functions in low dimen-sional domains. In NeurIPS , 2020. 4, 17 [46] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, XianPeng Lang, and Hang Zhao. Drivevlm: The convergence of autonomous driving and large vision-language models. In Proceedings of The 8th Conference on Robot Learning , pages 4698–4726, 2025. 2, 3 [47] Miles Turpin, Julian Michael, Ethan Perez, and Samuel R. Bowman. Language models don’t always say what they think: Unfaithful explanations in chain-of-thought prompting. In 
+
+NeurIPS , 2023. 3 [48] Shihao Wang, Zhiding Yu, Xiaohui Jiang, Shiyi Lan, Min Shi, Nadine Chang, Jan Kautz, Ying Li, and Jose M. Alvarez. Om-niDrive: A holistic vision-language dataset for autonomous driving with counterfactual reasoning. In Proceedings of 
+
+10 the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 22442–22452, 2025. 2, 3 [49] Tao Wang, Cong Zhang, Xingguang Qu, Kun Li, Weiwei Liu, and Chang Huang. DiffAD: A unified diffusion mod-eling approach for autonomous driving. arXiv preprint arXiv:2503.12170 , 2025. 3, 7 [50] Yan Wang et al. Alpamayo-R1: Bridging reasoning and action prediction for generalizable autonomous driving in the long tail. arXiv preprint arXiv:2511.00088 , 2025. 2, 3 [51] Penghao Wu, Xiaosong Jia, Li Chen, Junchi Yan, Hongyang Li, and Yu Qiao. Trajectory-guided control prediction for end-to-end autonomous driving: A simple yet strong baseline. In NeurIPS , 2022. 3, 7 [52] Yilin Wu, Anqi Li, Tucker Hermans, Fabio Ramos, An-drea Bajcsy, and Claudia P´ erez-D’Arpino. Do what you say: Steering vision-language-action models via runtime reasoning-action alignment verification. arXiv preprint arXiv:2510.16281 , 2025. 3 [53] Shaoyuan Xie, Lingdong Kong, Yuhao Dong, Chonghao Sima, Wenwei Zhang, Qi Alfred Chen, Ziwei Liu, and Liang Pan. Are VLMs ready for autonomous driving? an empirical study from the reliability, data, and metric perspectives. In 
+
+ICCV , 2025. 3 [54] Zhexiao Xiong, Xin Ye, Burhan Yaman, Sheng Cheng, Yiren Lu, Jingru Luo, Nathan Jacobs, and Liu Ren. UniDrive-WM: Unified understanding, planning and generation world model for autonomous driving. arXiv preprint arXiv:2601.04453 ,2026. 7 [55] Zhenhua Xu, Yujia Zhang, Enze Xie, Zhen Zhao, Yong Guo, Kwan-Yee K. Wong, Zhenguo Li, and Hengshuang Zhao. DriveGPT4: Interpretable end-to-end autonomous driving via large language model. IEEE Robotics and Automation Letters ,2024. 2, 3 [56] An Yang, Baosong Yang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Zhou, Chengpeng Li, Chengyuan Li, Dayiheng Liu, Fei Huang, et al. Qwen2 technical report. arXiv preprint arXiv:2407.10671 , 2024. 6, 16, 18 [57] Zhenjie Yang, Yilin Chai, Xiaosong Jia, Qifeng Li, Yuqian Shao, Xuekai Zhu, Haisheng Su, and Junchi Yan. DriveMoE: Mixture-of-experts for vision-language-action model in end-to-end autonomous driving. arXiv preprint arXiv:2505.16278 ,2025. 7 [58] Zhenjie Yang, Xiaosong Jia, Qifeng Li, Xue Yang, Maoqing Yao, and Junchi Yan. Raw2Drive: Reinforcement learning with aligned world models for end-to-end autonomous driving (in CARLA v2). In NeurIPS , 2025. 7 [59] Tian Yu, Lu Feng, and Sebastian Elbaum. Drive the thoughts: Runtime monitoring of VLA reasoning-trajectory consistency. 
+
+arXiv preprint arXiv:2608.29583 , 2026. 2, 3 [60] Lingjun Zhang, Yujian Yuan, Changjie Wu, Xinyuan Chang, Xin Cai, Shuang Zeng, Linzhe Shi, Sijin Wang, Hang Zhang, and Mu Xu. MindDriver: Introducing progressive multi-modal reasoning for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026. 7 [61] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming Zhang, and Long Chen. GenAD: Generative end-to-end autonomous driving. In ECCV , pages 87–104, 2024. 3, 7 [62] Weicheng Zheng, Yixin Huang, Qiao Sun, Derun Li, and Hang Zhao. DriveMA: Driving vision-language-action models with verifiable meta-actions. arXiv preprint arXiv:2605.31271 , 2026. 2, 3 [63] Xingcheng Zhou, Xuyuan Han, Feng Yang, Yunpu Ma, Volker Tresp, and Alois Knoll. Opendrivevla: Towards end-to-end autonomous driving with large vision language action model. In Proceedings of the AAAI Conference on Artificial Intelli-gence (AAAI) , pages 13782–13790, 2026. 3 [64] Zewei Zhou, Tianhui Cai, Seth Z. Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, et al. AutoVLA: A vision-language-action model for end-to-end autonomous driving with adap-tive reasoning and reinforcement fine-tuning. In Advances in Neural Information Processing Systems (NeurIPS) , 2025. arXiv:2506.13757. 2, 3, 7 
+
+11 Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models 
+
+# Supplementary Material 
+
+## A. Overview 
+
+We provide supplementary material to complement the main paper. It is organized as follows: • Sec. B: Potential questions raised by the main paper. • Sec. C: Details on the counterfactual decision-action data. • Sec. D: Implementation and training details. • Sec. E: More results. The tables, figures, equations and algorithms of this docu-ment are numbered with the prefix A, and its sections with letters. All other numbers refer to the main paper. 
+
+## B. Questions 
+
+Q1. What are the differences between Commit2Drive and MindDrive? 
+
+Commit2Drive adopts the architecture of MindDrive [10], in which a Decision Expert and an Action Expert share one VLM, and initializes its Action Expert from the released MindDrive checkpoint (Sec. D.2). In MindDrive, the deci-sion is a speed token that selects one of several candidate trajectories (Eq. (2)). The token is an index, and no term requires the selected candidate to follow it. The candidates of MindDrive are nearly identical on most frames, and its output follows a forced token on a minority of the frames (Sec. E.4). In Commit2Drive, the decision is a commitment 
+
+(d, θ ) that the deterministic rule Φ reads from any trajectory. The Maneuver Bank maps the commitment to a code with a kinematic meaning, and the consistency losses supervise every admissible decision of a scene with a trajectory that realizes it. The decisions of a scene then yield distinct tra-jectories, and the trajectory follows a forced decision on nearly all frames (Tab. A11). The supervision also differs: the decision labels of Commit2Drive are read from the future motion of the expert, so the label and the trajectory agree by construction, and the records are reviewed (Sec. C). 
+
+Q2. Is the consistency between the decision and the trajec-tory guaranteed at inference? 
+
+It is learned and not guaranteed. We relax the indicator of Eq. (3) into the consistency losses of Eq. (5) and apply no projection or rejection at inference. We therefore measure the consistency in two ways: with the say-do gap in closed loop and in open loop (Tab. 2 and Sec. E.2) and with interven-tions that force the decision to another value (Sec. E.4). In both, the trajectory departs from the decision on few frames. Since Φ is a deterministic rule on the planned trajectory, a remaining violation can be detected at run time. We do not use such a check in any reported result. 
+
+Q3. Why is conditioning the Action Expert on the decision not sufficient? 
+
+On expert data, every scene comes with one decision, and this decision is a function of the scene. A planner can then reproduce the expert from its hidden state ha alone, and the imitation loss does not constrain its output under any other decision. We state this formally in Sec. D.3. This agrees with what we observe for MindDrive, whose output follows a forced speed token on a minority of the frames (Fig. 1b). The counterfactual executions add every admissible decision of a scene to the training data, each with its own target, so only the decision tells the targets apart. Without them, the say-do gap rises (Tab. 3), the trajectories of different decisions move closer together, and the trajectory follows a forced decision far less often (Tab. A10). 
+
+Q4. How does the counterfactual data differ from the Action Dreaming of SimLingo? 
+
+SimLingo [39] simulates alternative futures to train the planner to follow external language instructions. These fu-tures are paired with instructions, and not with the deci-sion that the model itself states in its commentary. In our interventions on its released checkpoint, the trajectory fol-lows an explicit instruction on nearly all frames, but it fol-lows the commentary far less often when the commentary is forced to another decision (Tab. A12). In Commit2Drive, the counterfactual executions are paired with the decision of the model itself. The same records supervise the Decision Expert, through the admissible set, and the Action Expert, through the counterfactual executions. The admissible set is computed from the logged scene, so the alternatives are limited to the decisions that pass its collision check and its traffic rules (Sec. C.1). 
+
+Q5. Why does the say-exec gap remain large when the say-do gap is small? 
+
+The two gaps compare the stated decision with different trajectories: the say-do gap with the trajectory that is planned at the same step, which the consistency constraint covers, and the say-exec gap with the trajectory that the vehicle executes afterward. Since the model re-plans at every step, the executed trajectory results from many consecutive plans, and a decision that is stated at one step can be replaced at the next. The planned and the executed trajectory also differ for the baselines, as their do-exec gap shows (Tab. A13). Commit2Drive lowers the say-exec gap, but a large part of it remains (Tab. 2). This remainder concerns the consistency 12 of the decisions of consecutive steps, which the per-step constraint of Eq. (3) does not cover, and we leave it to future work. 
+
+Q6. Why does the decision space contain only speed deci-sions? 
+
+The Action Expert has a path branch and a speed branch (Fig. 2). In the annotations of MindDrive [10], the model on which Commit2Drive is built, the path token is the nav-igation command of Bench2Drive, so the decision that the model makes by itself is the speed decision. The released checkpoint confirms this: its path token equals the naviga-tion command on the validation frames, and its open-loop error comes almost entirely from the speed along the path (Sec. D.1). We therefore keep the path branch frozen and constrain the speed decision. The formulation does not de-pend on this choice: any decision that a deterministic rule can read from a trajectory can be stated as a commitment. We leave path decisions to future work. 
+
+Q7. What is the role of the VLM in the data pipeline? 
+
+The VLM does not produce the labels. Rule-based func-tions generate all four records of a frame from the raw log. The decision label is read from the future motion of the ex-pert, and the counterfactual executions, the admissible set and the perception facts are computed from the logged scene (Sec. C.1). The VLM [2] then acts in two roles, as a blind reviewer that judges the records without knowing their origin or the verdict of the rule-based functions, and as an editor that revises reasoning text. When the reviewer disagrees because of an error that originates in a rule or a template, we correct it at its source and regenerate the records, so the correction applies to every frame. In the example of Fig. 3, the reviewer judges that keeping the current speed toward a red light is illegal, and the rule that builds the admissible set is corrected to forbid KEEP when the stop line is within reach (Eq. (A5)). Fig. A5 shows a record of this kind before and after the correction. 
+
+## C. Details on the Counterfactual Decision-Action Data 
+
+The language annotations on which MindDrive [10] is trained are not checked against the expert trajectory. Their speed token agrees with the decision that the expert realizes over the next 3 s on 40.0% of the labeled frames (mapping of Sec. C.3). To supply the supervision that the consistent language-action mapping needs, we build an automatic data pipeline on the raw logs of the Bench2Drive base set [22], without new recordings. This section details the pipeline (Sec. C.1), the resulting dataset (Sec. C.2) and the mapping that expresses the decisions of existing models in our deci-sion space (Sec. C.3). 
+
+Algorithm A1 Counterfactual decision-action data pipeline.                                                                       
+
+> 1: Input: raw logs of the Bench2Drive base set
+> 2: Output: records ( ¯d, ¯θ),{¯ak},DF,Fof every labeled frame
+> 3: # Step 1: generate, by rule-based functions
+> 4: for all frames do
+> 5: ae←next 3 s of the expert trajectory
+> 6: ( ¯d, ¯θ)← Φ( ae),Θ( ae);¯a¯d←ae
+> 7: for all k∈ D \ { ¯d}do
+> 8: ¯ak←path of ae, re-timed with a speed profile of decision k
+> 9: roll out ¯akon the occupancy grid; infeasible if it collides
+> 10: end for
+> 11: DF← { k: ¯ akfeasible, no traffic rule forbids k}
+> 12: F←fact sentences rendered from the logged scene
+> 13: end for
+> 14: # Step 2: review, by the VLM as a blind reviewer
+> 15: for all records of the review sample do
+> 16: judge the decision sentence, the fact sentences and the alternative decisions; flag the record on a contradiction
+> 17: end for
+> 18: # Step 3: refine
+> 19: for all flagged records do
+> 20: if the error originates in a rule or a template then
+> 21: correct it at its source, regenerate and review again
+> 22: else
+> 23: revise the reasoning text, by the VLM as an editor
+> 24: end if
+> 25: end for
+> 26: human experts check a random sample of the records
+
+C.1. Data Pipeline 
+
+As shown in Fig. 3, the pipeline consists of three steps, fol-lowed by a check of a random sample by human experts: rule-based functions generate the records of every frame, a VLM reviews them, and flagged records are refined (Alg. A1). 
+
+Decision label. Let a = (p1, . . . , p Ns ) be a trajectory over the next 3 s, whose positions follow the current po-sition p0 at intervals of ∆t = 0.5 s. Its speed profile 
+
+w(a) = ( v1, . . . , v Ns ) consists of the step speeds vj =
+
+∥pj − pj−1∥/∆t, and v0 is the current speed. The rule Φ
+
+reads the decision that the trajectory a realizes from its end speed vNs , the mean speed over the last 0.5 s: 
+
+Φ( a) = 
+
+
+
+> STOP
+
+, vNs < ϵ v ,
+
+> SLOW
+
+, vNs − v0 < −δv ,
+
+> ACCEL
+
+, vNs − v0 > δ v ,
+
+> KEEP
+
+, otherwise ,
+
+(A1) where the cases are evaluated from top to bottom, with ϵv =0.5 m/s and δv = 1 m/s. The target value of the decision is read from the same trajectory: 
+
+Θ( a) = 
+
+(PNs 
+
+> j=1
+
+∥pj − pj−1∥, Φ( a) = STOP ,vNs , otherwise . (A2) For STOP , it is the distance that the vehicle travels within the 3 s. The vehicle is at rest at the end of this horizon, so 13 Table A1. Templates of the decision sentence and of the perception facts in the prompt of the Decision Expert. 〈·〉 is a slot that is filled from the record for training and, at inference, from the vehicle state and the outputs of the model, and | separates alternatives.                                                                                                                       
+
+> Type 1: Question and decision sentence
+> Question: “What actions should the car be taking?” Decision sentence: “The car should be 〈decision token 〉 〈 value token 〉 〈 path token 〉”, for example “The car should be <d slow> <v=4> <lanefollow> ”. Decision tokens: <d stop> ,<d slow> ,<d keep> ,<d accel> .Value tokens: <s= i>for a stopping distance of 2im, i= 0 , . . . , 40 (STOP ); <v= i>for an end speed of im/s, i= 0 , . . . , 15 (SLOW ,KEEP ,
+> ACCEL ). Path tokens: the six path tokens of MindDrive, selected by the navigation command at inference.
+> Type 2: Ego state
+> “Ego speed: 〈v0〉m/s. Navigation: 〈turn left |turn right |go straight |follow the lane |change lanes to the left |change lanes to the right 〉.”
+> Type 3: Perception facts, in this order
+> 1. Traffic light: “Traffic light: 〈red |yellow |green 〉, affects ego.” |“Traffic light: 〈state 〉, not affecting ego.” |“Traffic light: none.” 2. Objects: “Objects: 〈object 〉; . . . ; 〈object 〉.” |“Objects: none.”, where an object reads “ 〈class 〉 〈 nm ahead |alongside |nm behind 〉,〈in lane |
+> nm left |nm right 〉,〈stationary |moving ahead at vm/s |approaching at vm/s |crossing left at vm/s |crossing right at vm/s 〉”. The list has up to six objects: the nearest cars, vans, trucks, bicycles, pedestrians, traffic cones and traffic signs within 40 m that are at most 12 m to the side and 3 m behind. 3. Lead vehicle: “Lead vehicle: 〈class 〉 〈 n〉m ahead, 〈closing at vm/s, time to collision ts|pulling away at vm/s |same speed as ego 〉, time gap
+> 〈t〉s.” |“Lead vehicle: none within 40 m.” 4. Vulnerable road user: “Vulnerable road user in the corridor: 〈class 〉 〈 n〉m ahead, 〈in lane |nm left |nm right 〉,〈stationary |crossing left at
+> vm/s |crossing right at vm/s |moving along the road at vm/s 〉.” |“Vulnerable road user in the corridor: none within 30 m.”
+
+the distance is its stopping distance. The label of a frame is the commitment ( ¯d, ¯θ) = (Φ( ae), Θ( ae)) of the expert trajectory ae. It is rendered as the decision sentence by a tem-plate (Tab. A1), for example “The car should be <d stop> <s=8> <lanefollow> ” for a stop within 16 m. The fig-ures show this sentence in plain words, such as “stop within 16 m”. The label and the trajectory agree by construction. A frame carries a label if the 1 s before it and the 3 s after it lie within its clip. 
+
+Counterfactual executions. For every other decision k̸ = ¯d,the path of the expert is kept and re-timed with a speed profile of decision k:
+
+vj =
+
+
+
+v0, KEEP ,v0 − jNs max(1 .5, 0.3 v0), SLOW ,v0 + jNs 1.5, ACCEL ,
+
+(A3) with all speeds in m/s. For STOP , the profile has a constant deceleration of max  2.5 m /s2, v 0/(2 .475 s) , which brings the vehicle to rest before the last step. The positions follow from moving along the polyline of the expert trajectory by the traveled distance, and beyond its end the path continues straight in its last direction. This gives a trajectory ¯ak with 
+
+Φ(¯ ak) = k and the target value θk = Θ(¯ ak). Its end speed keeps a margin of at least 0.3 m/s from the thresholds of Φ.Only the speed along the path changes, so the executions of a frame differ in exactly the quantity that the decision de-scribes. A decision has no execution if it cannot be realized from the current speed: KEEP below 0.8 m/s, SLOW below 2.3 m/s, ACCEL above 11.5 m/s, and STOP if it requires a deceleration above 4.45 m/s 2.Each ¯ak is rolled out against the logged motion of the other agents on the occupancy grid of the open-loop planning metric [13], which has 200 × 200 cells of 0.5 m. The boxes of the vehicles, cyclists and pedestrians are drawn at their logged positions at each of the six future steps, and the footprint of the ego vehicle, 4.08 m by 1.85 m, is placed at the waypoint of the same step. The execution ¯ak is infeasible if the footprint overlaps a box at any step. A collision with an agent that follows the ego vehicle, with its center more than 1 m behind and within 2 m to the side, does not count, since a logged follower cannot react to a slower ego vehicle. If the STOP execution collides, decelerations of 3.0, 3.5 and 4.45 m/s 2 are tried in turn. The drivable area is not checked. 
+
+Admissible set. The admissible set keeps the decisions whose execution is feasible and that no traffic rule forbids: 
+
+DF = k ∈ D : ¯ ak is feasible , k is legal , (A4) where ¯a ¯d = ae is the expert trajectory, and a decision is legal if none of three traffic rules forbids it. The first two concern a red light that governs the ego lane: ACCEL is forbidden at such a light, and KEEP as well when its stop line is within reach. The third forbids KEEP and ACCEL when a stop sign of the ego lane is within reach and the vehicle has not stopped for it yet. Within reach of the stop line of a red light or of a stop sign, both KEEP and ACCEL are forbidden, as stated in Sec. 3.3. A stop line or a stop sign at a distance y
+
+ahead is within reach of a vehicle that moves at v0 ≥ 1 m/s if 
+
+0 < y ≤ v0 · 3 s + 5 m , (A5) 14 the distance that KEEP covers within the horizon plus a margin. STOP and SLOW are never forbidden. The state of the light and the distances to the stop line and to the stop sign are taken from the annotations of the simulator. If a rule forbids the decision of the expert, this decision is not in DF ,and the label of the Decision Expert is corrected (Sec. D.2). If no decision is admissible, DF falls back to { ¯d}, which occurs on seven training frames. 
+
+Perception facts. The perception facts F are short sentences, such as “Traffic light: red, affects ego.” and “Objects: car 12 m ahead, in lane, stationary.” For training, they are ren-dered from the annotated boxes and the annotated state of the traffic light. At inference, the same function renders them from the outputs of the detection heads of the model: the boxes with a score above 0.3 and the detected traffic light that governs the ego lane (Tab. A1). 
+
+Review. The contradictions of an annotation are also learned by the model, so the records are reviewed. The reviewer is the 32B version of Qwen3-VL [2] with greedy decoding. It receives the six camera images of a frame, a list of ground-truth facts from the simulator and the prompts of Tab. A2, and it answers in JSON. The review covers a sample of the validation records: the decision sentence and the fact sentences of 600 frames, 150 for each decision, and the admissibility of 300 pairs of a frame and a decision, of which 150 are admissible, 75 are forbidden at a red light and 75 are infeasible. The review is blind: the items are shuffled and carry random identifiers, and the reviewer is told neither the origin of a sentence nor the verdict of the rule-based functions. For the admissibility items, the future motion of the ego vehicle is withheld as well. The reviewer reads the decision in plain words. As a reference, the decision of the original annotation of each frame is rendered and reviewed in the same way. The reviewer finds a contradiction between the decision sentence and the motion of the ego vehicle in 62.5% of the original annotations and in 26.7% of ours. It agrees with the admissible set on 66.7% of the pairs: it rejects all 75 decisions that a red light forbids and 62.7% of the infeasible ones, and it accepts 52.0% of the admissible ones. 
+
+Refine. A disagreement of the reviewer is traced to its origin, since the reviewer can err as well. An error that originates in a rule or a template is corrected at its source, the records of all frames are regenerated, and the sample is reviewed again (dashed arrow in Fig. 3). Two of the three traffic rules above entered the pipeline in this way. The first version of the rules forbade only ACCEL at a red light. The reviewer rejected KEEP when a red light was a short distance ahead, and it rejected decisions that take the vehicle past a stop sign. The rule on the reach of a red light and the stop-sign rule were added, which changed the admissible set of 3.4% of the labeled training frames and of 2.7% of the labeled validation frames. The sentence templates were revised in the same way over four rounds of review. Reasoning text that contradicts itself is revised by the VLM, which then acts as an editor. Finally, human experts check a random sample of the records. 
+
+C.2. Dataset Statistics 
+
+The resulting dataset covers the base set of Bench2Drive, with 950 clips and 234,769 frames for training and 50 clips and 12,806 frames for open-loop validation (Tab. A3). A label exists for 196,769 training frames and 10,806 valida-tion frames. Every labeled frame carries four records: the decision label, the counterfactual executions of the other de-cisions, the admissible set and the perception facts. STOP is the most frequent decision, with 37.5% of the training labels, because the vehicle is at rest in many frames. ACCEL follows with 29.1%, KEEP with 20.7% and SLOW with 12.7%. For the training frames, 422,141 counterfactual executions are generated, of which 334,315 are admissible. The labeled training frames have 2.67 admissible decisions on average, and 77.5% of them have at least two, so that the Action Ex-pert sees most scenes under more than one decision. A red light governs the ego lane on 18.3% of the labeled training frames, and a traffic rule forbids the decision of the expert on 2.4%. Fig. A1 shows the distribution of the decisions and of their target values. 
+
+C.3. Mapping the Decisions of Existing Models 
+
+To measure the say-do gap of an existing model (Tab. 2), its stated decision has to be expressed in the decision space D.Tab. A4 lists the mapping. 
+
+Yield decision. The yield decision, the yielding action of Tab. 2, groups STOP and SLOW as yield, and KEEP and  
+
+> ACCEL
+
+as no yield. It is the only decision that all evaluated models state, and Tab. 2 reports it next to the speed decision. 
+
+MindDrive. MindDrive [10] states its decision as one of seven speed tokens. Four of them name a stop or a change of speed and map to STOP , SLOW and ACCEL . The other three name a speed level that is maintained (slow, moderate or fast) and map to KEEP .
+
+ORION. ORION [9] outputs no speed token. We read its yield decision by forced choice from the answer of its lan-guage head to the question “Please describe your driving behavior and explain the reasons.” We start the answer with “You should”, and the stated decision is to yield if the first token of “decelerate” is more likely than the first tokens of “keep”, “maintain” and “accelerate” together. 
+
+SimLingo. SimLingo [39] states its decision as a commen-tary. Every commentary template and each of its phrasings is cut at the first reason connector, and the remaining action phrase is assigned the decision of its canonical template. The 929 templates, each in 21 phrasings, give 160 distinct 15 Table A2. Prompts fed into Qwen3-VL to review the records. The six camera images precede the text. 〈·〉 is a slot that is filled from the record. For Prompt 1, the list of facts ends with the rendering conventions of the sentence under review, such as the rounding of its numbers and the thresholds of the decisions. 
+
+Prompt 1: Review of the decision sentence and of the fact sentences 
+
+System: You audit answers written for a driving dataset. You check every factual claim in the answer against six camera images of the scene and a list of ground-truth facts from the vehicle’s sensors and annotations. The ground-truth facts are reliable: when they disagree with your visual impression, trust the facts. Claims that neither the images nor the facts can settle are not errors. Be strict but fair, and answer only with JSON. 
+
+User: Question that was asked: 〈question 〉
+
+Answer to audit: 〈sentence 〉
+
+Ground-truth facts: 〈facts 〉
+
+Tasks: 1. List each claim in the answer that CONTRADICTS the images or the ground-truth facts. Types: “existence” (says an object is present that is not there, or denies an object that is there), “count”, “direction” (wrong position or side), “safety” (calls the situation safe/clear although a listed hazard exists, or the reverse), “ego action” (the ego vehicle’s speed or turning behaviour disagrees with its actual next 3 s), “traffic light”, “invisible mention” (names an object that cannot be seen in any image), “other”. Do not list omissions here. 2. “omits critical”: true only if the answer, given what the question asks, leaves out a listed hazard or a pedestrian or vehicle in the ego vehicle’s path that a careful driver would mention. 3. “fluency”: 1 (broken or incoherent) to 5 (natural and coherent). Reply with JSON only: {“contradictions”: [ {“claim”: “...”, “type”: “...”, “why”: “...” }], “omits critical”: false, “omission”: “”, “fluency”: 5 }
+
+Question for the decision sentence: What should the car do over the next 3 seconds? 
+
+Question for the fact sentences: Describe the traffic light state and the relevant objects ahead of the ego vehicle. 
+
+Prompt 2: Review of the admissible set 
+
+System: You assess candidate driving actions for an automated vehicle. You see six camera images of the scene and a list of ground-truth facts from the vehicle’s sensors and annotations. The ground-truth facts are reliable: when they disagree with your visual impression, trust the facts. An action is admissible when carrying it out over the next 3 seconds obeys the traffic rules, in particular the traffic light controlling the ego lane, and does not lead to a collision with another road user. An action can be admissible even if it is not the most efficient choice. Be strict but fair, and answer only with JSON. 
+
+User: Ground-truth facts: 〈facts 〉
+
+The candidate action keeps the ego vehicle on its current path and only changes its speed. Over the next 3 seconds, would it be safe and legal for the ego vehicle to 〈action 〉 while 〈navigation 〉? Consider the traffic light, other road users and the ego speed ( 〈v0〉 m/s). Answer JSON only: {“admissible”: true/false, “reason”: “...” }37.5 12.7 20.7 29.1 Training    
+
+> 43.8 10.9 18.0 27.4 Validation
+
+(a) Decision labels (%)          
+
+> STOP SLOW KEEP ACCEL
+> 22.5 27.9 9.0 40.5 Training
+> 25.5 29.2 7.4 37.9 Validation
+
+(b) Admissible decisions per frame (%)      
+
+> 1234 decisions
+> 010 20
+
+stopping distance (m) 
+
+> 0510 15
+> labels (%)
+> not drawn: at rest (0 m), 66.7%
+
+STOP     
+
+> 04812 16
+
+end speed (m/s) 
+
+> 0612 18
+
+SLOW     
+
+> 04812 16
+
+end speed (m/s) 
+
+> 015 30
+
+KEEP     
+
+> 04812 16
+
+end speed (m/s) 
+
+> 0816 24
+
+ACCEL 
+
+(c) Target value θ of the training labels 
+
+Figure A1. Statistics of the counterfactual decision-action data. (a) Share of the four decisions among the labels of the training and of the validation frames. (b) Share of the labeled frames with one to four admissible decisions. (c) Target value of the training labels in bins of 2 m and of 1 m/s, as a share of the labels of each decision: the stopping distance of STOP and the end speed of SLOW , KEEP and ACCEL . For 
+
+> STOP
+
+, the frames on which the vehicle is at rest, 66.7% of the STOP labels, are not drawn. 
+
+action phrases, each mapped to exactly one decision, and the mapping recovers the decision of all 19,509 template instances. 
+
+## D. Implementation Details 
+
+D.1. Model Details 
+
+Commit2Drive comprises a Decision Expert and an Action Expert, which share one VLM and differ only in their LoRA parameters. We employ EVA-02-L [8] as the vision encoder and Qwen2-0.5B [56] as the base LLM, which has a hidden 16 Table A3. Statistics of the dataset on the Bench2Drive base set.                                            
+
+> Shares refer to the labeled frames. The decision labels are those read from the expert trajectory. An execution can be both infeasible and forbidden by a traffic rule. Training Validation Clips 950 50 Frames 234,769 12,806 Frames with a label 196,769 10,806
+> Decision labels (%)
+> STOP 37.5 43.8
+> SLOW 12.7 10.9
+> KEEP 20.7 18.0
+> ACCEL 29.1 27.4
+> Counterfactual executions
+> Generated 422,141 22,004 Infeasible (colliding) 48,730 2,113 Forbidden by a traffic rule 40,991 2,646 Admissible 334,315 17,324
+> Admissible set
+> Frames with 1 decision (%) 22.5 25.5 Frames with 2 decisions (%) 27.9 29.2 Frames with 3 decisions (%) 9.0 7.4 Frames with 4 decisions (%) 40.5 37.9 Mean number of decisions 2.67 2.58 Red light governs the ego lane (%) 18.3 22.8 Stop line or stop sign within reach (frames) 7,107 324 Decision of the expert forbidden (%) 2.4 2.6
+> Review by the VLM
+> Frames with reviewed sentences –600 Reviewed pairs of a frame and a decision –300
+
+size of 896. Each expert has LoRA parameters of rank 16 on the query, key, value and output projections of the attention layers. Tab. A5 lists the hyper-parameters. At inference, the decision is selected first, and the trajectory is generated under it (Sec. 3.1). The Decision Expert outputs the commitment, the Maneuver Bank maps it to the code z, and the speed branch of the Action Expert generates the trajectory from its hidden state ha and the code (Eq. (4)). The hidden state 
+
+ha is computed with the planning prompt of MindDrive [10] and does not depend on the commitment. 
+
+Decision Expert. The prompt of the Decision Expert carries the perception facts F together with the current speed and the navigation command (Tab. A1). The Decision Expert states its decision in two forms, the commitment and the decision sentence, which are supervised by the same label (Sec. D.2). The commitment is read from the hidden state 
+
+hc of the language model at the special token <commit> :a linear layer scores the four decisions from the normalized state, the decision is the admissible one with the highest score, and the target value is decoded for this decision: 
+
+d = arg max 
+
+> k∈D F
+
+W LN( hc) + b
+
+> k
+
+,θ = softplus 
+
+
+
+MLP  [LN( hc); 1d; v0/10] 
+
+,
+
+(A6) where LN is layer normalization, 1d is the one-hot vector of d, and the MLP has one hidden layer of 256 units. The target value is then clipped to the range of its decision with the margin m of the consistency losses, for example to at least v0 + δv + m for ACCEL . At inference, DF is built from what the model observes. It contains the decisions whose range of target values is not empty at the current speed, which excludes SLOW below 2.1 m/s and KEEP below 0.1 m/s. These bounds are wider than those of the counterfactual executions (Sec. C.1), whose speed profiles are fixed. KEEP 
+
+and ACCEL are also excluded when the perception facts report a red light that governs the ego lane. The reach of Eq. (A5) is not evaluated here, as the perception facts carry no distance to the stop line. The admissible set of the labels additionally uses the logged future of the scene, which is not available at inference. The decision sentence states this commitment in tokens, one for the decision and one for the target value (Tab. A1), so the two forms state the same decision. 
+
+Maneuver Bank. The Maneuver Bank stores one learnable entry of dimension 64 for each of the four decisions, and the entries are initialized orthogonally. The target value and the current speed are scaled to the order of one ( θ by 20 m for  
+
+> STOP
+
+and by 10 m/s otherwise, v0 by 10 m/s) and encoded with Fourier features [45] with 4 frequencies: 
+
+γ(u) = u, sin(2 i π  
+
+> 2
+
+u), cos(2 i π  
+
+> 2
+
+u)3
+
+> i=0
+
+. (A7) The MLP ψ takes the one-hot vector of d together with γ(θ)
+
+and γ(v0), and its output is added to the entry E[d], which forms the commitment code z (Eq. (4)). The grounding head G takes z and v0, the latter as γ(v0), and decodes the nominal speed profile ˆw of Ns = 6 values. Both ψ and G
+
+have two hidden layers of 128 units. 
+
+Fusion and speed branch. The fusion MLP f has two hid-den layers of 512 units. It reads the hidden state ha after a layer normalization, the code z, the profile ˆw and the speed 
+
+v0, where ˆw enters without a gradient. Its output layer is initialized to zero, so training starts from the output g(ha)
+
+of the pretrained speed branch, and the commitment enters as a residual. The speed branch g keeps the architecture of MindDrive [10] (a prior network, a GRU and a decoder of seven candidate trajectories) and is initialized from the released weights. For each decision, the trajectory is taken from one fixed candidate of the decoder, that of the speed to-ken stop , slow down , maintain moderate speed 
+
+or speed up of MindDrive, respectively. The latent vari-able of the prior network is set to its mean. The commitment 17 Table A4. Mapping of the stated decisions of existing models to the decision space D. Yield: the yield decision to which each decision belongs. For SimLingo, the number of distinct action phrases of each decision is given with examples. ORION states only the yield decision, which is read as described in Sec. C.3. Decision Yield MindDrive speed tokens SimLingo commentary phrases  
+
+> STOP
+
+yield stop 57, e.g. “stop now”, “remain stopped”, “wait for a gap in the traffic”  
+
+> SLOW
+
+yield slow down , slow down rapidly 21, e.g. “decelerate”, “brake gently”, “lower your speed”  
+
+> KEEP
+
+no yield maintain slow speed ,
+
+maintain moderate speed ,
+
+maintain fast speed 
+
+61, e.g. “continue at the same speed”, “do not accelerate”  
+
+> ACCEL
+
+no yield speed up 21, e.g. “accelerate”, “drive faster”, “gain speed” Table A5. Hyper-parameters of the model, the consistency losses and the training. The online RL stage follows MindDrive [10] and keeps its settings, except for the added progress reward. Hyper-parameter Value                                                                    
+
+> Model
+> Vision encoder EVA-02-L [8] Base LLM, hidden size Qwen2-0.5B [56], 896 LoRA of each expert: rank, α, dropout 16, 16, 0.05 Speed waypoints Ns6 (3 s at 2 Hz)
+> Decision reading Φ
+> Stop threshold ϵv0.5 m/s Speed-change threshold δv1 m/s
+> Commitment head
+> Hidden size of the MLP for θ256 Value tokens: end speed, stopping distance 16 (1 m/s steps), 41 (2 m steps)
+> Maneuver Bank and fusion MLP
+> Entries ×dimension 4×64
+> Fourier frequencies 4Hidden size of ψand of G128 Output of the grounding head GNsspeed values Hidden size of the fusion MLP f512 Output layer of fzero-initialized
+> Consistency losses
+> Margin m0.3 m/s Weight λp3Hyper-parameter Value
+> IL, decision learning
+> Optimizer AdamW, weight decay 10 −5
+> Learning rate of the trained parameters 6.8×10 −5
+> Schedule cosine over one epoch Warm-up 500 iterations Batch size, training length 6, 6,000 iterations Gradient clipping, precision 35, FP16
+> IL, mapping learning
+> Optimizer AdamW, weight decay 10 −5
+> Learning rate of the Maneuver Bank and f3×10 −4
+> Learning rate of the speed branch g3×10 −5
+> Schedule cosine, 200 warm-up iterations Batch size, epochs 256 frames, 40 Gradient clipping 10
+> Online RL
+> Discount factor, GAE parameter 0.99, 1.0 Clip range 0.2 Weights of the value, KL and entropy terms 0.5, 0.5, 0 Optimizer AdamW Learning rate of the LoRA parameters 8×10 −6
+> Progress reward for a completed route 1Batch size 32
+
+enters through the fused state, which all candidates of the decoder share. The choice of the candidate alone does not make the trajectory follow the decision: the candidates of MindDrive follow their own speed token on 27% to 30% of the frames, and with the speed branch frozen at the weights of MindDrive, the trajectory of Commit2Drive still follows every forced decision on 98.8% of the frames (Secs. E.3 and E.4). Together with the Maneuver Bank, the branch has 16.0M parameters. The path branch of the Action Expert stays frozen, and the navigation command selects its path as in MindDrive. On all 12,806 validation frames, the path token that the released checkpoint predicts equals the nav-igation command. The open-loop error also comes almost entirely from the speed. On the validation subset (Sec. D.4), the error of the released checkpoint falls from 1.19 m to 0.16 m when the speed profile of the expert is placed on the planned path, and it stays at 1.14 m when the planned speed profile is placed on the path of the expert. 
+
+Reading a trajectory. The consistency losses of Eq. (5) read three quantities from a trajectory a: its speed profile 
+
+w(a) = ( v1, . . . , v Ns ) of step speeds (Sec. C.1), its target value Θ( a) of Eq. (A2), and the signed distance ρk of its speed profile to the boundary of decision k under Φ. For a given current speed v0, Eq. (A1) bounds the end speed of each decision by one or two conditions, with the signed distances 
+
+STOP : ϵv − vNs ,
+
+SLOW : v0 − vNs − δv , vNs − ϵv ,
+
+KEEP : δv − | vNs − v0|, vNs − ϵv ,
+
+ACCEL : vNs − v0 − δv , vNs − ϵv ,
+
+(A8) and ρk is the smallest distance of decision k. A distance is positive when its condition holds, and it is measured in 18 Algorithm A2 One training step of the consistent language-action mapping , written for one frame of the batch.                                                                                         
+
+> 1: Input: frame (V, L )with current speed v0, admissible set DFand targets {¯ak}k∈D F
+> 2: Trainable: Maneuver Bank (E, ψ, G ), fusion MLP f, speed branch
+> g; all other modules frozen
+> 3: ha←hidden state of the Action Expert for (V, L ), cached
+> 4: for all k∈ D Fdo
+> 5: #¯ak: expert trajectory if k= ¯d, else counterfactual execution (one exception, Sec. D.2)
+> 6: θk←Θ(¯ ak);˜θk←θkwith noise, clipped to the range of k
+> 7: zk←E[k] + ψ k, γ (˜θk), γ (v0)
+> 8: ˆwk←G(zk, v 0)
+> 9: ak←g ha+f([ ha;zk; ˆ wk;v0]) 
+> 10: compute Lexec from ak,¯akand θk, and Lground and Lsem
+> from the profile that Gdecodes for θk
+> 11: end for
+> 12: Lcons ←1
+> |D F|
+> P
+> k∈D F
+>  Lground +Lsem +Lexec
+> 
+> 13: update E,ψ,G,fand gby back-propagation on Lcons
+
+m/s. With the margin m = 0 .3 m/s, the hinge [m − ρk]+
+
+requires the profile to lie at least 0.3 m/s inside decision k.We implement it as the sum of the hinges of the individual conditions, which equals [m − ρk]+ whenever at most one of them is active. 
+
+D.2. Training Details 
+
+Commit2Drive is trained in two stages, IL and online RL, both following MindDrive [10]. The IL stage consists of decision learning and mapping learning. 
+
+Decision learning. The Action Expert is initialized from the released checkpoint of MindDrive, in which it has been trained by IL alone. The vocabulary is extended by 62 new tokens: <commit> , the four decision tokens and the 57 value tokens of Tab. A1. In decision learning, the LoRA parameters of the Decision Expert, the commitment head and the embeddings of the new tokens are trained, and all other parameters are frozen, so ha and the path are unchanged. The Decision Expert is trained with three losses on the labeled frames. The language modeling loss supervises the decision sentence. The commitment loss supervises the scores q =softmax( W LN( hc) + b) of the commitment head, which implement the selection policy πd, with the label ¯d and with the admissible set: 
+
+Lcommit = − log q ¯d − log X
+
+> k∈D F
+
+qk. (A9) The target value that the head decodes for ¯d is supervised by an L1 loss with respect to ¯θ. The label ( ¯d, ¯θ) is that of Sec. C.1, and the prompt carries the perception facts of the frame. If the decision of the expert is not admissible, because the expert keeps its speed or accelerates where a traffic rule forbids it, the label is replaced by STOP with the target value of its counterfactual execution. This affects 2.4% of the labeled training frames. If no feasible STOP exists either, only the second term of Eq. (A9) is applied. 
+
+Mapping learning. The Maneuver Bank, the fusion MLP and the speed branch are then trained with the consistency loss Lcons of Eq. (6), while all other modules are frozen. The VLM is among the frozen modules, so the hidden states 
+
+ha are computed once and cached. The speed branch of the reported results is trained on every third training clip, 317 clips with 78,078 frames, of which 65,398 carry a label, while the Decision Expert is trained on frames of all training clips. Alg. A2 gives one training step. For every admissible decision k of a frame, the commitment (k, θ k) is read from the target ¯ak, which is the expert trajectory for the decision of the expert and a counterfactual execution otherwise, with one exception that is given below. One frame contributes up to four targets, 2.7 on average, which differ only in the decision. The Maneuver Bank is fitted alone beforehand, with Lground and Lsem on the 618,896 valid executions of the labeled training frames, expert and counterfactual. The target value that the Maneuver Bank receives is perturbed by Gaussian noise with a standard deviation of 1.5 m for STOP 
+
+and of 2.0, 0.5 and 1.0 m/s for SLOW , KEEP and ACCEL ,and clipped to the range of its decision. This imitates the error of the Decision Expert, and Lground uses the value without noise. The exception concerns the trajectory that the pretrained speed branch generates without a commitment. If Φ reads this trajectory as a decision other than that of the expert, it replaces the counterfactual execution of that decision as the target, and the pair is left out of Lground and 
+
+Lsem . The trajectory term of Lexec is the L1 error of the positions plus half the L1 error of the displacements between consecutive waypoints. 
+
+Online RL. The second stage follows the online RL of MindDrive [10]: rollouts are collected in CARLA [7], and the Decision Expert is updated by proximal policy optimiza-tion (PPO) on the collected steps. The RL action is the decision of the commitment. It is sampled from the scores of the commitment head over DF , its target value is decoded as in Eq. (A6), and the frozen Action Expert executes it, so the stated decision is also the one that the Action Expert executes during exploration. The reward is that of MindDrive, −1 for a penalty event, +1 for a completed route and 0 otherwise. We add a progress reward that is paid in proportion to the route completion and amounts to 1 for a completed route. A penalty event ends the episode. The seven penalty events are a collision with a pedestrian, with a vehicle or with a static object; a traffic-light or a stop-sign infraction; a deviation from the route; and leaving the lanes of the route. As in MindDrive, PPO updates only the LoRA parameters of the Decision Expert and the output layer of the value network, which we initialize to zero. 19 D.3. Formal Statement on Expert-Only Supervision 
+
+Sec. 3.2 states that a conditioned planner can ignore its con-dition. Let x = ( V, L ) denote the input of a frame. Expert data contains one trajectory ae(x) per frame, so the commit-ment that is read from it, ce(x) =  Φ( ae(x)) , Θ( ae(x)) ,is a function of x. We take the generation policy πg as a deterministic planner P (x, c ) that maps an input and a com-mitment to a trajectory. Imitation on expert data minimizes 
+
+J(P ) = Ex
+
+h
+
+ℓ P (x, c e(x)) , a e(x)i
+
+(A10) for a loss ℓ.
+
+Proposition A1. (i) For every planner P , there is a planner 
+
+P ′ that ignores the commitment and has J(P ′) = J(P ). The minimum of J over the planners that ignore the commitment therefore equals its minimum over all planners. (ii) Two planners that agree on all pairs (x, c e(x)) have the same value of J, whatever they output for a commitment c̸ =
+
+ce(x).Proof. For (i), let P ′(x, c ) = P (x, c e(x)) . The planner 
+
+P ′ does not depend on c and agrees with P on all pairs 
+
+(x, c e(x)) , so J(P ′) = J(P ). For (ii), Eq. (A10) evaluates a planner only on the pairs (x, c e(x)) .Under expert-only supervision, the objective therefore neither rewards the use of the decision nor constrains the response of the planner to a decision other than that of the ex-pert. This agrees with the follow rate of MindDrive (Sec. E.4) and with the ablation of Sec. E.3, in which a branch that is su-pervised only on the decision of the expert follows a forced decision far less reliably. The consistency loss of Com-mit2Drive addresses both points: for an admissible decision 
+
+k other than that of the expert, the pair (x, (k, θ k)) enters the objective with the target ¯ak. This target differs from ae(x),since Φ(¯ ak) = k. A planner that ignores the commitment cannot fit both targets, and the response of the planner to the other admissible decisions is supervised. 
+
+D.4. Evaluation Protocol 
+
+Closed loop. The closed-loop results that we measure our-selves ( ‡ in Tab. 1) are obtained with the official Bench2Drive evaluator [22] on its 220 routes in CARLA 0.9.15 [7], in synchronous mode at 20 Hz. The evaluation runs on a single RTX 4090 with 24 GB of memory, which holds the simu-lator and the model together. The baselines are run from their released checkpoints with their official agents. One route, a highway exit in Town12, crashes the simulator for MindDrive and for ORION. It counts as zero in their scores, and their consistency analysis covers the other 219 routes. Each of these results is the median over multiple random seeds. For the released MindDrive checkpoint, 149 of the 219 scored routes receive the same score in two runs and 27                               
+
+> Table A6. Routes of Dev10 ,the development subset of DriveTransformer [23]. Route Scenario Town 2091 NonSignalizedJunctionLeftTurn Town12 3255 ParkingCrossingPedestrian Town13 3514 ParkingExit Town13 17569 SequentialLaneChange Town12 25378 YieldToEmergencyVehicle Town03 25381 HazardAtSideLane Town05 25424 ConstructionObstacleTwoWays Town11 26405 StaticCutIn Town15 27494 BlockedIntersection Town04 28198 SignalizedJunctionLeftTurnEnterFlow Town15
+
+change their success flag, which puts the standard deviation of a single run at about 1.0 points of DS and 1.7 points of SR. 
+
+Dev10. Dev10 is the development subset of DriveTransformer [23], which contains ten of the 220 routes and is distributed with the Bench2Drive evaluator (Tab. A6). It is used for the say-do gap of Commit2Drive (Tab. 2), for the rule-based decisions and for the latency breakdown (Tab. 4). Sec. E.2 also evaluates the baselines on these ten routes. 
+
+Consistency logging. For the consistency analysis, every tenth simulator tick is logged, which gives a rate of 2 Hz. A logged frame contains the detections of the model, its stated decision, its planned trajectory, the trajectory executed over the following horizon and the privileged state of all agents within 30 m. The loggers do not affect the run: replaying logged ticks with and without them gives identical plans and controls. 
+
+Consistency metrics. The say-do gap of Eq. (8) compares the stated decision dt with the decision Φ( at) of the planned trajectory. For Commit2Drive, the stated decision is the decision of the commitment, which the decision sentence states (Sec. D.1). The say-exec gap replaces at by the tra-jectory that the vehicle executes over the same horizon, and the do-exec gap compares the planned with the executed tra-jectory. Both leave out the last frames of a route, for which the executed horizon is incomplete. Each gap is reported for the speed decision and for the yield decision of Sec. C.3. In closed loop, the trajectories of all models are read over a horizon of 2.5 s, the longest that every evaluated model plans (Sec. E.2), on all logged frames. The commitment of Commit2Drive is defined over 3 s, and read over 3 s, its say-do gap on Dev10 is 0.0% (0 of 1,769 frames) instead of 1.8%. In open loop, all trajectories are read over 3 s. The de-cisions are imbalanced, so a model that always states KEEP 
+
+and mostly drives at a constant speed has a small gap with-out any dependence between its two outputs. We therefore 20 also report a normalized gap, which divides the gap by the one expected from two independent outputs with the same marginals: 
+
+fSD = SD 1 − P 
+
+> k∈D
+
+psay (k) pdo (k) = 1 − κ, (A11) where psay (k) and pdo (k) are the shares of frames on which the stated decision and the decision of the trajectory, respec-tively, equal k, and κ is Cohen’s coefficient of agreement [4]. A value of 0 means perfect agreement, and a value of 1 means that the two outputs agree no more often than inde-pendent ones. A value above 1 means that they agree less often. 
+
+Decision interventions. The gaps are correlational, so we also test whether the decision determines the trajectory: we replay logged frames, force the decision to a value k, decode the trajectory again and report the follow rate 
+
+Follow( k) = 1
+
+NfNf
+
+X
+
+> t=1
+
+I
+
+h
+
+Φ a(k)
+
+> t
+
+ = k
+
+i
+
+, (A12) where a(k) 
+
+> t
+
+is the trajectory that the model generates at frame 
+
+t under the forced decision k. The forced decision is a speed token for MindDrive, a commentary for SimLingo and a commitment for Commit2Drive. For MindDrive, a(k)
+
+> t
+
+is the candidate trajectory of the forced speed token, the token of decision k that Sec. D.1 names. For Commit2Drive, the target value of the forced commitment is read from the execution of k in the same frame. For both models, the sum runs over the frames on which this execution exists, including those on which k is the decision of the expert. 
+
+Open loop. Open-loop results use the 50 validation clips with 12,806 frames, of which 10,806 carry a label. The ablations of Sec. E.3 use the validation subset, the first 80 frames of every validation clip. It has 3,987 frames, since one clip has only 67, and 3,434 of them carry a label. The decision interventions on MindDrive and Commit2Drive use this subset and all validation frames, and those on SimLingo use its closed-loop logs (Sec. E.4). The average L2 of Tab. 1 is taken over 2 s at 2 Hz as in UniAD [15], and the L2 of Tab. 3 is the error at 3 s. The trajectory errors and collision rates of this supplementary material are computed with the evaluation code of MindDrive [10] in the protocol of ST-P3 [13]. 
+
+Confidence intervals. Where intervals are given, they are 95% percentile intervals of a bootstrap over routes with 1,000 resamples. One sampling matrix is shared by all models, so that differences are paired.                                        
+
+> Table A7. Runtime of Commit2Drive and of existing VLA models. Upper block: mean model time per step on an NVIDIA A100, as reported by MindDrive [10]. Middle block: model time per step on a single RTX 4090, without simulator and control (totals of Tab. 4). Lower block: median wall-clock time of one closed-loop step on a single RTX 4090, with the simulator tick included (Sec. E.1). Reproduced numbers of the baselines in italics. Method LLM GPU Time (ms) ↓
+> Model time, as reported by MindDrive [10]
+> ORION [9] Vicuna-7B A100 ∼1,106 ReCogDrive [32] Qwen2.5-7B A100 ∼750 MindDrive [10] Qwen2-0.5B A100 ∼540
+> Model time per step, measured
+> ORION [9] Vicuna-7B RTX 4090 251.1
+> MindDrive [10] Qwen2-0.5B RTX 4090 246.2
+> Commit2Drive Qwen2-0.5B RTX 4090 259.8 + rule-triggered Qwen2-0.5B RTX 4090 216.7
+> Closed-loop step, simulator included
+> MindDrive, 220 routes Qwen2-0.5B RTX 4090 582
+> MindDrive, two routes Qwen2-0.5B RTX 4090 588
+> Commit2Drive , two routes Qwen2-0.5B RTX 4090 547 + rule-triggered Qwen2-0.5B RTX 4090 474
+
+## E. More Results 
+
+E.1. Runtime Analysis 
+
+We analyze the runtime of Commit2Drive on a single RTX 4090. Tab. 4 gives the model time per step, which is mea-sured inside the agent and excludes the simulator and the control. Perception, which comprises the vision encoder and the perception heads, takes 189.8 of the 259.8 ms of Commit2Drive. The Decision Expert takes 35.5 ms and the planner 33.1 ms (MindDrive: 34.5 ms and 26.3 ms). When a rule issues the decision, the decision takes 5.4 ms instead of 35.5 ms, and the total falls to 216.7 ms. Tab. A7 places these totals next to the runtimes that MindDrive [10] reports on an NVIDIA A100 and next to the wall-clock time of one closed-loop step. A closed-loop step is the interval between two consecutive calls of the agent by the evaluator. It con-tains one simulator tick with six cameras and one forward pass of the model. For MindDrive, a step takes a median of 582 ms and a mean of 647 ms over its 220-route evaluation. On routes 17569 and 28198 of Dev10, on which the model times of MindDrive and Commit2Drive in Tab. 4 are mea-sured, the median step time is 547 ms for Commit2Drive and 588 ms for MindDrive. On the steps of Dev10 on which a rule issues the decision, it is 474 ms. 
+
+E.2. Consistency of All Evaluated Models 
+
+Tab. A8 lists the evaluated models, and Tab. A9 extends Tab. 2 with SimLingo [39], with the normalized gap of Eq. (A11) and with the baselines on the routes of Dev10. SimLingo is trained on its own dataset and states its decision 21 Table A8. Models of the consistency analysis. The baselines are evaluated from their released checkpoints. Plan: waypoints × interval of the planned trajectory. Stated decision: the output that is mapped to D (Sec. C.3). Frames, Routes: logged closed-loop frames at 2 Hz and the routes on which they are logged. Method LLM Plan Checkpoint Stated decision Frames Routes ORION [9] Vicuna-7B, LoRA 6 × 0.5 s released, FP16 yield decision, forced choice 26,638 219 MindDrive [10] Qwen2-0.5B, two LoRAs 6 × 0.5 s released, online RL speed token 24,317 219 SimLingo [39] InternVL2-1B 10 × 0.25 s released, epoch 13 commentary 19,149 220 
+
+Commit2Drive Qwen2-0.5B, two LoRAs 6 × 0.5 s ours, after IL commitment 1,769 10 Table A9. Say-do consistency of all evaluated models in closed loop on Bench2Drive. Raw: share of frames (%) on which the stated decision differs from the decision of the planned trajectory (say-do) or of the executed trajectory (say-exec), as in Tab. 2. 1−κ: the normalized gap of Eq. (A11). Lon.: speed decision; Yield: yield decision. ORION states only the yield decision. Frames: logged frames. Upper block: the baselines on all their logged routes (Tab. A8), as in Tab. 2. Lower block: all models on the ten routes of Dev10 (Tab. A6). Say-do, Lon. Say-do, Yield Say-exec, Lon. Say-exec, Yield Method Frames Raw ↓ 1−κ ↓ Raw ↓ 1−κ ↓ Raw ↓ 1−κ ↓ Raw ↓ 1−κ ↓
+
+All logged routes 
+
+ORION [9] 26,638 – – 23.8 0.97 – – 65.7 1.00 MindDrive [10] 24,317 83.5 0.95 19.8 0.84 69.6 0.94 59.9 0.98 SimLingo [39] 19,149 49.3 0.69 43.4 0.78 21.0 0.41 16.1 0.42 
+
+Ten routes of Dev10 
+
+ORION [9] 1,339 – – 29.4 0.98 – – 73.3 1.02 MindDrive [10] 1,582 80.1 0.96 18.8 0.80 80.2 0.97 69.7 0.99 SimLingo [39] 904 59.6 0.77 51.9 0.88 19.4 0.36 14.3 0.36 
+
+Commit2Drive 1,769 1.8 0.03 0.8 0.02 52.4 0.82 39.8 0.74 Table A10. More ablations of the consistent language-action mapping in open loop , on the 3,434 labeled frames of the validation subset (Sec. D.4), with measures that Tab. 3 does not report. Each variant retrains the Maneuver Bank, the fusion MLP and, unless frozen, the speed branch. Col.: collision rate at 3 s in the protocol of ST-P3 [13], with the label of the frame as the commitment (label) and with the commitment that a Decision Expert outputs (predicted), here an earlier checkpoint than the reported one. Sep.: mean distance between the end points of the trajectories of two decisions in the same frame. All: share of frames on which the trajectory follows every forced decision (Eq. (A12)). Runs: number of random seeds; the mean over the runs is given, and the reported model is one of the three runs of the first row. Col. (%) ↓
+
+Variant Runs Label Predicted Sep. (m) All (%) ↑
+
+Commit2Drive 3 0.50 1.31 8.39 99.0 w/o counterfactual data 1 1.08 1.16 2.65 32.4 w/o Lground and Lsem 3 0.52 1.28 8.39 99.1 speed branch g frozen 3 0.60 1.33 8.43 98.8 20 instead of 40 epochs 1 0.49 1.21 8.41 98.8 
+
+as a commentary, so it is not listed in Tab. 2. Its say-exec gap of 21.0% is the lowest of the three baselines, while its commentary and its own plan still disagree on 49.3% of the frames for the speed decision and on 43.4% for the yield decision. The normalized gaps show that the small yield gaps of MindDrive and ORION do not indicate agreement. Their normalized gaps are 0.84 and 0.97, so their stated de-cision and their planned trajectory agree barely more often than two independent outputs. In open loop, on the 10,806 labeled validation frames, the say-do gap of Commit2Drive is 0.4% and its normalized gap 0.006. 
+
+Same routes. In Tab. 2, Commit2Drive is evaluated on Dev10 and the baselines on all their logged routes. The lower block of Tab. A9 evaluates all models on the ten routes of Dev10. On these routes, the say-do gap of MindDrive is 80.1% for the speed decision and 18.8% for the yield decision, compared with 83.5% and 19.8% on all routes, and its say-exec gap is 80.2%. For ORION, the say-do and the say-exec gap of the yield decision are 29.4% and 73.3%. On the same routes, the say-do gap of Commit2Drive is 78.3 points below that of MindDrive, and its say-exec gap 27.8 points. SimLingo again has the lowest say-exec gap, 19.4%. 22 Table A11. Decision interventions on the labeled validation frames. Subset: the 3,434 labeled frames of the validation subset, which give the numbers behind Fig. 1b. All: the 10,806 labeled frames of the validation set. Follow: share of frames (%) on which the trajectory under a forced decision is read back as this decision (Eq. (A12)). Sep.: mean distance between the end points of the trajectories of two forced decisions in the same frame. A decision is forced on the frames that have an execution of it: 3,414, 2,509, 2,666 and 3,429 frames of the subset and 10,741, 5,340, 5,934 and 10,795 of all frames, in the order of the columns. Follow (%) ↑ Sep. Frames Method STOP SLOW KEEP ACCEL (m) Subset MindDrive [10] 27.4 29.7 30.3 27.7 0.51 
+
+Commit2Drive 99.9 99.9 99.4 99.4 8.38 All MindDrive [10] 35.5 24.6 34.4 33.8 0.63 
+
+Commit2Drive 100.0 99.9 99.2 99.1 8.20 Table A12. Interventions on SimLingo in closed loop , on 9,620 of its logged frames from all 220 routes. Forced commentary: the commentary is set to a decision k and the trajectory is decoded again; follow as in Eq. (A12). ∆v: difference in end speed between two forced decisions. Forced instruction: the instruction-following task that Action Dreaming trains, on 4,865 of these frames. Resam-pling: a second forward pass with the dropout of the model active, with the share of changed decisions of the commentary and of the plan. Removing the commentary: the trajectory is decoded without the commentary, and the row gives how often the decision of the plan changes and the mean change of its end speed. Brackets: 95% route-bootstrap intervals. Intervention Value 
+
+Forced commentary 
+
+follow (%), STOP / SLOW / KEEP / ACCEL 29 / 13 / 20 / 67 follow (%), average 32 [31, 33] 
+
+∆v, ACCEL vs. SLOW +3.1 m/s [2.6, 3.7] 
+
+∆v, KEEP vs. STOP +0.5 m/s [0.4, 0.6] 
+
+Forced instruction 
+
+success (%), stop / slower / faster 99.6 / 94.1 / 99.9 
+
+Resampling with dropout 
+
+changed decision (%), commentary / plan 4.6 / 7.3 
+
+Removing the commentary 
+
+changed decision (%) / mean |∆v| 13.9 / 0.72 m/s Table A13. Gaps and infractions of existing models by scene type , in closed loop, for the yield decision. S-D: say-do gap; S-E: say-exec gap; D-E: do-exec gap, all in % of the frames. Infr.: infractions per kilometer on the frames of the scene type. A frame can belong to several complex scene types. For SimLingo, 19,147 of the 19,149 logged frames have a stated decision. MindDrive [10] ORION [9] SimLingo [39] Scene type Frames S-D S-E D-E Infr. Frames S-D S-E D-E Infr. Frames S-D S-E D-E Infr. Simple 1,609 6.0 13.2 10.1 4.8 1,479 5.3 9.1 5.4 3.6 471 18.7 28.1 23.7 1.8 C1 junction or turn 10,869 26.2 66.7 47.1 14.0 11,838 29.9 73.5 48.1 12.9 10,157 43.9 16.3 49.9 6.1 C2 vulnerable road user 3,344 25.5 52.0 36.1 5.0 3,810 31.6 62.8 38.6 7.8 2,952 42.7 17.5 43.2 2.2 C3 conflict or cut-in 9,830 15.6 68.6 56.8 14.2 11,984 16.1 73.5 59.7 12.8 7,547 44.0 20.1 51.8 7.0 C4 stopped or low speed 15,612 26.7 82.2 60.9 27.4 18,137 31.7 87.8 60.4 28.1 14,030 52.0 12.4 56.1 8.3 C5 static obstacle 5,890 17.3 59.7 45.5 5.3 8,300 21.3 74.1 53.9 3.9 5,134 42.5 13.7 46.1 3.6 C6 night or rain 13,702 19.0 61.5 47.7 9.1 14,537 22.2 66.3 47.8 7.7 10,211 46.2 17.4 50.7 3.8 C7 dense interaction 8,050 16.2 40.9 29.5 8.6 9,305 18.0 48.7 34.9 9.1 7,155 37.2 21.1 45.1 6.4 Complex (any) 22,694 20.8 63.3 47.6 9.8 25,152 24.9 69.1 47.9 8.7 18,673 44.1 15.8 48.9 4.7 All 24,317 19.8 59.9 45.1 8.9 26,638 23.8 65.7 45.5 7.9 19,147 43.4 16.1 48.3 4.5 
+
+Which output is wrong. On the open-loop validation frames, the expert trajectory tells which of the two outputs is wrong. The speed token of MindDrive matches the decision of the expert on 33% of the frames, and its planned trajectory on 71%. For ORION, the yield decision of the language head matches the expert on 49% of the evaluated frames, and its planned trajectory on 80%. For both models, the trajectory is the more accurate output, in line with Sec. 4.2. In closed loop, the most frequent conflict of MindDrive is a token that maintains the speed while the plan accelerates, on 15,360 of its 24,317 logged frames. 
+
+E.3. More Ablation Studies 
+
+Tab. 3 removes the Maneuver Bank, the counterfactual data or the consistency losses as a whole. Tab. A10 complements it in open loop with measures that Tab. 3 does not report: the collision rate, the distance between the trajectories of two decisions and the follow rate. Every variant retrains the Maneuver Bank, the fusion MLP and, unless it is frozen, the speed branch on the same cached hidden states (Sec. D.2), 23 and the commitment is either the label of the frame or the output of a Decision Expert. The counterfactual data matters most. With supervision on the decision of the expert only, the trajectories of two decisions end 2.65 m apart instead of 8.39 m, the trajectory follows every forced decision on 32.4% of the frames instead of 99.0%, and the collision rate under a label commitment rises from 0.50% to 1.08%. Removing Lground and Lsem 
+
+leaves these measures almost unchanged, since Lexec still supervises the generated trajectory and requires it to be read back as the decision. The two losses supervise the code of the Maneuver Bank, which these measures do not capture. Without them, the grounding head receives no supervision, and the nominal speed profile ˆw that it decodes from the code no longer matches the decision. On the training frames, it deviates from the speed profile of its target by 4.77 m/s on average, compared with 0.22 m/s with the two losses. Freezing the speed branch raises the collision rate under a label commitment from 0.50% to 0.60%. 
+
+E.4. Decision Interventions 
+
+MindDrive and Commit2Drive. Tab. A11 gives the follow rate of Eq. (A12) for every decision. A decision is evaluated on the frames on which an execution of it exists, between 2,509 and 3,429 of the 3,434 frames of the subset. On the validation subset, the trajectory of MindDrive follows a forced speed token on 27% to 30% of the frames. Its seven candidate trajectories fall into one decision on 86% of the frames, and the candidates of two speed tokens that name different decisions end only 0.51 m apart on average. The token is an index without a kinematic meaning. The trajectory of Commit2Drive follows a forced decision on at least 99% of the frames for each of the four decisions, and the trajectories of two decisions end 8.38 m apart on average, close to the 8.49 m of the executions that supervise them. On the full validation set (10,806 labeled frames), the trajectory of MindDrive follows a forced speed token on 25% to 36% of the frames, and that of Commit2Drive again on at least 99%. 
+
+SimLingo. Tab. A12 lists the interventions on SimLingo [39]. Forcing the commentary to a decision moves the trajectory into this decision on 32% of the frames on av-erage, whereas an explicit instruction, the task that Action Dreaming trains, succeeds on 94% to 100%. The trajectory therefore depends much less on the decision that the model itself states than on an external instruction. The official agent of SimLingo keeps the dropout of its adapters active at inference, and we run the interventions with and without it. 
+
+E.5. Consistency across Scene Types 
+
+Frames are assigned to scene types from the privileged sim-ulator state and the scenario of the route. Model outputs are not used, so the scene types are the same for all models. A frame belongs to C1 if the route turns by more than 15 ◦
+
+within the distance that the ego vehicle covers in 3 s, at least 15 m; C2 if a pedestrian or cyclist is within 20 m or inside the ego corridor; C3 if a vehicle has a time to collision below 3 s or cuts into the corridor; C4 if the ego vehicle is slower than 1 m/s, a red light or a stop sign of the ego lane is within 30 m, or a stationary vehicle blocks the corridor within 20 m; 
+
+C5 if a static obstacle is inside the corridor; C6 at night or in rain; and C7 if at least three moving agents are within 30 m and a vehicle is in the corridor. A frame also belongs to C1, C2, C3, C5 or C7 if the scenario of its route is of this type. A frame is simple if none of the conditions on the simulator state holds and the ego vehicle drives at more than 3 m/s, and 
+
+complex if it belongs to at least one scene type and is not simple. Tab. A13 gives the gaps and the infraction rate of each scene type. For MindDrive and ORION, the say-exec gap grows from 13.2% and 9.1% on simple frames to 63.3% and 69.1% on complex ones. It peaks at 82.2% and 87.8% on stopped or low-speed frames (C4), the scene type with the highest infraction rate. SimLingo shows the opposite order for the say-exec gap, with 28.1% on simple frames and 15.8% on complex ones, while its say-do gap more than doubles. 
+
+E.6. Perception versus Language 
+
+Commit2Drive grounds the decision in facts that the percep-tion of the model reports. Tab. A14 motivates this design with ORION [9], whose language head can be asked about the facts that its perception heads report. We compare two facts in closed loop, a hazard and a red light, and list the two conditions of the red light separately. A hazard is re-ported when a vehicle or a vulnerable road user, rolled out at constant velocity, meets the front of the ego vehicle within 3 s. A red light is reported when a traffic light governs the ego lane and is red. Each disagreement is checked against the privileged simulator state with a tolerance band, and frames inside the band are not scored. The answers of the language head contradict the perception of the model itself most often for the hazard, on 12.9% of the frames on which this fact is scored and 14.8% of the complex ones, and the language head is wrong in 84% of the scored disagreements. On the open-loop validation frames, the same analysis gives a see-say gap of 0.4% on simple frames and 14.9% on com-plex ones on average over the facts, with the language head wrong in 94% of the scored disagreements. Perception is the more reliable source for the hazard and as accurate as the language head for the red light, so Commit2Drive builds the admissible set at inference from the perception facts. 24 current speed v0 = 7.2 m/s                 
+
+> (a) Scene
+> Decision that a speed token names (b) or that the commitment states (c) STOP SLOW KEEP ACCEL expert
+> 0123
+> time (s)
+> 0246810
+> speed (m/s)
+> STOP SLOW KEEP ACCEL
+> seven tokens, one motion
+> (b) MindDrive: seven speed tokens
+> 0510 15 20 25
+> distance after 3 s (m)
+> all tokens within 3.5 m
+> 0123
+> time (s)
+> 0246810
+> STOP SLOW KEEP ACCEL
+> one motion per decision
+> (c) Commit2Drive: four decisions
+> 0510 15 20 25
+> distance after 3 s (m)
+> decisions spread over 15.3 m
+
+Figure A2. Candidate trajectories of MindDrive and of Commit2Drive in the same scene of the validation set , in which a construction site blocks the lane ahead. (a) Front camera image. (b) Speed over the next 3 s of the seven candidate trajectories of MindDrive, one for each speed token, in the color of the decision that the token names. All seven brake in the last step and are read as STOP , and they end within 3.5 m of each other. The token that MindDrive states is maintain moderate speed . (c) Speed of the trajectories of Commit2Drive under its four decisions. Each ends in the region of its own decision, and their end points lie up to 15.3 m apart. Dashed: the expert. Gray band: the last 0.5 s, whose mean speed is the end speed that Φ reads; the lines at 0.5 m/s and at v0 ± 1 m/s separate the four decisions. Bottom: distance traveled within the 3 s; in (b), two of the seven markers coincide. Table A14. Perception versus language for ORION in closed loop (26,638 frames). Acc.: accuracy of the fact reported by the perception heads (see) and of the answer of the language head to a question about the same fact (say), against the privileged simulator state. See-say gap: share of frames on which the answer contradicts the perception of the model itself, on all, simple and complex frames. Say wrong: share of the scored disagreements in which the language head is wrong. All values in %. The see-say gap of the hazard is scored on the 8,950 frames outside its tolerance band, and “Red, given light” on the 2,138 frames on which perception reports a light that governs the ego lane. Acc. See-say gap Say Fact see say all simple complex wrong Hazard 95.5 87.0 12.9 3.7 14.8 84 Red light 95.7 95.5 7.1 1.6 7.4 51 Light governs ego 94.4 94.2 9.3 3.5 9.6 51 Red, given light 99.1 98.8 1.0 0.0 1.0 62 Table A15. Rule-based functions that are plugged into Com-mit2Drive without retraining. Each rule reads the scene state s
+
+from the perception of the model. When triggered, it issues the decision in place of the Decision Expert (Eq. (7)). Rule Trigger Decision Traffic light a red light governs the ego lane  
+
+> STOP
+
+or SLOW 
+
+Collision avoidance a hazard is within the time-to-collision threshold 
+
+> STOP
+
+E.7. Rule-Based Decisions 
+
+Tab. A15 lists the two rule-based functions of Sec. 4.4. A triggered rule issues the decision in place of the Decision Expert, and the Action Expert executes it without modifi-cation or retraining. The experiment tests this extensibility, without evaluating the quality of the two rules. On Dev10, the DS changes from 53.09 to 51.57 with the rules active. In the Dev10 run that measures the latency of a rule-issued decision (Sec. E.1), a rule issues the decision on 7,375 of the 26,209 steps (28.1%), and the trajectory of the Action Expert realizes the rule-issued decision on 7,372 of them. Given the hidden state ha, the Maneuver Bank and the speed branch take a median of 14.7 ms on one CPU thread for one commitment. 
+
+E.8. More Qualitative Results 
+
+Decisions with distinct trajectories. Fig. A2 compares the candidate trajectories of MindDrive and of Commit2Drive in the same scene. The seven candidates of MindDrive overlap, while every admissible decision of Commit2Drive yields its own trajectory, which Φ reads back as that decision. 
+
+Closed-loop driving. On two routes of Dev10 (Fig. A3), the decision that MindDrive states differs from the decision of its planned trajectory on 94% and 44% of the frames, 25 0 5 10 15 20 25 
+
+time (s)              
+
+> MindDrive say MindDrive do Commit2Drive say Commit2Drive do
+> say-do gap 94% say-do gap 6%
+> t = 2.5 s, 4.5 m/s t = 7.0 s, 0.0 m/s t = 11.5 s, 3.0 m/s t = 16.0 s, 4.0 m/s t = 20.5 s, 4.9 m/s
+> t = 2.5 s, 0.0 m/s t = 7.0 s, 0.8 m/s t = 11.5 s, 2.8 m/s t = 16.0 s, 5.1 m/s t = 20.5 s, 1.4 m/s
+> 010 20 30 40 50
+
+time (s)         
+
+> MindDrive say MindDrive do Commit2Drive say Commit2Drive do
+> say-do gap 44% say-do gap 5%
+> t = 5.0 s, 4.1 m/s t = 14.5 s, 0.7 m/s t = 24.0 s, 4.7 m/s t = 33.5 s, 2.9 m/s t = 43.0 s, 1.4 m/s
+> t = 5.0 s, 3.0 m/s t = 14.5 s, 2.1 m/s t = 24.0 s, 1.9 m/s t = 33.5 s, 2.5 m/s t = 43.0 s, 2.3 m/s
+
+say: stated decision do: decision that the planned trajectory realizes 
+
+(a) SignalizedJunctionLeftTurnEnterFlow, Town15, route 28198 
+
+> MindDrive
+
+Say: KEEP 
+
+Do: SLOW ✗ Say: KEEP 
+
+Do: ACCEL ✗ Say: KEEP 
+
+Do: ACCEL ✗ Say: KEEP 
+
+Do: ACCEL ✗ Say: KEEP 
+
+Do: ACCEL ✗
+
+> Commit2Drive
+
+Say: STOP, 2.2 m 
+
+Do: STOP ✓ Say: ACCEL, 7.2 m/s 
+
+Do: ACCEL ✓ Say: ACCEL, 8.1 m/s 
+
+Do: ACCEL ✓ Say: ACCEL, 8.7 m/s 
+
+Do: ACCEL ✓ Say: ACCEL, 7.4 m/s 
+
+Do: ACCEL ✓
+
+(b) HazardAtSideLane, Town05, route 25381 
+
+> MindDrive
+
+Say: KEEP 
+
+Do: KEEP ✓ Say: ACCEL 
+
+Do: KEEP ✗ Say: KEEP 
+
+Do: KEEP ✓ Say: KEEP 
+
+Do: KEEP ✓ Say: ACCEL 
+
+Do: ACCEL ✓
+
+> Commit2Drive
+
+Say: ACCEL, 5.1 m/s 
+
+Do: ACCEL ✓ Say: ACCEL, 4.6 m/s 
+
+Do: ACCEL ✓ Say: STOP, 2.6 m 
+
+Do: STOP ✓ Say: KEEP, 2.7 m/s 
+
+Do: KEEP ✓ Say: ACCEL, 7.2 m/s 
+
+Do: ACCEL ✓
+
+STOP SLOW KEEP ACCEL Figure A3. Closed-loop runs of MindDrive and Commit2Drive on two routes of Dev10. Ribbons: the stated decision (say) and the decision that the planned trajectory realizes (do) at 2 Hz over the whole run, read with a horizon of 2.5 s (Sec. D.4). The triangles mark the five frames below, which are evenly spaced over the shorter of the two runs. Each frame is labeled with its time and the current speed. Under each frame: the two decisions, for Commit2Drive with the target value of the commitment, and a check or a cross for their agreement. On both routes, each model completes the route with one collision (DS 60). 
+
+compared with 6% and 5% for Commit2Drive. 
+
+Failure cases of MindDrive. In the frames of Fig. A4, the stated decision, the planned trajectory and the executed trajectory of MindDrive disagree. 
+
+Records of the dataset. Fig. A5 shows the records of two validation frames before and after the review and refinement of Sec. C.1. In the first frame, the original annotation states a maintained speed while the expert stops, and our sentence passes the review. On 228 of the 600 reviewed frames, the reviewer finds such a contradiction in the original annotation and none in our sentence, and the reverse holds on 13 frames. In the second frame, the reviewer rejects KEEP toward a red light, and the refined rules remove it. 26 front left front front right 
+
+> 010 20
+
+0 1 2 3
+
+time (s) 
+
+02468  
+
+> speed (m/s)
+> STOP SLOW
+> KEEP
+> ACCEL
+> front left front front right
+> 010 20
+
+0 1 2 3
+
+time (s) 
+
+02468  
+
+> speed (m/s)
+> STOP
+> SLOW
+> KEEP ACCEL
+> front left front front right
+> 010 20
+
+0 1 2 3
+
+time (s) 
+
+02468
+
+> speed (m/s)
+> STOP SLOW
+> KEEP
+> ACCEL
+
+(a) States KEEP, plans ACCEL, executes KEEP and hits a pedestrian that it detects DynamicObjectCrossing, Town02, route 24224 
+
+Detects: a pedestrian (score 0.79) on a collision course 
+
+States: KEEP (token maintain_slow_speed) 
+
+Plans: ACCEL, 8.3 m/s after 3 s Executes: KEEP, 4.3 m/s after 3 s 
+
+Outcome: hits the pedestrian after 0.80 s (route DS 50) 
+
+(b) States SLOW, plans and executes ACCEL and collides with a vehicle EnterActorFlow, Town12, route 2201 
+
+Detects: a vehicle on a collision course 
+
+States: SLOW (token slow_down_rapidly) 
+
+Plans: ACCEL, 8.3 m/s after 3 s Executes: ACCEL, 5.0 m/s after 3 s 
+
+Outcome: collides with a vehicle after 1.35 s (route DS 34) 
+
+(c) States KEEP, plans ACCEL and executes STOP SignalizedJunctionRightTurn, Town12, route 4937 
+
+Detects: a vehicle on a collision course 
+
+States: KEEP (token maintain_moderate_speed) 
+
+Plans: ACCEL, 6.7 m/s after 3 s Executes: STOP, 0.1 m/s after 3 s 
+
+Outcome: comes to a stop that it neither states nor plans (route DS 60)          
+
+> detection of the model agent (ground truth) stated decision (band) planned trajectory executed trajectory collision STOP SLOW KEEP ACCEL
+
+Figure A4. Cases in which the stated decision, the planned trajectory and the executed trajectory of MindDrive disagree , from its closed-loop evaluation. Left: the three front cameras with the detections of the model. Middle: top view with the planned trajectory and the trajectory that is executed over the next 3 s; forward is up, and the ticks are in meters. Right: speed over the next 3 s; the band is the decision that the stated speed token names. The color of a band or of a curve shows its decision, which is read over these 3 s and is the same with the horizon of 2.5 s of Sec. D.4. (a) The model detects a pedestrian, states a maintained speed and plans to accelerate, and hits the pedestrian after 0.80 s. (b) It states a rapid slowdown, while its plan and the executed trajectory accelerate into a collision. (c) It states a maintained speed, plans to accelerate and comes to a stop. 
+
+27 STOP SLOW KEEP ACCEL in the admissible set outside the admissible set ✓ ✗ verdict of the reviewer 
+
+(a) Decision sentence: the original annotation contradicts the motion of the expert HardBreakRoute, Town01, route 32, frame 24 
+
+Executions of the four decisions 
+
+(b) Admissible set: the reviewer rejects KEEP toward a red light, and a rule is added CrossingBicycleFlow, Town12, route 977, frame 35 
+
+Executions of the four decisions 
+
+Ego state and perception facts: Ego speed: 6.7 m/s. Navigation: follow the lane. Traffic light: none. Objects: car 12 m ahead, in lane, moving ahead at 7.2 m/s; car 27 m ahead, in lane, moving ahead at 8.3 m/s. Lead vehicle: car 12 m ahead, pulling away at 0.6 m/s, time gap 1.8 s. Vulnerable road user in the corridor: none within 30 m. 
+
+Original annotation: “The car should maintain a moderate speed and follow the lane.” 
+
+Reviewer: ✗ contradiction with the ego action. “… the ego vehicle comes to a stop (speed after 3 s is 0.0 m/s) from 6.7 m/s, which is a deceleration of more than 1 m/s, thus contradicting ‘maintain a moderate speed’ …” 
+
+Our sentence: (STOP, 5.6 m) “The car should stop within 6 m and follow the lane.” 
+
+Reviewer: ✓ no contradiction and no critical omission. 
+
+Label: (STOP, 5.6 m) 
+
+Admissible set: 
+
+STOP SLOW KEEP ACCEL 
+
+Ego state and perception facts: Ego speed: 8.8 m/s. Navigation: follow the lane. Traffic light: red, affects ego. Objects: bicycle 5 m ahead, 9 m left, approaching at 2.0 m/s; traffic sign 3 m ahead, 11 m left, stationary; bicycle 37 m ahead, 9 m left, approaching at 2.2 m/s. Lead vehicle: none within 40 m. Vulnerable road user in the corridor: none within 30 m. 
+
+First rules: only ACCEL is forbidden at a red light. 
+
+Admissible set: STOP SLOW KEEP ACCEL 
+
+Reviewer on KEEP: ✗ not admissible. “… since the light is red, continuing at current speed would result in running a red light, which is illegal. …” 
+
+Refined rules: KEEP is forbidden as well when the stop line of the red light is within reach. Here the stop line is 8 m ahead and the reach is v0 × 3 s + 5 m = 31.3 m (v0 = 8.77 m/s), so KEEP leaves the set. 
+
+Label: (STOP, 3.5 m) 
+
+Admissible set: 
+
+STOP SLOW KEEP ACCEL 
+
+> front camera
+
+0 1 2 3
+
+time (s) 
+
+0246810 
+
+> speed (m/s)
+> STOP (expert)
+> SLOW
+> KEEP
+> ACCEL
+> front camera
+
+0 1 2 3
+
+time (s) 
+
+04812 
+
+> speed (m/s)
+> STOP (expert)
+> SLOW
+> KEEP
+> ACCEL
+
+Figure A5. Records of the dataset before and after the review and refinement , for two frames of the validation set. Left: the front camera image with the label and the admissible set of the final record. Middle: the text of the record with the verdict of the reviewer, of which an excerpt is quoted. Right: speed of the executions of the four decisions over the next 3 s. (a) The original annotation states a maintained speed while the expert stops behind the vehicle ahead, which brakes hard in this scenario, and the reviewer finds the contradiction. Our sentence is rendered from the commitment that is read from the expert trajectory, and the reviewer has no objection. The executions of the other three decisions collide, so only STOP is admissible. (b) Under the first version of the rules, KEEP is admissible although the stop line of a red light is 8 m ahead, and the reviewer rejects it. The rule of Eq. (A5) on the reach of a red light is added and removes KEEP from the admissible set, while SLOW remains admissible under the rules of Sec. C.1. 
+
+28

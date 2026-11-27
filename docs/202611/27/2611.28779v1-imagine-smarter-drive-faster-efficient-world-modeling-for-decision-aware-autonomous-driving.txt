@@ -1,0 +1,2570 @@
+Imagine Smarter, Drive Faster:
+Efficient World Modeling for Decision-Aware Autonomous Driving
+Feiyang Jia1,†, Lin Liu2,†, Zhicheng Bao1,†, Caiyan Jia1,∗,
+Ziying Song3,∗, Shengkai Zhang1, Lina Han1, Yan Zhao1, Xiaoshuai Hao4,‡
+1Beijing Jiaotong University
+2Dalian University of Technology
+3Nanyang Technological University
+4Li Auto Inc.
+DiffusionDrive
+WoTE
+Drive-JEPA (R)
+Drive-JEPA (V)
+(a) Representation Bottleneck
+ or Selection Bottleneck?
+(c) Performance & Efficiency
+(b) "Trade-off" Methods vs. Our FastWorld
+"Trade-off" Methods Pipeline: Requires Additional Knowledge?
+FastWorld Pipeline: Natively Lightweight Architecture!
+Lightweight
+Representation
+Domain-specific
+Pre-training
+General
+Pre-training
+Distillation
+Short World Rollout
+Prediction
+Selective Trajectory
+Refinement
+Full
+NAVTEST
+ PDMS
+Selected
+Scene
+Selected
+PDMS
+Selected
+Scene
+Best-
+Prop.
+PDMS
+91.5
+98.2
+92.2
+93.7
+98.6
+93.1
+88.3
+98.4
+87.1
+88.1
+94.6
+86.0
+-8.6
+-11.3
+-6.0
+-5.5
+FPS
+PDMS
+FastWorld
+-4.2
+92.2
+96.2
+92.0
+FastWorld
+(Ours)
+TransFuser
+Drive-JEPA
+DrivoR
+GoalFlow
+Hydra-MDP
+DiffusionDrive
+WoTE
+MeanFuser
+E2E-
+based
+Methods
+W.-M.-
+based
+Methods
+H20
+4090
+Param.
+Representation
+Domain-specific
+Pre-training
+General
+Pre-training
+Distillation
+World Rollout
+Prediction
+Trajectory
+Refinement
++
+Score
+Figure 1. Rethinking world modeling for efficient autonomous driving. (a) Representative planners exhibit substantial gaps between
+their best candidate and selected trajectories, suggesting that candidate selection, beyond representation capacity, is a key planning bot-
+tleneck. (b) FastWorld pursues efficiency through a natively lightweight architecture combining compact representations, short-horizon
+future prediction, and selective trajectory refinement, without teacher distillation or additional domain-specific pre-training. (c) Com-
+pared with existing E2E-based methods [6, 24, 32, 34, 46, 52] and World-Model-based methods [31, 47], FastWorld achieves a favorable
+performance–efficiency balance on NAVSIMv1 [9], delivering 92.2 PDMS at 132 FPS with a single 4090 GPU and only 27M parameters.
+Abstract
+World models hold great promise for autonomous driv-
+ing planning, yet their ability to imagine the future often
+comes at a formidable computational cost. Efficiency ef-
+forts, such as knowledge distillation and domain-specific
+pre-training, often shift this burden to costly teachers
+or training pipelines, leaving lightweight world model-
+ing an open challenge.
+We introduce FastWorld, a na-
+tively lightweight world-model framework for efficient au-
+tonomous driving planning. FastWorld reduces computa-
+tion through compact scene representations, short-horizon
+action-conditioned prediction, and selective candidate ver-
+ification and score refinement. These designs support effi-
+cient future-informed planning without teacher distillation
+or additional domain-specific pre-training. On NAVSIMv1,
+FastWorld achieves 92.2 PDMS at 132 FPS on a single
+† Equal contribution. ∗Corresponding author. ‡ Project lead.
+4090 GPU. It also achieves 89.4 EPDMS on NAVSIMv2
+and an average L2 of 0.40 over 3 seconds at 17 FPS on
+nuScenes.
+Code and models can be found at https:
+//github.com/MoyangSensei/FastWorld.
+1. Introduction
+Autonomous driving has evolved from directly map-
+ping sensor inputs to driving actions toward anticipatory
+decision-making that predicts environmental dynamics and
+evaluates action consequences. World models provide an
+important foundation for this transition [10, 11, 14, 19,
+45, 55, 61].
+Recent world-model-based planning meth-
+ods for autonomous driving have shown substantial per-
+formance potential, but their computational efficiency still
+limits practical deployment [19].
+A common consensus
+is that rich future imagination often incurs high computa-
+tional costs. Explicit modeling approaches [13, 25, 56, 57]
+1
+arXiv:2611.28779v1  [cs.CV]  21 Nov 2026
+
+
+typically generate high-dimensional images, occupancy, or
+explicit scene representations. Although implicit modeling
+approaches [12, 20, 28, 39, 60] avoid some reconstruction
+overhead, they may still require complex state transitions
+and candidate evaluation. These costs further increase when
+future prediction extends to multiple candidate actions, cre-
+ating a pronounced trade-off between planning performance
+and efficiency.
+To address this trade-off, some works use knowledge
+distillation or pretrained knowledge transfer to balance
+performance and deployment efficiency.
+For example,
+WPT [22] transfers a world-model-guided teacher policy to
+a lightweight student policy through policy distillation and
+world reward distillation. Drive-JEPA [47] combines a pre-
+trained video encoder [1] with additional driving videos to
+learn predictive representations. These methods offer ef-
+fective practical solutions, but their capabilities necessarily
+rely on strong teacher supervision, costly feature extractors,
+or additional training data. Efficiency gains at inference do
+not directly imply lower overall learning costs. Thus, these
+approaches fundamentally retain their dependence on ex-
+pensive representations. Parameter-efficient adaptation also
+offers a complementary route [15, 23].
+However, does high-quality planning necessarily de-
+pend on expensive representations?
+To re-examine this
+question, we selected several representative autonomous
+driving approaches [31, 34, 47] and analyzed the average
+quality of both their candidate trajectories and final selected
+trajectories across a subset of NAVSIM [9], as illustrated
+in Fig. 1(a). A key observation is that the trajectories ulti-
+mately selected by all models often fail to realize the full po-
+tential of their candidate sets. Moreover, Drive-JEPA [47]
+achieves similar candidate trajectory quality with feature
+extractors of different sizes. This suggests that represen-
+tation quality alone does not determine the performance
+bottleneck. For autonomous driving world models, what
+matters more is understanding the futures associated with
+different candidates and making accurate selections accord-
+ingly. Therefore, improving planning performance requires
+not only richer future imagination but also more effective
+use of limited future information for candidate evaluation.
+The above analysis motivates us to explore a more direct
+pipeline: learning future information that is truly useful
+for planning under a limited computation budget via na-
+tively lightweight architectural design that constrains the
+cost of future state construction and trajectory evaluation.
+As shown in Fig. 1(b), we propose FastWorld, a lightweight
+world model framework for efficient autonomous driving
+planning. First, FastWorld constructs a compact world state
+that preserves camera identities and coarse spatial layouts.
+Second, FastWorld generates a candidate trajectory set and
+preliminarily filters a small subset of top candidates for
+low-cost visual verification, confining expensive cross-view
+feature interactions to limited candidates while preserving
+shared candidate context. Built upon this, the lightweight
+state transition network predicts compact future world states
+conditioned on the current state, ego motion, and candidate
+actions. Finally, a small MLP reads out future utility and
+corrects the initial score with bounded residuals. In this
+way, FastWorld allocates limited computation to both ‘pre-
+dicting the futures’ and ‘assessing the value of these futures
+for decision-making’, avoiding full high-dimensional scene
+generation or complex future feature decoding for each can-
+didate trajectory. Meanwhile, FastWorld does not rely on
+teacher distillation or extra domain-specific pre-training to
+achieve lightweight capacity. On the NAVSIM [4, 9] bench-
+mark, FastWorld achieves an inference speed of 132 FPS
+with planning performance comparable to state-of-the-art
+methods (92.2 PDMS and 89.4 EPDMS), see Fig. 1(c). On
+the nuScenes [2] benchmark, FastWorld achieves a 3s aver-
+age L2 of 0.40 and a 3s average CR of 0.31, at 17 FPS. The
+competitive inference latency demonstrates FastWorld’s po-
+tential to attain a better balance between planning quality
+and computational efficiency.
+In summary, our main contributions are as follows:
+• We identify the candidate trajectory selection bottle-
+neck in autonomous driving models. We observe a sub-
+stantial gap between the latent performance of the candi-
+date set and the final selection in most models. There-
+fore, enhancing candidate understanding and evaluation
+is a promising direction for improving efficient planning.
+• We propose FastWorld, a natively lightweight world
+model framework. With compact state representation,
+shared state transition, and selective candidate verifica-
+tion, FastWorld structurally controls the computational
+cost of future prediction and trajectory evaluation.
+• FastWorld achieves a competitive balance between
+performance and efficiency. Without teacher distillation
+or extra domain-specific pre-training, FastWorld achieves
+92.2 PDMS at 132 FPS on NAVSIMv1 [9], 89.4 EPDMS
+on NAVSIMv2 [4], and 0.40 m average L2 error at 17 FPS
+on nuScenes [2], offering an efficient world-model-based
+solution for real-time autonomous driving.
+2. Related Work
+End-to-End Autonomous Driving.
+End-to-end au-
+tonomous driving aims to directly map raw sensor inputs to
+planned trajectories. Recent research has increasingly fo-
+cused on multi-modal trajectory generation [36, 41, 42, 59]
+and closed-loop robustness [40, 59].
+DIVER [42] com-
+bines diffusion-based multi-modal trajectory generation
+with reinforcement learning. GuideFlow [36] models multi-
+modal trajectory distributions through constraint-guided
+flow matching. Diffusion Planner [59] uses a DiT to jointly
+model ego-vehicle planning and other-agent prediction, em-
+ploying classifier guidance to generate multi-modal driving
+2
+
+
+behaviors and demonstrating closed-loop robustness on nu-
+Plan [3]. These methods improve planning capabilities in
+complex driving scenarios, but temporal interactions and
+iterative trajectory generation also pose challenges to in-
+ference efficiency [43]. To address these challenges, ex-
+isting approaches adopt strategies such as task paralleliza-
+tion (e.g., PARA-Drive [50] and SparseDrive [44]), sparse
+scene representations (e.g., SSR [27], SparseDrive [44],
+and DriveTransformer [21]), and fewer trajectory genera-
+tion steps (e.g., DiffusionDrive [34] and GoalFlow [52]),
+reducing computational overhead and supporting progress
+toward safe real-world deployment.
+Efficient World Modeling for Autonomous Driving.
+World models for autonomous driving increasingly in-
+tegrate future scene generation with trajectory planning.
+However, explicit scene generation often incurs substantial
+computational overhead [5, 49, 56]. Some studies model
+future scenes in latent space [20, 29–31].
+For example,
+DriveWorld-VLA [20] connects world modeling and action
+planning through shared latent states, avoiding costly pixel-
+level future rollouts. Although latent-space modeling re-
+duces visual reconstruction costs, rich imagination of fu-
+ture worlds may still involve multi-step state prediction and
+action-conditioned interactions. Other works further prior-
+itize efficiency in world model design [8, 48, 53, 54]. For
+example, SparseWorld [8] uses sparse scene representations
+to reduce future prediction costs. Latent-WAM [48] com-
+presses multi-view images into compact scene tokens using
+learnable queries. Building on compact latent-space mod-
+eling, FastWorld further reduces inference latency through
+compact scene representations, short-horizon future predic-
+tion, and selective trajectory refinement.
+3. Method
+FastWorld supports the planning task through compact,
+action-conditioned future prediction, as shown in Fig. 2.
+FastWorld comprises three main components: Observation
+Encoding (Sec. 3.1), Action-Conditioned World Predic-
+tion (Sec. 3.2, ACWP), and Future-Aware Utility Scoring
+(Sec. 3.3, FAUS). The visual encoder constructs the scene
+state and provides trajectory-aligned evidence for candidate
+trajectory generation under a computational budget. ACWP
+predicts compact future states conditioned on the current
+scene and candidate actions, while FAUS uses these predic-
+tions to refine candidate trajectory scores.
+3.1. Observation Encoding
+Given V synchronized camera images It = {Iv
+t }V
+v=1 and
+the current ego state et with local pose, velocity, accelera-
+tion and a navigation command, FastWorld first constructs
+a shared visual memory Ft ∈RV ×Cvis×Hvis×Wvis:
+Ft = fvis(It, et)
+(1)
+where fvis(·) denotes the shared visual encoder with multi-
+scale feature fusion [16, 35, 38].
+Next, FastWorld uses
+Ft to construct a compact scene representation zt
+∈
+RV ×Cz×Hz×Wz at time t:
+zt = fcomp(Ft)
+(2)
+where fcomp(·) applies spatial pooling within each view, a
+fixed orthogonal projection, and normalization. This repre-
+sentation preserves camera identity and coarse spatial lay-
+out. The current observation is encoded once and shared by
+proposal generation and world prediction.
+3.2. Action-Conditioned World Prediction
+Trajectory proposal refinement. The proposal generator
+conditions a bank of learnable queries Q on the ego state
+to obtain the initialized query Q(0). At each refinement
+stage r ∈{1, . . . , R}, we decode candidate trajectories
+from Q(r−1) and use the predicted poses to gather visual
+features and update the queries to Q(r):
+T (r) = f (r)
+dec(Q(r−1)),
+Q(r) = falign(Q(r−1), Ft, fproj(T (r)))
+(3)
+where T (r) and f (r)
+dec(·) denote the trajectory and its de-
+coder for stage r.
+For queries undergoing visual verifi-
+cation, fproj(·) projects pose-based reference points into
+the camera views. The shared interaction module falign(·)
+combines query self-attention with cross-attention to visual
+memory at the projected reference locations [33]. After R
+stages, we obtain T (R), the final proposal set, and the cor-
+responding query features Q(R). Each proposal τi contains
+local positions and headings over the full planning horizon.
+Budgeted visual verification. To control the final verifica-
+tion cost, a lightweight router uses candidate features and
+the shared native scorer to select a set S of K candidate
+indices before the final visual update. In the final refine-
+ment stage, image cross-attention and the subsequent feed-
+forward computation operate only on the selected queries,
+while self-attention preserves the context of all candidates.
+We use the same indices S to gather the retained query fea-
+tures Q(R)
+S
+from Q(R) and their corresponding trajectories
+T (R)
+S
+from T (R).
+Action encoding. We distinguish the prediction horizon ∆
+from the full planning horizon and encode only the trajec-
+tory prefix within ∆into an action condition ai:
+ai = fact(τ ≤∆
+i
+), τi ∈T (R)
+S
+(4)
+where fact(·) denotes the future action encoder, and τ ≤∆
+i
+denotes the prefix of candidate trajectory τi within the pre-
+diction horizon ∆. This temporal alignment restricts the
+transition input to actions within the modeled interval.
+3
+
+
+Multi-view Images
+Ego Info.
+Visual
+Encoder
+Compact
+$$\mathcal{z_t}$$
+Scene State
+$$ z_{t+\Delta}^{\,gt}$$
+$$\mathcal{L}_{\mathrm{obs}}$$
+<<
+Action Encoder
+Context
+Decoder
+$$\mathcal{Q}^{0}$$
+$$\mathcal{×r}$$
+ Prop. Router
+Self/Cross
+Attention
+$$\hat z_{t+\Delta}^{\,k}$$
+…...
+Future
+Scene State 
+$$\hat z_{t+\Delta}^{\,1}$$
+$$\mathcal{e_t}$$
+$$\mathcal{F}_{t}$$
+Traj. Decoder
+$$\mathcal{x}$$
+$$\mathcal{y}$$
+Future
+Utility Readout
+Comparison
+Refinement
+0.4 0.6
+0.1
+0.3
+$$b_{i }$$
+Query
+$$\mathcal{Q}^{i}$$
+0.85
+$$s_{i }$$
+0.2
+Final Traj. Scores
+0.7 0.3
+All Prop.
+$$\el_i$$
+MLP
+$$ y_{i}^{sim}$$
+$$\mathcal{L}_{\mathrm{rank}}$$
+Selected Prop.
+Base
+Utility Readout
+$$\delta_i^{\mathrm{cmp}}$$
+Predictor
+(d) Result
+(a) Observation Encoding
+(b) Action-Conditioned World Prediction
+(c) Future-Aware Utility Scoring
+<<
++
+Figure 2. FastWorld Pipeline. FastWorld achieves efficient planning through a natively lightweight architecture. (a) Observation Encoding
+extracts shared multi-view features and constructs a compact scene state. (b) Action-Conditioned World Prediction retains a budgeted
+subset of trajectory proposals and predicts their short-horizon future states in parallel. (c) Future-Aware Utility Scoring refines candidate
+scores using the predicted futures and selects the final trajectory. (d) Future-informed trajectory selection yields the final driving decision.
+Parallel future prediction. Next, we combine the compact
+scene state zt (see Eq. 2) and the ego state et to obtain a
+shared context vector ct:
+ct = fctx(zt, et)
+(5)
+where fctx(·) denotes the context encoder. For each candi-
+date i, we add the increment to the current scene state zt to
+obtain the predicted future state ˆz i
+t+∆:
+ˆz i
+t+∆= zt + fdyn(ct, ai)
+(6)
+where fdyn(·) maps the shared context and action condition
+to a scene-state increment. The predicted state ˆz i
+t+∆has the
+same shape as zt. All candidates share the transition pa-
+rameters and are processed in parallel. The module directly
+predicts the target-time state without auto-regressive rollout
+or pixel reconstruction.
+3.3. Future-Aware Utility Scoring
+Pairwise comparison prior. For each retained candidate,
+FAUS first applies temporal max pooling to its query fea-
+tures and passes the pooled feature to the shared native
+scorer to obtain a base utility score ℓi. It then ranks the
+candidates by these scores and pairs candidates at corre-
+sponding ranks in the upper and lower halves of the ranked
+list. We refine ℓi through pairwise comparison to obtain the
+comparison prior bi:
+bi∈S = ℓi + δcmp
+i
+(7)
+where δcmp
+i
+is a bounded correction computed by the com-
+parison module. The module compares paired candidates
+using their retained query features Q(R)
+S
+and trajectories
+T (R)
+S
+(see Sec. 3.2), along with the current ego state et and
+the base utility scores. To compute the correction for can-
+didate i, it combines information from the pair containing
+that candidate with context aggregated across all pairs.
+Future-aware reranking.
+For each retained candidate,
+FAUS uses the predicted future state ˆz i
+t+∆(see Eq. 6) to
+refine the comparison prior bi and obtain the final utility
+score si:
+si∈S = bi + futil
+ ˆz i
+t+∆
+
+(8)
+where futil(·) is a lightweight utility readout that maps
+the predicted state to a scalar correction with magnitude
+bounded by ρu.
+With this, FastWorld efficiently selects
+the highest-scoring retained trajectory through shared vi-
+sual encoding, budgeted visual verification, and lightweight
+scoring of compact future states predicted in parallel.
+3.4. Training Objective
+Future state prediction supervision. For the logged ac-
+tion, we match the predicted future state ˆzlog
+t+∆(see Eq. 6)
+to the observed future state z⋆
+t+∆(see Eq. 2), yielding the
+observation loss Lobs:
+Lobs = Evalid
+h
+Dobs
+ ˆzlog
+t+∆, z⋆
+t+∆
+i
+(9)
+where Dobs(·) combines smooth L1 loss with the mean to-
+kenwise cosine distance and Evalid(·) denotes the expecta-
+tion over samples with valid future observations.
+Decision supervision. We use simulator-derived utilities yi
+to supervise the final candidate scores si (see Eq. 8). To
+rank candidates with higher utility above those with lower
+utility, we use the pairwise loss Lrank:
+Lrank =
+X
+(m,n)∈P
+wmn × SoftPlus
+sn −sm
+Ts
+
+(10)
+where P contains ordered pairs (m, n) drawn from E that
+satisfy ym −yn > η. The set E contains retained candi-
+dates whose comparison priors lie within ε of the highest
+prior. The weight wmn is the simulator utility gap ym −yn
+normalized over P, and Ts is the score temperature. The
+4
+
+
+Table 1. Comparison with state-of-the-art methods in NAVSIMv1 [9]. The BEST and the SECOND BEST are indicated with bold and
+underline respectively. ⋆results are cited from [46]. † results are cited from [20]. ‡ results are reproduced using the official checkpoint.
+Abbreviations: Num.×C: surround Num.-view cameras; L: LiDAR; NC: No Collision; DAC: Drivable Area Compliance; TTC: Time-
+To-Collision; EP: Ego Progress; C: Comfort; PDMS: Predictive Driver Model Score; FPS[GPU]: Frames Per Second (includes the complete
+forward pass and evaluated with a single [GPU]).
+Methods
+Venue
+Sensors
+Backbone
+NC↑
+DAC↑
+TTC↑
+C↑
+EP↑
+PDMS↑
+FPS↑[GPU]
+Human
+-
+-
+-
+100.0
+100.0
+100.0
+99.9
+87.5
+94.8
+-
+E2E-based Methods
+TransFuser [6]
+TPAMI 2022
+3×C & L
+ResNet-34
+97.7
+92.8
+92.8
+100.0
+79.2
+84.0
+⋆63 [H20]
+Hydra-MDP [32]
+arXiv 2024
+3×C & L
+ResNet-34
+98.3
+96.0
+94.6
+100.0
+78.7
+86.5
+⋆20 [H20]
+DiffusionDrive [34]
+CVPR 2025
+3×C & L
+ResNet-34
+98.2
+96.2
+94.7
+100.0
+82.2
+88.1
+⋆39 [H20]
+GoalFlow [52]
+CVPR 2025
+3×C & L
+V2-99
+98.4
+98.3
+94.6
+100.0
+85.0
+90.3
+⋆10 [H20]
+MeanFuser [46]
+CVPR 2026
+3×C
+ResNet-34
+98.6
+97.0
+95.0
+100.0
+82.8
+89.0
+59 [H20]
+World-Model-based Methods
+WoTE [31]
+ICCV 2025
+3×C & L
+ResNet-34
+98.5
+96.8
+94.9
+99.9
+81.9
+88.3
+‡50 [4090]
+Epona [56]
+ICCV 2025
+1×C
+DCAE
+97.9
+95.1
+93.8
+99.9
+80.4
+86.2
+†0.4 [H20]
+DriveLaW [51]
+CVPR 2026
+1×C
+LTX-Video 3D VAE
+99.0
+97.1
+96.7
+100.0
+81.3
+89.1
+- [4090]
+DriveVLA-W0 [30]
+ICLR 2026
+1×C
+-
+98.7
+99.1
+95.3
+99.3
+83.3
+90.2
+13 [H200]
+DriveVA [37]
+ECCV 2026
+1×C
+Wan2.2 3D VAE
+99.2
+97.5
+98.7
+100.0
+83.5
+90.9
+- [H20]
+DriveWorld-VLA [20]
+ICML 2026
+3×C
+ResNet-34
+99.1
+98.2
+96.1
+100.0
+85.9
+91.3
+1.2 [H20]
+MomWorld [43]
+arXiv 2026
+3×C & L
+V2-99
+98.6
+98.2
+93.9
+100.0
+85.7
+90.2
+7.2 [4090]
+Drive-JEPA [47]
+arXiv 2026
+1×C
+ViT-L
+99.1
+98.2
+96.2
+99.9
+91.4
+93.7
+‡18 [4090]
+DriveFuture [17]
+NeurIPS 2026
+6×C
+V2-99
+98.8
+99.1
+95.4
+100.0
+84.2
+90.7
+- [5090]
+FastWorld (Ours)
+-
+4×C
+ResNet-34
+98.5
+98.0
+94.6
+99.9
+89.9
+92.2
+132 [4090]
+SoftPlus(·) penalty increases as the score sn of the lower-
+utility trajectory approaches or exceeds the score sm of the
+higher-utility trajectory. We also encourage the model to
+assign more probability to candidates with higher simulator
+utility through Lutil:
+Lutil = umax −
+X
+i∈E
+piyi
+(11)
+where umax is the utility upper bound, and pi is the softmax
+probability of si over E at temperature Ts. We average both
+decision losses over scenes with valid pairs.
+Total training objective. We combine the three supervision
+terms and the regularizers into the total training objective L:
+L = λobsLobs + λrankLrank + λutilLutil + Lreg
+(12)
+where Lreg is the weighted sum of the residual, imitation,
+and planner consistency losses (detailed in the Supplemen-
+tary Material). And the λ control their contributions.
+4. Experiments
+4.1. Details
+Dataset.
+We evaluate FastWorld on NAVSIMv1 [9],
+NAVSIMv2 [4] and nuScenes [2]. NAVSIMv1 is an au-
+tonomous driving planning benchmark built on the Open-
+Scene [7] dataset, providing 120 hours of driving data with
+multi-camera inputs and fused LiDAR point clouds. The
+core metric Predictive Driver Model Score (PDMS) is de-
+fined as the product of a penalty term and a weighted av-
+erage score.
+NAVSIMv2 proposes a two-stage pseudo-
+simulation evaluation.
+Its core metric is called the Ex-
+tended Predictive Driver Model Score (EPDMS). For open-
+loop planning, nuScenes is a large-scale outdoor driving
+dataset with 1000 multi-modal scenes. Each scene lasts 20
+s, is annotated at 2 Hz, and includes 6 synchronized camera
+images and LiDAR point clouds. We use L2 and Collision
+Rate (CR) as evaluation metrics. See the Supplementary
+Material for more information about the datasets.
+Implementation.
+For NAVSIM, we take synchronized
+images from four cameras (CAM F0, CAM B0, CAM L0,
+CAM R0) as input. A shared ResNet-34 [16] with FPN [35]
+outputs a 14 × 24, 256-channel feature map per view. For
+world prediction, each view is pooled to a 2 × 2 grid and
+projected to 64 channels, compressing visual memory from
+1,344 spatial tokens to 16 scene tokens. The planner gener-
+ates 64 trajectories; we keep 16 candidates for visual verifi-
+cation and predict a compact 1-second future state for each.
+Training uses AdamW with a global batch size of 128. The
+model for Tab. 1 and Tab. 2 is trained for 30 epochs on 8
+RTX 4090 GPUs. For nuScenes, we use six surround-
+view cameras. A Swin-T [38] encoder processes the current
+frame and a frame from roughly 1 second prior. The utility
+readout employs 36 tokens (width 64) per prediction step
+to rerank 16 out of 64 proposals over a 3-second horizon.
+The model for Tab. 3 is trained for 95 epochs on the same
+hardware. See the Supplementary Material for additional
+implementation details.
+4.2. Main Results
+NAVSIMv1. As shown in Tab. 1, FastWorld achieves 92.2
+PDMS at 132 FPS on a single RTX 4090, surpassing ex-
+isting approaches by a large margin in FPS while main-
+taining competitive PDMS. Only Drive-JEPA [47] boasts a
+modest PDMS advantage among competing planners (92.2
+vs. 93.7). Running on the same GPU, FastWorld reaches
+7.3× its throughput (132 vs. 18), at the cost of just -1.5
+PDMS. FastWorld also exceeds DriveWorld-VLA [20] by
+5
+
+
+Table 2. Comparison with state-of-the-art methods in NAVSIMv2 [4]. The BEST and the SECOND BEST are indicated with bold and
+underline respectively. ‡ results are reproduced using the official checkpoint. Abbreviations: NC: No at-fault Collision; DAC: Drivable
+Area Compliance; DDC: Driving Direction Compliance; TLC: Traffic Light Compliance; EP: Ego Progress; TTC: Time to Collision; LK:
+Lane Keeping; HC: History Comfort; EC: Extended Comfort; EPDMS: Extended Predictive Driver Model Score.
+Split
+Methods
+Venue
+Backbone
+Stage
+NC↑
+DAC↑
+DDC↑
+TLC↑
+EP↑
+TTC↑
+LK↑
+HC↑
+EC↑
+EPDMS↑
+navtest
+E2E-based Methods
+TransFuser [6]
+TPAMI 2022
+ResNet-34
+-
+96.9
+89.9
+97.8
+99.7
+87.1
+95.4
+92.7
+98.3
+87.2
+76.7
+HydraMDP++ [26]
+arXiv 2025
+V2-99
+-
+98.8
+97.8
+99.1
+100.0
+84.0
+95.3
+70.1
+-
+96.8
+84.1
+DiffusionDrive [34]
+CVPR 2025
+ResNet-34
+-
+98.2
+95.9
+99.4
+99.8
+87.5
+97.3
+96.8
+98.3
+87.7
+84.5
+MeanFuser [46]
+CVPR 2026
+ResNet-34
+-
+98.3
+97.2
+99.6
+99.8
+87.6
+97.4
+97.3
+98.3
+88.2
+89.5
+World-Model-based Methods
+DriveVLA-W0 [30]
+ICLR 2026
+-
+-
+98.5
+99.1
+98.0
+99.7
+86.4
+98.1
+93.2
+97.9
+58.9
+86.1
+Latent-WAM [48]
+ACMMM 2026
+DINOv2-B
+-
+98.1
+97.3
+99.6
+99.8
+87.7
+97.3
+97.6
+98.1
+87.3
+89.3
+DriveWorld-VLA [20]
+ICML 2026
+ResNet-34
+-
+98.6
+99.1
+99.6
+99.8
+87.4
+97.9
+97.0
+97.8
+78.6
+86.8
+MomWorld [43]
+arXiv 2026
+V2-99
+-
+98.1
+98.1
+99.5
+99.8
+88.9
+98.2
+96.1
+98.3
+90.6
+90.1
+Drive-JEPA [47]
+arXiv 2026
+ViT-L
+-
+98.4
+98.6
+99.1
+99.8
+88.4
+97.8
+97.6
+97.9
+84.8
+87.8
+DriveFuture [17]
+NeurIPS 2026
+V2-99
+-
+98.8
+99.1
+99.6
+99.9
+86.6
+98.4
+96.4
+98.3
+74.8
+89.9
+FastWorld (Ours)
+-
+ResNet-34
+-
+98.2
+97.4
+99.5
+99.6
+89.3
+97.5
+96.8
+98.3
+86.2
+89.4
+navhard
+E2E-based Methods
+‡DiffusionDrive [34]
+CVPR 2025
+ResNet-34
+1
+96.0
+79.7
+97.4
+99.5
+81.3
+93.1
+90.8
+96.8
+73.8
+24.2
+2
+82.1
+72.2
+88.5
+98.7
+85.1
+78.8
+49.2
+89.3
+71.2
+GuideFlow [36]
+CVPR 2026
+ResNet-34
+1
+97.8
+97.1
+100.0
+100.0
+81.4
+98.5
+91.4
+92.8
+34.2
+46.7
+2
+87.3
+92.3
+98.0
+96.9
+75.8
+85.5
+59.3
+95.4
+53.5
+World-Model-based Methods
+MomWorld [43]
+arXiv 2026
+V2-99
+1
+96.9
+93.6
+99.8
+99.8
+80.4
+96.9
+96.4
+97.6
+60.0
+42.8
+2
+86.4
+88.2
+94.2
+98.3
+81.7
+84.4
+55.3
+97.0
+54.7
+DriveFuture [17]
+NeurIPS 2026
+V2-99
+1
+99.8
+99.8
+100.0
+99.6
+85.7
+99.8
+98.7
+97.6
+66.2
+55.5
+2
+90.6
+87.5
+94.1
+99.1
+84.6
+88.8
+58.3
+93.5
+45.6
+‡Drive-JEPA [47]
+arXiv 2026
+ViT-L
+1
+95.3
+96.4
+99.4
+99.8
+85.1
+94.9
+96.9
+97.3
+35.1
+37.7
+2
+87.8
+86.0
+92.3
+99.1
+80.2
+84.7
+54.9
+93.0
+27.2
+1
+96.7
+92.9
+99.0
+99.3
+80.0
+96.7
+92.2
+97.3
+60.0
+FastWorld (Ours)
+-
+ResNet-34
+2
+88.0
+86.7
+94.2
+98.5
+77.8
+85.0
+61.0
+95.4
+51.9
+43.9
+Table 3. Comparison with state-of-the-art methods in nuScenes [2] validation set. The BEST and the SECOND BEST are indicated
+with bold and underline respectively. † results are cited from [20]. ‡ results are reproduced using the official checkpoint. For a fair
+comparison, FastWorld makes no use of ego status information. Abbreviations: C: surround 6-view cameras (∗indicates the use of only
+the front camera), CR: Collision Rate; FPS[GPU]: Frames Per Second (includes the complete forward pass and evaluated with a single [GPU]).
+Methods
+Venue
+Sensors
+Backbone
+L2(m)↓
+CR(%)↓
+FPS↑[GPU]
+1s
+2s
+3s
+Avg.
+1s
+2s
+3s
+Avg.
+E2E-based Methods
+UniAD [18]
+CVPR 2023
+C
+ResNet-101
+0.48
+0.96
+1.65
+1.03
+0.05
+0.17
+0.71
+0.31
+1.8 [A100]
+MomAD [41]
+CVPR 2025
+C
+ResNet-50
+0.43
+0.88
+1.62
+0.98
+0.06
+0.16
+0.68
+0.30
+7.8 [4090]
+World-Model-based Methods
+GenAD [58]
+ECCV 2024
+C
+ResNet-50
+0.36
+0.83
+1.55
+0.91
+0.06
+0.23
+1.00
+0.43
+6.7 [3090]
+‡LAW [29]
+ICLR 2025
+C
+Swin-T
+0.31
+0.61
+1.02
+0.65
+0.27
+0.21
+0.54
+0.34
+‡19 [4090]
+Epona [56]
+ICCV 2025
+∗C
+DCAE
+0.61
+1.17
+1.98
+1.25
+0.01
+0.22
+0.85
+0.36
+†0.4 [H20]
+DriveWorld-VLA [20]
+ICML 2026
+C
+Swin-T
+0.28
+0.58
+0.99
+0.61
+0.00
+0.10
+0.38
+0.16
+1.2 [H20]
+MomWorld [43]
+arXiv 2026
+C
+ResNet-50
+0.27
+0.52
+0.86
+0.55
+0.02
+0.17
+0.42
+0.20
+7.2 [4090]
+FastWorld (Ours)
+-
+C
+Swin-T
+0.21
+0.37
+0.63
+0.40
+0.10
+0.30
+0.52
+0.31
+17 [4090]
+0.9 PDMS points (92.2 vs. 91.3) and achieves the second-
+highest EP (89.9). These results show that FastWorld can
+run substantially faster while remaining close to the best
+planning score in the comparison.
+NAVSIMv2.
+Tab. 2 presents the comparison with state-
+of-the-art methods on the navtest and the two-stage
+navhard. On the navtest split, FastWorld achieves a
+competitive EPDMS of 89.4, outperforming most existing
+E2E and World-Model-based methods.
+Although Mom-
+World [43] achieves the highest EPDMS of 90.1, its in-
+ference speed is limited to only 7.2 FPS, and its perfor-
+mance on NAVSIMv1 is inferior to FastWorld (90.2 vs.
+92.2 in Tab. 1).
+Similarly, DriveFuture [17] achieves a
+slightly higher EPDMS of 89.9 but falls behind FastWorld
+on NAVSIMv1 (90.7 vs. 92.2 in Tab. 1). Latent-WAM [48]
+achieves a comparable EPDMS of 89.3 but reports an infer-
+ence latency of approximately 0.11s (9 FPS) on an NVIDIA
+A100 GPU. On the more challenging navhard split, Fast-
+World achieves an EPDMS of 43.9, outperforming Mom-
+World [43] (42.8) while remaining competitive with other
+approaches.
+The performance gap compared with the
+strongest methods could potentially be explained by our
+constrained computational budget, which may restrict the
+modeling capacity for complex, long-horizon interactions.
+nuScenes. Tab. 3 presents the quantitative comparison
+with state-of-the-art methods on the nuScenes validation
+set. The inference speed of FastWorld is measured using the
+dedicated nuScenes pipeline without any ego status infor-
+mation. FastWorld achieves state-of-the-art performance,
+obtaining the lowest L2 across all prediction horizons (0.21
+6
+
+
+PDMS
+Scene Counting
+(a) DiffusionDrive
+ResNet-34 / 20 Prop.
+(b) DrivoR
+DINOv2 ViT-S / 64 Prop.
+(c) WoTE
+ResNet-34 / 256 Prop.
+(d) DriveWorld-VLA
+ResNet-34 / 16 Prop.
+(e) Drive-JEPA
+ViT-L / 32 Prop.
+(f) Drive-JEPA
+ResNet-34 / 64 Prop.
+(g) FastWorld (Ours)
+ResNet-34 / 16 Prop.
+.
+E2E-based
+Methods
+World-Model-based
+Methods
+FastWorld
+(Ours)
+Full NAVTEST
+Avg. PDMS
+Selected Scene
+Avg. Best-Prop. PDMS
+Selected Scene
+Avg. Selected PDMS
+Selected Scene
+PDMS Trends 
+21
+50
+24
+22
+44
+43
+88.1
+93.7
+94.6
+86.0
+99.3
+95.3
+88.3
+98.4
+87.1
+91.3
+94.3
+83.8
+93.7
+93.1
+98.6
+91.5
+98.2
+92.2
+96.2
+92.2
+92.0
+48
+(-4.2)
+(-6.0)
+(-5.5)
+(-10.5)
+(-11.3)
+(-4.0)
+(-8.6)
+Figure 3. Analysis of proposal potential and selection effectiveness in 100 selected navtest scenes. We compare (a) Diffusion-
+Drive [34], (b) DrivoR [24], (c) WoTE [31], (d) DriveWorld-VLA [20], (e) & (f) Drive-JEPA [47], and (g) our FastWorld. Prior methods
+exhibit a substantial candidate potential-selection gap. Among World-Model-based approaches, FastWorld achieves the smallest selection
+gap (4.2 PDMS) with limited computational overhead.
+Table 4. Analysis of model parameters and two types of FPS in
+NAVSIMv1 [9]. The BEST and the SECOND BEST are indicated
+with bold and underline respectively. ⋆results are cited from [46].
+‡ results reproduced with the official checkpoint. ‘Plan FPS’ ex-
+cludes the perception encoder, while ‘Forward FPS’ includes the
+complete forward pass. ‘GPU’ denotes only the device for FPS
+measurement, not necessarily for PDMS.
+Methods
+Param.↓
+PDMS↑
+FPS↑
+GPU
+(M)
+Plan
+Forward
+TransFuser [6]
+⋆55.9
+84.0
+⋆3934
+⋆63
+H20
+GoalFlow [52]
+⋆62.3
+90.3
+⋆11
+⋆10
+H20
+Hydra-MDP [32]
+⋆65.2
+86.5
+⋆25
+⋆20
+H20
+DiffusionDrive [34]
+⋆60.7
+88.1
+⋆75
+⋆39
+H20
+MeanFuser [46]
+54.6
+89.0
+434
+59
+H20
+DrivoR [24]
+‡40.8
+93.7
+‡173
+‡11
+4090
+WoTE [31]
+‡63.9
+88.3
+‡90
+‡50
+4090
+Drive-JEPA [47]
+‡311.2
+93.7
+‡94
+‡18
+4090
+FastWorld (Ours)
+27.0
+92.2
+520
+132
+4090
+m, 0.37 m, and 0.63 m). In terms of inference efficiency,
+FastWorld achieves 17 FPS, ranking second among all com-
+pared methods and closely approaching LAW [29] (19
+FPS). LAW [29] benefits from its lightweight perception-
+free architecture. Despite this, FastWorld achieves substan-
+tially higher planning accuracy with only a marginal reduc-
+tion in inference speed.
+4.3. Performance-Efficiency Analysis
+Proposal Potential and Selection Effectiveness. To fur-
+ther investigate the trajectory selection bottleneck identified
+in Fig. 1, we analyze the quality of candidate and selected
+trajectories across representative planning methods.
+As
+shown in Fig. 3, we sample 100 scenes from the navtest
+split and report the average PDMS of the best candidate tra-
+jectory (red dashed line) and the finally selected trajectory
+(green dashed line) for each method, together with the dis-
+tribution of selected trajectory scores (purple dashed line
+from bar).
+A key observation is that high-quality trajectory gener-
+ation does not necessarily translate into effective trajectory
+selection. Despite generating promising candidates, most
+methods exhibit substantial gaps between their best achiev-
+able and actual selected scores, reaching 11.3, 10.5, and 8.6
+PDMS points for WoTE [31], DriveWorld-VLA [20], and
+DiffusionDrive [34], respectively. Moreover, the selected
+trajectory scores of DiffusionDrive [34] and WoTE [31] are
+relatively dispersed, with only 21 and 24 scenes falling into
+the highest PDMS interval (99–100), respectively. In con-
+trast, several other methods exhibit greater concentrations
+of high scores.
+Notably, FastWorld achieves a remarkably small selec-
+tion gap of only 4.2 PDMS (96.2 vs. 92.0), the smallest
+among world-model-based methods and close to the over-
+all minimum of 4.0 PDMS (99.3 vs.
+95.3) attained by
+DrivoR [24]. These results empirically support our core
+premise: effectively leveraging limited future-related infor-
+mation can be more valuable than simply increasing the
+complexity of imagined futures.
+Model parameters and two types of FPS. Tab. 4 com-
+pares model complexity, planning performance, and infer-
+ence efficiency on NAVSIMv1. Following MeanFuser [46],
+we report Plan FPS (excluding the perception encoder) and
+Forward FPS (full forward pass). FastWorld achieves the
+smallest model size at 27.0M parameters. Notably, Trans-
+Fuser [6] shows a large gap between Plan FPS and Forward
+FPS (3934 vs. 63), indicating its latency is dominated by
+7
+
+
+Table 5. Ablation study of latency in NAVSIMv1 [9]. ‘World
+Model’ includes action-conditioned future-state prediction and
+future-aware utility readout. ‘Action Head’ includes native util-
+ity scoring, paired candidate comparison and score refinement.
+Module
+Visual
+Prop. Update
+Action
+World
+Total
+Encoding
+(4×)
+Head
+Model
+Latency (ms)
+5.63
+∼0.40
+0.13
+0.05
+7.55
+Table 6.
+Ablation study of the number of proposals in
+NAVSIMv1 [9]. Default setting of FastWorld in green.
+Total Prop. Refined Prop. NC↑DAC↑TTC↑
+C↑
+EP↑PDMS↑FPS↑
+32
+16
+98.4
+98.2
+94.5
+99.9 89.4
+92.1
+134.2
+64
+16
+98.5
+98.0
+94.6
+99.9 89.9
+92.2
+132.4
+64
+32
+98.5
+98.0
+94.6
+99.9 89.8
+92.2
+129.8
+128
+16
+95.7
+96.5
+87.7
+97.3 88.4
+87.0
+123.7
+128
+32
+95.7
+96.7
+87.8
+97.2 88.5
+87.2
+123.2
+128
+64
+95.6
+96.7
+88.0
+97.2 88.4
+87.2
+122.4
+Table 7. Ablation study of world state prediction horizon in
+NAVSIMv1 [9]. Default setting of FastWorld in green. ‘None’
+indicates that the world state prediction is replaced by a random
+tensor of the same shape.
+Pred. Horizon
+NC↑
+DAC↑
+TTC↑
+C↑
+EP↑
+PDMS↑
+FPS↑
+None
+98.2
+97.7
+94.2
+99.8
+89.9
+91.8
+133.3
+1s
+98.5
+98.0
+94.6
+99.9
+89.9
+92.2
+132.4
+2s
+98.5
+98.0
+94.7
+99.9
+89.8
+92.2
+130.1
+3s
+98.3
+97.8
+94.2
+99.9
+90.1
+92.0
+129.3
+4s
+98.6
+98.0
+94.8
+99.9
+89.6
+92.2
+128.6
+Table 8. Ablation study of visual encoder in NAVSIMv1 [9].
+Default setting of FastWorld in green.
+Name
+Param.↓NC↑DAC↑TTC↑
+C↑
+EP↑PDMS↑FPS↑
+ResNet-34
+27.0
+98.5
+98.0
+94.6
+99.9 89.9
+92.2
+132.4
+ViT-L
+309.2
+97.0
+95.6
+90.3
+99.9 88.6
+88.3
+20.5
+backbone feature extraction.
+In contrast, GoalFlow [52]
+yields nearly matching Plan and Forward FPS (11 vs. 10),
+pointing to bottlenecks in downstream feature processing
+and planning.
+Instead of leaning toward either extreme,
+FastWorld uses a balanced lightweight design cutting over-
+head in perception and planning, enabling efficient end-to-
+end inference with preserved planning performance.
+4.4. Ablation Study
+Ablation of latency. Tab. 5 presents the latency of Fast-
+World. The world model takes only 0.05 ms, contributing
+minimally to the total inference latency.
+Ablation of the number of proposals. Tab. 6 presents the
+results with different numbers of total and refined propos-
+als. The first three configurations all achieve satisfactory
+performance, with 64 total proposals and 16 refined pro-
+posals providing the best balance between efficiency and
+performance. Increasing the proposal count to 128 impairs
+trajectory selection, reducing both PDMS and FPS.
+Ablation of the world state prediction horizon. Tab. 7
+(d) 99e3b8d3211f53d7
+(c) 14769a8e472350cc
+(a) 49a0d29c7058501c
+(b) 73b4c0560bd85b5e
+GT Traj.
+Drive-JEPA Traj.
+FastWorld (Ours) Traj.
+Figure 4.
+4s trajectory planning visualization examples of
+turning scenarios from NAVSIM [9] for FastWorld and Drive-
+JEPA [47]. Subfigure label: sample tokens. Top label: source of
+trajectory.
+presents the results with different world state prediction
+horizons. Longer horizons do not consistently improve per-
+formance but steadily reduce FPS, with the world model
+latency increasing from 0.05ms (see Tab. 5) at 1s to 0.18ms
+at 4s. The FPS degradation is modest, as the world model
+contributes little to total inference latency.
+Ablation of visual encoder. Tab. 8 presents the results with
+different visual encoders. Replacing ResNet-34 with ViT-L
+increases the parameter count but reduces PDMS from 92.2
+to 88.3 and FPS from 132.4 to 20.5. These results suggest
+that, unlike Drive-JEPA [47], our lightweight design does
+not fully exploit the potential of such an expensive visual
+representation.
+See the Supplementary Material for additional ablation
+studies.
+4.5. Visualization
+As shown in Fig. 4, we provide some visualization exam-
+ples of turning scenarios from NAVSIM [9].
+FastWorld
+achieves stable turning trajectories with better alignment to
+the GT compared with Drive-JEPA [47]. See the Supple-
+mentary Material for more visualization.
+5. Conclusion
+In this study, we introduce FastWorld, an efficient au-
+tonomous driving framework that integrates compact world
+prediction into trajectory selection.
+Specifically, Action-
+8
+
+
+Conditioned World Prediction forecasts compact future rep-
+resentations for candidate actions in parallel, while Future-
+Aware Utility Scoring uses these predictions to refine candi-
+date rankings. By directly predicting future states in a com-
+pact latent space, FastWorld incorporates future scene infor-
+mation into decision-making with minimal computational
+overhead. Evaluations on NAVSIM and nuScenes demon-
+strate that FastWorld achieves leading inference speed while
+maintaining competitive planning performance, offering
+practical insights into the efficient deployment of world
+models for autonomous driving.
+LLM Usage Statement
+ChatGPT was used to assist with code drafting, and Doubao
+was employed to aid manuscript preparation, including
+translation, polishing and grammatical refinement.
+All
+method design, literature organization, figures, mathemat-
+ical formulations, experimental analysis, and all technical
+claims were independently developed, written, and verified
+by the authors. No generative AI tools produced core tech-
+nical contributions, experimental data, or evaluation results.
+Acknowledgements
+This work is supported by the Fundamental Research Funds
+for the Central Universities (No. 2024XKRC024, Key Pro-
+gram), the National Natural Science Foundation of China
+(NSFC) under Grants No. 62536001 and No. 62576026,
+and the Beijing Nova Program (202604841209). We would
+like to thank Caixia Wu for insightful discussions and help-
+ful feedback throughout the writing process.
+References
+[1] Mido Assran, Adrien Bardes, David Fan, Quentin Garrido,
+Russell Howes, Matthew Muckley, Ammar Rizvi, Claire
+Roberts, Koustuv Sinha, Artem Zholus, et al. V-jepa 2: Self-
+supervised video models enable understanding, prediction
+and planning. arXiv preprint arXiv:2506.09985, 2025. 2
+[2] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora,
+Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-
+ancarlo Baldan, and Oscar Beijbom.
+nuscenes: A multi-
+modal dataset for autonomous driving. In Proceedings of
+the IEEE/CVF conference on computer vision and pattern
+recognition, pages 11621–11631, 2020. 2, 5, 6, 13, 14, 18,
+19, 20, 21, 22, 23
+[3] Holger Caesar, Juraj Kabzan, Kok Seang Tan, Whye Kit
+Fong, Eric Wolff, Alex Lang, Luke Fletcher, Oscar Beijbom,
+and Sammy Omari. nuplan: A closed-loop ml-based plan-
+ning benchmark for autonomous vehicles.
+arXiv preprint
+arXiv:2106.11810, 2021. 3, 12
+[4] Wei Cao, Marcel Hallgarten, Tianyu Li, Daniel Dauner,
+Xunjiang Gu, Caojun Wang, Yakov Miron, Marco Aiello,
+Hongyang Li, Igor Gilitschenski, et al. Pseudo-simulation
+for autonomous driving. arXiv preprint arXiv:2506.04218,
+2025. 2, 5, 6, 13
+[5] Yuntao Chen, Yuqi Wang, and Zhaoxiang Zhang. Driving-
+gpt: Unifying driving world modeling and planning with
+multi-modal autoregressive transformers. In Proceedings of
+the IEEE/CVF International Conference on Computer Vi-
+sion, pages 26890–26900, 2025. 3
+[6] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao Yu,
+Katrin Renz, and Andreas Geiger.
+Transfuser: Imitation
+with transformer-based sensor fusion for autonomous driv-
+ing. IEEE transactions on pattern analysis and machine in-
+telligence, 45(11):12878–12895, 2022. 1, 5, 6, 7
+[7] OpenScene Contributors.
+Openscene: The largest up-to-
+date 3d occupancy prediction benchmark in autonomous
+driving.
+https://github.com/OpenDriveLab/
+OpenScene, 2023. 5, 12
+[8] Chenxu Dang, Haiyan Liu, Jason Bao, Pei An, Xinyue Tang,
+An Pan, Jie Ma, Bingchuan Sun, and Yan Wang. Sparse-
+world: A flexible, adaptive, and efficient 4d occupancy world
+model powered by sparse and dynamic queries. In Proceed-
+ings of the AAAI Conference on Artificial Intelligence, pages
+3497–3505, 2026. 3
+[9] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo
+Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor
+Gilitschenski, Boris Ivanovic, Marco Pavone, et al. Navsim:
+Data-driven non-reactive autonomous vehicle simulation and
+benchmarking. Advances in Neural Information Processing
+Systems, 37:28706–28719, 2024. 1, 2, 5, 7, 8, 12, 13, 14, 15,
+16, 17
+[10] Tuo Feng, Wenguan Wang, and Yi Yang.
+A survey of
+world models for autonomous driving.
+arXiv preprint
+arXiv:2501.11260, 2025. 1
+[11] Ao Fu, Yi Zhou, Tao Zhou, Yi Yang, Bojun Gao, Qun Li,
+Guobin Wu, and Ling Shao. Exploring the interplay between
+video generation and world models in autonomous driving:
+A survey. arXiv preprint arXiv:2411.02914, 2024. 1
+[12] Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta, Yi-
+hang Qiu, Andreas Geiger, Jun Zhang, and Hongyang Li.
+Vista: A generalizable driving world model with high fidelity
+and versatile controllability. Advances in Neural Information
+Processing Systems, 37:91560–91596, 2024. 2
+[13] Songen Gu, Wei Yin, Bu Jin, Xiaoyang Guo, Junming Wang,
+Haodong Li, Qian Zhang, and Xiaoxiao Long. Dome: Tam-
+ing diffusion model into high-fidelity controllable occupancy
+world model. arXiv preprint arXiv:2410.10429, 2024. 1
+[14] Yanchen Guan, Haicheng Liao, Zhenning Li, Jia Hu, Runze
+Yuan, Yunjian Li, Guohui Zhang, and Chengzhong Xu.
+World models for autonomous driving: An initial survey.
+IEEE Transactions on Intelligent Vehicles, 2024. 1
+[15] Yufei Guo, Yinan Wu, Haoran Duan, Guiguang Ding,
+and Jungong Han. Phaselora: Control-regime-conditioned
+low-rank adaptation for continuous-action vision-language-
+action policies. arXiv preprint arXiv:2608.15285, 2026. 2
+[16] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning for image recognition. In Proceed-
+ings of the IEEE conference on computer vision and pattern
+recognition, pages 770–778, 2016. 3, 5, 13
+[17] Yufeng Hong, Xiaotian Zhou, Yingyan Li, Xiangpo Zhou,
+Lin Liu, Yadan Luo, Shaoqing Xu, Lei Yang, and Ziying
+9
+
+
+Song. Drivefuture: Future-aware latent world models for au-
+tonomous driving. arXiv preprint arXiv:2605.09701, 2026.
+5, 6
+[18] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, et al. Planning-oriented autonomous driving. In Pro-
+ceedings of the IEEE/CVF conference on computer vision
+and pattern recognition, pages 17853–17862, 2023. 6
+[19] Feiyang Jia, Caiyan Jia, Ziying Song, Zhicheng Bao, Lin
+Liu, Shaoqing Xu, Yan Gong, Lei Yang, Xinyu Zhang, Bin
+Sun, Xiaoshuai Hao, Long Chen, and Yadan Luo. Progres-
+sive robustness-aware world models in autonomous driving:
+A review and outlook. TechRxiv Preprint, 2025. 1
+[20] Feiyang Jia, Lin Liu, Ziying Song, Caiyan Jia, Hangjun Ye,
+Xiaoshuai Hao, and Long Chen. Driveworld-VLA: Unified
+latent-space world modeling with vision–language–action
+for autonomous driving. In Forty-third International Con-
+ference on Machine Learning, 2026. 2, 3, 5, 6, 7
+[21] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan.
+Drivetransformer: Unified transformer for scalable end-to-
+end autonomous driving. arXiv preprint arXiv:2503.07656,
+2025. 3
+[22] Guangfeng Jiang, Yueru Luo, Jun Liu, Yi Huang, Yiyao Zhu,
+Zhan Qu, Dave Zhenyu Chen, Bingbing Liu, and Xu Yan.
+Wpt: World-to-policy transfer via online world model distil-
+lation. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition, pages 17842–17852,
+2026. 2
+[23] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted
+Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov,
+Ethan Foster, Grace Lam, Pannag Sanketi, et al. Openvla:
+An open-source vision-language-action model, 2024. URL
+https://arxiv. org/abs/2406.09246, 1(2):4, 2024. 2
+[24] Ellington Kirby, Alexandre Boulch, Yihong Xu, Yuan Yin,
+Gilles Puy, ´Eloi Zablocki, Andrei Bursuc, Spyros Gidaris,
+Renaud Marlet, Florent Bartoccioni, et al. Driving on regis-
+ters. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition, pages 32058–32069,
+2026. 1, 7
+[25] Bohan Li, Jiazhe Guo, Hongsi Liu, Yingshuang Zou, Yikang
+Ding, Xiwu Chen, Hu Zhu, Feiyang Tan, Chi Zhang, Tiancai
+Wang, et al. Uniscene: Unified occupancy-centric driving
+scene generation. arXiv preprint arXiv:2412.05435, 2024. 1
+[26] Kailin Li, Zhenxin Li, Shiyi Lan, Yuan Xie, Zhizhong
+Zhang, Jiayi Liu, Zuxuan Wu, Zhiding Yu, and Jose M
+Alvarez.
+Hydra-mdp++:
+Advancing end-to-end driv-
+ing via expert-guided hydra-distillation.
+arXiv preprint
+arXiv:2503.12820, 2025. 6
+[27] Peidong Li and Dixiao Cui. Navigation-guided sparse scene
+representation for end-to-end autonomous driving.
+In In-
+ternational Conference on Learning Representations, pages
+29118–29134, 2025. 3
+[28] Qifeng Li, Xiaosong Jia, Shaobo Wang, and Junchi Yan.
+Think2drive: Efficient reinforcement learning by thinking
+with latent world model for autonomous driving (in carla-
+v2).
+In European Conference on Computer Vision, pages
+142–158. Springer, 2024. 2
+[29] Yingyan Li, Lue Fan, Jiawei He, Yuqi Wang, Yuntao Chen,
+Zhaoxiang Zhang, and Tieniu Tan. Enhancing end-to-end
+autonomous driving with latent world model. arXiv preprint
+arXiv:2406.08481, 2024. 3, 6, 7
+[30] Yingyan Li, Shuyao Shang, Weisong Liu, Bing Zhan,
+Haochen Wang, Yuqi Wang, Yuntao Chen, Xiaoman Wang,
+Yasong An, Chufeng Tang, et al. Drivevla-w0: World mod-
+els amplify data scaling law in autonomous driving. arXiv
+preprint arXiv:2510.12796, 2025. 5, 6
+[31] Yingyan Li, Yuqi Wang, Yang Liu, Jiawei He, Lue Fan,
+and Zhaoxiang Zhang. End-to-end driving with online tra-
+jectory evaluation via bev world model.
+arXiv preprint
+arXiv:2504.01941, 2025. 1, 2, 3, 5, 7
+[32] Zhenxin Li, Kailin Li, Shihao Wang, Shiyi Lan, Zhiding Yu,
+Yishen Ji, Zhiqi Li, Ziyue Zhu, Jan Kautz, Zuxuan Wu, et al.
+Hydra-mdp: End-to-end multimodal planning with multi-
+target hydra-distillation. arXiv preprint arXiv:2406.06978,
+2024. 1, 5, 7
+[33] Zhiqi Li, Wenhai Wang, Hongyang Li, Enze Xie, Chong-
+hao Sima, Tong Lu, Qiao Yu, and Jifeng Dai. Bevformer:
+learning bird’s-eye-view representation from lidar-camera
+via spatiotemporal transformers. IEEE Transactions on Pat-
+tern Analysis and Machine Intelligence, 2024. 3
+[34] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng
+Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang,
+Qian Zhang, et al. Diffusiondrive: Truncated diffusion model
+for end-to-end autonomous driving. In Proceedings of the
+Computer Vision and Pattern Recognition Conference, pages
+12037–12047, 2025. 1, 2, 3, 5, 6, 7
+[35] Tsung-Yi Lin, Piotr Doll´ar, Ross Girshick, Kaiming He,
+Bharath Hariharan, and Serge Belongie.
+Feature pyramid
+networks for object detection.
+In 2017 IEEE conference
+on computer vision and pattern recognition (CVPR), pages
+936–944. Ieee, 2017. 3, 5
+[36] Lin Liu, Caiyan Jia, Guanyi Yu, Ziying Song, JunQiao
+Li, Feiyang Jia, Peiliang Wu, Xiaoshuai Hao, and Yadan
+Luo. Guideflow: Constraint-guided flow matching for plan-
+ning in end-to-end autonomous driving. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 3719–3728, 2026. 2, 6
+[37] Mengmeng Liu, Diankun Zhang, Jiuming Liu, Jianfeng Cui,
+Hongwei Xie, Guang Chen, Hangjun Ye, Michael Ying
+Yang, Francesco Nex, and Hao Cheng. Driveva: Video ac-
+tion models are zero-shot drivers. In European Conference
+on Computer Vision, pages 315–335. Springer, 2026. 5
+[38] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng
+Zhang, Stephen Lin, and Baining Guo. Swin transformer:
+Hierarchical vision transformer using shifted windows. In
+Proceedings of the IEEE/CVF international conference on
+computer vision, pages 10012–10022, 2021. 3, 5, 13
+[39] Jingcheng Ni, Yuxin Guo, Yichen Liu, Rui Chen, Lewei
+Lu, and Zehuan Wu. Maskgwm: A generalizable driving
+world model with video mask reconstruction. arXiv preprint
+arXiv:2502.11663, 2025. 2
+[40] Katrin Renz, Long Chen, Elahe Arani, and Oleg Sinavski.
+Simlingo: Vision-only closed-loop autonomous driving with
+language-action alignment. In Proceedings of the Computer
+10
+
+
+Vision and Pattern Recognition Conference, pages 11993–
+12003, 2025. 2
+[41] Ziying Song, Caiyan Jia, Lin Liu, Hongyu Pan, Yongchang
+Zhang, Junming Wang, Xingyu Zhang, Shaoqing Xu, Lei
+Yang, and Yadan Luo. Don’t shake the wheel: Momentum-
+aware planning in end-to-end autonomous driving. In Pro-
+ceedings of the Computer Vision and Pattern Recognition
+Conference, pages 22432–22441, 2025. 2, 6
+[42] Ziying Song, Lin Liu, Hongyu Pan, Bencheng Liao,
+Mingzhe Guo, Lei Yang, Yongchang Zhang, Shaoqing Xu,
+Caiyan Jia, and Yadan Luo.
+Diver: Reinforced diffusion
+breaks imitation bottlenecks in end-to-end autonomous driv-
+ing. arXiv preprint arXiv:2507.04049, 2025. 2
+[43] Ziying Song, Shengkai Zhang, Lei Yang, Haozhuang Chi,
+Yuchen Liu, Jiangtao Su, Lin Liu, Ziyang Liu, and Chen
+Lv.
+Momworld:
+Momentum-aware latent world model
+for long-horizon autonomous driving.
+arXiv preprint
+arXiv:2609.33737, 2026. 3, 5, 6
+[44] Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang, Hao-
+ran Wu, and Sifa Zheng.
+Sparsedrive:
+End-to-end au-
+tonomous driving via sparse scene representation.
+arXiv
+preprint arXiv:2405.19620, 2024. 3
+[45] Sifan Tu, Xin Zhou, Dingkang Liang, Xingyu Jiang, Yumeng
+Zhang, Xiaofan Li, and Xiang Bai. The role of world mod-
+els in shaping autonomous driving: A comprehensive survey.
+arXiv preprint arXiv:2502.10498, 2025. 1
+[46] Junli Wang, Yinan Zheng, Xueyi Liu, Zebin Xing, Pengfei
+Li, Kun Ma, Hangjun Ye, Guang Chen, Guang Li, Long
+Chen, et al.
+Meanfuser: Fast one-step multi-modal tra-
+jectory generation and adaptive reconstruction via mean-
+flow for end-to-end autonomous driving. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 17884–17893, 2026. 1, 5, 6, 7
+[47] Linhan Wang, Zichong Yang, Chen Bai, Guoxiang Zhang,
+Xiaotong Liu, Xiaoyin Zheng, Xiao-Xiao Long, Chang-Tien
+Lu, and Cheng Lu. Drive-jepa: Video jepa meets multimodal
+trajectory distillation for end-to-end driving. arXiv preprint
+arXiv:2601.22032, 2026. 1, 2, 5, 6, 7, 8, 14
+[48] Linbo Wang, Yupeng Zheng, Qiang Chen, Shiwei Li, Yichen
+Zhang, Zebin Xing, Qichao Zhang, Xiang Li, Deheng Qian,
+Pengxuan Yang, et al.
+Latent-wam: Latent world action
+modeling for end-to-end autonomous driving. arXiv preprint
+arXiv:2603.24581, 2026. 3, 6
+[49] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen,
+and Zhaoxiang Zhang. Driving into the future: Multiview
+visual forecasting and planning with world model for au-
+tonomous driving. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, pages
+14749–14759, 2024. 3
+[50] Xinshuo Weng, Boris Ivanovic, Yan Wang, Yue Wang, and
+Marco Pavone. Para-drive: Parallelized architecture for real-
+time autonomous driving. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 15449–15458, 2024. 3
+[51] Tianze Xia, Yongkang Li, Lijun Zhou, Jingfeng Yao, Kaixin
+Xiong, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen,
+Hangjun Ye, et al. Drivelaw: Unifying planning and video
+generation in a latent driving world.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 39701–39712, 2026. 5
+[52] Zebin Xing, Xingyu Zhang, Yang Hu, Bo Jiang, Tong He,
+Qian Zhang, Xiaoxiao Long, and Wei Yin. Goalflow: Goal-
+driven flow matching for multimodal trajectories genera-
+tion in end-to-end autonomous driving. In 2025 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 1602–1611. IEEE, 2025. 1, 3, 5, 7, 8
+[53] Haoran Xu, Peixi Peng, Guang Tan, Yiqian Chang, Yisen
+Zhao, and Yonghong Tian.
+Delta-triplane transformers as
+occupancy world models. arXiv preprint arXiv:2503.07338,
+2025. 3
+[54] Zhenya Yang, Zhe Liu, Yuxiang Lu, Liping Hou, Chenx-
+uan Miao, Siyi Peng, Bailan Feng, Xiang Bai, and Heng-
+shuang Zhao. Geniedrive: Towards physics-aware driving
+world model with 4d occupancy guided video generation. In
+Proceedings of the IEEE/CVF Conference on Computer Vi-
+sion and Pattern Recognition, pages 35680–35690, 2026. 3
+[55] Zifan Zeng, Chongzhe Zhang, Feng Liu, Joseph Sifakis,
+Qunli Zhang, Shiming Liu, and Peng Wang. World mod-
+els: The safety perspective. In 2024 IEEE 35th International
+Symposium on Software Reliability Engineering Workshops
+(ISSREW), pages 369–376. IEEE, 2024. 1
+[56] Kaiwen Zhang, Zhenyu Tang, Xiaotao Hu, Xingang Pan,
+Xiaoyang Guo, Yuan Liu, Jingwei Huang, Li Yuan, Qian
+Zhang, Xiao-Xiao Long, et al. Epona: Autoregressive dif-
+fusion world model for autonomous driving. arXiv preprint
+arXiv:2506.24113, 2025. 1, 3, 5, 6
+[57] Wenzhao Zheng, Weiliang Chen, Yuanhui Huang, Borui
+Zhang, Yueqi Duan, and Jiwen Lu. Occworld: Learning a 3d
+occupancy world model for autonomous driving. In Euro-
+pean conference on computer vision, pages 55–72. Springer,
+2024. 1
+[58] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming
+Zhang, and Long Chen. Genad: Generative end-to-end au-
+tonomous driving.
+In European Conference on Computer
+Vision, pages 87–104. Springer, 2024. 6
+[59] Yinan Zheng, Ruiming Liang, Kexin Zheng, Jinliang Zheng,
+Liyuan Mao, Jianxiong Li, Weihao Gu, Rui Ai, Shengbo
+Li, Xianyuan Zhan, et al. Diffusion-based planning for au-
+tonomous driving with flexible guidance. In International
+conference on learning representations, pages 37207–37227,
+2025. 2
+[60] Yupeng Zheng, Pengxuan Yang, Zebin Xing, Qichao Zhang,
+Yuhang Zheng, Yinfeng Gao, Pengfei Li, Teng Zhang,
+Zhongpu Xia, Peng Jia, et al. World4drive: End-to-end au-
+tonomous driving via intention-aware physical latent world
+model. arXiv preprint arXiv:2507.00603, 2025. 2
+[61] Zheng Zhu, Xiaofeng Wang, Wangbo Zhao, Chen Min, Ni-
+anchen Deng, Min Dou, Yuqi Wang, Botian Shi, Kai Wang,
+Chi Zhang, et al. Is sora a world simulator? a comprehensive
+survey on general world models and beyond. arXiv preprint
+arXiv:2405.03520, 2024. 1
+11
+
+
+Imagine Smarter, Drive Faster:
+Efficient World Modeling for Decision-Aware Autonomous Driving
+Supplementary Material
+S1. More Details about Training Objective
+The training objective combines future-state prediction,
+candidate ranking, expected utility maximization, and plan-
+ning regularization:
+L = 1 · Lobs + 0.1 · Lrank + 0.2 · Lutil + Lreg
+(S1)
+Here, we detail the regularization term Lreg, which con-
+tains residual, imitation, and planner consistency losses:
+Lreg = 0.002 · Lres + 0.01 · Limit
++ 200 · Lcompat + 20 · Lnative + 20 · Lprior
+(S2)
+Residual regularization. The future-aware correction for
+candidate i is futil(ˆz i
+t+∆), which contributes to its final
+score si together with the comparison prior bi. Let ¯Futil de-
+note the mean correction over the retained candidate set S.
+We penalize the centered future-aware corrections as Lres:
+Lres = 1
+K
+X
+i∈S
+ futil(ˆz i
+t+∆) −¯Futil
+2
+(S3)
+where K is the number of retained candidates. Centering re-
+moves the mean correction, so this term constrains relative
+score changes while leaving a shared offset unpenalized.
+Trajectory imitation. For each proposal τi ∈T (R), with
+pose τi,h at planning step h, let pos(τi,h) denote its position
+components, and let xlog
+h
+denote the logged position at that
+step. The best-of-N imitation loss Limit is:
+Limit =
+min
+i∈{1,...,N}
+1
+H
+H
+X
+h=1
+Lsm
+ pos(τi,h), xlog
+h
+
+(S4)
+where N is the total number of proposals, H is the number
+of planning steps, and Lsm(·) denotes the Smooth L1 loss.
+The minimum selects the proposal with the smallest imita-
+tion loss, encouraging the proposal set to cover the logged
+trajectory.
+Proposal compatibility.
+For each proposal τi ∈T (R),
+before the router selects the retained indices S, the initial-
+ized planner provides a query-matched proposal τ 0
+i and ba-
+sic readout score ℓ0
+i . We denote its full proposal set by
+T (R),0 = {τ 0
+i }N
+i=1. The current and initialized coarse utility
+probabilities are qi = sigmoid(ℓi) and q0
+i = sigmoid(ℓ0
+i ),
+respectively. The proposal compatibility loss Lcompat is:
+Lcompat = Lsm
+ T (R), T (R),0
++ 1
+N
+N
+X
+i=1
+(qi −q0
+i )2
+(S5)
+where N is the total number of proposals, and Lsm(·) de-
+notes the Smooth L1 loss. This loss keeps the full proposal
+set and its coarse utility probabilities close to those of the
+initialized planner, preserving its proposal and scoring prior
+during joint training.
+Native-score consistency. For each proposal τi ∈T (R),
+the native-score consistency loss Lnative is:
+Lnative = 1
+N
+N
+X
+i=1
+(ℓi −ℓ0
+i )2
+(S6)
+where N is the total number of proposals. This loss an-
+chors the basic readout scores of all proposals to their ini-
+tialized values, stabilizing the base scoring branch during
+joint training.
+Comparison-prior consistency. After candidate selection,
+the comparison prior bi is computed for each retained can-
+didate i ∈S. The initialized planner has its own retained in-
+dex set S0 and corresponding prior scores b0
+i . We compare
+the priors only for query indices retained by both planners:
+Lprior =
+P
+i∈S∩S0(bi −b0
+i )2
+max
+ 1, |S ∩S0|
+
+(S7)
+Here, S0 is the initialized planner’s retained index set, and
+b0
+i is its comparison prior for query index i. Candidates are
+matched by their original query indices. The loss is 0 when
+the intersection is empty. These consistency losses compare
+the current planner with its own initialization and require no
+external teacher.
+S2. More Details about Dataset
+NAVSIMv1. NAVSIMv1 [9] is built on OpenScene [7],
+a 2Hz redistribution of nuPlan [3], which contains ap-
+proximately 120 hours of urban driving data. Each sam-
+ple provides eight camera views and a fused LiDAR point
+cloud from five sensors. The benchmark provides filtered
+navtrain and navtest splits and evaluates a predicted
+four-second trajectory in a non-reactive simulation: the ego
+vehicle follows the plan using an LQR controller and a
+kinematic bicycle model, while other actors replay their
+recorded future motion.
+The primary metric Predictive
+Driver Model Score (PDMS) is:
+PDMS = NC · DAC · 5 EP + 5 TTC + 2 C
+12
+(S8)
+where NC is No At-Fault Collision, DAC is Drivable Area
+Compliance, EP is Ego Progress, TTC is Time to Collision,
+12
+
+
+and C is Comfort. NC and DAC act as multiplicative safety
+penalties. EP measures progress along the route relative to a
+safe-progress reference, TTC penalizes a predicted time to
+collision below the safety threshold, and C evaluates trajec-
+tory comfort from kinematic quantities such as acceleration
+and jerk. All component scores are normalized to [0, 1].
+PDMS is averaged over evaluated frames and reported on a
+0–100 scale.
+NAVSIMv2.
+NAVSIMv2 [4] extends the OpenScene-
+based benchmark with pseudo-simulation, including pre-
+generated synthetic follow-up observations for two-stage
+evaluation. The primary metric Extended Predictive Driver
+Model Score (EPDMS), extends PDMS with additional
+rule-compliance and comfort terms:
+EPDMS =˜sNC · ˜sDAC · ˜sDDC · ˜sTLC
+· 5˜sTTC + 5˜sEP + 2˜sLK + 2˜sHC + 2˜sEC
+16
+(S9)
+where NC, DAC, EP, and TTC retain their NAVSIMv1 [9]
+meanings; DDC is Driving Direction Compliance, TLC is
+Traffic Light Compliance, LK is Lane Keeping, HC is His-
+tory Comfort, and EC is Extended Comfort.
+The mul-
+tiplicative terms penalize collisions, leaving the drivable
+area, wrong-way driving, and red-light violations.
+The
+weighted terms measure progress, collision risk, lane keep-
+ing, comfort across the transition from human history to the
+predicted plan, and consistency between successive plans.
+Each ˜sm is the filtered score for metric m: it equals 1 when
+the human trajectory also violates that metric, and other-
+wise equals the agent’s score. EPDMS is computed from
+normalized scores in [0, 1] and reported on a 0–100 scale.
+The navtest split uses the single-stage EPDMS evalua-
+tion. For the navhard two-stage split, each initial scene
+and its synthetic follow-up scenes are scored with EPDMS.
+Follow-up scores are weighted by their spatial proximity to
+the endpoint predicted in the first stage, and the weighted
+second-stage score is multiplied by the first-stage score:
+EPDMS2−stage = EPDMSs1
+X
+j
+wj EPDMSj
+s2
+(S10)
+where EPDMSs1 is the initial-scene score, EPDMSj
+s2 is
+the score for follow-up scene j, and wj is its normalized
+proximity weight.
+nuScenes. nuScenes [2] contains 1,000 annotated scenes
+collected in Boston and Singapore. Each scene spans 20
+seconds and is annotated at 2Hz, with data from six cam-
+eras, one LiDAR, and five radars. The first metric is the L2,
+computed at prediction horizons t ∈{1, 2, 3} seconds:
+L2(t) = 1
+N
+N
+X
+n=1
+ˆpn(t) −pgt
+n (t)
+
+2
+(S11)
+where N is the number of evaluated samples, and ˆpn(t) and
+pgt
+n (t) are the predicted and logged ego positions for sample
+n at time t. L2 is reported in meters, and lower values indi-
+cate more accurate trajectory prediction. The second metric
+is Collision Rate (CR), which measures the fraction of eval-
+uated samples whose predicted ego trajectory collides with
+another actor by horizon t:
+CR(t) = 100
+NHt
+N
+X
+n=1
+Ht
+X
+h=1
+cn,h.
+(S12)
+where N is the number of valid evaluation samples, Ht is
+the number of waypoints up to horizon t, and cn,h is the box
+collision indicator for sample n at waypoint h.
+S3. More Details about Implementation
+NAVSIM. The ResNet-34 [16] FPN outputs a 256×14×24
+feature map per camera at stride 32. We flatten the spatial
+grid into 336 feature vectors per view and preserve the four
+views for image cross-attention. For NAVSIMv1, we jointly
+fine-tune the planner and the world model for 30 epochs on
+8 NVIDIA GeForce RTX 4090 GPUs with a global batch
+size of 128. The approximate wall-clock training time is 75
+hours. The planner uses a lower learning rate than the future
+prediction module.
+nuScenes. We project the 768-channel Swin-T [38] fea-
+tures to 256 channels and use six learned queries per cam-
+era view to obtain a 36 × 256 scene representation for each
+frame. We jointly train the model on images for 15 epochs,
+then continue training for 80 epochs using cached scene rep-
+resentations and trajectory proposals, with an overall wall-
+clock training time of approximately 20 hours. Retrieving
+the cached features by timestamp avoids repeated image
+encoding and proposal generation. During the final three
+epochs, we keep the world dynamics fixed and update the
+trajectory scorer.
+S4. More Ablation Study
+Ablation of proposal pairing. Tab. S1 compares two natu-
+ral ways to pair proposals. Score rank pairs candidates with
+different utility scores, while trajectory divergence pairs
+candidates with different paths. The two rules differ by only
+0.1 PDMS and both run at around 130 FPS.
+Ablation of latency in nuScenes [2]. Tab. S2 reports the
+inference latency of FastWorld on nuScenes. Compared
+with the NAVSIM results in Tab. 5 of the main paper, most
+of the additional latency comes from visual encoding and
+the world model. The visual backbone encodes both histor-
+ical and current surround-view images. The world model
+takes 8.54 ms as it predicts a waypoint-conditioned state
+for each input frame and applies a Transformer transition
+over three rollout steps for the 16 shortlisted proposals. In
+13
+
+
+Table S1. Ablation study of proposal pairing in NAVSIMv1 [9].
+‘Score Rank’ pairs candidates based on their scores, while ‘Tra-
+jectory Divergence’ pairs candidates based on differences in their
+paths. Default setting of FastWorld in green.
+Pairing
+NC↑DAC↑TTC↑
+C↑
+EP↑PDMS↑FPS↑
+Score Rank
+98.5
+98.0
+94.6
+99.9 89.9
+92.2
+132.4
+Trajectory Divergence 98.4
+97.9
+94.6
+99.9 89.8
+92.1
+129.7
+Table S2. Ablation study of latency in nuScenes [2]. ‘World
+Model’ includes action-conditioned future-state prediction and
+future-aware utility readout. ‘Prop. Update’ includes one way-
+point decoding pass per frame and the generation of 64 proposals
+from the current-frame waypoints. ‘Action Head’ includes native
+utility scoring, paired candidate comparison and score refinement.
+Module
+Visual
+Prop. Update
+Action
+World
+Total
+Encoding
+Head
+Model
+Latency (ms)
+45.72
+1.65
+3.28
+8.54
+60.09
+comparison, the NAVSIM version uses a single lightweight
+transition to predict the target-time state directly.
+Ablation of the number of proposals in nuScenes [2].
+Tab. S3 compares different numbers of refined proposals on
+nuScenes, with the total fixed at 64. Refining 8 or 16
+proposals yields similar L2, collision rates, and inference
+speeds. A separate run with 32 refined proposals also yields
+nearly identical results to the default setting. Since the pro-
+posals are generated around a shared waypoint sequence, a
+small shortlist appears sufficient for this setting.
+Ablation of displacement scoring in nuScenes [2].
+Tab. S4 evaluates displacement scoring, an auxiliary scor-
+ing term specific to the nuScenes variant of FastWorld.
+On NAVSIM, the PDMS supervision already includes EP.
+On nuScenes, proposals can follow similar paths yet in-
+cur different L2 if they cover different distances over the
+same time. To account for this difference during ranking,
+displacement scoring compares each proposal’s displace-
+ment magnitude at 1, 2, and 3 seconds with the correspond-
+ing predicted distribution of ego displacement. Adding this
+term reduces the average L2 from 0.47m to 0.40m and the
+average collision rate from 0.34% to 0.31%, while inference
+speed decreases slightly from 16.9 to 16.6 FPS.
+Ablation of world state prediction in nuScenes [2].
+Tab. S5 shows that predicted world state reduce L2 at all
+three horizons compared with random world state. The av-
+erage L2 drops from 0.51m to 0.40m, while inference speed
+decreases from 18.0 to 16.6 FPS.
+S5. More Visualization
+We have provided more visual examples shown in Fig. S1,
+Fig. S2, and Fig. S3 for NAVSIM [9], as well as Fig. S4,
+Fig. S5, Fig. S6, Fig. S7, Fig. S8 and Fig. S9 for
+nuScenes [2]. Among them, Fig. S1, Fig. S4, and Fig. S5
+Table S3.
+Ablation study of the number of proposals in
+nuScenes [2]. Default setting of FastWorld in green.
+Total Prop. Refined Prop.
+L2(m)↓
+CR(%)↓
+FPS↑
+1s
+2s
+3s
+Avg.
+1s
+2s
+3s
+Avg.
+64
+8
+0.22 0.38 0.63 0.41 0.12 0.32 0.54 0.33 16.6
+64
+16
+0.21 0.37 0.63 0.40 0.10 0.30 0.52 0.31 16.6
+Table S4.
+Ablation study of displacement scoring in
+nuScenes [2]. Default setting of FastWorld in green.
+Displacement
+L2(m)↓
+CR(%)↓
+FPS↑
+1s
+2s
+3s
+Avg.
+1s
+2s
+3s
+Avg.
+w/ Displacement 0.21 0.37 0.63 0.40 0.10 0.30 0.52 0.31
+16.6
+w/o Displacement 0.25 0.44 0.71 0.47 0.10 0.32 0.60 0.34
+16.9
+Table S5.
+Ablation study of world state prediction in
+nuScenes [2]. ‘Random’ replaces the predicted states with a
+fixed, same-shape Gaussian tensor before utility readout. Default
+setting of FastWorld in green.
+Future State
+L2(m)↓
+CR(%)↓
+FPS↑
+1s
+2s
+3s
+Avg.
+1s
+2s
+3s
+Avg.
+Predicted
+0.21
+0.37
+0.63
+0.40
+0.10
+0.30
+0.52
+0.31
+16.6
+Random
+0.26
+0.48
+0.79
+0.51
+0.15
+0.25
+0.50
+0.30
+18.0
+collect samples where the GT trajectory is straight; Fig. S2,
+Fig. S6, and Fig. S7 collect samples with left-turn GT tra-
+jectories; Fig. S3, Fig. S8, and Fig. S9 collect samples with
+right-turn GT trajectories.
+Visualization of NAVSIM [9].
+Following the format of
+Fig. 4 in the main text, we construct visualizations of 4-
+second trajectories for Drive-JEPA [47], the GT, and our
+FastWorld. FastWorld consistently tends to produce con-
+servative trajectories close to GT, while Drive-JEPA [47]
+yields more aggressive predictions. Representative exam-
+ples include 2 row 2 col in Fig. S1, 3 row 4 col in Fig. S1, 1
+row 4 col in Fig. S2, and 3 row 2 col in Fig. S3.
+Visualization of nuScenes [2]. We visualize the 3s tra-
+jectory predictions of GT and FastWorld, with trajectories
+projected onto the 6-view camera perspectives. FastWorld
+generally yields trajectory planning results close to GT.
+14
+
+
+GT Traj. :
+Drive-JEPA Traj. :
+FastWorld (Ours) Traj. :
+Figure S1. Visualization examples of NAVSIM [9] on straight trajectory. Subfigure label: sample tokens. Top label: source of trajectory.
+15
+
+
+GT Traj. :
+Drive-JEPA Traj. :
+FastWorld (Ours) Traj. :
+Figure S2. Visualization examples of NAVSIM [9] on left-turn trajectory. Subfigure label: sample tokens. Top label: source of trajectory.
+16
+
+
+GT Traj. :
+Drive-JEPA Traj. :
+FastWorld (Ours) Traj. :
+Figure S3. Visualization examples of NAVSIM [9] on right-turn trajectory. Subfigure label: sample tokens. Top label: source of
+trajectory.
+17
+
+
+0d2418d9f09e438bbe698731476bd8d7
+2e4c526a088741c28f8ea25d97e1c8fb
+4cff630ec8db419caed75ff4d4755918
+b24eea3e5ebd423fafe109de526cb484
+                                                       GT Traj. :                                                        FastWorld   (Ours)   Traj. :
+Figure S4. Visualization examples of nuScenes [2] on straight trajectory. Left label: sample token. Top label: source of trajectory.
+18
+
+
+08d4e366f727495a91c8d1e33f4257c9
+d07db190a3c14383b739d298818570e6
+d82a8671e85c47989834e95c6e7b3852
+fc6968b9cc604f30b6073e5368787e04
+                                                       GT Traj. :                                                        FastWorld   (Ours)   Traj. :
+Figure S5. Visualization examples of nuScenes [2] on straight trajectory. Left label: sample token. Top label: source of trajectory.
+19
+
+
+1ee6726a7f75445b8603980cb2bc20df
+3f3cf325418a4c8abb597fedf4088bd3
+a9ade3776c974116a2d319539f359f94
+c567f9b8e9f34817acdc9c49d791c557
+                                                       GT Traj. :                                                        FastWorld   (Ours)   Traj. :
+Figure S6. Visualization examples of nuScenes [2] on left-turn trajectory. Left label: sample token. Top label: source of trajectory.
+20
+
+
+64dd350ef9f745a898c18be7202f6794
+0382fe992523435580ac3599fee07b2c
+07794b6977294d6185f1b4567cd10e4b
+4723346fc05c40478a04e6331dc5bd58
+                                                       GT Traj. :                                                        FastWorld   (Ours)   Traj. :
+Figure S7. Visualization examples of nuScenes [2] on left-turn trajectory. Left label: sample token. Top label: source of trajectory.
+21
+
+
+dd1015f9ccd8470690b405f7dd0bd021
+0d28a80a8d574418810e9aa656347e62
+0ed87ec201a04c3581bf8328600f0f7b
+2beac07fddfa49f38f5380f1ae761d6d
+                                                       GT Traj. :                                                        FastWorld   (Ours)   Traj. :
+Figure S8. Visualization examples of nuScenes [2] on right-turn trajectory. Left label: sample token. Top label: source of trajectory.
+22
+
+
+9f7efc90664f4c3f84ce0014bbeb3fde
+61a7bd24f88a46c2963280d8b13ac675
+68cc30fac5f043d09cf991e05c47c75e
+85e6fee037794599bfd43c4faeada38a
+                                                       GT Traj. :                                                        FastWorld   (Ours)   Traj. :
+Figure S9. Visualization examples of nuScenes [2] on right-turn trajectory. Left label: sample token. Top label: source of trajectory.
+23

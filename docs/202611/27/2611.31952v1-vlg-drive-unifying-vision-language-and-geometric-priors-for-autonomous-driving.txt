@@ -1,0 +1,609 @@
+Title: VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving
+
+URL Source: https://arxiv.org/pdf/2611.31952v1
+
+Published Time: Wed, 25 Nov 2026 02:07:29 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving 
+
+## Junge Zhang 1,* Jie Zhu 2,* Yanqi Jia 3 Xiangyu Xu 4 Zixun Huang 4
+
+## Wenbin He 4 Xin Li 4 Jiachen Li 1 Liu Ren 4
+
+> 1
+
+Georgia Institute of Technology 2University of North Carolina at Chapel Hill 
+
+> 3
+
+City University of New York 4Bosch North America 
+
+> *
+
+Equal contribution Geometry-Centric Semantic Injected by Geometric 
+
+> VGA | DVGT-2
+> Decoupled Semantic & Geometric
+> VLM | VGGDrive VLA | UniDriveVLA
+> Inject
+> VGA
+
+Geometry-Centric 
+
+Planner 
+
+> Unified Semantic & Geometric
+> VLM
+
+VLM-Based Planner 
+
+# C
+
+> VLA
+
+Action Expert 
+
+# B VLG | VLG-Drive (Ours) 
+
+# A 
+
+> No Semantic Dense 3D Geometry VLM
+> (Semantic)
+> VLG
+> Unify
+
+Unified Representation 
+
+for Planning 
+
+> Dense 3D Geometry Understanding Expert
+> (Semantic)
+> Perception Expert
+> (Sparse Geometry)
+
+# ×
+
+# D  
+
+> VLM
+> (Semantic)
+> Dense 3D Geometry
+> Ego
+> Trajectory
+> Ego
+> Trajectory
+> Ego
+> Trajectory
+> Ego
+> Trajectory
+> Semantic Reasoning Sparse 3D Geometry Dense 3D Geometry
+
+Figure 1. Semantic-geometric interfaces for action planning. (A) UniDriveVLA decouples semantics and geometry into an under-standing expert and a sparse-geometry perception expert that feed an action expert [20]. (B) VGGDrive injects dense 3D geometry into a VLM-based planner [36]. (C) DVGT-2 plans with a geometry-centric model that has no semantic stream [49]. (D) VLG-D RIVE unifies VLM semantics and dense 3D geometry in a joint representation for planning. 
+
+## Abstract 
+
+A driving planner needs both scene semantics, which vision-language models (VLMs) provide, and spatial structure, which geometric foundation models recover from visual his-tory. We present VLG-D RIVE , which keeps both models frozen and trains only a fusion interface and a planner from trajectory labels. At each camera-grid cell, the inter-face fuses the paired VLM and geometry features into one joint token through a geometry-anchored residual, and a command-conditioned planner reads these tokens to predict the ego trajectory. VLG-D RIVE achieves 31 .78 EPDMS on NavHard under perturbed initial states, the highest among the compared methods, and 88 .27 PDMS on NavTest from cameras alone. Pointwise fusion outperforms independent VLM and geometry streams on both benchmarks. In closed-loop driving on 420 HUGSIM scenarios, VLG-D RIVE out-performs all compared planners. These results indicate that a lightweight planner trained on fused features of frozen vision-language and geometric foundation models is an ef-fective alternative to adapting either model for planning. 
+
+## 1. Introduction 
+
+Driving decisions depend on both what a scene means and what motion its physical structure permits. Recognizing a merging vehicle must be related to its position and the available space; interpreting a turn must account for the road layout. Vision-language models (VLMs) connect vi-sual observations with semantic and task context [2, 25, 27], while geometric foundation models learn spatial represen-tations through reconstruction [34, 38]. How can a driv-ing planner make joint use of these different sources? Re-cent systems answer this question in different ways (Fig-1arXiv:2611.31952v1 [cs.CV] 24 Nov 2026 ure 1). UniDriveVLA decouples semantics and geometry into an understanding expert and a sparse-geometry per-ception expert [20], VGGDrive injects dense 3D geometry into a VLM-based planner [36], and DVGT-2 plans with a geometry-centric model that has no semantic stream [49]. A simpler alternative would give the planner both feature streams and let its attention combine them. Both features, however, describe the same image locations, so their corre-spondence is known in advance, yet this design leaves the planner to rediscover it from limited trajectory labels. What matters is therefore not only access to both sources but also the interface that combines them. Motivated by these observations, we propose VLG-DRIVE , which binds VLM and geometry features that share a camera-grid address before the planner reads them. The key idea is to let trajectory supervision shape how the two priors interact, so that scene meaning and spatial struc-ture inform ego motion together. A residual interface an-chored on the geometry feature combines each dense VLM– geometry pair into one joint token, which replaces the pair in the planner memory. Fusion is local while planning is global, so the interface decides how the two priors describe each location, and a separate, command-conditioned de-coder decides which locations matter for the requested ma-neuver. Both encoders stay frozen, and trajectories are de-coded by a dedicated planner rather than a language model. We evaluate VLG-D RIVE primarily on NavHard, be-cause its perturbed initial states require the planner to re-spond to a changed spatial relationship between the ego ve-hicle and its surroundings [5]. On NavHard, VLG-D RIVE 
+
+reaches 31 .78 EPDMS, the highest among the compared methods. On NavTest, which evaluates recorded initial states [8], it reaches 88 .27 PDMS from camera input alone. Pointwise fusion outperforms independent streams at every tested label fraction on both benchmarks, with the largest NavTest margin at 10% of the labels ( 82 .23 versus 79 .21 
+
+PDMS). The same interface improves a second frozen ge-ometry backbone, DVGT-2, on both benchmarks. In closed-loop driving on 420 HUGSIM scenarios with reactive traf-fic [47], VLG-D RIVE scores higher than LTF and well above VGGDrive and DVGT-2. A component-level anal-ysis shows that vision-language context mainly improves drivable-area compliance after the perturbation with both geometry backbones, whereas collision avoidance is al-ready supported by the geometric representation. The contributions are threefold: (i) VLG-D RIVE , a geometry-anchored residual interface that fuses frozen VLM and geometry features into joint tokens for a dedi-cated trajectory planner; (ii) evidence that the interface, not access to both priors alone, drives the gain: pointwise fu-sion outperforms independent streams at every tested label fraction and improves two geometry backbones; and (iii) 
+
+the highest NavHard EPDMS among the compared meth-ods, the highest closed-loop HD-Score among the compared planners on HUGSIM, and strong three-camera NavTest re-sults with frozen foundation models, together with an anal-ysis of where vision-language context helps. 
+
+## 2. Related Work 
+
+Vision-language models for driving and planning. End-to-end planners connect scene representations to action through bird’s-eye-view aggregation [21], task queries [10], vectorized scenes [13], sensor fusion [7], and the design of perception–planning connections [39]. Foundation models add pretrained knowledge to this design space. Image-text alignment, visual instruction tuning, and the Qwen-VL fam-ily provide representations for language-conditioned scene understanding [2, 3, 25, 27]. Flamingo and BLIP-2 learn interfaces between pretrained visual and language compo-nents [1, 17], while OpenVLA adapts pretrained visual features to robotic action [15]. Driving methods built on VLMs connect these capabilities to planning in sev-eral ways. LMDrive uses language-conditioned closed-loop control [28]; DriveGPT4 combines explanations and control prediction [43]; DriveLM and DriveVLM orga-nize reasoning through structured questions or hierarchical plans [29, 32]. EMMA represents scene elements and tra-jectories in a common language space [11], and AutoVLA generates discrete trajectory actions autoregressively [48]. ReCogDrive connects VLM driving priors to a continu-ous diffusion planner [19]. Closest to the representation question studied here, UniDriveVLA coordinates under-standing, sparse perception, and action through specialized experts [20]. These VLM-based planners read the scene mainly through 2D image features, which leave the metric position of semantic cues implicit. VLG-D RIVE instead combines dense geometry features with VLM features be-fore a dedicated trajectory decoder reads them, so that each semantic feature is tied to the 3D structure at its location and the planner knows where that evidence lies in space. 
+
+Geometric foundation models. Reconstruction provides supervision for reusable spatial features. DUSt3R pre-dicts point maps without requiring known camera calibra-tion or poses [38], and MASt3R adds descriptors for im-age matching [16]. Spann3R and CUT3R accumulate scene information sequentially [33, 37]; Fast3R processes multi-ple views jointly [44], and MonST3R addresses dynamic scenes [45]. VGGT jointly estimates cameras, depth, point maps, and tracks [34], and VGGT-Ω extends geometric pre-training across static and dynamic scenes and studies trans-fer to vision-language-action models [35]. By reconstruct-ing depth, camera poses, and point maps accurately from images alone, these models let an agent locate scene ele-ments at concrete positions in 3D space rather than inferring their location from appearance. DVGT-2 brings this capa-bility to driving by jointly predicting geometry and trajec-2tories in a streaming architecture without an explicit VLM branch [49]. VGGDrive instead incorporates dense geomet-ric features into VLM states and lets the VLM generate the trajectory [36]. VLG-D RIVE combines frozen geometric and VLM representations cell by cell on a shared camera grid in a trajectory-supervised interface and plans without reconstructing an explicit scene. 
+
+Geometry priors in multimodal language models. Sev-eral recent models inject geometric features into mul-timodal language models. Spatial-MLLM builds on Qwen2.5-VL [3] and merges its 2D visual features with those of a spatial encoder initialized from VGGT [34] through a lightweight MLP connector [41]. VG LLM, a video–3D geometry large language model, adds VGGT ge-ometry features to the visual tokens of Qwen2.5-VL be-fore the language model [46]. VLM-3R fuses reconstruc-tion tokens from CUT3R [37] with 2D appearance fea-tures through cross-attention for spatial and temporal rea-soning [9]. In all of these models, the fused features are routed back into the language model, which is tuned with instruction-style supervision and produces its output as text. Most of the VLM-based driving planners discussed above follow the same paradigm. VLG-D RIVE departs from it. It fuses geometric and vision-language features outside the language model and learns a dedicated planner directly on the fused features, which regresses continuous ego motion from trajectory labels. Neither source model is fine-tuned, and producing a plan requires no language decoding. 
+
+## 3. VLG-Drive: Unifying Vision-Language and Geometric Priors 
+
+3.1. Planning from complementary priors 
+
+Well-pretrained foundation models already capture much of what a driving planner needs. A driving-adapted VLM reads the semantics of a scene and the task it implies, and a geometric foundation model recovers the scene’s spatial structure from visual history. Both have been trained at a scale that downstream driving data cannot match. Rec-ognizing this potential, we ask whether a planner can be learned from their features alone while both foundation models stay frozen. VLG-D RIVE answers this question by unifying the two priors at the representation level. Let It denote the current multi-camera observation, Ht
+
+the visual history including the current observation, ut the route command, and mt the recent ego-motion history in-cluded in the VLM prompt. Frozen encoders produce VLM features Vt and geometry features Gt, a trainable interface 
+
+Fθ combines them into a joint planning representation Zt,and a dedicated planner Pϕ predicts the future trajectory: 
+
+Vt = Evlm (It, u t, m t), Gt = Egeo (Ht),Zt = Fθ (Vt, G t), ˆτt = Pϕ(Zt, u t). (1) Only Fθ and Pϕ are trained (Section 3.3). The route com-mand conditions the VLM prompt and the planner, and mo-tion history enters only through the prompt. This factoriza-tion separates representation formation, which decides how the two priors describe each part of the scene, from trajec-tory decoding, which decides which parts matter for the re-quested maneuver. Figure 2 summarizes the architecture. 
+
+3.2. Forming a joint planning representation 
+
+Establishing correspondence. The two models are pre-trained for different objectives, so matching channel dimen-sions alone does not make their features compatible; the camera image instead provides a common indexing domain. The VLM features are the final-layer hidden states of its language model at the image-token positions, so they are conditioned on the prompt with the route command and mo-tion history. The interface pools both sources to a common 
+
+17 × 30 grid per camera and projects them to the planner width D. Each grid cell is indexed by i = ( c, h, w ), where 
+
+c ∈ { 1, 2, 3} selects the front-left, front, or front-right cam-era, and h ∈ { 1, . . . , 17 } and w ∈ { 1, . . . , 30 } are the row and column of the cell in that camera’s grid. Source-specific adapters produce 
+
+vi = Av (Vi; πi), gi = Ag (Gi; πi), (2) where Vi and Gi are the pooled features of cell i from Vt
+
+and from the current-frame grid of Gt, and πi encodes the viewing ray of the cell. The address specifies where the two sources are paired, while the adapters learn how each source is represented for planning. 
+
+Pl ¨ ucker ray encoding. Grid indices alone do not tell the planner where a cell looks, because the same row and col-umn point in different directions in different cameras. Each cell is therefore tagged with its viewing ray in the ego frame. Let phw be the homogeneous image coordinate of the cell center, Kc the intrinsic matrix of camera c, and Rc and oc
+
+its rotation and center in the ego frame. The ray is described by its Pl¨ ucker coordinates 
+
+di = RcK−1 
+
+> c
+
+phw 
+
+∥RcK−1 
+
+> c
+
+phw ∥ , mi = oc × di, (3) where the unit direction di gives the orientation of the ray and the moment mi distinguishes parallel rays from differ-ent camera centers. These coordinates are mapped to the planner width with fixed random Fourier features, 
+
+πi =  sin(2 πB ⊤xi); cos(2 πB ⊤xi), xi = di; mi/s ,
+
+(4) where B ∈ R6×D/ 2 is a fixed Gaussian matrix and s = 2 mscales the moment to the size of the camera rig. Both adapters add this parameter-free encoding (Appendix A), so the two sources describe each cell in the same ray coor-dinates. 3Joint Planning Memory 
+
+(B) Feature Fusion   
+
+> Camera Sequences Vision Language Model
+> Geometry Foundation Model
+> Planning
+> Predicted Ego Trajectory
+> Trajectory Planner
+> t-1.0s
+> Left
+> Front
+> Right
+> t-0.5s t(Current)
+> Ego State
+> Command
+> Camera Pose
+> Planning Queries Driving Context
+> Frozen VLM
+> Frozen Geometry
+> Fuse & Replace
+> Joint Memory
+> Fused Carrier
+> Current Views
+> Image History
+> Retained Context
+> No Separate Dense Stream
+> Dense Grid
+> Dense Grid
+> Retained Context
+
+# ×
+
+(A) System Overview 
+
+> Feature
+> Fusion
+
+Figure 2. The VLG-D RIVE architecture. (A) The frozen VLM reads the current views (orange box), and the frozen geometry model reads each camera’s image sequence (blue panel). Their features are fused into a joint planning memory, which the trajectory planner reads with planning queries conditioned on the route command, together with ego-state and camera-pose queries, to predict the ego trajectory. Snowflakes mark frozen modules and flames mark trainable ones. (B) At each of the 3 × 17 × 30 paired cells, pointwise residual fusion adds a learned update from both sources to the geometry feature (Equation 5), and the resulting token of the fused carrier replaces both dense features in the joint memory. The retained context of each source (dashed arrows) enters the joint memory directly. 
+
+Pointwise residual fusion. With both sources aligned at every cell, the remaining question is how to combine them. Passing the two features to the planner as separate tokens would leave it to discover, from trajectory labels alone, which VLM feature belongs to which geometric ev-idence. Since the grid address already specifies this corre-spondence, we combine each pair at its address before the planner reads the scene. The combination takes a residual form, with the geometry feature, which carries the metric structure of the cell, as the anchor and a learned update that injects vision-language context: 
+
+ri = fθ ([LN g (gi); LN v (vi)]) , zi = gi + ri, (5) where fθ is a nonlinear projection shared across locations and [·; ·] denotes channel-wise concatenation. The residual depends on both inputs and thus learns a cross-source inter-action. We call the anchoring stream the carrier ; the VLM carrier swaps the roles of gi and vi (Section 4.4). Zero-initializing the final projection gives zi = gi at the start of training, so optimization begins from the geometric part. 
+
+Fuse and replace. The complete representation is Zt =
+
+{zi}i∈S ∪ C t, where S indexes the paired dense grid and 
+
+Ct retains the camera and register tokens of the geometry model and two global VLM tokens, the final-layer hidden state averaged over the non-image prompt tokens and the hidden state at the last prompt position, none of which has a dense counterpart. The dense VLM stream thus enters the planner only through the joint tokens, which reduces the planner memory from 3,114 tokens for independent streams to 1,584 in the main setting. 
+
+3.3. Action-conditioned trajectory prediction 
+
+A dedicated trajectory planner translates Zt into future ego motion. It follows query-based transformer decoding [6], but unlike object queries, which form an unordered set, each query qk corresponds to an ordered future step k and incor-porates the route command ut. Self-attention among the queries coordinates the future steps into a consistent trajec-tory, and cross-attention lets each step retrieve the scene ev-idence it needs from Zt. Each decoder layer ℓ ∈ { 1, 2, 3}
+
+predicts incremental ego motion ˆδ(ℓ) 
+
+> k
+
+= (∆ x, ∆y, ∆ψ) for eight future steps at 0.5-second intervals, and the final-layer increments are accumulated to form ˆτt.
+
+Training objective. Let ¯δk denote the ground-truth incre-ment at step k, normalized per channel with training-set statistics, and let mk ∈ { 0, 1} mask future steps without ground truth. The trajectory loss of decoder layer ℓ is a masked Smooth-L1 loss on the normalized increments of the three channels j ∈ { x, y, ψ },
+
+L(ℓ)traj = 1
+
+P 
+
+> k
+
+mk
+
+> 8
+
+X
+
+> k=1
+
+mk
+
+X
+
+> j
+
+SmoothL1  ˆδ(ℓ) 
+
+> k,j
+
+− ¯δk,j 
+
+. (6) 4Additional ego-state, ego-pose, and per-camera queries in the decoder contribute three terms, Lstate , Lpose , and Lcam ,whose targets come from the same driving log and from the frozen geometry encoder (Appendix A). The total objective applies all terms at every decoder layer, 
+
+L =
+
+> 3
+
+X
+
+> ℓ=1
+
+λℓ
+
+
+
+L(ℓ)traj + 0 .2 L(ℓ)state + 0 .5 L(ℓ)pose + 0 .1 L(ℓ)cam 
+
+
+
+,
+
+(7) with layer weights (λ1, λ 2, λ 3) = (0 .2, 0.6, 1.0) . Supervi-sion therefore comes entirely from the logged ego motion and the frozen encoders’ own outputs. 
+
+## 4. Experiments 
+
+4.1. Experimental protocol 
+
+We train on NAVSIM v1 NavTrain and evaluate on two benchmarks. NavTest contains 12 ,146 scenarios scored by PDMS under the official four-second non-reactive proto-col [8]; PDMS multiplies no-at-fault collision and drivable-area compliance terms with a weighted average of ego progress, time to collision, and comfort. NavHard con-tains 5,912 observations scored by the official two-stage EPDMS [5]. Stage 1 scores the plan from 450 recorded scenes; Stage 2 scores plans from 5,462 synthetic start states rendered around the human driver’s position four sec-onds later, each weighted by its proximity to the endpoint of the Stage-1 plan, and EPDMS multiplies the two stage scores of each scene. VLG-D RIVE builds its frozen feature branches on a driving-adapted 2B Qwen3-VL model, the Stage-1 checkpoint released with UniDriveVLA [20]. The VLM receives the current front-left, front, and front-right images, and VGGT-Ω receives three timestamps per camera (Appendix B.1). Only the interface and planner are trained, 
+
+106 .1M parameters in total. The planner is a three-layer decoder of width 1024 with eight attention heads and eight planning queries, trained from scratch for 24 ,000 updates with batch size 128, AdamW, a learning rate of 2.5 × 10 −4,and 4,000 warmup updates on cached encoder outputs. Pub-lished baseline scores come from the cited sources, and we evaluate VGGDrive and DVGT-2 from their official check-points (Appendix C.1); Appendix A lists all recipes, and Appendix C.3 reports training and inference cost. Each en-try is one training run; Appendix B.3 reports the variation across runs. 
+
+4.2. Overall planning performance 
+
+Perturbed-state planning. NavHard tests whether a plan-ner produces useful motion when the ego state departs from the recorded trajectory. Table 1 reports every component at both stages and compares VLG-D RIVE with published baselines and with the two closest alternatives to our de-sign, VGGDrive, which feeds geometry into a VLM that generates the plan, and DVGT-2, which plans from geome-try alone. VLG-D RIVE reaches 31 .78 EPDMS, 2.98 points above the strongest baseline, DVGT-2. The gain comes from Stage 2, which scores the plans made after perturba-tion. Its stage score of 41 .0 is the highest reported, driven by higher NC and TTC than DVGT-2 at a small cost in ego progress. 
+
+Standard-distribution planning. NavTest evaluates the same planner from recorded initial states, measuring its driving quality under the standard distribution (Table 2). VLG-D RIVE reaches 88 .27 PDMS from three cameras, above DiffusionDrive, which additionally uses LiDAR, and 
+
+4.25 points above VGGDrive, which generates trajectories with its VLM. DVGT-2 trains all parameters of its geom-etry backbone and planner on large-scale driving data and reaches 88 .60 PDMS, and DVGT-2-NAVSIM further fine-tunes the full model on NAVSIM with eight cameras to reach 90 .30 . VLG-D RIVE keeps both foundation mod-els frozen, with a geometry backbone not trained for driv-ing, and trains only 106 .1M parameters in about 58 GPU-hours, against about ten days on 64 GPUs for DVGT-2 (Ap-pendix C.3); it comes within 0.33 PDMS of DVGT-2 and exceeds the same checkpoint by 2.98 EPDMS on NavHard, which makes a lightweight planner on general-purpose pri-ors a promising route for driving. 
+
+4.3. Closed-loop driving on HUGSIM 
+
+NAVSIM scores a plan without letting it change the scene. We therefore also drive the NAVSIM-trained planners in closed loop on HUGSIM [47], which renders reconstructed scenes from nuScenes [4], Waymo [31], KITTI-360 [24], and PandaSet [42] with reactive inserted vehicles. The ego vehicle follows each plan for 0.25 s per step, for up to 400 steps. Table 3 reports the HUGSIM metrics, and Appendix C.2 lists the inputs of each planner. HD-Score combines route completion with per-step collision, drivable-area, time-to-collision, and comfort terms, and we give its 95% scenario-bootstrap interval. Paired over all 420 scenarios, VLG-D RIVE exceeds LTF by 4.7 HD-Score points ( 95% interval [1 .1, 8.4] ), VGGDrive by 15 .2
+
+([12 .3, 18 .2] ), and DVGT-2 by 9.8 ([6 .3, 13 .4] ). VLG-DRIVE has the highest collision, drivable-area, time-to-collision, and route-completion scores of all compared planners; only DVGT-2 scores higher on comfort. The two foundation-model baselines have different weaknesses: VGGDrive, which decodes trajectories with its VLM, has the lowest drivable-area and route-completion scores, and DVGT-2, which plans from geometry alone, has the low-est collision and time-to-collision scores. VLG-D RIVE ,which fuses both priors for a dedicated planner, shows nei-ther weakness, and its largest margins over DVGT-2 are in collision and time-to-collision, the terms that also drive its NavHard advantage. 5Table 1. Planning from perturbed initial states on NavHard. Scores are percentages; ↑ marks metrics where higher is better. Bold marks the best value in each column within each stage. S1/S2 are the evaluation stages, S. is the score of each stage, and EPDMS is the official combined score. NC, DAC, DDC, TLC, EP, TTC, LK, HC, and EC denote no-at-fault collisions, drivable-area and driving-direction compliance, traffic-light compliance, ego progress, time to collision, lane keeping, history comfort, and extended comfort. Scores for LTF [8], DiffusionDrive [23], GTRS-DP [22], and GuideFlow [26] are reported by Li et al. [18]; we evaluate VGGDrive [36] and DVGT-2 [49]. – denotes an unavailable result.                                                                                                                                                                       
+
+> Method Stage NC ↑DAC ↑DDC ↑TLC ↑EP ↑TTC ↑LK ↑HC ↑EC ↑S. ↑EPDMS ↑
+> LTF S1 97.3 80.2 97.8 99.3 83.4 96.2 92.9 97.8 71.1 61.3 S2 79.4 69.0 85.6 98.5 83.8 76.7 47.9 97.0 70.6 39.2 24.40 DiffusionDrive S1 96.8 86.0 98.8 99.3 84.0 95.8 96.7 97.6 79.6 66.7 S2 80.1 72.8 84.4 98.4 85.9 76.6 46.4 96.3 72.8 40.5 27.50 GTRS-DP S1 94.7 78.8 96.1 99.5 83.0 94.4 92.0 97.5 72.8 –S2 80.3 74.4 84.9 98.0 81.9 78.8 45.4 96.7 70.1 –23.80 GuideFlow S1 96.6 80.5 96.3 99.3 82.3 94.9 91.5 97.7 67.8 –S2 87.3 76.7 88.8 99.2 84.3 85.1 49.7 93.1 44.5 –27.10 VGGDrive S1 95.4 80.9 97.6 99.1 86.6 94.4 92.9 97.8 68.9 68.3 S2 76.5 70.3 82.4 97.9 89.7 72.8 49.3 95.8 58.6 36.8 26.09 DVGT-2 S1 96.0 88.4 97.6 100.0 85.5 96.0 95.3 97.8 71.1 76.5
+> S2 76.9 70.1 77.5 98.7 92.0 72.5 47.5 82.0 38.8 35.3 28.80
+> VLG-D RIVE S1 97.3 85.6 99.6 99.8 84.9 95.8 96.7 97.6 70.7 74.9 S2 82.4 71.7 85.7 98.5 89.4 79.3 47.4 95.9 55.7 41.0 31.78
+
+Table 2. System-level NAVSIM v1 NavTest planning. Scores are percentages; ↑ marks metrics where higher is better, and bold marks the best value in each column. Cameras count physical views, and auxiliary supervision lists the targets other than the trajectory used in downstream training. E2E, VGA, and VLA denote conventional end-to-end, geometry-based, and vision-language-action planners. Published scores are taken from the cited sources, and we evaluate VGGDrive (Appendix C.1).                                                                                                                                  
+
+> Method Family Downstream auxiliary supervision Cameras LiDAR NC ↑DAC ↑TTC ↑Comfort ↑EP ↑PDMS ↑
+> UniAD [10] E2E Map & bbox 8–97.80 91.90 92.90 100.00 78.80 83.40 Latent TransFuser [8] E2E Map & bbox 3–97.40 92.80 92.40 100.00 79.00 83.80 TransFuser [7] E2E Map & bbox 3✓97.78 92.63 92.89 99.98 78.88 83.88 PARA-Drive [39] E2E Map & bbox 8–97.90 92.40 93.00 99.80 79.30 84.00 DiffusionDrive [23] E2E Map & bbox 3✓98.20 96.20 94.70 100.00 82.20 88.10 LFG [30] VGA Pseudo 3D & motion 1–98.20 93.70 94.40 100.00 79.10 85.20 DVGT-2 [49] VGA Dense geometry 8–97.80 97.20 93.90 100.00 83.40 88.60 DVGT-2-NAVSIM [49] VGA Dense geometry 8–98.70 97.90 95.80 100.00 84.30 90.30
+> AutoVLA [48] VLA CoT reasoning 3–96.89 92.42 88.06 99.94 75.82 80.54 ReCogDrive [19] VLA Driving QA 3–98.30 95.10 94.30 100.00 81.10 86.80 VGGDrive [36] VLA None 3–96.14 93.44 91.17 99.93 80.29 84.02
+> VLG-D RIVE VLA Ego state & camera pose 3–98.55 96.16 95.20 100.00 82.27 88.27
+
+Table 3. Closed-loop driving on HUGSIM (420 scenarios). Scores in percent; Rc is route completion, and brackets give the 95% scenario-bootstrap interval of HD-Score. LTF is the NAVSIM-trained client provided with HUGSIM. 
+
+Method NC ↑ DAC ↑ TTC ↑ Comfort ↑ Rc ↑ HD-Score ↑
+
+LTF [8] 43.0 85.2 38.8 93.4 35.7 21.2 [18.2, 24.3] VGGDrive [36] 49.7 71.1 39.8 97.3 23.2 10.7 [ 9.1, 12.5] DVGT-2 [49] 30.1 82.5 27.0 99.4 33.6 16.1 [13.2, 19.1] VLG-D RIVE 59.2 89.2 51.6 98.2 40.6 25.9 [22.9, 28.9] 
+
+4.4. Interaction between pretrained representations 
+
+The system comparison does not reveal whether the gain comes from the fusion interface or simply from giving the planner both sources. Table 4 therefore compares indepen-dent streams with the VLM and geometry carriers of Sec-tion 3.2; the no-injection variants keep only the partner’s global context, which separates injecting the partner from compacting the memory. Geometry-carrier fusion reaches 88 .06 PDMS and 30 .75 
+
+EPDMS, compared with 87 .12 and 28 .69 for independent streams, with higher NC, DAC, TTC, and EP. The full-data arms of Table 5 and a control without the motion-history prompt (Appendix B.2) show the same ordering. Fuse-and-replace keeps one dense token per cell instead of two, so its benefit could come from compaction alone. The no-injection geometry carrier tests this: with the same mem-ory layout but no VLM injection, it scores 86 .87 PDMS and 29 .18 EPDMS, compared with 87 .12 and 28 .69 for in-6Table 4. Fusion and carrier configurations. NavTest components and PDMS, and NavHard EPDMS, in percent; ↑ marks metrics where higher is better, and bold marks the best value in each column. DDC is driving-direction compliance; other metrics follow Table 2. All rows use the base recipe (width 512, 12 ,000 updates; Table S1).                                                       
+
+> Dense representation Interaction NC ↑DAC ↑DDC ↑TTC ↑Comfort ↑EP ↑PDMS ↑EPDMS ↑
+> Independent streams Decoder attention only 98.15 95.34 98.23 94.63 100.00 81.08 87.12 28.69 VLM carrier No dense geometry injection 97.39 94.47 98.11 93.18 99.98 79.70 85.23 25.89 VLM carrier Pointwise fusion 98.42 95.88 98.28 94.85 100.00 81.85 87.78 29.47 Geometry carrier No dense VLM injection 98.19 95.23 98.08 94.33 99.99 81.22 86.87 29.18 Geometry carrier Pointwise fusion 98.59 95.92 98.24 95.14 99.99 82.11 88.06 30.75
+
+Table 5. Planning with reduced downstream labels. Columns give the share of NavTrain samples used for downstream train-ing. The subsets are nested and consist of whole driving logs, with 
+
+7,215 , 18 ,209 , and 72 ,902 samples from 135 , 301 , and 1,152 
+
+logs. NavTest PDMS and NavHard EPDMS are percentages; ↑
+
+marks metrics where higher is better, and bold marks the best value in each column. All arms use the main training recipe.                           
+
+> 10% 25% 100% Representation PDMS ↑EPDMS ↑PDMS ↑EPDMS ↑PDMS ↑EPDMS ↑
+> Geometry only (G) 80.21 21.54 84.33 24.00 86.97 27.99 Independent streams (I) 79.21 18.96 84.62 23.53 87.27 28.43 Pointwise fusion (F) 82.23 21.51 85.43 24.03 88.27 31.78
+
+Table 6. Alternative geometry backbones. NavTest PDMS and NavHard EPDMS in percent; bold marks the better value per back-bone. G is geometry only and F is pointwise fusion; the VGGT-Ω
+
+F row is the main model.              
+
+> Backbone Rep. PDMS ↑EPDMS ↑
+> VGGT-ΩG86.97 27.99 F88.27 31.78
+> DVGT-2 G86.66 22.87 F87.48 23.78
+
+dependent streams, whereas filling that memory with joint tokens raises PDMS to 88 .06 , with the largest gains in EP, TTC, and DAC, and EPDMS to 30 .75 . Compaction thus accounts for none of the NavTest gain and for 0.49 of the 
+
+2.06 -point NavHard gain. For the VLM carrier, fusion like-wise raises PDMS from 85 .23 to 87 .78 and EPDMS from 
+
+25 .89 to 29 .47 , and the geometry carrier scores higher in both settings on both benchmarks, which motivates anchor-ing the residual on geometry. Correct pairing also matters at test time: shifting the VLM grid of the main model by one cell, so that each VLM feature meets the geometry of its horizontal neighbor, lowers PDMS by 2.53 and EPDMS by 4.14 (Appendix C.4). Access to both sources is therefore not enough; they should interact before readout, at the same grid location and with geometry as the anchor. 
+
+4.5. Scope of the representation effect 
+
+Table 4 establishes the benefit of fusion with the full training set and one geometry backbone. We next test whether it 
+
+Table 7. Fusing features from different encoder layers. NavTest PDMS and NavHard EPDMS in percent; bold marks the best value per column within each block. Geometry taps are zero-indexed, and VLM blocks are one-indexed decoder layers (Appendix B.7). Setting Geo. taps VLM PDMS ↑ EPDMS ↑
+
+Geometry depth, final-layer VLM 
+
+Final-layer fusion O23 Final 88.27 31.78 
+
+CAT3 O4/O17/O23 Final ×3 88.31 31.34 DUP3 O23 ×3 Final ×3 88.14 31.64 
+
+Cross-source layer pairing 
+
+LP-LATE O17/O23 28/28 88.09 28.06 LP-PAIR O17/O23 14/28 88.44 30.56 
+
+persists across different amounts of downstream trajectory supervision and different geometry backbones, the two axes that determine how widely the approach applies. 
+
+Across downstream supervision levels. If the joint rep-resentation makes better use of the pretrained priors, its ad-vantage should be most visible when downstream labels are scarce. Table 5 tests this by comparing geometry alone (G), both sources as independent streams (I), and their pointwise fusion (F), each trained on 10% , 25% , or 100% of the Nav-Train samples (Appendix B.6). Fusion scores above inde-pendent streams at every label fraction on both benchmarks. Its NavTest margin is largest at 10% of the labels ( 82 .23 ver-sus 79 .21 PDMS), where independent streams score below geometry-only memory on both benchmarks: with 7,215 
+
+samples, the planner cannot yet exploit separate VLM to-kens, whereas fused tokens raise PDMS by 2.02 over geom-etry alone. On NavHard, fusion and geometry-only mem-ory remain close at 10% and 25% , while the full-data main model reaches 31 .78 EPDMS, 3.79 points above geometry only. On NavTest, fusion thus extracts the most from the frozen priors when labels are scarce; on NavHard, its ad-vantage over geometry alone grows with supervision. 
+
+Across geometry backbones. A useful composition should hold beyond a single geometry checkpoint. Table 6 therefore tests whether adding VLM features through the same interface also helps DVGT-2, a frozen geometry back-bone that differs from VGGT-Ω in both architecture and training data. Because DVGT-2 encodes undistorted im-7(a) (b) (c)    
+
+> Geometry only (G) VLG-Drive (F) Drivable-area boundary Footprint off the drivable area
+
+Figure 3. Perturbed NavHard starts where vision-language context keeps the plan on the road. Each column shows a Stage-2 start: the three front views (top) and a bird’s-eye view (bottom) with the plans of the VGGT-Ω geometry-only planner (G, orange) and VLG-DRIVE (F, blue). Outlines show the simulated ego footprint, and red dashed ones leave the drivable area: G cuts the inside of a curve (a) and the corner of an intersection (b), and swings wide when leaving a turn (c), whereas F stays on the road. 
+
+ages, the VLM grid is resampled into its camera frame so that both sources share grid addresses (Appendix B.6). Fu-sion improves both backbones on both benchmarks, by 1.30 
+
+PDMS and 3.79 EPDMS for VGGT-Ω over its full-data geometry-only arm in Table 5, and by 0.82 and 0.91 in the DVGT-2 pair. The fusion interface thus carries over to a second geometry backbone, so its benefit is not specific to the architecture or training data of VGGT-Ω.
+
+4.6. Fusing features from different encoder layers 
+
+Both foundation models expose a hierarchy of internal fea-tures, while the main system fuses only the final layer of each. Since intermediate layers retain finer spatial detail, Table 7 tests whether fusing several levels helps. CAT3 fuses early, intermediate, and final geometry taps, and DUP3 repeats the final tap through three adapters to sepa-rate depth diversity from the number of feature banks; a sec-ond comparison pairs the geometry taps O17 and O23 with VLM decoder blocks, where LP-LATE uses the final block 28 for both taps and LP-PAIR pairs O17 with the intermedi-ate block 14. Final-layer fusion, the main model, achieves the best NavHard EPDMS among the geometry-depth vari-ants and matches the best NavTest PDMS to within 0.04 
+
+points, and CAT3 and DUP3 perform similarly. Pairing an intermediate VLM block with the intermediate geome-try tap raises PDMS by 0.35 and EPDMS by 2.50 over us-ing the final VLM block for both taps. Final-layer fusion is therefore a simple and competitive design, as no multi-level variant improves both metrics over it, and multi-level fusion benefits from pairing VLM and geometry layers by depth. 
+
+4.7. Where vision-language context helps 
+
+The preceding studies show that VLM features improve planning, but not which driving abilities each prior pro-vides. We therefore compare the VGGT-Ω geometry-only planner of Table 6 with the fused main system on NavHard (Table 8). The gain concentrates in Stage 2, after the 
+
+Table 8. NavHard components with and without vision-language context. G is the VGGT-Ω geometry-only planner of Table 6 and F the fused main system. NC, DAC, DDC, TTC, and EP follow Table 1, and S. is the stage score. Scores are percent-ages; bold marks the better value in each stage. Table S5 in Ap-pendix B.4 lists all components for both geometry backbones.                                  
+
+> Stage Rep. NC ↑DAC ↑DDC ↑TTC ↑EP ↑S. ↑
+> S1 G97.78 84.44 99.33 96.22 84.15 74.06 F97.33 85.56 99.56 95.78 84.92 74.87
+> S2 G82.42 68.56 85.25 77.88 87.76 38.74 F82.43 71.74 85.70 79.31 89.39 40.99
+
+ego state is perturbed, where the stage score rises by 2.25 
+
+points compared with 0.81 in Stage 1. The largest Stage-2 improvement is in drivable-area compliance ( +3 .18 ), while no-at-fault collisions are unchanged ( +0 .01 ). Vision-language context thus keeps the displaced planner on the road (Figure 3), whereas geometry already supports col-lision avoidance; the two priors contribute different driv-ing abilities, which is why combining them outperforms geometry alone. With DVGT-2, fusion likewise concen-trates its gain in Stage 2 ( +1 .53 versus +0 .62 ) and improves drivable-area compliance (Appendix B.4). Appendix C.5 further shows that the planner reads a small set of fused cells along the driving path. 
+
+## 5. Conclusion and Limitations 
+
+VLG-D RIVE turns frozen vision-language and geometry features into a trajectory-supervised joint planning repre-sentation. It reaches 31 .78 EPDMS on NavHard, the high-est among the compared methods, and 88 .27 PDMS on NavTest from camera input alone. Pointwise fusion outper-forms independent streams at every tested label fraction and improves two different geometry backbones on both bench-marks. In closed-loop driving on HUGSIM, VLG-D RIVE 
+
+8outperforms all compared planners. Vision-language con-text mainly improves drivable-area compliance after pertur-bation with both geometry backbones, while the geomet-ric representation already supports collision avoidance. A lightweight planner trained on the fused features of frozen vision-language and geometric foundation models is there-fore an effective alternative to adapting either model for planning. Because VLG-D RIVE keeps both foundation models frozen and trains only a lightweight interface and planner, fully fine-tuning the geometry model on larger driving datasets, as DVGT-2 does, could further improve the results given sufficient compute. Closed-loop evalua-tion on further benchmarks such as nuPlan [14] and further pretrained encoder combinations will test how broadly joint representation learning benefits driving planners. 
+
+## References 
+
+[1] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Mensch, Katherine Millican, Malcolm Reynolds, et al. Flamingo: A visual language model for few-shot learning. In Advances in Neural Information Processing Systems , pages 23716– 23736, 2022. [2] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, et al. Qwen3-VL technical report. arXiv preprint arXiv:2511.21631 , 2025. [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun Tang, et al. Qwen2.5-VL technical report. arXiv preprint arXiv:2502.13923 , 2025. [4] Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-ancarlo Baldan, and Oscar Beijbom. nuScenes: A multi-modal dataset for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 11621–11631, 2020. [5] Wei Cao, Marcel Hallgarten, Tianyu Li, Daniel Dauner, Xunjiang Gu, Caojun Wang, Yakov Miron, Marco Aiello, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap Chitta. Pseudo-simulation for autonomous driving. In Proceedings of the 9th Conference on Robot Learning , pages 4709–4722, 2025. [6] Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas Usunier, Alexander Kirillov, and Sergey Zagoruyko. End-to-end object detection with transformers. In Proceedings of the European Conference on Computer Vision , pages 213–229, 2020. [7] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao Yu, Katrin Renz, and Andreas Geiger. TransFuser: Imitation with transformer-based sensor fusion for autonomous driv-ing. IEEE Transactions on Pattern Analysis and Machine Intelligence , 45(11):12878–12895, 2023. [8] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap Chitta. NAVSIM: Data-driven non-reactive autonomous vehicle simulation and benchmarking. In Advances in Neural Information Processing Systems ,pages 28706–28719, 2024. [9] Zhiwen Fan, Jian Zhang, Renjie Li, Junge Zhang, Run-jin Chen, Hezhen Hu, Kevin Wang, Peihao Wang, Huaizhi Qu, Shijie Zhou, Dilin Wang, Zhicheng Yan, Hongyu Xu, Justin Theiss, Tianlong Chen, Jiachen Li, Zhengzhong Tu, Zhangyang Wang, and Rakesh Ranjan. VLM-3R: Vision-language models augmented with instruction-aligned 3D re-construction. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 31054– 31065, 2026. [10] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng Dai, Yu Qiao, and Hongyang Li. Planning-oriented autonomous driv-ing. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , pages 17853–17862, 2023. [11] Jyh-Jing Hwang, Runsheng Xu, Hubert Lin, Wei-Chih Hung, Jingwei Ji, Kristy Choi, Di Huang, Tong He, Paul Covington, Benjamin Sapp, Yin Zhou, James Guo, Dragomir Anguelov, and Mingxing Tan. EMMA: End-to-end multimodal model for autonomous driving. Transactions on Machine Learning Research , 2025. [12] Sarthak Jain and Byron C. Wallace. Attention is not ex-planation. In Proceedings of the Conference of the North American Chapter of the Association for Computational Lin-guistics: Human Language Technologies , pages 3543–3556, 2019. [13] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. VAD: Vectorized scene representa-tion for efficient autonomous driving. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 8340–8350, 2023. [14] Napat Karnchanachari, Dimitris Geromichalos, Kok Seang Tan, Nanxiang Li, Christopher Eriksen, Shakiba Yaghoubi, Noushin Mehdipour, Gianmarco Bernasconi, Whye Kit Fong, Yiluan Guo, and Holger Caesar. Towards learning-based planning: The nuPlan benchmark for real-world au-tonomous driving. In IEEE International Conference on Robotics and Automation , 2024. [15] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan P. Foster, Pannag R. Sanketi, Quan Vuong, Thomas Kollar, Benjamin Burchfiel, Russ Tedrake, Dorsa Sadigh, Sergey Levine, Percy Liang, and Chelsea Finn. OpenVLA: An open-source vision-language-action model. In Proceedings of the 8th Conference on Robot Learning , pages 2679–2713, 2025. [16] Vincent Leroy, Yohann Cabon, and J´ erˆ ome Revaud. Ground-ing image matching in 3D with MASt3R. In Proceedings of the European Conference on Computer Vision , pages 71–91, 2024. [17] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi. BLIP-2: Bootstrapping language-image pre-training with 
+
+9frozen image encoders and large language models. In Pro-ceedings of the 40th International Conference on Machine Learning , pages 19730–19742, 2023. [18] Jingyu Li, Zhe Liu, Dongnan Hu, Junjie Wu, Zipei Ma, Wenxiao Wu, Chao Han, Zhihui Hao, Zhikang Liu, Kun Zhan, Jiankang Deng, Xiatian Zhu, and Li Zhang. Metis: A generalizable and efficient world-action model for au-tonomous driving and urban navigation. arXiv preprint arXiv:2606.15869 , 2026. [19] Yongkang Li, Kaixin Xiong, Xiangyu Guo, Fang Li, Sixu Yan, Gangwei Xu, Lijun Zhou, Long Chen, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Wenyu Liu, and Xinggang Wang. ReCogDrive: A reinforced cognitive framework for end-to-end autonomous driving. In Interna-tional Conference on Learning Representations , 2026. [20] Yongkang Li, Lijun Zhou, Sixu Yan, Bencheng Liao, Tianyi Yan, Kaixin Xiong, Long Chen, Hongwei Xie, Bing Wang, Guang Chen, Hangjun Ye, Wenyu Liu, Haiyang Sun, and Xinggang Wang. UniDriveVLA: Unifying understanding, perception, and action planning for autonomous driving. 
+
+arXiv preprint arXiv:2604.02190 , 2026. [21] Zhiqi Li, Wenhai Wang, Hongyang Li, Enze Xie, Chong-hao Sima, Tong Lu, Yu Qiao, and Jifeng Dai. BEVFormer: Learning bird’s-eye-view representation from multi-camera images via spatiotemporal transformers. In Proceedings of the European Conference on Computer Vision , pages 1–18, 2022. [22] Zhenxin Li, Wenhao Yao, Zi Wang, Xinglong Sun, Joshua Chen, Nadine Chang, Maying Shen, Zuxuan Wu, Shiyi Lan, and Jose M. Alvarez. Generalized trajectory scor-ing for end-to-end multimodal planning. arXiv preprint arXiv:2506.06664 , 2025. [23] Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li, Ying Zhang, Qian Zhang, and Xinggang Wang. DiffusionDrive: Trun-cated diffusion model for end-to-end autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 12037–12047, 2025. [24] Yiyi Liao, Jun Xie, and Andreas Geiger. KITTI-360: A novel dataset and benchmarks for urban scene understanding in 2D and 3D. IEEE Transactions on Pattern Analysis and Machine Intelligence , 45(3):3292–3310, 2022. [25] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. Visual instruction tuning. In Advances in Neural Information Processing Systems , pages 34892–34916, 2023. [26] Lin Liu, Caiyan Jia, Guanyi Yu, Ziying Song, JunQiao Li, Feiyang Jia, Peiliang Wu, Xiaoshuai Hao, and Yadan Luo. GuideFlow: Constraint-guided flow matching for plan-ning in end-to-end autonomous driving. arXiv preprint arXiv:2511.18729 , 2025. [27] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever. Learning transferable visual models from natural language supervision. In Proceedings of the 38th International Conference on Machine Learning ,pages 8748–8763, 2021. [28] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song, Steven L. Waslander, Yu Liu, and Hongsheng Li. LMDrive: Closed-loop end-to-end driving with large language models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 15120–15130, 2024. [29] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen, Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo, Andreas Geiger, and Hongyang Li. DriveLM: Driving with graph visual question answering. In Proceedings of the Euro-pean Conference on Computer Vision , pages 256–274, 2024. [30] Matthew Strong, Wei-Jer Chang, Quentin Herau, Jiezhi Yang, Yihan Hu, Chensheng Peng, and Wei Zhan. Learning to drive is a free gift: Large-scale label-free autonomy pre-training from unposed in-the-wild videos. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 32144–32153, 2026. [31] Pei Sun, Henrik Kretzschmar, Xerxes Dotiwalla, Aurelien Chouard, Vijaysai Patnaik, Paul Tsui, James Guo, Yin Zhou, Yuning Chai, Benjamin Caine, et al. Scalability in perception for autonomous driving: Waymo open dataset. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2020. [32] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, XianPeng Lang, and Hang Zhao. DriveVLM: The convergence of autonomous driving and large vision-language models. In Proceedings of the 8th Conference on Robot Learning , pages 4698–4726, 2025. [33] Hengyi Wang and Lourdes Agapito. 3D reconstruction with spatial memory. In International Conference on 3D Vision ,pages 78–89, 2025. [34] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. VGGT: Visual geometry grounded transformer. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 5294–5306, 2025. [35] Jianyuan Wang, Minghao Chen, Shangzhan Zhang, Nikita Karaev, Johannes Sch¨ onberger, Patrick Labatut, Piotr Bo-janowski, David Novotny, Andrea Vedaldi, and Christian Rupprecht. VGGT-Ω. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , 2026. [36] Jie Wang, Guang Li, Zhijian Huang, Chenxu Dang, Hangjun Ye, Yahong Han, and Long Chen. VGGDrive: Empowering vision-language models with cross-view geometric ground-ing for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 10954–10964, 2026. [37] Qianqian Wang, Yifei Zhang, Aleksander Holynski, Alexei A. Efros, and Angjoo Kanazawa. Continuous 3D perception model with persistent state. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10510–10522, 2025. [38] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris Chidlovskii, and Jerome Revaud. DUSt3R: Geometric 3D vision made easy. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 20697–20709, 2024. 
+
+10 [39] Xinshuo Weng, Boris Ivanovic, Yan Wang, Yue Wang, and Marco Pavone. PARA-Drive: Parallelized architec-ture for real-time autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 15449–15458, 2024. [40] Sarah Wiegreffe and Yuval Pinter. Attention is not not ex-planation. In Proceedings of the Conference on Empirical Methods in Natural Language Processing and the Interna-tional Joint Conference on Natural Language Processing ,pages 11–20, 2019. [41] Diankun Wu, Fangfu Liu, Yi-Hsin Hung, and Yueqi Duan. Spatial-MLLM: Boosting MLLM capabilities in visual-based spatial intelligence. In Advances in Neural Informa-tion Processing Systems , 2025. [42] Pengchuan Xiao, Zhenlei Shao, Steven Hao, Zishuo Zhang, Xiaolei Chai, Judy Jiao, Zesong Li, Jian Wu, Kai Sun, Kun Jiang, et al. PandaSet: Advanced sensor suite dataset for au-tonomous driving. In IEEE International Intelligent Trans-portation Systems Conference (ITSC) , 2021. [43] Zhenhua Xu, Yujia Zhang, Enze Xie, Zhen Zhao, Yong Guo, Kwan-Yee K. Wong, Zhenguo Li, and Hengshuang Zhao. DriveGPT4: Interpretable end-to-end autonomous driving via large language model. IEEE Robotics and Automation Letters , 9(10):8186–8193, 2024. [44] Jianing Yang, Alexander Sax, Kevin J. Liang, Mikael Henaff, Hao Tang, Ang Cao, Joyce Chai, Franziska Meier, and Matt Feiszli. Fast3R: Towards 3D reconstruction of 1000+ images in one forward pass. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 21924–21935, 2025. [45] Junyi Zhang, Charles Herrmann, Junhwa Hur, Varun Jam-pani, Trevor Darrell, Forrester Cole, Deqing Sun, and Ming-Hsuan Yang. MonST3R: A simple approach for estimating geometry in the presence of motion. In International Con-ference on Learning Representations , 2025. [46] Duo Zheng, Shijia Huang, Yanyang Li, and Liwei Wang. Learning from videos for 3D world: Enhancing MLLMs with 3D vision geometry priors. In Advances in Neural In-formation Processing Systems , 2025. [47] Hongyu Zhou, Longzhong Lin, Jiabao Wang, Yichong Lu, Dongfeng Bai, Bingbing Liu, Yue Wang, Andreas Geiger, and Yiyi Liao. HUGSIM: A real-time, photo-realistic and closed-loop simulator for autonomous driving. arXiv preprint arXiv:2412.01718 , 2024. [48] Zewei Zhou, Tianhui Cai, Seth Z. Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. AutoVLA: A vision-language-action model for end-to-end autonomous driving with adaptive reasoning and reinforcement fine-tuning. In 
+
+Advances in Neural Information Processing Systems , pages 27920–27956, 2025. [49] Sicheng Zuo, Zixun Xie, Wenzhao Zheng, Shaoqing Xu, Fang Li, Hanbing Li, Long Chen, Zhi-Xin Yang, and Ji-wen Lu. DVGT-2: Vision-geometry-action model for au-tonomous driving at scale. arXiv preprint arXiv:2604.00813 ,2026. 
+
+11 A. Implementation Details 
+
+Sources of vision-language and geometric priors. The vision-language branch uses a driving-adapted Qwen3-VL model with 2B parameters, the publicly released Stage-1 nuScenes checkpoint of UniDriveVLA [20]. According to its released training configuration, it is fine-tuned from Qwen3-VL-2B-Instruct [2] on driving question-answering and planning corpora built on nuScenes [4] and on BDD-X, DRAMA, LingoQA, CODA-LM, Talk2Car, SUTD-TrafficQA, and MAPLM, together with a general visual question-answering subset. None of these sources is derived from nuPlan [14], from which the NAVSIM logs are drawn, so no NAVSIM training or test log reaches the frozen VLM during its adaptation. The geometry branch uses VGGT-
+
+Ω. Both encoders are frozen during downstream training. VLM features correspond to the current front-left, front, and front-right images. The main geometry features are ex-tracted per camera with visual history, and the current-frame grid is passed to the planner. 
+
+Dense layout and spatial indexing. Both branches sup-ply a 17 × 30 grid per camera. Qwen3-VL encodes each 
+
+1920 × 1080 view at its native resolution, which its proces-sor rounds to 1920 × 1088 ; with 16 -pixel patches and 2 × 2
+
+token merging, each view yields a 34 × 60 grid of merged visual tokens. We take the final hidden states of the lan-guage model at these image-token positions, restore their two-dimensional layout from the processor’s grid size, and average-pool each 2 × 2 block, so every cell of the 17 × 30 
+
+grid summarizes a fixed 64 ×64 -pixel image region. VGGT-
+
+Ω features of the same view are pooled to the same grid. In an earlier front-camera, geometry-only study, a coarser 
+
+8 × 11 grid scored 86 .74 NavTest PDMS against 87 .37 for 
+
+17 × 30 . Pooling and camera ordering define correspond-ing row-major addresses, so correspondence is defined at the grid level. Source-specific adapters project the features to the decoder width. Ray directions are computed at cell centers from the recorded intrinsics and camera-to-ego ex-trinsics, and the Pl¨ ucker encoding of Equation 4 is applied to both sources. The geometry adapter adds the encoding to its projected feature. The VLM adapter uses a second encoding of the same form with its own random matrix, maps it through a zero-initialized linear layer, and adds it to Vi before projection, so the VLM features are unchanged at initialization. The geometry adapter additionally adds a learned camera embedding and a fixed two-dimensional si-nusoidal encoding of the grid position. 
+
+Fusion and memory. The pointwise fusion module is a two-layer MLP with GELU activation, source-specific Lay-erNorm, and a zero-initialized output layer. Concatenat-ing independent streams retains 1,530 dense VLM tokens and 1,530 dense geometry tokens, together with context, for 3,114 memory tokens. Pointwise fusion retains 1,530 
+
+joint tokens, three camera tokens, 48 register tokens, a null token, and two global VLM tokens (the final-layer hidden state averaged over the non-image prompt tokens and the hidden state at the last prompt position), totaling 1,584 de-coder memory tokens. 
+
+Training configurations. The main system and the data-efficiency, backbone, feature-level, and history-length stud-ies use the main recipe; Sec. B.5 lists the recipe of each fusion-study row. Table S1 compares the two recipes. Both have three decoder layers, eight attention heads, and a feed-forward expansion of four. The main recipe has 106.1M trainable parameters outside the frozen encoders. When the source representation is fixed, frozen-encoder outputs are cached once and reused during downstream training; exper-iments that vary internal feature levels extract the relevant features online.                   
+
+> Table S1. Downstream training recipes. Both keep the pre-trained encoders frozen and train the downstream modules from scratch. Setting Base recipe Main recipe Decoder width 512 1024 Decoder layers 33Training iterations 12,000 24,000 Batch size 256 128 Learning rate 10 −32.5×10 −4
+> Warmup iterations 1,000 4,000
+
+Planning queries and losses. Eight planning queries repre-sent future poses at 0.5-second intervals over four seconds. A learned four-way command embedding (left, straight, right, or unknown) conditions these queries. Each decoder layer applies query self-attention, memory cross-attention, and a feed-forward block. The model predicts normalized per-step (∆ x, ∆y, ∆ψ) in the NAVSIM ego frame and is trained with the objective of Equation 7. Outputs are de-normalized per channel and cumulatively summed. The ego-state, ego-pose, and per-camera queries share the de-coder layers with the planning queries, and their prediction heads serve only the training objective. Lstate is an L1 loss on the normalized current velocity and acceleration. Lpose 
+
+is a Smooth-L1 loss on the ego motion since the previous frame, with the heading change represented by its sine and cosine. Lcam is a Smooth-L1 consistency loss between the predicted camera-pose encodings and those of the frozen geometry encoder. 
+
+Prompt and causal inputs. The VLM prompt contains the native NAVSIM command and a recent history-trajectory string in the convention expected by the driving model. Mo-tion history reaches the model only through this prompt and the geometry history. The planner receives no ego-state in-put; ego velocity and acceleration serve only as auxiliary targets. Sec. B.2 removes the history-trajectory string. 12 B. Additional Representation Studies 
+
+B.1. Geometry history length 
+
+Table S2. Temporal context in the three-camera fusion planner. 
+
+The vision-language branch receives the current views; only the number of timestamps supplied per camera to the geometry model changes, and all rows use the main recipe. The three-timestamp row is the main system of Tables 1 and 2. Scores use the percent-age scale; ↑ marks metrics where higher is better, and bold marks the best value in each column. Geometry NavTest NavHard timestamps PDMS ↑ EPDMS ↑
+
+1 83.30 28.68 2 87.85 30.68 3 88.27 31.78 
+
+4 88.27 30.52 
+
+Table S2 shows that visual history is essential for the ge-ometry branch. A second timestamp raises NavTest PDMS from 83 .30 to 87 .85 and NavHard EPDMS from 28 .68 to 
+
+30 .68 . A third timestamp raises both scores further, to 
+
+88 .27 PDMS and 31 .78 EPDMS, the best NavHard result. A fourth timestamp leaves NavTest at 88 .27 and lowers NavHard to 30 .52 . Three timestamps, the setting of the main system, give the best overall result. The first additional timestamp, which supplies the paral-lax and recent motion that a single frame lacks, accounts for most of the benefit ( 4.55 PDMS and 2.00 EPDMS), and the third adds 0.42 PDMS and 1.10 EPDMS. 
+
+B.2. Fusion without the motion-history prompt 
+
+Motion history enters VLG-D RIVE in two ways: as the history-trajectory string in the VLM prompt and as the earlier timestamps seen by the geometry model. To test whether the fusion gain depends on the explicit motion history, we remove the history-trajectory string from the prompt, both when the VLM features of the training set are cached and at test time, and retrain the fusion (F) and independent-stream (I) arms with the main recipe. The ge-ometry model still receives three timestamps, so the planner retains visual motion cues; the single-timestamp row of Ta-ble S2 shows the effect of removing those. 
+
+Table S3. Planning without the motion-history prompt. 
+
+NavTest PDMS and NavHard EPDMS in percent for the main-recipe arms trained without the history-trajectory string in the prompt. Arm NavTest PDMS ↑ NavHard EPDMS ↑
+
+Independent streams (I) 87.66 29.49 Pointwise fusion (F) 87.85 31.84 
+
+Without the prompt, fusion still outperforms indepen-dent streams on both benchmarks, by 0.19 PDMS on NavTest and 2.35 EPDMS on NavHard. 
+
+B.3. Variation across training runs 
+
+Each entry in the main-text tables is a single training run. Table S4 reports three training runs of each arm of the fu-sion study with the main recipe: pointwise fusion (F, the full-data VLG-D RIVE model), independent streams (I), and geometry only (G). The first run of each arm is the one re-ported in the main text; the further runs of F use seeds 1 and 
+
+0, and those of I and G seeds 1 and 2.
+
+Table S4. Results over training runs of the fusion study. Each arm is trained three times with the main recipe; the first run is the one reported in the main text. NavTest PDMS and NavHard EPDMS in percent.                                             
+
+> Fusion (F) Indep. streams (I) Geometry only (G) Run PDMS ↑EPDMS ↑PDMS ↑EPDMS ↑PDMS ↑EPDMS ↑
+> 1 (reported) 88.27 31.78 87.27 28.43 86.97 27.99 288.35 31.81 87.54 30.45 86.76 27.10 388.21 31.39 87.56 30.01 86.90 27.62 Mean ±s.d. 88.28 ±0.07 31.66 ±0.23 87.46 ±0.16 29.63 ±1.06 86.88 ±0.11 27.57 ±0.45
+
+On both benchmarks, every fusion run scores above every independent-streams run, and every independent-streams run above every geometry-only run. Over the three runs, VLG-D RIVE reaches 31 .66 ± 0.23 EPDMS on NavHard and 88 .28 ± 0.07 PDMS on NavTest. 
+
+B.4. NavHard components with and without vision-language context 
+
+Table S5 lists every NavHard component for the VGGT-
+
+Ω geometry-only planner of Table 6 and the fused main system, the two planners compared in Section 4.7, and the same comparison for the DVGT-2 pair of Table 6. The table values are the official aggregate component scores of each stage. 
+
+B.5. Fusion-study controls 
+
+All five rows of Table 4 use the base recipe; Table 5 repeats the comparison of independent streams and fusion with the main recipe. The no-injection geometry carrier removes the paired dense VLM grid but keeps global VLM context. The no-injection VLM carrier removes dense geometry but keeps geometry camera and register context. Pointwise fu-sion combines the two features that share a grid address. 
+
+B.6. Data-efficiency and backbone-transfer proto-cols 
+
+Reduced downstream labels. The 10% and 25% subsets are nested whole-log subsets of NavTrain with fixed mem-bership, so every scenario of a smaller subset also belongs to the larger ones. Trajectory normalization statistics are 13 Table S5. NavHard components with and without vision-language context. Geometry only (G) is the VGGT-Ω geometry-only planner of Table 6; pointwise fusion (F) is the main system of Tables 1 and 2. The lower block compares the DVGT-2 G and F planners of the same table. Scores are percentages; ↑ marks metrics where higher is better, and bold marks the better value within each stage. Metric abbreviations follow Table 1.                                                                                                
+
+> Stage Representation NC ↑DAC ↑DDC ↑TLC ↑EP ↑TTC ↑LK ↑HC ↑EC ↑S. ↑
+> S1 Geometry only (G) 97.78 84.44 99.33 100.00 84.15 96.22 96.22 97.78 68.00 74.06 Pointwise fusion (F) 97.33 85.56 99.56 99.78 84.92 95.78 96.67 97.56 70.67 74.87
+> S2 Geometry only (G) 82.42 68.56 85.25 98.40 87.76 77.88 44.50 96.65 56.04 38.74 Pointwise fusion (F) 82.43 71.74 85.70 98.47 89.39 79.31 47.40 95.87 55.68 40.99
+> DVGT-2 backbone (Table 6)
+> S1 Geometry only (G) 96.56 85.11 98.56 99.78 85.31 95.33 96.22 97.78 70.22 72.76 Pointwise fusion (F) 95.78 86.89 98.67 99.78 85.48 94.89 94.44 97.78 64.89 73.38
+> S2 Geometry only (G) 73.78 62.73 76.34 97.55 94.12 68.81 49.61 75.72 29.70 30.10 Pointwise fusion (F) 73.75 63.62 79.97 97.62 94.25 70.22 47.10 75.76 26.27 31.63
+
+computed from the training data of each fraction. All arms use the main recipe with 24 ,000 updates at batch size 128, so smaller subsets are revisited proportionally more often. The geometry-only arm (G) disables the VLM pathway, the independent-stream arm (I) passes both dense grids to the decoder memory, and the fusion arm (F) uses pointwise fu-sion. The full-data fusion entry and the VGGT-Ω fusion entry in Table 6 both reuse the main model reported in Ta-bles 1 and 2. 
+
+Second geometry backbone. The DVGT-2 arms use the released frozen DVGT-2 encoder features computed from undistorted images. The VLM dense grid, extracted from the raw images, is transformed into the undistorted camera frame by calibration-derived bilinear feature resampling, and the same corrected intrinsics define the ray descrip-tors of both sources. The two global VLM tokens are kept unchanged. The geometry-only and fused DVGT-2 plan-ners each train a new downstream head on the full 72 ,902 -example training set with the main recipe. 
+
+B.7. Feature-level controls 
+
+Setup. Table 7 uses three cameras, three-frame geome-try histories, and a current-frame 17 × 30 grid per camera. Each configuration trains its adapters, fusion interface, and planner from scratch with the main recipe (Table S1), and CAT3/DUP3 and LP-LATE/LP-PAIR use the same training sample order within each pair. 
+
+Geometry-depth control. The final-layer fusion row reuses the main model of Tables 1 and 2, which fuses final-layer geometry and VLM features into one bank. The geometry-depth comparison is CAT3 versus DUP3. O4, O17, and O23 denote zero-indexed geometry taps. CAT3 uses an independent geometry adapter for each tap; DUP3 applies three independent adapters to the same raw O23 fea-ture. A shared VLM projection and shared fusion MLP serve all banks. All fused banks enter the shared key/value memory of every decoder layer. Context is retained once. For three banks, dense attention logits receive a − log 3 bias to control the increased dense-versus-context multiplicity. CAT3 and DUP3 have the same number of trainable param-eters and the same memory size. 
+
+Cross-source layer-pairing control. LP-LATE and LP-PAIR extract both frozen representations for each sample. The VLM receives 960 × 544 current-view images. Its se-lected states are image-token outputs of language-decoder blocks 14 and 28. Block 14 is passed through the frozen final RMSNorm; block 28 is already normalized. Geome-try uses O17 and O23, where O17 is a deep intermediate tap. LP-LATE uses block 28 for both banks, whereas LP-PAIR uses block 14 with O17 and block 28 with O23. As in CAT3, each bank has its own geometry adapter, and the VLM projection and fusion MLP are shared. Both banks enter every decoder layer’s main memory, with a − log 2 
+
+dense-logit bias. Late-layer geometry context and global VLM tokens are retained once in both arms. 
+
+## C. Evaluation and Diagnostic Protocols 
+
+C.1. External baselines and aggregation 
+
+Published NavTest rows follow the comparison in Wang et al. [36]; AutoVLA and ReCogDrive use its supervised-fine-tuning setting. Camera counts in Table 2 denote dis-tinct physical views consumed by each model before any image stitching. The NAVSIM reproductions of UniAD and PARA-Drive use all eight views, whereas Latent TransFuser and TransFuser use the three front-facing views [8]; Trans-Fuser additionally uses LiDAR. DiffusionDrive retains the TransFuser camera and LiDAR setup [23]. LFG uses a single monocular front camera [30]. AutoVLA, ReCog-Drive, and VGGDrive use the front-left, front, and front-right views [19, 36, 48]. The DVGT-2 NavTest row reports the official result of Zuo et al. [49] for its released check-point with eight views, the same checkpoint that we evalu-ate on NavHard. The DVGT-2-NAVSIM row reports their official result after fine-tuning DVGT-2 on NAVSIM with eight views and four frames. 14 All our baseline evaluations use the official checkpoints released by the authors, without additional training or fine-tuning. For VGGDrive, we run the official NAVSIM check-point and inference code on both NavTest and NavHard, with a causal prompt that contains only information avail-able at inference time. For DVGT-2, we evaluate the official base checkpoint on NavHard with eight views, four frames, and official image undistortion. For external baselines predicting only (x, y ), head-ings are constructed with a forward tangent at non-terminal points and a consistent terminal conven-tion. The NavHard result is read from the official 
+
+extended pdm score combined summary, which combines the two stages at the scenario level before averaging. Every model in Tables 4, 5, 7, and S2 is scored on all 12 ,146 NavTest scenarios and 5,912 NavHard observations, and NavTest component values and PDMS are scenario-weighted means. 
+
+C.2. Closed-loop protocol and further results 
+
+Scenarios and simulator. The HUGSIM benchmark de-fines 436 scenarios. We exclude the same 16 for every method because the released simulator code cannot run them: the 15 PandaSet medium scenarios with index 02, which its constant-velocity planner rejects, and one Waymo hard scenario whose scenario file specifies an invalid start velocity. We made one fix to the released code, an out-of-range read of the route-command list on the final, route-complete step; it affected two episodes, which were rerun. Every method is scored on all 420 remaining scenarios. 
+
+Inputs. The simulator renders the front-left, front, and front-right cameras with the median NAVSIM front-rig cal-ibration, with the front camera placed at the reconstruc-tion’s front camera. Planners receive camera history at 2 Hz; before enough history exists at the start of an episode, it is filled by constant-speed back-extrapolation. LTF runs through HUGSIM’s NAVSIM client. DVGT-2 runs its re-leased checkpoint on the three front cameras at three times-tamps, the camera setup of the DVGT-2 arms in Table 6, because HUGSIM cannot faithfully render the rear and side views of its native eight-camera input for all datasets. VG-GDrive runs its official NAVSIM checkpoint on the three current views with the causal prompt of Sec. C.1; an un-parseable output falls back to a constant-velocity plan for that step, which happened in 18 of 8,561 steps. The simula-tor waits for each plan, so planning latency does not affect the outcome. 
+
+Results by dataset. Table S6 breaks HD-Score down by source dataset. KITTI-360 is the hardest for every method. 
+
+Run-to-run variation. Closed-loop episodes are not bit-reproducible, because non-deterministic GPU kernels change the first plan by a few centimeters and the loop am-plifies the difference. We reran VLG-D RIVE on 54 scenar-                         
+
+> Table S6. Closed-loop HD-Score by source dataset (percent; number of scenarios in parentheses). Method nuScenes Waymo KITTI-360 PandaSet (88) (107) (113) (112) LTF 34.5 21.7 2.3 29.3 VGGDrive 12.0 11.9 1.7 17.7 DVGT-2 15.3 19.0 7.1 23.0 VLG-D RIVE 29.8 35.0 6.7 33.4
+
+ios on the same GPU model and on 55 scenarios on a differ-ent GPU model. The HD-Score of a single episode varies between runs with a standard deviation of 12 points on the same GPU model and 16 points across GPU models, but the mean over the rerun scenarios moves by only −0.4 points (95% interval [−4.9, 4.1] ) and +1 .4 points ( [−4.4, 7.3] ), re-spectively. Every episode of VLG-D RIVE in Table 3 ran on the same GPU model (RTX 6000 Ada), so over 420 sce-narios this run-to-run noise changes its mean by under one point. 
+
+C.3. Computational cost 
+
+Table S7 summarizes training and inference cost. VLG-DRIVE trains only its interface and planner on cached en-coder outputs; the caches are computed once per source and reused by all runs that share it. Inference runs both frozen encoders online for every step, and the 2B VLM dominates its latency: it accounts for 65 of the 87 TFLOPs per step and the geometry encoder for 22 , so the geometry-only planner needs a quarter of the compute and 40% of the latency. VLG-D RIVE needs slightly more compute per step than VGGDrive but runs 2.7 times faster, because VG-GDrive generates about 99 tokens per step one after an-other; each token adds only 0.015 TFLOPs but needs its own pass through the 7B model. Of the planners we mea-sured, DVGT-2 needs the least compute, and its latency is close to that of the geometry-only planner. Training VLG-DRIVE , including the one-time caches, takes about 58 GPU-hours, whereas DVGT-2 reports about ten days on 64 H20 GPUs. 
+
+C.4. Robustness to calibration errors 
+
+Both feature grids index the same camera image, so the pair-ing of VLM and geometry features does not depend on cal-ibration. Calibration enters only through the ray encoding of Equation 4. Table S8 perturbs the intrinsics and camera-to-ego extrinsics used by this encoding at test time, without retraining, and, as a direct test of the correspondence, shifts the VLM grid by one cell relative to the geometry grid. For every scenario and camera, with a fixed seed, a ro-tation turns the camera-to-ego extrinsic by the given angle about a random axis, a translation moves the camera by 15 Table S7. Training and inference cost. Latency is the median per-step planning time and memory the peak GPU memory in HUGSIM on one RTX 6000 Ada. FLOPs are counted for one plan-ning step on HUGSIM input (three 1920 ×1080 cameras and the history each planner uses), over matrix multiplications, convolu-tions, and attention, with one multiply-add counted as two FLOPs. Total parameters are those loaded for inference. † Reported in the respective paper; n/r: not reported. Method Total Trainable Training Latency Memory TFLOPs params params (GPU-h) (ms) (GiB) per step VLG-D RIVE 3.38B 106.1M 29 a 1123 9.8 87.0 Geometry only (G) 1.25B 103.0M 27 a 450 5.3 21.7 VGGDrive 9.39B 8.48B b n/r b 3028 21.6 77.0 DVGT-2 1.71B 1.71B c ≈15,000 †c 425 11.4 15.5        
+
+> a24,000 updates on 8 RTX PRO 6000 GPUs (about 3.6 h for VLG-DRIVE ; G is about 5% faster per update), plus about 29 GPU-h, once, to cache the VLM and geometry features. bThe second stage fine-tunes the VLM and the geometry adapter with VGGT frozen; 7.81B if the vision en-coder is also frozen, which the paper does not state. Two plus two epochs on 16 H200 GPUs. cThe paper does not state which modules are frozen; the released configuration trains all parameters. About ten days on 64 H20 GPUs.
+
+Table S8. Perturbed calibration and correspondence at test time. NavTest PDMS and NavHard EPDMS in percent for the main model, without retraining. Each perturbation is drawn per scenario and camera and applied to all input frames. Perturbation PDMS ↑ EPDMS ↑
+
+None 88.27 31.78 Rotation, 1◦ 87.49 30.99 Rotation, 3◦ 83.01 26.84 Translation, 10 cm 87.25 30.42 Focal length, ±5% 87.87 31.88 VLM grid shifted by one cell 85.74 27.64 
+
+10 cm in a random direction, and a focal-length error scales 
+
+fx and fy by 1.05 or 0.95 with the principal point fixed. The same perturbation applies to all input frames of the sce-nario. The grid shift moves each camera’s VLM grid by one column, repeating the edge column, so that each VLM cell is paired with its horizontal neighbor in the geometry grid while the calibration stays exact. Small calibration errors cost about one point or less. A 
+
+1◦ rotation lowers PDMS by 0.78 and EPDMS by 0.79 , a 10 cm translation by 1.02 and 1.36 , and a 5% focal-length error changes them by −0.40 and +0 .10 . Larger rotations matter: at 3◦ the model loses 5.26 PDMS and 4.94 EPDMS, and its NavHard score falls below those of DVGT-2, Diffu-sionDrive, and GuideFlow in Table 1. Shifting the VLM grid by a single cell lowers PDMS by 2.53 and EPDMS by 
+
+4.14 , so the planner relies on the cell-wise correspondence between the two sources and not only on their presence. 
+
+C.5. Attention and spatial interventions 
+
+Where the planner reads. Planning queries place 99 .94% 
+
+of their cross-attention on the fused dense grid, which holds 
+
+96 .6% of the memory tokens. Within the grid, attention concentrates on the region the vehicle will traverse, as a projected reference-path tube occupies 2.19% of the dense cells but receives 12 .89% of the attention mass. Splitting the dense attention by camera and averaging within each command group shows that the reading follows the route command. Left-command scenes place 36 .9% of the atten-tion on the front-left camera and 23 .6% on the front-right camera; right-command scenes reverse this ordering, with 
+
+15 .1% and 32 .8% . Straight-command scenes concentrate 
+
+59 .5% of the attention on the front camera, and scenes with-out a known command spread it nearly evenly across the three views. The same fused memory is therefore read dif-ferently according to the requested maneuver. 
+
+Attended locations drive the prediction. To test whether this attention reflects reliance [12, 40], we replace selected features with the mean dense feature of the same camera in every decoder layer and recompute the trajectories. Replac-ing the top 5% of attended cells shifts waypoints by 0.717 
+
+m, compared with 0.066 m for equal-size random cells and 
+
+0.0009 m for the bottom 5% . Replacing the path tube it-self shifts waypoints by 0.414 m, compared with 0.043 mfor an equal-size random control. The planner’s predictions therefore depend on a small set of localized memory cells concentrated along the driving path. 
+
+Protocol. The analysis uses the VLG-D RIVE model re-ported in Tables 1 and 2. The diagnostic set is drawn from the 3,373 validation samples by taking, within each com-mand group (left, straight, right, and unknown), one scene from each of the low, middle, and high trajectory-error strata, so that it spans every route command and a range of difficulty. Cross-attention is recovered for all decoder layers, atten-tion heads, and planning queries by replaying the observed attention calls with their masks; the recomputed outputs match the original calls to within 1.91 × 10 −5. Quantita-tive measurements use the native attention grid. In every decoder layer, selected dense key/value inputs are replaced by the mean dense feature from the same cam-era. The top and bottom 5% of attended cells are compared with three random selections of the same size. A second in-tervention targets a one-cell-radius neighborhood of valid, visible projected reference waypoints, using equal-size ran-dom controls. Projection uses (x, y, 0) and calibrated cam-era transforms, since the trajectory’s third channel is head-ing. Invisible reference nodes are omitted, and the reference trajectory serves only to define the diagnostic region. The reported shift is the mean distance between the per-turbed and original predicted waypoints. Averaged over scenes, the path tube receives 6.74 × its share of cells in 16 attention mass. 
+
+C.6. Qualitative examples and failure cases 
+
+Selection. Drivable-area compliance (DAC) is the lowest of the four multiplicative components of VLG-D RIVE in Stage 2 of NavHard (NC, DAC, DDC, and TLC in Table 1), so we look at the plans that leave the drivable area. Fig-ure S1 compares the main system (F) with the VGGT-Ω
+
+geometry-only planner (G) of Table 6 on Stage-2 starts at which DAC is the only one of these components that G fails, F passes all of them, and both planners score above zero from the recorded start of the same scene. A random sam-ple with a fixed seed gives twelve such starts from different scenes; Figure 3 of the paper shows three of them, chosen for legibility, and Figure S1 shows the other nine. Figure S2 shows failures of F alone, sampled without reference to any other planner: a random sample with a fixed seed of six Stage-2 starts from different scenes at which DAC is the only one of these components that F fails, and at which F scores above zero from the recorded start of the same scene. 
+
+Examples. In Figure S1, G leaves the road at forks and bends (a, b, e, f), at the corner of an intersection (h), and over the edge of a lane (d, g, i), while the plan of F stays inside the drivable area. In (c) a corner of the footprint of G falls into a narrow gap between the lane and the parking area in the map. In several of these starts the two plans nearly coincide, and a small lateral offset at the road edge decides the outcome. 
+
+Failure cases. In Figure S2, the plans continue along the road, and the footprint leaves it sideways. In four starts the footprint begins within 0.2 m of the edge of the drivable area (b, c, d, f). It crosses that edge in (b), (c), and (f), and the plan then brings it back inside; in (d) it stays over the edge of a narrow lane. In the other two starts the road bends. In (a) the plan runs wide of a left bend and does not return within the horizon, and in (e) the front left corner crosses the outside edge of a right bend at the end of the plan. 
+
+What the failing starts share. Over all Stage-2 starts, those at which F fails DAC differ from those at which it passes in the same two respects. The failing starts begin closer to the edge of the drivable area: the median distance from the edge to the closest corner of the footprint is 1.1 m, against 1.6 m. Their routes also bend more: over the next 
+
+25 m, where the route extends that far, the median head-ing change of its centerline is 19 ◦, against 4◦. The speed at the start is similar, with medians of 4.1 and 3.8 m/s. The distributions overlap, so these are tendencies. The training objective contains no term on the road boundary: its tar-gets are the logged ego motion and the outputs of the frozen encoders (Equation 7). Adding a drivable-area term during training is a natural next step for these failures. 17 (a) (b) (c) 
+
+(d) (e) (f) 
+
+(g) (h) (i)    
+
+> Geometry only (G) VLG-Drive (F) Drivable-area boundary Footprint off the drivable area
+
+Figure S1. Further starts at which only the geometry-only planner leaves the drivable area. Stage-2 starts of NavHard; the nine sampled starts that are not shown in Figure 3 of the paper. Each panel shows the three front views (top) and a bird’s-eye view (bottom) with the plans of G (orange) and VLG-D RIVE (F, blue). Outlines show the simulated ego footprint, and red dashed ones leave the drivable area (black line). G fails drivable-area compliance at every start and F passes it. 
+
+18 (a) (b) (c) 
+
+(d) (e) (f)   
+
+> VLG-Drive (F) Drivable-area boundary Footprint off the drivable area
+
+Figure S2. Failure cases of VLG-D RIVE (F). Six sampled Stage-2 starts of NavHard at which F leaves the drivable area. Each panel shows the three front views (top) and a bird’s-eye view (bottom) with the plan of F (blue). Outlines show the simulated ego footprint, and red dashed ones leave the drivable area (black line). 
+
+19

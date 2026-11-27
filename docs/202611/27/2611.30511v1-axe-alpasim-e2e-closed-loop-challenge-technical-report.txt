@@ -1,0 +1,524 @@
+Title: AXE: AlpaSim E2E Closed Loop Challenge Technical Report
+
+URL Source: https://arxiv.org/pdf/2611.30511v1
+
+Published Time: Tue, 24 Nov 2026 05:16:26 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# AXE: AlpaSim E2E Closed Loop Challenge Technical Report 
+
+Joonhee Lim † Seonmyeong Lee ‡ Sihwan Hwang ‡ Hanbin Jang ‡ Hiwon Shin ‡ Dogun Kim ‡
+
+Hyelin Jo ‡ Hyeonjun Jeong ‡ Yongjae Lee Junseong Kwak Junhyeok Park Satyam Mishra Juyeb Shin Uisung Kim Hyeonseo Kim Saparkhan Kassymbekov Hailemichael Molla Gashaw Abi Rahman Syamil Mingyu Kim Hyeongjun Kim Yeina Lee Moogeun Park Dongsuk Kum ∗
+
+KAIST AXE Lab 
+
+kingear3@kaist.ac.kr † dskum@kaist.ac.kr ∗†Project lead ‡Part lead ∗Corresponding author 
+
+Abstract 
+
+This report presents a comprehensive pipeline for developing an end-to-end (E2E) autonomous driving model for the Physical AI AV Track. The framework con-sists of data curation, HD map auto-labelling, data-driven imitation learning, and simulator-based reinforcement learning. To ensure safety in the closed-loop set-ting, we introduce a selection-based E2E planning approach that leverages ob-ject detection and BEV segmentation to filter out trajectory candidates likely to cause collisions or off-road driving. Trained on NVIDIA NuRec and the NVIDIA PAI-AV dataset, our method scores a fixed vocabulary of trajectory candidates for collision, drivable-area compliance, and progress learned from simulated rollouts, and selects the best candidate that passes the filter. This design highlights the ef-fectiveness of combining E2E planning with perception-based trajectory filtering for safe and reliable closed-loop autonomous driving. 
+
+1 Method summary 
+
+Our proposed method for the Physical AI AV Track comprises an end-to-end (E2E) autonomous driving pipeline designed to achieve robust performance in closed-loop execution. As illustrated in Figure 1, the framework follows a sequential development and training pipeline comprising five core stages, from data curation and imitation learning to reinforcement learning-based policy refinement. 1. Data Curation: We curate 1,400 additional PAI-AV clips using scenario-based, semantic, and spatiotemporal feature-based selection to address coverage gaps and model failures. The selected clips are subsequently auto-labeled and used for end-to-end policy training. 2. HD Map Auto-labeling: HD map annotations for the PAI-AV dataset are automatically generated using a 3DGS-based method. We extend PseudoMapTrainer [1] with LiDAR supervision and DINOv3 [2] distillation to ensure annotation quality. 3. End-to-End Autonomous Driving Model: We develop an E2E architecture that encodes multi-view temporal observations into a BEV representation and selects a safe trajectory from 8,192 candidates via perception-based feasibility checks and coarse-to-fine scoring. 4. Data-driven Imitation Learning: We train the E2E model on NVIDIA NuRec data and auto-labeled PAI-AV data using perception, imitation, and scoring losses. 5. Simulator-based Reinforcement Learning: Finally, to address compounding errors and enhance robustness in out-of-distribution states, we fine-tune the policy using reinforce-ment learning within a realistic closed-loop simulator, NVIDIA AlpaSim. arXiv:2611.30511v1 [cs.RO] 23 Nov 2026 Curated Clips  
+
+> IL Model RL Policy
+> NVIDIA PAI
+> 300,000 Clips
+> Data Curation
+> Clip Selection
+> HD Map Auto-labeling
+> Map Labeling
+> 3DOD Labeling
+> Provided by Visionary
+> E2E Model Development
+> Data-based IL
+> AlpaGym
+> Simulator-based RL
+> NuRec
+> 2,200 Clips
+> Curated Data
+> Labeled Data
+> Det Labels Map Labels Curated Clips
+
+Figure 1: Comprehensive workflow for end-to-end model development. 
+
+2 Policy description 
+
+2.1 Data Curation 
+
+We curate complementary driving clips to address scenario imbalance and model failures while lim-iting map-refinement effort. Starting from approximately 2K NuRec clips, we select additional data from a labeled 10K-clip subset of NVIDIA Physical AI (PAI), which contains approximately 300K clips overall. We retain the relatively accurate PAI object annotations and refine map annotations for selected clips before training. To select informative clips for downstream policy training, we apply three complementary selection strategies and select a total of 1,400 PAI-AV clips. 
+
+Scenario-based Selection. We characterize clips using longitudinal and lateral ego motion and the distribution of surrounding objects to identify scenarios underrepresented in NuRec. We initially select clips to improve scenario coverage, including rare lane-change maneuvers. After initial model training, we select clips resembling low-scoring or failed scenarios, including turning maneuvers and high-speed straight driving. 
+
+VLM-guided Scene Selection. To capture context beyond predefined scenario labels, we use a pretrained VLM to generate scene descriptions and tags. These guide the selection of clips with contexts similar to model failures, while visual inspection helps identify rare cases for fine-tuning. 
+
+Scene-embedding-based Selection. We further select clips using distances between spatiotem-poral scene embeddings extracted by SparseDrive. A hierarchical scene encoder aggregates sparse object and map tokens within each frame and models their temporal evolution to obtain clip-level embeddings. These embeddings guide selection based on novelty relative to existing training data and similarity to failure scenarios. 
+
+2.2 HD Map Auto-labeling 
+
+We extend PseudoMapTrainer [1] and have developed our own auto-labeling framework to generate HD map annotations for downstream driving model training. 
+
+Semantic Road Surface Reconstruction. PseudoMapTrainer only optimizes road surface Gaus-sians with perspective view RGB and semantic label images. This may result in inconsistent re-construction due to inconsistencies across the multi-view images. To address such limitations, we leverage auxiliary supervision from static point cloud reconstruction using LiDAR observations. In addition, we introduce DINOv3 [2] latent embedding to each Gaussian representation to boost multi-view consistency. 
+
+Semantic HD Map Pseudo-Label Generation. The resulting semantically enhanced road Gaus-sian representation is rendered into ego-centric semantic Bird’s-Eye-View (BEV) maps, which serve as pseudo-labels for downstream driving model training. 22.3 End-to-End Autonomous Driving Model 
+
+Our method formulates trajectory planning as selection from a fixed vocabulary of 8,192 candidate trajectories. The model encodes multi-view temporal observations into a bird’s-eye-view (BEV) representation and leverages perception outputs to filter infeasible candidates based on drivable-area constraints and object collisions, promoting safe driving. The remaining candidates are ranked through a coarse-to-fine scoring pipeline [3] to select a single trajectory for closed-loop execution. 
+
+Inputs and BEV Encoding. The model takes three temporal frames ( t − 1.0, t − 0.5, and t) from three front and front-side cameras ( 512 × 256 ), the current frame from the two rear cameras ( 512 ×
+
+256 each), along with ego state and 20 route waypoints. A DINOv3-pretrained ViT-S backbone [2] and a three-layer BEVFormer encoder [4] produce a 112 ×112 BEV grid, where ego-motion-aligned temporal features are fused via convolution. The two rear views are encoded separately by the same ViT-S, without temporal fusion or BEV projection, and pooled into 256 rear tokens. 
+
+Trajectory Scoring and Selection. A three-layer transformer decoder scores 8,192 candidate tra-jectories from a fixed k-means trajectory vocabulary using 56 × 56 pooled BEV tokens, the 256 rear tokens, route features, and ego state. The scoring heads predict no-fault collision (NC), drivable-area compliance (DAC), ego progress (EP), their product (the overall scene score), and imitation similarity. A coarse-to-fine pipeline [3] ranks all candidates and re-scores the top 256 with a sep-arate refinement decoder over the same pooled BEV features and rear tokens. A perception-based feasibility gate, derived from perception heads operating on the same BEV representation, penalizes candidates that violate drivable-area constraints or overlap with detected objects. The highest-ranked candidate is output as a sequence of 40 poses (x, y, θ ) at 0.1 s intervals over a 4 s horizon and tracked by an MPC controller. 
+
+2.4 Data-driven Imitation Learning 
+
+During the imitation learning stage, the E2E model is trained on real-world driving logs using joint perception and planning objectives to learn scene understanding and trajectory selection. Focal loss [5] is used for 3D object classification, L1 loss with Hungarian matching [6] for bounding-box regression, and class-weighted cross-entropy for BEV segmentation. Soft cross-entropy is used to imitate recorded trajectories, while auxiliary losses predict simulator-generated NC, DAC, and EP labels and their product. Both planning losses are applied to all 8,192 candidates at the coarse stage and the top 256 at the fine stage. Further details are provided in Appendix A.4. 
+
+2.5 Simulator-based Reinforcement Learning 
+
+For online reinforcement learning (RL), we utilize the 3D Gaussian Splatting (3DGS)-based simu-lator, NVIDIA AlpaSim. To mitigate the computational overhead of 3DGS rendering and alleviate long-horizon credit assignment challenges, the RL agent interacts with the environment at a down-sampled frequency of 2 Hz, derived from the native 10 Hz simulation rate. We employ Proximal Policy Optimization (PPO) [7] for online policy optimization. The episode reward decomposes into a step-wise function rt = RC t · LD t − Cor t − Tt, where RC t ∈ [0 , 1] and LD t ∈ [0 , 1] denote route completion and normalized lateral alignment, respectively. Cor t ∈ [0 , 1] is the corridor penalty for lateral distances between 1 m and 4 m. Tt ∈ { 0, 1} is a hard constraint penalty triggered by safety violations (e.g., collisions, off-road driving, or boundary cross-overs), which terminates the episode immediately upon violation. 
+
+3 Resources and training 
+
+3.1 Data Curation 
+
+For additional training data, we use a labeled subset of approximately 10K clips from the NVIDIA PAI-AV dataset, which contains approximately 300K clips in total. We apply three complementary selection paradigms across four curation rounds: scenario-based coverage and failure-aware selec-tion, semantic retrieval using Qwen-based scene metadata [8], and feature-space selection using temporal scene representations extracted by SparseDrive [9]. The SparseDrive model used for fea-ture extraction was trained on an approximately 1K-clip subset of the labeled PAI data. Following 3deduplication across the curation rounds, 1,400 unique PAI-AV clips were retained. Their map an-notations were generated using the HD Map Auto-labeling pipeline described in Sec. 2.2 and 3.2, while the available object annotations were retained. The resulting labeled PAI-AV clips were com-bined with the NuRec clips for downstream end-to-end policy training. The selected datasets and models were used according to their respective usage terms and are listed in the references. 
+
+3.2 HD Map Auto-labeling 
+
+We generate HD map annotations on the curated NVIDIA PAI-AV clips using multi-view camera images, LiDAR point clouds, and ego poses. Our pipeline builds upon PseudoMapTrainer [1] for road surface reconstruction using Gaussian representation. For semantic label for Gaussian opti-mization, we employ off-the-shelf Mask2Former [10], trained on MapillaryVistasV2 [11] dataset, to extract semantic label predictions. We additionally use pretrained DINOv3 [2] ViT-L model to provide rich feature optimization. 
+
+3.3 End-to-End Autonomous Driving Model 
+
+The image backbone uses publicly available pre-trained DINOv3 weights [2], the BEV encoder follows the BEVFormer architecture [4], and trajectory scoring is based on DriveSuprim [3]. 
+
+3.4 Data-driven Imitation Learning 
+
+We train on NVIDIA NuRec 26.01 and 26.04 together with clips from the NVIDIA PAI-AV dataset. For NuRec, 3D bounding boxes and BEV drivable-area labels come from the provided annotations and maps. For PAI-AV, 3D bounding boxes are obtained by auto-labeling, and we additionally auto-label a BEV drivable-area raster for every frame, which serves both as the segmentation target and as the drivable area for DAC scoring. Planner labels are generated by tracking each of the 8,192 vocabulary trajectories with an MPC controller and scoring the rollout with NC, DAC, EP, and their product, with EP set to zero for lateral deviations exceeding 4 m from the GT trajectory. Training proceeds in three stages: 20 epochs of perception-only training, 5 epochs with frozen backbone and BEV encoder, and 5 epochs of joint training. We use AdamW [12] with a learning rate of 10 −4 and weight decay of 0.01; each stage starts with a 500-iteration linear warmup, followed by a cosine decay to 10 −6 scheduled over 30 epochs and truncated at the end of the stage. Training uses a batch size of 64 across four NVIDIA H200 GPUs. Further details are provided in Appendix A.4. 
+
+3.5 Simulator-based Reinforcement Learning 
+
+Closed-loop RL fine-tuning is conducted on AlpaSim using 1,761 training and 441 validation NuRec scenes across 48 parallel simulator sessions at a 2 Hz control frequency. Keeping the pretrained IL policy (48.3M parameters) fully frozen, we train only 0.54M LoRA [13] parameters placed on plan-ner’s transformer decoder layers and a separate 1.78M critic network. We fine-tune using PPO [7] with an exact KL penalty ( β = 0 .02 ) relative to the SFT policy, optimized via AdamW [12] at a constant learning rate of 1 × 10 −4 and a rollout buffer batch size of 2,048 steps (minibatch size 512) for 17 epochs across 8× NVIDIA H100 GPUs. 
+
+4 Limitations and safety considerations 
+
+Failure Modes. The planner selects from a fixed set of 8,192 trajectories clustered from recorded driving, so maneuvers outside this set (e.g., tight U-turns or multi-point turns) cannot be produced, and rare situations are covered by fewer nearby candidates. 
+
+Limitations. Trajectories are scored and selected using collision avoidance, drivable-area compli-ance, ego progress, and imitation. Ride comfort (e.g., acceleration, jerk, and yaw rate) is not part of the selection criteria, so the chosen trajectories can be less smooth than human driving. 
+
+Safety Considerations. The candidate filter relies on the model’s own front-view BEV perception, so missed detections and rear agents, seen by the planner only through rear-camera tokens, can pass it. Traffic-light state is not part of the planner labels, so the planner can proceed through a red light. 4Acknowledgments 
+
+We thank Visionary for providing 3D object annotations. This research was supported by the Ad-vanced GPU Utilization Support Program funded by the Government of the Republic of Korea (Ministry of Science and ICT). 
+
+References 
+
+[1] C. Löwens, T. Funke, J. Xie, and A. P. Condurache, “Pseudomaptrainer: Learning online map-ping without hd maps,” in 2025 IEEE/CVF International Conference on Computer Vision (ICCV) . IEEE, 2025, pp. 5263–5272. [2] O. Siméoni, H. V. Vo, M. Seitzer, F. Baldassarre, M. Oquab, C. Jose, V. Khalidov, M. Szafraniec, S. Yi, M. Ramamonjisoa et al. , “Dinov3,” arXiv preprint arXiv:2508.10104 ,2025. [3] W. Yao, Z. Li, S. Lan, Z. Wang, X. Sun, J. M. Alvarez, and Z. Wu, “Drivesuprim: Towards precise trajectory selection for end-to-end planning,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 40, no. 14, 2026, pp. 11 910–11 918. [4] Z. Li, W. Wang, H. Li, E. Xie, C. Sima, T. Lu, Q. Yu, and J. Dai, “Bevformer: learning bird’s-eye-view representation from lidar-camera via spatiotemporal transformers,” IEEE Transac-tions on Pattern Analysis and Machine Intelligence , vol. 47, no. 3, pp. 2020–2036, 2024. [5] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Dollár, “Focal loss for dense object detection,” in 
+
+Proceedings of the IEEE international conference on computer vision , 2017, pp. 2980–2988. [6] N. Carion, F. Massa, G. Synnaeve, N. Usunier, A. Kirillov, and S. Zagoruyko, “End-to-end object detection with transformers,” in European conference on computer vision . Springer, 2020, pp. 213–229. [7] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Proximal policy optimiza-tion algorithms,” arXiv preprint arXiv:1707.06347 , 2017. [8] Qwen Team, “Qwen3.6-27B: Flagship-level coding in a 27b dense model,” April 2026. [Online]. Available: https://qwen.ai/blog?id=qwen3.6-27b [9] W. Sun, X. Lin, Y. Shi, C. Zhang, H. Wu, and S. Zheng, “Sparsedrive: End-to-end autonomous driving via sparse scene representation,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 8795–8801. [10] B. Cheng, I. Misra, A. G. Schwing, A. Kirillov, and R. Girdhar, “Masked-attention mask trans-former for universal image segmentation,” in 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . IEEE, 2022, pp. 1280–1289. [11] G. Neuhold, T. Ollmann, S. Rota Bulo, and P. Kontschieder, “The mapillary vistas dataset for semantic understanding of street scenes,” in Proceedings of the IEEE international conference on computer vision , 2017, pp. 4990–4999. [12] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” arXiv preprint arXiv:1711.05101 , 2017. [13] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen, “Lora: Low-rank adaptation of large language models,” arXiv preprint arXiv:2106.09685 , 2021. [14] Z. Feng, W. Wu, T. Deng, and H. Wang, “Rogs: Large scale road surface reconstruction with meshgrid gaussian,” arXiv preprint arXiv:2405.14342 , 2024. [15] S. Woo, S. Debnath, R. Hu, X. Chen, Z. Liu, I. S. Kweon, and S. Xie, “Convnext v2: Co-designing and scaling convnets with masked autoencoders,” in 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . Ieee, 2023, pp. 16 133–16 142. [16] J. Schulman, P. Moritz, S. Levine, M. Jordan, and P. Abbeel, “High-dimensional continuous control using generalized advantage estimation,” 2018. [Online]. Available: https://arxiv.org/abs/1506.02438 5A Additional details 
+
+A.1 Data Curation 
+
+We curate 1,400 PAI clips from a candidate pool of 9,924. The pool is built in two steps: we first filter the full NVIDIA PAI release by country and vehicle platform, so that calibration and traffic conventions stay consistent, and then apply data selection. Every clip in the pool is then auto-labelled with our own pipeline for ego trajectory, objects and map information, so all curation operates on a common set of annotations. Three complementary strategies draw from this pool. Sec. A.1.1 selects over explicit clip attributes, Sec. A.1.2 retrieves over VLM semantic tags, and Sec. A.1.3 selects in a learned latent space. Figure 2 summarizes the scenario distribution of the curated subset, while Fig. 3 shows how it supplements NuRec along the scenario axes defined in Sec. A.1.1. Straight (<20°) Left (20–45°) Left (45–90°) Left (≥90°) Right (20–45°) Right (45–90°) Right (≥90°) 495 92 124 195 102 175 217 
+
+Turn direction and heading range 
+
+> Left only Right only Both directions No lane change Unavailable 177 119 13 1,089 2
+
+Lane-change category 
+
+> <20° 20–45° 45–90° ≥90° 495 194 299 412
+
+Ego heading range (20 s) 
+
+> <3 3–7 7–12 12–18 >18 137 382 329 246 306
+
+Median ego speed (m/s) 
+
+> <50 50–150 150–300 300–600 >600 57 505 452 304 82
+
+Travel distance (20 s; m)      
+
+> 04812 16 20 Hour of day
+> 050 100 150
+> Clips
+
+Recording time      
+
+> 1357911 Month
+> 050 100 150 200 250
+> Clips
+
+Recording month 
+
+> <2,000 2,000–5,000 5,000–10,000 10,000–20,000 >20,000 282 348 354 313 103
+
+Obstacle annotations per clip 
+
+Figure 2: Scenario distribution of the PAI subset curated by data selection strategies. Each panel reports the 1,400 clips grouped by one clip-level attribute, and the numbers are clip counts. Constant Accel Decel Mixed Hard accel Hard brake   
+
+> 0500 1000 1500 2000
+> Clips
+> +658 +298 +327 +69 +41 +7
+
+Longitudinal      
+
+> NuRec Curated subset (1,400 clips)
+> Straight Left Right Large left Large right
+> 0500 1000 1500 2000
+> Clips
+> +711 +215 +315 +97 +62
+
+Lateral       
+
+> None O PPO CCO CP CPO
+> 0200 400 600 800 1000 1200
+> Clips
+> +259 +118 +47 +19 +403 +258 +156 +140
+
+Dynamic objects 
+
+Figure 3: Scenario coverage of NuRec (Light blue) before and after compensation by the curated subset (Blue). Bar labels give the number of clips the curation adds to each class. The dynamic-object panel shows the eight combinations of vehicle (C), pedestrian (P) and other (O) presence. 6Table 1: Longitudinal scenario classes. # Scenario Criterion 1 Hard braking ˆa− < T ˆa−
+
+2 Hard acceleration ˆa+ > T ˆa+
+
+3 Accelerating I+ ≥ TI+
+
+4 Decelerating I− ≥ TI−
+
+5 Mixed I+ ≥ TI+ , I − ≥ TI−
+
+6 Constant speed otherwise Table 2: Lateral scenario classes. # Scenario Criterion 1 Straight −30 ◦ < ∆ψ < 30 ◦
+
+2 Left turn −100 ◦ < ∆ψ ≤ − 30 ◦
+
+3 Right turn 30 ◦ ≤ ∆ψ < 100 ◦
+
+4 Large left −180 ◦ < ∆ψ ≤ − 100 ◦
+
+5 Large right 100 ◦ ≤ ∆ψ < 180 ◦
+
+A.1.1 Scenario-based Data Selection 
+
+Our first selection pass targets the gaps in NuRec rather than the PAI pool itself. To make "gap" measurable we define a scenario taxonomy over three independent axes, namely longitudinal ego behaviour, lateral ego behaviour and the presence of surrounding dynamic objects, and label every clip on each axis from the obstacle annotations and ego-motion information. The axes yield 6 × 5 ×
+
+8 = 240 scenario cells. Characterising NuRec in these terms exposes which cells it covers thinly, and we then draw PAI clips from exactly those cells. 
+
+Longitudinal axis. Let ax(t) denote the longitudinal ego acceleration over a clip [t0, t 1], and let 
+
+a+ 
+
+> x
+
+(t) = max  ax(t), 0 and a− 
+
+> x
+
+(t) = min  ax(t), 0 denote its positive and negative parts. We summarise the clip by two peaks and two accumulated efforts, 
+
+ˆa+ = max  
+
+> t∈[t0,t 1]
+
+a+ 
+
+> x
+
+(t), ˆa− = min  
+
+> t∈[t0,t 1]
+
+a− 
+
+> x
+
+(t), I+ =
+
+Z t1
+
+> t0
+
+a+ 
+
+> x
+
+(t) dt, I− = −
+
+Z t1
+
+> t0
+
+a− 
+
+> x
+
+(t) dt, (1) where ˆa+ and ˆa− denote the peak acceleration and peak deceleration, and I+ and I− denote the total acceleration and deceleration accumulated over the clip. Peaks capture brief, sharp events while the integrals capture sustained effort, which separates a clip that accelerates steadily from one whose speed merely drifts. Table 1 lists the six behaviours each clip falls into under thresholds Tˆa+ = 3 
+
+and Tˆa− = −4 m/s 2 for the peaks and TI+ = 9 and TI− = 8 m/s for the integrals, set by inspecting clips at each value. 
+
+Lateral axis. Yaw change per unit time confounds turning with speed, so we measure yaw change over a fixed travelled distance instead. Let ψ(t) denote the ego heading and s(t) its position. For a window of 20 m, 
+
+∆ψ20m = ψ(t2) − ψ(t1) s.t. Xt2−0.1
+
+> t1
+
+s(t + 0 .1) − s(t) = 20 m , ∆ψ = max ∆ψ20m ,
+
+(2) where ∆ψ20m denotes the heading change accumulated over one such window and ∆ψ denotes the largest of these over the clip. Table 2 lists the five classes each clip is assigned by ∆ψ.
+
+Dynamic-object axis. Obstacle classes are grouped into vehicles (automobile ), pedes-trians (person ) and other objects (heavy_truck , trailer , bus , rider , stroller ,
+
+protruding_object , other_vehicle , train_or_tram_car , animal ). A group counts as present if any of its instances falls inside a region of interest around the ego at any point in the clip, taken as 4 m to either side, 30 m ahead and 10 m behind. The three groups give 23 = 8 combi-nations. 
+
+A.1.2 VLM-assisted Data Selection 
+
+The scenario taxonomy of Sec. A.1.1 describes how the ego moves and what surrounds it, but not what the scene is : a construction detour, a school bus unloading and an ambulance being followed all collapse into the same cell. We therefore tag the remaining pool of 5,258 clips with the pretrained Qwen3.6-27B [8] model and retrieve against the tags. 
+
+Fields and prompt. The fields follow the scenario-categorisation tags of ISO 34504, kept to what a single forward camera can judge over 20 s. With binary fields for the interactions a driving policy would have to handle, a free-text summary, a difficulty rating and a confidence, the schema has 27 
+
+fields, returned as one JSON object per clip. The ten fields whose reading is otherwise open are pinned by a plain-language definition in Table 3. 7Table 3: The ten fields pinned by a definition in the prompt. The rest are constrained by their permit-ted values alone. ∗ denotes a binary field, marked 1 when the event occurs at any point in the clip, which makes it a clip-level judgement rather than a per-frame one. Field Definition as given to the model 
+
+light bright = clear daylight, overcast = flat grey, dim_dusk = low sun or twilight with the sky still lit, dark_shadow = tunnel or deep shade 
+
+traffic_density low < 3 vehicles in view, medium 3–9, high ≥ 10 , over the clip 
+
+lanes_visible lanes in the ego’s direction of travel 
+
+lead_vehicle ∗ a vehicle directly ahead in the ego lane at any point 
+
+occluded_view ∗ a vehicle or structure hides a meaningful part of the forward view 
+
+cut_in ∗ another vehicle moves into the ego lane ahead 
+
+lead_brakes ∗ the lead vehicle visibly brakes or slows sharply 
+
+vru_near_path ∗ a pedestrian or cyclist is in, or moving into, the ego’s driving corridor 
+
+crossing_traffic ∗ a vehicle crosses the ego’s path, typically at a junction 
+
+difficulty how demanding this clip would be for a driving policy 
+
+Inference. The 32 frames sampled across 20 s are passed through the model’s video pathway, where the vision encoder pairs adjacent frames into 16 temporal steps, so motion between them is legible. 
+
+Selection. We query the tags in two ways. The first looks for clips whose tagged context resembles the scenarios the model fails on. The second looks for rare cases through tag combinations and the summaries. Candidates are reviewed as contact sheets showing the sampled frames with their tags beneath, and what we keep follows scarcity. Every accident or breakdown clip in the pool is taken and nearly every emergency-vehicle one, while the abundant VRU and construction categories are sampled sparsely. Figure 4 shows two of the clips kept this way. Although the taxonomy of Sec. A.1.1 places them in the same cell, both accelerating and straight, the summaries using VLM separate them on semantics, which is what lets the selection retrieve by scene context rather than by attributes alone. One ego waits at a signal with a stopped truck blocking its view before pulling away, while the other pulls away only once pedestrians have cleared a stop-sign crossing. 0.0 s 6.4 s 13.5 s 20.0 s                                                  
+
+> Scene Light overcast Traffic density medium Lanes visible 2
+> Interaction Lead vehicle 1Lead brakes 1Cut-in 0Crossing traffic 0VRU near path 1Occluded view 1
+> Summary The ego vehicle is initially stationary in an urban environment under an overpass, waiting behind a stopped SUV. A postal truck is stopped in the adjacent lane with workers unloading, and pedestrians are present near the vehicle. The ego vehicle proceeds through the intersection once the lead vehicle moves and the light is green.
+> Assessment Difficulty moderate Confidence 0.9
+> 0.0 s 6.4 s 13.5 s 20.0 s
+> Scene Light bright Traffic density medium Lanes visible 1
+> Interaction Lead vehicle 1Lead brakes 1Cut-in 0Crossing traffic 1VRU near path 1Occluded view 0
+> Summary The ego vehicle is stopped at an unsignalized intersection with stop signs, waiting for pedestrians to cross the street. A white sedan ahead also waits and then proceeds through the intersection as the pedestrians clear the path.
+> Assessment Difficulty moderate Confidence 0.9
+
+Figure 4: Two examples of the selected clips with our tag fields. Each panel shows the sampled frames given to the model, with the values it returned listed below them. (Top) A signalized crossing on an urban street under an elevated structure, with a postal truck stopped in the adjacent lane, and a lead vehicle braking ahead. (Bottom) An unsignalized crossing on an urban street, with pedestrians walking across the ego’s path, parked cars along kerbs and a lead vehicle waiting at the stop line. 8select_both.txt 
+
+> pool trained selected fail-case
+
+Figure 5: Illustrative visualization of an intermediate clip-selection run in the latent space. Colors indicate training clips (blue), failed evaluation clips (red), candidate clips (gray), and selected clips (green). The displayed selection is an intermediate diagnostic and does not represent the final number of curated clips. 80 60 40 20 0 20 40 60 80 
+
+> t-SNE 1
+> 60
+> 40
+> 20
+> 020 40 60
+> t-SNE 2
+> Global t-SNE colored by maneuver
+> left_turn mild_or_ambiguous_turn right_turn straight
+
+(a) Lateral motion 80 60 40 20 0 20 40 60 80  
+
+> t-SNE 1
+> 60
+> 40
+> 20
+> 020 40 60
+> t-SNE 2
+> Global t-SNE colored by Mean acceleration (m/s^2)
+> 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 Mean acceleration (m/s^2)
+
+(b) Longitudinal motion 80 60 40 20 0 20 40 60 80  
+
+> t-SNE 1
+> 60
+> 40
+> 20
+> 020 40 60
+> t-SNE 2
+> Global t-SNE colored by traffic_density
+> dense medium sparse
+
+(c) Traffic density 
+
+Figure 6: Visualization of clips in the latent space categorized by rule-based class labels: (a) lateral motion, (b) longitudinal motion (acceleration), and (c) traffic density. Features form reasonably well-separated clusters across the latent space for each class attribute. 
+
+A.1.3 Spatiotemporal Feature Diversity 
+
+Traditional rule-based scenario classification is limited by its inability to distinguish between dis-crete clips assigned to the same semantic class (e.g., straight driving, accelerating, or environments containing only vehicles). While suitable for initial data curation, this approach necessitates expan-sion into a continuous latent space for finer granularity. To address this, we use a scene encoder to extract clip-level spatiotemporal embeddings, which enable the identification and selection of novel and diverse driving clips. Figure 5 illustrates the sample selection process utilizing these latent embeddings. By leveraging the indices of previously trained and failed evaluation cases, we use the latent space distance to identify new samples that exhibit novel features and can potentially mitigate known failure modes. Specifically, we first filter for novelty by isolating clips that are distant from the existing training distribution, and subsequently prioritize clips situated in close proximity to the failed cases. Furthermore, we analyzed the latent space distributions annotated with rule-based class labels (Fig-ure 6) to evaluate whether the learned features naturally separate according to high-level semantic categories. The visualization qualitatively demonstrates that the extracted features form discernible clusters, particularly concerning lateral (Figure 6a) and longitudinal motion (Figure 6b). To validate that the latent distance metric effectively captures semantic similarity and dissimilarity, we conducted qualitative evaluations comparing an anchor scene against its nearest, random, and 9Anchor 
+
+> left_turn | v=6.4 | dv=12.8 stop=0.20 | dense
+> Anchor d=0.000
+> ped_crossing divider boundary
+> left_turn | v=4.8 | dv=9.4 stop=0.00 | dense
+> Nearest
+> Nearest1 d=0.079
+> left_turn | v=4.8 | dv=3.7 stop=0.10 | dense
+> Nearest2 d=0.105
+> left_turn | v=4.9 | dv=6.5 stop=0.15 | medium
+> Nearest3 d=0.110
+> left_turn | v=7.0 | dv=15.5 stop=0.15 | dense
+> Nearest4 d=0.121
+> left_turn | v=5.4 | dv=11.2 stop=0.10 | dense
+> Nearest5 d=0.122
+> left_turn | v=1.8 | dv=1.2 stop=0.00 | dense
+> Random
+> Random1 d=0.359
+> straight | v=2.6 | dv=-0.3 stop=0.00 | sparse
+> Random2 d=1.012
+> left_turn | v=6.0 | dv=13.1 stop=0.28 | medium
+> Random3 d=0.707
+> mild_or_ambiguous_turn | v=4.7 | dv=5.5 stop=0.07 | medium
+> Random4 d=0.972
+> left_turn | v=2.6 | dv=0.4 stop=0.12 | dense
+> Random5 d=0.420
+> right_turn | v=10.9 | dv=4.7 stop=0.00 | sparse
+> Farthest
+> Farthest1 d=1.898
+> right_turn | v=9.7 | dv=-11.9 stop=0.00 | sparse
+> Farthest2 d=1.839
+> straight | v=7.5 | dv=-5.1 stop=0.00 | sparse
+> Farthest3 d=1.825
+> right_turn | v=6.3 | dv=-3.9 stop=0.00 | sparse
+> Farthest4 d=1.822
+> right_turn | v=10.2 | dv=0.4 stop=0.00 | sparse
+> Farthest5 d=1.822
+
+A015 a0d0fe1c: anchor-neighbor semantic validation Figure 7: Qualitative validation of scene feature distance in the latent space. The top row displays the reference anchor scene ( d = 0 .000 ). Subsequent rows show the five nearest ( d ≈ 0.079 –0.122 ), random intermediate ( d ≈ 0.359 –1.012 ), and five farthest ( d ≈ 1.898 –1.822 ) scenes based on distance d in the scene feature space. Nearest neighbors preserve key semantic elements—including ego trajectory curvature, road layout geometry, and object density—whereas farthest samples show clear divergence. farthest neighbors in the latent space (Figure 7). Each scene is represented via a bird’s-eye view (BEV) plot detailing the ego trajectory, high-definition (HD) map topology, and surrounding dy-namic agents. The results confirm that nearest-neighbor scenes share high semantic similarity in ego trajectory curvature, road layout geometry, and object density, whereas distant samples exhibit fundamentally different driving contexts. 
+
+A.2 HD Map Auto-labeling 
+
+To automatically generate HD map annotations on the curated PAI-AV data, we adopt a PMT-based auto-labeling pipeline that employs RoGS [14] for scene-level road surface reconstruction. We en-hance its semantic representation by incorporating LiDAR-derived semantic supervision and DI-NOv3 [2] feature distillation. The overall auto-labeling pipeline is illustrated in Figure 8. 
+
+Semantic Road Surface Reconstruction. RoGS [14] relies on perspective-view RGB and se-mantic supervision, which may lead to inconsistent road surface reconstruction due to discrepancies across camera views. To mitigate this issue, we incorporate additional 3D semantic supervision from a globally aggregated static LiDAR point cloud, with semantic consistency improved through multi-view majority voting. Specifically, we project LiDAR points onto multiple camera images and assign semantic labels using Mask2Former [10] predictions, resolving conflicting labels through majority voting across views. After filtering out dynamic objects and retaining static road-related classes, we transform the labeled points into the global coordinate frame and aggregate them across frames. The resulting semantic point cloud provides additional 3D semantic supervision for road surface reconstruction. 10 Gaussian     
+
+> Rasterizer
+> ℒ𝑟𝑟𝑟𝑟𝑟𝑟
+> 𝑰𝑰𝒓𝒓𝒓𝒓𝒓𝒓
+> 𝑰𝑰𝒄𝒄
+> �𝑰𝑰𝒓𝒓𝒓𝒓𝒓𝒓
+> �𝑰𝑰𝒄𝒄
+> Road Gaussians
+> �𝑰𝑰𝒇𝒇𝒇𝒇𝒇𝒇𝒇𝒇
+> MLP 𝒄𝒄
+> MLP 𝒇𝒇𝒇𝒇𝒇𝒇𝒇𝒇
+> ℒ𝑐𝑐
+> ℒ𝑓𝑓𝑓𝑓𝑓𝑓𝑓𝑓
+> 𝑰𝑰𝒇𝒇𝒇𝒇𝒇𝒇𝒇𝒇
+> 𝑰𝑰𝒇𝒇𝒇𝒇𝒇𝒇𝒇𝒇
+> DINOv3
+> 𝑰𝑰𝒓𝒓𝒓𝒓𝒓𝒓
+> 𝑰𝑰𝒄𝒄
+> Mask2Former ℒ𝑧𝑧 _𝐵𝐵𝐵𝐵𝐵𝐵
+> Learnable
+> 𝒙𝒙𝒙𝒙𝒙𝒙 ∈ ℝ 3
+> 𝒓𝒓𝒓𝒓𝒓𝒓 ∈ ℝ 3
+> 𝒔𝒔𝒙𝒙𝒔𝒔 𝒙𝒙 ∈ ℝ 𝟑𝟑
+> 𝜶𝜶 ∈ ℝ 1
+> 𝐑𝐑 ∈ ℝ 4
+> 𝐟𝐟 ∈ ℝ |𝓒𝓒 |
+> 𝒙𝒙
+> MLP 𝒄𝒄 ℒ𝑐𝑐 _𝐵𝐵𝐵𝐵𝐵𝐵 𝐟𝐟
+> PV camera [R|t]
+> 𝐋𝐋𝐋𝐋𝐋𝐋𝐋𝐋 𝐑𝐑 𝒄𝒄
+> 𝐋𝐋𝐋𝐋𝐋𝐋𝐋𝐋 𝐑𝐑 𝒙𝒙𝒙𝒙𝒙𝒙
+> 𝐋𝐋𝐋𝐋𝐋𝐋𝐋𝐋 𝐑𝐑 𝒄𝒄
+> Voting
+> & Aggregation
+> 𝑰𝑰𝒄𝒄
+> 𝐋𝐋𝐋𝐋𝐋𝐋𝐋𝐋 𝐑𝐑 𝒙𝒙𝒙𝒙𝒙𝒙 _𝒇𝒇
+
+Figure 8: Overview of the proposed HD map auto-labeling pipeline. A globally aggregated semantic LiDAR point cloud provides additional 3D semantic supervision for RoGS-based road surface re-construction. Learnable Gaussian feature embeddings are jointly supervised by perspective-view se-mantic predictions, LiDAR-derived semantic labels, and DINOv3 features. The reconstructed Gaus-sian representation is subsequently rendered into BEV drivable area pseudo-labels for training the End-to-End Autonomous Driving model. Building upon RoGS [14], we expand the Gaussian reconstruction range to 30 m around the his-torical ego-vehicle trajectory to cover a larger road surface region. To further improve multi-view consistency, we extend the Gaussian representation with learnable feature embeddings jointly super-vised by perspective-view semantic predictions, LiDAR-derived semantic labels, and DINOv3 [2] features. Specifically, each Gaussian surfel is parameterized as 
+
+Θi = {(xi, y i, z i), (ri, g i, b i), (sx,i , s y,i ), α i, Ri, fi} , fi ∈ RD , (3) where the position, color, scale, opacity, and rotation follow the original RoGS formulation, and fi
+
+denotes a D-dimensional learnable feature embedding associated with the i-th Gaussian, replacing the original semantic vector Sem . These embeddings are differentiably rendered into feature maps, which are processed by two separate MLP-based decoders. The semantic decoder predicts semantic labels supervised by both perspective-view semantic predictions and LiDAR-derived semantic la-bels, while the feature decoder predicts dense DINOv3 features supervised by pretrained DINOv3 representations. This joint supervision encourages the Gaussian embeddings to capture richer and more consistent visual representations across views. 
+
+Semantic HD Map Pseudo-Label Generation. Following the PMT auto-labeling pipeline, we generate BEV drivable area pseudo-labels by rendering the reconstructed Gaussian representation within an ego-centric region. Specifically, we define the BEV region to cover 5 m behind and 160 m ahead of the ego vehicle, with a lateral extent of 40 m on each side. Unlike PMT, which considers multiple semantic map categories, we adopt a binary semantic representation that distinguishes only between drivable and non-drivable areas. The resulting BEV segmentation maps serve as pseudo-labels for training the End-to-End Autonomous Driving model. Additionally, we apply rule-based post-processing to the BEV segmentation maps to generate vectorized HD map annotations com-prising dividers, road boundaries, and pedestrian crossings. Qualitative examples of the generated BEV segmentation and vector map annotations are presented in Figure 9. 
+
+A.3 End-to-End Autonomous Driving Model Model Input. Along with the camera images, the model takes a projection matrix for each front and front-side camera image, which the BEV encoder uses to map BEV locations to image pixels. It also takes the current frames of the rear-left and rear-right cameras ( 512 × 256 each), which are not projected into the BEV. The ego state s ∈ R4 consists of the current velocity (vx, v y ) and acceleration (ax, a y ); the driving command is not used, as the route replaces it. The model also receives the poses of the two past frames relative to the current rear-axle frame, which are used to align past BEV features with the current frame. 11 Figure 9: Visualization of automatically generated BEV segmentation and vector HD map anno-tations. Each example shows three perspective-view images on the left (front-wide, cross-left, and cross-right) and the corresponding BEV visualization on the right. The binary segmentation distin-guishes drivable and non-drivable areas, while rule-based post-processing generates vectorized map elements comprising dividers (blue), road boundaries (red), and pedestrian crossings (yellow). The BEV region extends 5 m behind and 160 m ahead of the ego vehicle, with a lateral extent of 40 m on each side. 
+
+Feature Extractor. The DINOv3 [2] ViT-S/16 image backbone encodes each camera image into 
+
+32 ×16 patch features at stride 16, which are upsampled and downsampled into a three-level pyramid (strides 8, 16 and 32) with 256 channels per level. In the BEVFormer [4] encoder, the grid covers 0–56 m ahead of the vehicle and ±28 m to each side at 0.5 m resolution, and each cell is a learnable query that gathers features from this pyramid around its projected locations in each camera that sees it. To save computation, the two past frames pass through only the first encoder layer, without gradients during training, and the encoder outputs a BEV feature map F ∈ R256 ×112 ×112 that is shared by the perception heads and the planner. The drivable-area head applies two ConvNeXt-V2 [15] blocks to F to predict whether each BEV cell is drivable. The detection head also reads F
+
+and follows the DETR-style BEVFormer head [6, 4], with 600 object queries that predict scores for seven classes (vehicle, pedestrian, bicycle, traffic cone, barrier, construction-zone sign and generic object) and a 3D box with position, size, orientation and velocity. The two rear images pass through the same ViT-S one at a time; their 32 × 16 patch maps are placed side by side, projected to 256 channels by a 1 × 1 convolution with GroupNorm and GELU, average-pooled to 32 × 8 = 256 
+
+tokens, and given learned positional embeddings. They use only the current frame, bypass the BEV encoder, and in the final training stage send no gradient to the shared backbone. 
+
+Trajectory Vocabulary. The vocabulary is built from the 4 s future trajectory at every frame with a full 4 s future in the NuRec and PAI-AV clips, sampled as eight poses (x, y, θ ) at 0.5 s intervals. We first remove trajectories that the MPC controller cannot track. Because turns and lane changes are rare, we add their left–right mirror images, which stay within the controller limits. The trajectories are then interpolated to 40 steps at 0.1 s and clustered with bisecting k-means, splitting a cluster only if both halves keep at least five trajectories, so every entry averages at least five recorded or mirrored trajectories and satisfies the controller limits. 
+
+Feasibility Gate. The gate checks each candidate against the predicted drivable area and detec-tions and returns a binary mask (Figure 10). The ego footprint is the clip’s rig bounding box (length and width scaled by 0.98), placed ahead of the rear-axle pose by the rear-axle-to-center offset and enlarged by 1.1. A candidate fails if, at any of its 40 poses, a footprint corner inside the BEV range falls on a cell with drivable probability below 0.6, or if, within its first 10 poses (1 s), the footprint overlaps a detection with confidence above 0.4 under the separating axis theorem; detections are en-larged by 2.0 for pedestrians and bicycles and 1.1 otherwise, and moved at their predicted velocity with fixed heading. Both thresholds were chosen to maximize segmentation IoU and detection F1 12 (a) Coarse candidates       
+
+> (b) Collision check
+> (c) Off -road check (d) After feasibility gate
+> penalized candidate (collision) penalized candidate (off -road)
+> collision candidate off -road candidate Detected object
+> Enlarged & moved object
+> candidate
+
+Figure 10: Visualization of feasibility gate process: (a) coarse candidates before gating, (b) check the ego footprint against detected objects within the first 1 s, (c) check the footprint corners against the predicted drivable area, (d) failed candidates penalized and ranked below passing ones. on validation. If fewer than 256 candidates pass, the highest-scoring failed ones fill the remaining slots. 
+
+Planner. In the coarse stage, each vocabulary trajectory (40 poses (x, y, θ )) is flattened, embedded by an MLP, and passed through one self-attention layer over all candidates to form the decoder queries. The keys and values are the pooled BEV tokens with learned positional embeddings and the 256 rear tokens, concatenated with 20 route tokens (one per waypoint, with empty slots masked). The ego state and a route summary are added to each candidate’s decoder output, from which MLP heads predict NC, DAC, EP, the overall score and imitation. The coarse score is the product of the predicted NC, DAC and EP plus the imitation score normalized to [0 , 1] , all with weight 1.0; the overall-score head is trained but not used for ranking. Candidates failing the feasibility gate are demoted by the score range plus one, and the top 256 are kept. In the fine stage, their decoder outputs serve as queries of a three-layer refinement decoder with its own heads, attending to the pooled BEV tokens, the rear tokens and its own route tokens. All three layers are supervised, and the final trajectory is the candidate with the highest last-layer score, computed as in the coarse stage but with an imitation weight of 0.02. 
+
+Controller. Planner labels are generated with a batched re-implementation of the AlpaSim lin-ear MPC controller, so they reflect how the simulator would drive each candidate. The vehicle is a dynamic bicycle model (kinematic below 5 m/s) with a 2.85 m wheelbase, whose steering and accel-eration follow their commands through first-order lags of 0.1 s. Every 0.1 s, the controller linearizes the model about the current state and solves a quadratic program over a 2 s horizon, penalizing lon-gitudinal, lateral and heading errors (weights 2.0, 1.0 and 1.0), the acceleration state (0.1), and the steering and acceleration commands (5.0 and 1.0), with tracking applied only from 1 s ahead. The states are bounded by a heading change of at most 90 ◦, 0 ≤ vx ≤ 35 m/s, a steering angle of at most 
+
+45 ◦, and −8 ≤ a ≤ 6 m/s 2. Each of the 8,192 vocabulary trajectories is simulated for 4 s from the recorded ego state, re-solving the MPC at every step. 
+
+A.4 Data-driven Imitation Learning Data Filtering. We remove clips with unreliable labels or duplicated drives. For NuRec, these are clips with reverse driving that the MPC cannot follow, missing or inconsistent map or route 13 geometry, or object boxes unsupported by any camera frame. For PAI-AV, these are clips in which the ego vehicle leaves the annotated drivable area, along with clips that duplicate a NuRec drive. 
+
+Perception Loss. BEV segmentation uses class-weighted cross-entropy with inverse-frequency class weights and a loss weight of 4.5. Detection follows the BEVFormer head [4]: a sigmoid focal loss [5] ( γ = 2 , α = 0 .25 ) for classification with weight 2.0 and an L1 loss on the 3D box parameters with weight 0.25. Queries are assigned by Hungarian matching [6] on the same weighted sum of the focal classification cost and the L1 box cost, and every decoder layer is supervised. 
+
+Planning Loss. The imitation and score losses follow DriveSuprim [3]. The imitation target is a softmax over negative squared distances to the recorded trajectory at eight timestamps (0.5 s apart), with temperature σ = 0 .5. The loss weights are 1.0 for imitation and 3.0 (NC), 3.0 (DAC), 2.0 (EP), and 1.0 (their product) for the score heads. Scenes with identical labels for all candidates, mostly beyond the MPC speed limit, are excluded from the score losses. 
+
+Training Stage. Stage 1 initializes the image backbone from DINOv3 [2] and disables the plan-ning losses; each later stage initializes from the previous one with a fresh optimizer and schedule. We keep DriveSuprim’s [3] EMA teacher, which is used at inference, and student-only photometric augmentation, with momentum rising from 0.992 to 0.998 over the first three epochs, but do not use its rotation-augmented views. The feasibility gate is also applied during Stages 2 and 3 using predicted detections and drivable area rather than ground truth, so the fine stage is trained on the can-didate distribution it receives at inference. Training uses bf16 mixed precision and gradient clipping at a global norm of 35. 
+
+A.5 Simulator-based Reinforcement Learning Policy Architecture and Optimization. We train our policy using Proximal Policy Optimization (PPO) [7] and Generalized Advantage Estimation (GAE) [16]. The actor is parameterized via Low-Rank Adaptation (LoRA), while the critic is trained jointly. Both networks are optimized using AdamW ( β1 = 0 .9, β2 = 0 .999 , ϵ = 10 −5) with a constant learning rate of 10 −4. Weight decay is set to 0.01 for LoRA parameters. 
+
+Experience Rollout and Distributed Training. Each update collects a buffer of about 2,048 de-cision steps from 48 concurrent simulation sessions. Each update runs up to 3 PPO epochs over 4 minibatches of 512 steps, i.e. up to 12 optimizer steps. Training uses 8× NVIDIA H100 (80 GB) GPUs with data parallelism. Each GPU hosts one learner rank, which also serves policy inference for the sessions it owns, together with seven neural-rendering instances and a physics service. Each rank processes about 64 steps per minibatch with a micro-batch size of 8 via gradient accumulation. 
+
+RL Objectives and Regularization. To align with the 10 Hz decision frequency, we set discount 
+
+γ = 0 .951 (0.99 5) and GAE λ = 0 .774 (0.95 5). Policy clip ϵ, value clip threshold, and value loss coefficient are set to 0.1, 0.1, and 0.5, respectively. To prevent deviation from the SFT baseline, an exact KL penalty ( βKL = 0 .02 ) is computed over 256 candidates, and training early-stops if approximate KL exceeds 1.5 × 0.03 . Gradients are clipped independently at norm 0.5. Advantage normalization is executed per minibatch across all GPUs. Policy entropy is regulated via a sampling temperature targeting 2.5 nats without explicit entropy loss. 
+
+Implementation Details. The complete training run consists of two stages. The first stage spans 
+
+12 epochs over 2,202 scenes, comprising 26 ,424 episodes and 391 PPO updates, and completes in approximately 29 .5 hours. The second stage continues from this checkpoint for 5 additional epochs on the 894 scenes with mixed success and failure outcomes, adding 4,470 episodes and 69 PPO updates in approximately 5 hours. In total, training comprises 30 ,894 episodes and 460 PPO updates over approximately 34 .5 hours of wall-clock time on the 8× H100 setup. Detailed hyperparameter configurations are summarized in Table 4. 14 Table 4: Reinforcement learning hyperparameters and system configuration. 
+
+Parameter / Setting Value 
+
+Algorithm PPO Optimizer AdamW ( β1 = 0 .9, β 2 = 0 .999 , ϵ = 10 −5)Learning Rate 10 −4
+
+Weight Decay 0.01 
+
+PPO Epochs 12 (1st stage), 5 (2nd stage) Batch Size 2048 
+
+Discount ( γ) / GAE ( λ) 0.951 / 0.774 
+
+Clip ( ϵ) / Value Clip 0.1 / 0.1
+
+Value Loss Coef. 0.5
+
+KL Penalty ( βKL ) 0.02 
+
+Early Stopping Approx. KL > 0.045 
+
+Gradient Clipping 0.5 (L2 norm) Advantage Normalization Per minibatch Hardware 8× NVIDIA H100 80 GB Training Overhead 12 + 5 epochs ( 460 updates, ∼ 34 .5 h) 
+
+15

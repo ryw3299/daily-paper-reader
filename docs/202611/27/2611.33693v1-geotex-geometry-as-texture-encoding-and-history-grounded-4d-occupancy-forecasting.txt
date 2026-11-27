@@ -1,0 +1,717 @@
+Title: GeoTex: Geometry-as-Texture Encoding and History-Grounded 4D Occupancy Forecasting
+
+URL Source: https://arxiv.org/pdf/2611.33693v1
+
+Published Time: Thu, 26 Nov 2026 01:54:17 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# GeoTex: Geometry-as-Texture Encoding and History-Grounded 4D Occupancy Forecasting 
+
+Shijun Guo 1 Yaming Yang 1 Haoran Xu 2 Wei Zhao 1* 
+
+Ziyu Guan 1 Cai Xu 1 Peixi Peng 21Xidian University 2Peking University 
+
+ywzhao@mail.xidian.edu.cn 
+
+## Abstract 
+
+4D occupancy forecasting models 3D scene evolution to support future prediction and scenario generation in autonomous-driving world models. Semantic occupancy abstracts image color and texture into discrete labels, leav-ing 3D voxel arrangements as the primary cues for distin-guishing local shapes within each class. Existing meth-ods borrow image-encoding frameworks to obtain com-pact latent representations through height-channel encod-ing or plane factorization, but do not sufficiently model within-column height patterns and cross-column relations jointly before compression, weakening these geometric cues. Forecasting also underutilizes complementary his-tory and struggles to retain reliable observation evidence. We therefore propose GeoTex, an occupancy world model combining geometry-as-texture encoding with history-grounded forecasting. GeoTex Representation jointly en-codes within-column height patterns and cross-column re-lations into compact continuous latent representations and restores 3D structure through content-dependent height unfolding and geometric interaction. GeoTex Prediction retains initial evidence throughout rollout in fixed cross-observation relational memory and incorporates comple-mentary recent history through target-referenced residual updates. After prediction training, decoder-only adap-tation improves semantic decoding of predicted states. GeoTex improves average forecasting mIoU and IoU by 
+
+9.79% and 11.91% relative to GenieDrive while reducing parameters from 3.47M to 2.33M, with gains increasing at longer horizons. 
+
+## 1 Introduction 
+
+Occupancy world models (OWMs) [18, 41, 46] repre-sent driving environments with 3D semantic occupancy and model future scene evolution through 4D occu-pancy forecasting, supporting autonomous-driving plan-ning [9, 22, 40] and simulation [21, 36, 39]. Occupancy 
+
+*Corresponding author. Trunk + branching           
+
+> Reshape
+> Height as channels
+> Compression
+> Less distinct
+> geometric cues Height -channel encoding
+> Horizontal
+> interaction
+> Height -wise
+> interaction
+> Compression
+> More distinct
+> geometric cues
+> 10 15 20 25 30 35 40 45 50 20 25
+> 30
+> 35 40 45 50 55 60 Avg. mIoU (%) Avg. IoU (%)
+> OccWorld
+> 72.39M
+> OccSora
+> 174.19M DOME
+> 397.55M UniScene
+> 69.47M
+> COME
+> 692.97M
+> I² -World
+> 22.71M
+> GenieDrive
+> 3.47M
+> GeoTex
+> 2.33M
+> OccLLaMA
+> >7B
+> Occ -LLM
+> >7B
+> Height -wise
+> interaction
+> GeoTex
+> Bubble size indicates parameter count (log -scaled).
+> Height variation
+> Occupancy input
+> Occupancy input
+
+(a) Image texture (b) Occupancy labels Trunk + branching           
+
+> Reshape
+> Height as channels
+> Compression
+> Less distinct
+> geometric cues Height -channel encoding
+> Horizontal
+> interaction
+> Height -wise
+> interaction
+> Compression
+> More distinct
+> geometric cues
+> 10 15 20 25 30 35 40 45 50 20 25
+> 30
+> 35 40 45 50 55 60 Avg. mIoU (%) Avg. IoU (%)
+> OccWorld
+> 72.39M
+> OccSora
+> 174.19M DOME
+> 397.55M UniScene
+> 69.47M
+> COME
+> 692.97M
+> I² -World
+> 22.71M
+> GenieDrive
+> 3.47M
+> GeoTex
+> 2.33M
+> OccLLaMA
+> >7B
+> Occ -LLM
+> >7B
+> Height -wise
+> interaction
+> GeoTex
+> Bubble size indicates parameter count (log -scaled).
+> Height variation
+> Occupancy input
+> Occupancy input
+
+(c) Geometry-as-texture encoding Trunk + branching           
+
+> Reshape
+> Height as channels
+> Compression
+> Less distinct
+> geometric cues Height -channel encoding
+> Horizontal
+> interaction
+> Height -wise
+> interaction
+> Compression
+> More distinct
+> geometric cues
+> 10 15 20 25 30 35 40 45 50 20 25
+> 30
+> 35 40 45 50 55 60 Avg. mIoU (%) Avg. IoU (%)
+> OccWorld
+> 72.39M
+> OccSora
+> 174.19M DOME
+> 397.55M UniScene
+> 69.47M
+> COME
+> 692.97M
+> I² -World
+> 22.71M
+> GenieDrive
+> 3.47M
+> GeoTex
+> 2.33M
+> OccLLaMA
+> >7B
+> Occ -LLM
+> >7B
+> Height -wise
+> interaction
+> GeoTex
+> Bubble size indicates parameter count (log -scaled).
+> Height variation
+> Occupancy input
+> Occupancy input
+
+(d) Forecasting accuracy vs. model size 
+
+Figure 1. Geometry as texture and forecasting efficiency. 
+
+(a–b) Semantic occupancy expresses local shape through geo-metric arrangements rather than appearance texture. (c) GeoTex preserves height patterns and cross-column relations during compression. (d) GeoTex establishes a state-of-the-art accuracy– efficiency trade-off, attaining the highest average mIoU and IoU with only 2.33M parameters. 
+
+representations unify geometry and semantics in semantic voxel grids [12, 32], capturing the 3D shapes and bound-aries of irregular objects without relying on bounding boxes. To efficiently model scene evolution, these models encode historical occupancy into compact latent states and predict their changes. Forecasting quality therefore depends both on the scene structure preserved in latent 1arXiv:2611.33693v1 [cs.CV] 25 Nov 2026 representations and on how history is used during predic-tion. To construct these states, existing OWMs primar-ily adopt VAE-series architectures from image genera-tion [8, 13, 14, 23, 25], but their encoding designs do not fully account for how occupancy expresses local shape. In Fig. 1(a–b), image color and texture provide cues for distinguishing tree structures [10, 47, 48], whereas se-mantic occupancy abstracts these variations into a shared vegetation label, making local shape discrimination de-pend on 3D voxel arrangements. Continuation, gaps, and termination along vertical columns define height patterns, while variations and connections across columns describe surfaces, boundaries, and spatial extent. Together, these relations form the geometric texture of occupancy scenes. Height-channel encoding [18, 46] and tri-plane factoriza-tion [6, 41] produce compact representations but insuffi-ciently model these relations jointly before compression, weakening the geometric cues that distinguish local shape (Fig. 1(c)). This mismatch between encoding design and how occupancy expresses structure motivates encoding centered on occupancy geometry. Forecasting also requires effective use of historical ev-idence. Existing methods learn scene evolution through autoregressive prediction [18, 41, 46] or diffusion gener-ation [11, 24, 29], and some further combine geometric propagation and content refinement [7, 19, 34] to exploit spatial correspondence for forecasting. However, histor-ical feature aggregation does not explicitly distinguish what each frame adds relative to the current target; even with spatial correspondence, observations still differ in content due to visibility and sampling. Meanwhile, dur-ing autoregressive rollout with sliding history, real obser-vations gradually leave the window, limiting continued access to initial observation evidence. Moreover, a de-coder trained only on states encoded from ground-truth occupancy faces a distribution shift when decoding autore-gressively generated states, affecting semantic decoding quality. To address these issues, we propose GeoTex , an occu-pancy world model that combines geometry-as-texture encoding with history-grounded forecasting. At the rep-resentation stage, GeoTex Representation alternates height-wise and horizontal interactions after local 3D encoding, linking within-column shape to surrounding structures before height-ordered aggregation into com-pact continuous latent states. During reconstruction, the decoder unfolds content-dependent height features and restores occupancy through geometric interactions and 3D upsampling. In this continuous latent space, GeoTex Prediction 
+
+retains initial observation evidence throughout rollout in fixed relational memory and tracks recent states through sliding history. At each prediction step, ego-motion lo-cates historical regions corresponding to target positions, and current target features guide content retrieval. To ex-ploit complementary information from recent history, we introduce a target-referenced historical residual update 
+
+that subtracts current target features from retrieved his-torical features, weights the residuals across frames, and writes them into the target state. After prediction train-ing, we freeze the other modules and adapt the decoder using encoded and predicted states to improve semantic decoding. Our contributions are summarized as follows: • We introduce GeoTex Representation, which jointly organizes height patterns and cross-column relations during compression and reconstruction to preserve geo-metric texture in occupancy scenes. • We propose GeoTex Prediction, retaining initial scene evidence in relational memory and extracting comple-mentary updates through target-referenced historical residuals for history-grounded forecasting. • With only 2.33M parameters, GeoTex improves aver-age forecasting mIoU and IoU by 9.79% and 11.91% 
+
+relative to leading methods, better preserves scene ge-ometry, and widens its advantage at longer horizons. 
+
+## 2 Related Work 
+
+2.1 3D Scene Representation and Latent Encoding 
+
+3D scene representation research organizes scene ge-ometry through height information and spatial context. BEVDepth [16] and BEVHeight [38] connect image features to 3D space using depth and ground-relative height, respectively, while 3D occupancy perception meth-ods further recover scene structure through spatial con-text [5, 17, 30, 45]. To efficiently forecast scene evolution, occupancy world models draw on image and video tok-enizers [8, 33, 42, 43] to construct latent states through voxel encoding [37], temporal reconstruction [15], and compact planar representations [3, 18, 41, 46]. However, existing encoders insufficiently organize within-column height patterns and cross-column relations jointly, weak-ening local shape cues. GeoTex Representation jointly organizes height-wise and horizontal relations before compression and restores 3D structure through content-dependent height unfolding during decoding, preserving geometric texture throughout encoding and reconstruc-tion. 
+
+2.2 4D Occupancy Forecasting and World Models 
+
+Occupancy world models primarily model future scenes through diffusion generation [11, 24, 29] or autoregres-sive prediction [18, 41, 46], while OccLLaMA [31] and Occ-LLM [35] further introduce language conditions to expand generation control. To exploit motion con-ditions and spatial structure, DFIT-OccWorld [44] and 2⋯  
+
+> t−3 t
+> Sliding history Axial scene interaction
+> Refine
+> Decoder
+> Prediction
+> Training stages
+> 1. Prediction training
+> Prediction
+> Decoder
+> 2. Decoder adaptation
+> Prediction
+
+(a) GeoTex Representation     
+
+> VAE encoder
+> Occupancy 3D downsample
+> Geometric interaction
+> Height Horizontal Height Ordered -column
+> compression
+> Continuous latent
+> representation
+> Decoder
+> Reconstruction
+
+(b) GeoTex Prediction            
+
+> Initial observations
+> Decoder
+> Cross -frame encoding
+> Map location
+> Read features
+> Append prediction and replace the oldest state
+> ⋮
+> Reference
+> observation Other
+> observation
+> Target -Referenced Historical Residual Update
+> Current target
+> Target feature
+> Query history
+> −=
+> −=
+> Sliding history Read feature Target feature Residual
+> Temporal weighting Σ
+> Residual update
+> +
+> Updated target
+> ⋮
+> Relational memory
+> Cross -Observation Relational Memory
+> Local
+> interaction
+> Historical residual
+> update
+> Updated target
+> Memory neighborhood
+> Ego -motion
+> Target feature
+> Memory recall
+> Σ
+> Ego -guided
+> initialization
+
+Figure 2. Overview of GeoTex. (a) GeoTex Representation organizes height patterns and cross-column relations into compact continuous latent representations for scene reconstruction. (b) GeoTex Prediction grounds autoregressive forecasting in cross-observation relational memory and target-referenced historical residual updates. Decoder-only adaptation further improves semantic decoding of predicted states. 
+
+OccSim [19] introduce dynamic flow and rigid propaga-tion, respectively, while EfficientOCF [34] and GAST [7] combine geometric propagation with content refinement to improve future scene prediction. However, even with geometric correspondence, direct aggregation does not ex-plicitly distinguish what each historical frame adds to the current state. GeoTex Prediction preserves initial obser-vation evidence in fixed relational memory and extracts target-referenced residual updates from recent history, balancing reliable observation evidence with recent state changes across prediction steps. 
+
+## 3 Proposed Method 
+
+3.1 Overall Architecture 
+
+As shown in Fig. 2, GeoTex consists of GeoTex Repre-sentation and GeoTex Prediction, combining geometry-as-texture encoding with history-grounded forecasting. Given L historical occupancy frames O−L+1:0 , Geo-Tex forecasts T future semantic occupancy frames bO1: T .Each frame is Ot ∈ { 0, . . . , K − 1}H×W ×D, where 
+
+H, W, D are the grid dimensions and K is the num-ber of labels. GeoTex Representation jointly organizes height patterns and cross-column relations, mapping each scene through the encoder to a continuous latent state 
+
+Zt = Enc( Ot) ∈ Rh×w×c, where h, w are the latent planar resolutions and c is the channel dimension. In this latent space, the prediction module F combines ego-motion conditions, fixed relational memory built from initial observations, and recent sliding history to autore-gressively generate future states bZ1: T . The decoder Dec 
+
+then reconstructs future occupancy from these states. Training first learns GeoTex Representation through occupancy reconstruction to preserve geometric texture during compression and reconstruction; its encoder and decoder are detailed in Sec. 3.2. We then freeze the repre-sentation module and train GeoTex Prediction to model scene evolution conditioned on history in latent space. Finally, we freeze the encoder and prediction module and adapt only the decoder to improve semantic decoding of predicted states. The prediction module and decoder adaptation are described in Sec. 3.3. 
+
+3.2 GeoTex Representation 
+
+Semantic occupancy explicitly describes 3D positions and spatial occupancy, but abstracts continuous appearance into discrete classes. Voxels with the same semantic label may play different structural roles, such as the interior, outer contour, and top termination of a tree canopy. These roles are revealed by voxel relations: vertical continua-3tion, gaps, and termination characterize within-column shape, while changes and connections between neighbor-ing columns describe surfaces, boundaries, and spatial extent. We refer to the discriminative cues jointly formed by these height patterns and their horizontal organization as geometric texture .To preserve these geometric relations in a compact representation, GeoTex Representation organizes 3D geo-metric features before height compression within a con-tinuous VAE framework. Class embedding and local 3D encoding first produce S ∈ Rh×w×d×C , where d and C
+
+denote the encoded height resolution and feature dimen-sion. Attention blocks [27] then connect within-column shape with surrounding structures in a height–horizontal– height order: 
+
+S = Conv 3D
+
+> ↓
+
+  Embed( O),
+
+Svu, : = Attn (1) 
+
+> z
+
+ Su, : | ez
+
+,
+
+Sh 
+
+> :,ℓ
+
+= Attn xy 
+
+ Sv
+
+> :,ℓ
+
+,
+
+Gu, : = Attn (2) 
+
+> z
+
+ Shu, : | ez
+
+,
+
+(1) where u and ℓ index horizontal position and height, and ez
+
+denotes ordered height embeddings learned separately in each block. The first height interaction produces column-aware features Sv . Conditioned on these features and relative positions, horizontal interaction adaptively aggre-gates cross-column information at each height in parallel along the two planar axes to form Sh. The second height interaction integrates the horizontal context across levels, linking column shape with surrounding geometry in G
+
+before compression. All stages use residual updates, with 
+
+ez added to height-attention queries and keys. After these geometric interactions, we compress the volume features G into a planar representation. At each horizontal position u, ordered-column compression ap-plies a learned mapping to Gu, 1 ⊕· · ·⊕ Gu,d , where ⊕ de-notes concatenation in height order. Height-ordered con-catenation keeps features from different levels distinguish-able before aggregation, allowing structures with similar semantic compositions but different vertical arrangements to enter compression as distinct feature sequences. Pla-nar refinement and posterior heads then parameterize the diagonal Gaussian posterior q(· | O) [13], whose mean defines the latent representation Z = Enc( O).To recover 3D structure from the compact latent state, the decoder produces semantic logits through eO =Dec( Z). It first extracts local planar context and un-folds volume features through height-specific content mappings: 
+
+V = Context( Z),
+
+eGu,ℓ = Lℓ(Vu) + ez,ℓ , (2) where Vu is the planar context at horizontal position 
+
+u. The height-specific mapping Lℓ and decoder height embedding ez,ℓ produce the unfolded volume feature 
+
+eGu,ℓ at height level ℓ. The decoder then applies height– horizontal–height interaction to the unfolded volume with its own parameters, followed by 3D upsampling to pro-duce semantic logits. We supervise this encoding and decoding process with the occupancy reconstruction loss 
+
+Locc = LCE + LLov , (3) where LCE and LLov are cross-entropy and Lovász– Softmax [2] losses. For posterior samples z, we combine this reconstruction loss with KL regularization: 
+
+Lrepr = Ez∼q(·| O)
+
+Locc 
+
+  Dec( z), O 
+
++ λKL 
+
+hwc DKL (q(z | O) ∥ N (0, I)) , (4) where N (0, I) is the standard Gaussian prior and λKL 
+
+weights the mean KL divergence over hwc latent ele-ments. Forecasting uses the posterior mean Z.
+
+3.3 GeoTex Prediction 
+
+In this continuous latent space, GeoTex Prediction learns how scene states evolve over time. History-grounded fore-casting requires both a persistent reference to observed structure and complementary information about recent evolution. We therefore organize initial observations into fixed relational memory M and extract target-referenced residual updates from the sliding history Ht. At autore-gressive step t, the prediction module combines these two sources with ego-motion conditions to generate the next latent state: 
+
+bZt+1 = F (Ht, M, at), t = 0 , . . . , T − 1, (5) where Ht = {(¯Zs, Ps)}ts=t−L+1 stores recent latent states and ego-to-global pose matrices Ps ∈ R4×4. Dur-ing inference, ¯Zs is an initially encoded state Zs for s ≤ 0
+
+or a previously predicted state bZs for s > 0. The condi-tion at encodes ego-motion from t to t + 1 . Ego-motion establishes spatial correspondence between target loca-tions and historical content, while current target content guides feature retrieval and updates. 
+
+Cross-Observation Relational Memory. The value of history lies not only in what each frame observes, but also in how different observations describe the same scene. A local shape can receive complementary evidence from another viewpoint, while a boundary can obtain more complete spatial context through cross-frame relations. We take each initial observation in turn as the reference and read related content from the remaining frames, en-hancing its representation with cross-frame context. Let 
+
+I0 = {− L + 1 , . . . , 0} denote the initial frame index set, 4and Tj→i = P−1 
+
+> i
+
+Pj map coordinates from source frame 
+
+j to reference frame i. Relational encoding is written as 
+
+Rmem  
+
+> i
+
+= CrossRead( Zi, {Zj , Tj→i}j∈I 0, j ̸ =i) ,
+
+Bi = Spatial( Zi + Rmem  
+
+> i
+
+) ,
+
+M = {(Zi, Bi, Pi)}i∈I 0 ,
+
+(6) where CrossRead retrieves neighborhood content Rmem  
+
+> i
+
+,and Spatial organizes planar context. Memory retains na-tive states Zi and relational states Bi. Relational features guide selection and supplement retrieved native content to form target-time scene evidence. The cross-frame encod-ing branch in Fig. 2 constructs this memory once, keeping observed evidence accessible throughout the rollout. 
+
+Target-Referenced Historical Residual Update. 
+
+Fixed relational memory preserves scene context from initial observations, while recent state changes enter prediction through the sliding history. We transport the latest state according to ego-motion into the next-frame coordinate system to initialize the target state, then apply local interaction and historical residual updates through successive transition units. Given a unit’s input state 
+
+U, local interaction produces Uloc = Local( U), which retrieves features Rs from each recent frame s for the current target positions: 
+
+Rs = GeoAttn  Query( Uloc , at), ¯Zs; Grid( Tt+1 →s) ,
+
+(7) where Grid( Tt+1 →s) maps target locations into source frame s, and Query combines target content, position, and ego-motion. GeoAttn reads relevant content around these geometric references using learned sampling off-sets [49]. To extract complementary information from each his-torical frame relative to the current target, we subtract projected target features from the retrieved features to form target-referenced residuals δs, then weight them across frames to obtain the historical update ∆Uhist :
+
+δs = Rs − νs ⊙  Wv Uloc 
+
+,
+
+∆Uhist = HistProj 
+
+> t
+
+X
+
+> s=t−L+1
+
+βs ⊙ δs
+
+!
+
+, (8) where Wv denotes the channel projection shared by his-torical and target features within each transition unit, and 
+
+Rs aggregates the projected historical features. This pro-vides a common feature space and target reference for residuals across frames. The mask νs restricts target-feature subtraction to supported reads; ⊙ denotes element-wise multiplication. Ordered residuals and their adjacent changes determine βs, normalized over valid historical frames at each target position and broadcast over chan-nels. HistProj then maps the weighted residual sum to the target feature space. 
+
+History-Grounded Forecasting. After historical resid-ual updating, the memory-enhanced transition unit uses 
+
+Uh to query fixed relational memory. Axial scene interac-tion then integrates recalled evidence with target content to form Ug :
+
+Uh = Uloc + ∆ Uhist ,
+
+(Rrecall , m) = Recall( Uh, M, at),
+
+Ug = SceneAttn( Uh, Rrecall , m, at),
+
+bZt+1 = Refine( Ug , Ht, at),
+
+(9) where Rrecall and m are recalled evidence on the target grid and its validity mask. SceneAttn applies axial atten-tion [28] along both planar axes. Refine continues local spatial interaction and historical updates to form the next latent state, which is appended to the sliding history. To learn these state transitions, we freeze GeoTex Rep-resentation and train the prediction module and memory encoder with future-latent mean squared error (MSE): 
+
+Lpred =
+
+> T
+
+X 
+
+> τ=1
+
+wτ MSE 
+
+bZτ , Enc( Oτ )
+
+
+
+, (10) where τ indexes future frames, wτ weights each forecast step, and MSE averages over latent elements. We reduce teacher forcing through scheduled sampling [1] and retain cross-step gradients through generated states. 
+
+Prediction-Domain Decoder Adaptation. Following this training, the prediction module generates future latent states, which the decoder restores to semantic occupancy. Since representation learning exposes the decoder only to states encoded from ground-truth occupancy, we then freeze the encoder and prediction module and adapt only the decoder using both encoded and predicted states to improve semantic decoding of generated states. For future frame τ , the encoded state Zτ = Enc( Oτ ) and predicted state bZτ share the same decoder: 
+
+Ladapt = Eτ
+
+h
+
+η Locc 
+
+  Dec( Zτ ), Oτ
+
+
+
++ (1 − η) Locc 
+
+  Dec( bZτ ), Oτ
+
+i
+
+,
+
+(11) where Eτ averages over future steps and η balances the encoded and predicted domains. The first term retains reconstruction supervision, while the second adapts se-mantic readout to predicted states. 
+
+## 4 Experiments 
+
+4.1 Experimental Settings Dataset and Metrics. Following prior occupancy world models [7, 18, 41, 46], we conduct experiments on 5Table 1. 4D occupancy forecasting on Occ3D-nuScenes. The upper block reports endpoint results, where Avg. is the arithmetic mean over 1s, 2s, and 3s. Following the public GAST evaluator, the lower block pools adjacent future-frame pairs for the three intervals and all six frames for Avg. Best and second-best upper-block accuracy results are in bold and underlined, respectively. 
+
+Method Input mIoU (%) ↑ IoU (%) ↑ FPS ↑ Params. (M) ↓
+
+Recon. 1s 2s 3s Avg. Recon. 1s 2s 3s Avg. OccWorld [46] Occ 66.38 25.78 15.14 10.51 17.14 62.29 34.63 25.07 20.18 26.63 18.00 72.39 OccSora [29] Occ 66.97 32.77 22.04 14.40 23.07 68.78 41.39 33.68 29.97 35.01 20.00 174.19 OccLLaMA [31] Occ & Text 75.20 25.05 19.49 15.26 19.93 63.79 34.56 28.53 24.41 29.17 – >7000 Occ-LLM [35] Occ & Text – 24.02 21.65 17.29 20.99 – 36.65 32.14 28.77 32.52 – >7000 DFIT [44] Occ & Camera – 31.68 21.29 15.19 22.71 – 40.28 31.24 25.29 32.27 – –DOME [11] Occ 83.08 35.11 25.89 20.29 27.10 77.25 43.99 35.36 29.74 36.36 6.54 397.55 UniScene [15] Occ & Box & Map 72.90 35.37 29.59 25.08 30.01 64.10 38.34 32.70 29.09 33.38 1.72 69.47 COME [24] Occ 83.08 42.75 32.97 26.98 34.23 77.25 50.57 43.47 38.36 44.13 0.30 692.97 I2-World [18] Occ 81.22 47.62 38.58 32.98 39.73 68.30 54.29 49.43 45.69 49.80 37.04 22.71 GenieDrive [41] Occ 86.15 50.47 41.47 35.83 42.59 75.53 56.87 51.46 47.08 51.80 41.38 3.47 
+
+GeoTex(Ours) Occ 95.03 54.54 45.99 39.76 46.76 88.40 62.59 57.79 53.54 57.97 47.28 2.33 
+
+Adjacent-pair pooled protocol (GAST evaluator) 
+
+GAST [7] Occ – 55.54 46.33 40.18 47.40 – 60.77 55.97 51.96 56.24 – 12.09 
+
+GeoTex(Ours) Occ – 58.03 47.69 41.27 48.93 – 64.54 58.89 54.58 59.34 47.28 2.33 
+
+Occ3D-nuScenes [26]. Built on nuScenes [4], it contains 700 training and 150 validation scenes annotated at 2 Hz. Each frame is a 200 ×200 ×16 grid spanning [−40 , 40] 
+
+meters horizontally and [−1, 5.4] meters vertically at 0.4-meter resolution. Four historical occupancy frames are used to predict six future frames. Reconstruction and fore-casting are evaluated by mIoU over 17 non-empty classes and IoU over their union. Short-term results use 1s, 2s, and 3s endpoints and their arithmetic mean. Long-term results use 4s, 5s, and 6s. 
+
+Implementation Details. GeoTex is implemented in PyTorch and trained on two NVIDIA RTX 4090 GPUs. GeoTex Representation and GeoTex Prediction use AdamW [20] with learning rates of 3×10 −4 and 10 −3, re-spectively. We then adapt only the decoder for 10 epochs at 10 −5. Architecture and additional training details are provided in Appendix A. 
+
+4.2 Evaluation on 4D Occupancy Forecasting Short-term Occupancy Forecasting. As shown in Tab. 1, GeoTex achieves the best mIoU and IoU at 1s, 2s, and 3s. Average mIoU increases from GenieDrive’s 42.59% to 46.76%, a relative gain of 9.79%. Under GAST’s adjacent-frame pooled protocol, GeoTex also achieves relative gains of 3.23% and 5.51% over GAST in average mIoU and IoU, respectively. GeoTex reaches 57.97% average IoU, an 11.91% rela-tive gain over GenieDrive, exceeding the relative mIoU gain. Since IoU measures occupancy overlap indepen-dently of semantic labels, this improvement reflects better geometric prediction. At 3s, GeoTex more accurately predicts pedestrians in the left inset’s cyan boxes and pre-
+
+Table 2. Long-term 4D occupancy forecasting on Occ3D-nuScenes. Avg. is the mean over 4s, 5s, and 6s. GAST values are reproduced as published.                                                                  
+
+> Method mIoU (%) ↑IoU (%) ↑
+> 4s 5s 6s Avg. 4s 5s 6s Avg. OccWorld [46] 7.79 6.29 5.76 6.61 17.23 15.31 14.54 15.69 DOME [11] 23.50 19.37 17.27 20.05 13.84 10.14 8.15 10.71 UniScene [15] 16.44 16.41 15.61 16.15 14.31 14.33 14.15 14.26 I2-World [18] 28.59 25.32 22.55 25.49 41.75 38.47 35.41 38.54 GenieDrive [41] 31.16 27.17 23.66 27.33 42.81 39.00 35.60 39.14 GAST [7] 24.36 21.98 19.81 22.05 39.52 37.19 34.99 37.23
+> GeoTex(Ours) 35.83 32.14 28.86 32.28 49.94 46.61 43.35 46.63
+
+serves wall continuity in the right inset, whereas baselines miss foreground details or fragment geometry (Fig. 3). Alongside these accuracy gains, GeoTex uses only 2.33M parameters, while GeoTex Prediction achieves an inference speed of 47.28 FPS. Observation memory is en-coded once per rollout and reused alongside a four-frame sliding history, retaining initial evidence without enlarg-ing the history window. Compared with GenieDrive’s 
+
+50 ×58 latent grid, GeoTex’s 50 ×50 grid further reduces per-location projection and feature-update costs. 
+
+Long-term Occupancy Forecasting. GeoTex achieves the best reported results from 4s to 6s, averaging 32.28% mIoU and 46.63% IoU (Tab. 2). Compared with Ge-nieDrive, relative gains increase from 15.0% at 4s to 22.0% at 6s in mIoU and from 16.7% to 21.8% in IoU, showing a widening advantage at longer horizons. The widening advantage reflects slower forecasting degradation. From 4s to 6s, GeoTex’s mIoU and IoU decrease by 19.45% and 13.20%, compared with 24.07% 6Time  1.0 s  2.0 s  3.0 s 
+
+> GT I² -World GenieDrive GeoTex(Ours)
+
+Figure 3. Qualitative comparison of short-term occupancy forecasting on Occ3D-nuScenes. Rows show the ground truth and predictions from I 2-World, GenieDrive, and GeoTex at 1s, 2s, and 3s. The enlarged regions at 3s highlight pedestrian prediction (left, cyan boxes) and building-structure continuation (right). Table 3. Scene reconstruction. Interfaces are occupied voxels with an empty or differently labeled GT six-neighbor. Other occupied voxels are interiors.                    
+
+> Method Encoding Reconstruction mIoU (%) ↑IoU (%) ↑Interface Interior mIoU (%) ↑mIoU (%) ↑
+> I2-World [18] Intra–Inter Tokens 81.22 68.30 86.88 97.34 GenieDrive [41] Tri-plane 86.15 75.53 91.18 98.64
+> GeoTex(Ours) Geometry-as-Texture 95.03 88.40 96.71 99.75
+
+and 16.84% for GenieDrive. This slower decline high-lights GeoTex’s stability over multiple autoregressive steps. GeoTex Representation preserves a stable geo-metric basis for long-term forecasting, while persistent observation memory enables GeoTex Prediction to re-trieve reliable scene evidence after initial observations leave the sliding window, mitigating structural degrada-tion and forecasting drift. 
+
+4.3 Geometry-Preserving Scene Reconstruction 
+
+We compare GeoTex Representation with I 2-World and GenieDrive on the complete validation set, assessing re-construction quality and fidelity at interfaces and interiors. GeoTex Representation achieves the best performance across metrics in Tab. 3. Compared with GenieDrive, reconstruction mIoU increases from 86.15% to 95.03%, -1.0 -0.5 0+0.5 +1.0 Semantic correctness gain  
+
+> (a) Ground truth (b) Reconstruction gain (50 × 50 × 4)
+
+(a) Ground truth (b) Reconstruction gain 
+
+Figure 4. Spatial distribution of reconstruction gains. Geo-Tex’s semantic-correctness gain over the mean of I 2-World and GenieDrive is aggregated into a 50 ×50 ×4 field. Warm and cool colors denote improvements and regressions, respectively. 
+
+while IoU and interface mIoU improve by 17.04% and 6.06% relatively. All methods approach saturation in structural interiors, whereas interfaces retain a clear per-formance gap. The larger performance gap at structural interfaces highlights GeoTex’s improved preservation of scene shape and semantic boundaries. These gains con-centrate on regions with complex height changes, thin structures, and extended spatial layouts (Fig. 4). Category-wise gains peak in manmade and vegetation, characterized by complex height variations and cross-column extent (Appendix C). 7Table 4. Representation ablations in reconstruction and forecasting. Forecasting metrics average the 1s, 2s, and 3s endpoints after decoder adaptation.                         
+
+> Method Reconstruction (%) Forecasting (%) mIoU ↑IoU ↑Interface Interior mIoU ↑IoU ↑
+> mIoU ↑mIoU ↑
+> w/o Explicit Geometry Modeling 84.13 76.19 89.63 99.16 43.57 53.45 w/o Joint Geometric Interaction 91.82 85.32 94.80 99.51 44.46 55.51
+> Full Method 95.03 88.40 96.71 99.75 46.76 57.97
+
+Table 5. Component ablations of GeoTex Prediction on Occ3D-nuScenes. Structural variants use adapted decoders. The w/o Decoder Adaptation variant pairs the final prediction module with the original decoder.                                          
+
+> Method mIoU (%) ↑IoU (%) ↑
+> 1s 2s 3s Avg. 1s 2s 3s Avg. w/o Relational Memory 52.00 43.47 37.34 44.27 60.65 55.46 51.27 55.79 w/o Historical Residual Update 50.68 42.68 36.53 43.30 60.36 55.33 51.05 55.58 w/o Decoder Adaptation 47.72 38.87 32.85 39.81 60.72 55.89 51.61 56.07
+> Full Method 54.54 45.99 39.76 46.76 62.59 57.79 53.54 57.97
+
+4.4 Ablation Study GeoTex Representation Evaluation. We construct two ablations to examine explicit geometric modeling and joint geometric interaction. The first merges height di-rectly into channels and uses a 2D encoder and decoder, removing explicit 3D geometric modeling. The second retains local 3D feature extraction but removes the joint interaction between within-column height patterns and cross-column spatial relations. Both variants modify the decoder and use the same GeoTex Prediction architecture for forecasting. As shown in Tab. 4, retaining local 3D processing yields relative increases of 9.14% in reconstruction mIoU and 11.99% in IoU. This indicates that explicitly orga-nizing 3D neighborhoods preserves scene structure more effectively than directly mixing height channels. Average forecasting mIoU and IoU also rise by 2.04% and 3.87%. Full Method further connects within-column and cross-column structures, reaching 95.03% reconstruction mIoU and 88.40% IoU. Average forecasting scores reach 46.76% and 57.97%, relative gains of 5.17% and 4.43% over the second variant. All three variants approach satura-tion in interiors but differ markedly at structural interfaces. This aligns with the goal of joint geometric interaction: linking local height patterns with surrounding structure to preserve the geometric texture formed by interfaces, gaps, and height variations during compression and reconstruc-tion. 
+
+GeoTex Prediction Component Evaluation. Table 5 evaluates cross-observation relational memory, target-referenced historical residual update, and prediction-domain decoder adaptation.  
+
+> (a) Before decoder adaptation (b) After decoder adaptation
+
+Figure 5. Qualitative effect of prediction-domain decoder adaptation. The enlarged regions highlight the grid-like se-mantic confusion and fragmented boundaries produced by the original reconstruction decoder, which are notably suppressed after adapting only the decoder to predicted latent states. 
+
+The memory-free variant trails Full Method by 5.33% in average mIoU and 3.76% in IoU, with the relative mIoU gap widening from 4.66% at 1s to 6.09% at 3s. Without historical residual updates, accuracy drops at every horizon, and average mIoU and IoU decline by 7.40% and 4.12%. Initial observation memory thus helps sustain multi-step accuracy, while complementary recent-history residuals support each state update. Decoding Full Method’s predictions with the original reconstruction decoder reduces average mIoU and IoU by 14.86% and 3.28%. The larger semantic decline reflects this decoder’s limited ability to interpret predicted latent states, rather than a complete loss of scene structure in those states. 
+
+Prediction-Domain Decoder Adaptation. The de-coder is trained on latent representations from observed occupancy but must decode autoregressively generated states during forecasting. This distribution shift can am-plify inconsistencies between neighboring cells during height unfolding and two-stage 3D upsampling, produc-ing grid-like semantic confusion and fragmented bound-aries (Fig. 5(a)). With the encoder and prediction module frozen, we adapt the decoder using encoded and predicted states. Grid-like confusion decreases, and elongated structures and occupancy boundaries become more continuous (Fig. 5(b)). Since both visualizations use identical pre-dicted latent states, these improvements reflect better de-coding of existing scene information. GeoTex’s high pre-adaptation IoU and larger relative gains in mIoU than in IoU indicate that adaptation improves semantic decoding of geometry retained in predicted states. Decoder adaptation also alleviates semantic confusion and merging of neighboring classes in I 2-World and Ge-nieDrive. I 2-World’s gains contrast with its E2E degra-dation reported by GenieDrive, highlighting the value of preserving the learned representation and prediction process. See Appendix D for detailed comparisons. 85 Conclusion 
+
+We present GeoTex, an occupancy world model combin-ing geometry-as-texture encoding with history-grounded 4D occupancy forecasting. GeoTex Representation jointly organizes height patterns and cross-column relations as geometric texture during compression and reconstruction. This preserves local shape distinctions within semantic classes. GeoTex Prediction retains initial observation evi-dence in fixed relational memory and updates future states through target-referenced historical residuals. Decoder-only adaptation then improves the decoding of these states into 3D semantic occupancy. Experiments demonstrate improved scene geometry and state-of-the-art forecasting with a compact model, and the gains increase at longer horizons. 
+
+## LLM Usage Statement 
+
+Generative AI tools, including OpenAI ChatGPT and Codex, were used during the preparation of this work to assist with language editing, improving the clarity and organization of the manuscript, and literature search and summarization. These tools also assisted with code syntax refinement and debugging, figure and table preparation and layout in LaTeX, and feedback on the presentation of mathematical formulations. All AI-generated suggestions were carefully assessed by the authors before incorpo-ration. Relevant literature suggested by AI tools was manually verified against the original sources, and all AI-assisted text and technical content were reviewed and revised by the authors. The authors take full responsibility for the final content of this work, including all text, claims, results, and artifacts produced with the aid of generative AI. 
+
+## References 
+
+[1] Samy Bengio, Oriol Vinyals, Navdeep Jaitly, and Noam Shazeer. Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks. Advances in Neural Information Processing Systems , 28, 2015. [2] Maxim Berman, Amal Rannen Triki, and Matthew B Blaschko. The Lovász-Softmax Loss: A Tractable Surro-gate for the Optimization of the Intersection-over-Union Measure in Neural Networks. In 2018 IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition , pages 4413–4421. IEEE, 2018. [3] Hengwei Bian, Lingdong Kong, Haozhe Xie, Liang Pan, Yu Qiao, and Ziwei Liu. DynamicCity: Large-Scale 4D Occupancy Generation from Dynamic Scenes. In Inter-national Conference on Learning Representations , pages 40682–40716, 2025. [4] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Giancarlo Baldan, and Oscar Beijbom. nuScenes: A Multimodal Dataset for Autonomous Driving. In 2020 IEEE/CVF conference on computer vision and pattern recognition (CVPR) , pages 11618–11628. IEEE, 2020. [5] Anh-Quan Cao and Raoul De Charette. Monoscene: Monocular 3d semantic scene completion. In 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 3981–3991. IEEE, 2022. [6] Eric R Chan, Connor Z Lin, Matthew A Chan, Koki Nagano, Boxiao Pan, Shalini De Mello, Orazio Gallo, Leonidas J Guibas, Jonathan Tremblay, Sameh Khamis, et al. Efficient geometry-aware 3d generative adversarial networks. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 16123– 16133, 2022. [7] Sitao Chen, Zhuangwei Zhuang, Hui Luo, Qingyao Wu, and Mingkui Tan. Geometry-Aware Spatio-Temporal Con-text Modeling for 4D Occupancy Forecasting. In European Conference on Computer Vision , pages 382–399. Springer, 2026. [8] Patrick Esser, Robin Rombach, and Bjorn Ommer. Taming transformers for high-resolution image synthesis. In Pro-ceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 12873–12883, 2021. [9] Tuo Feng, Wenguan Wang, and Yi Yang. Gaussian-based World Model: Gaussian Priors for Voxel-Based Occu-pancy Prediction and Future Motion Prediction. In 2025 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 25239–25249. IEEE, 2025. [10] Leon Gatys, Alexander S Ecker, and Matthias Bethge. Texture Synthesis Using Convolutional Neural Networks. 
+
+Advances in Neural Information Processing Systems , 28, 2015. [11] Songen Gu, Wei Yin, Bu Jin, Xiaoyang Guo, Jun-ming Wang, Haodong Li, Qian Zhang, and Xiaoxiao Long. DOME: Taming Diffusion Model into High-Fidelity Controllable Occupancy World Model. arXiv preprint arXiv:2410.10429 , 2024. [12] Yuanhui Huang, Wenzhao Zheng, Yunpeng Zhang, Jie Zhou, and Jiwen Lu. Tri-Perspective View for Vision-Based 3D Semantic Occupancy Prediction. In 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 9223–9232. IEEE, 2023. [13] Diederik P Kingma and Max Welling. Auto-Encoding Variational Bayes. arXiv preprint arXiv:1312.6114 , 2013. [14] Doyup Lee, Chiheon Kim, Saehoon Kim, Minsu Cho, and Wook-Shin Han. Autoregressive image generation using residual quantization. In 2022 IEEE/CVF conference on computer vision and pattern recognition (CVPR) , pages 11513–11522. IEEE, 2022. [15] Bohan Li, Jiazhe Guo, Hongsi Liu, Yingshuang Zou, Yikang Ding, Xiwu Chen, Hu Zhu, Feiyang Tan, Chi 
+
+9Zhang, Tiancai Wang, et al. Uniscene: Unified occupancy-centric driving scene generation. In 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 11971–11981. IEEE, 2025. [16] Yinhao Li, Zheng Ge, Guanyi Yu, Jinrong Yang, Zen-gran Wang, Yukang Shi, Jianjian Sun, and Zeming Li. Bevdepth: Acquisition of reliable depth for multi-view 3d object detection. In Proceedings of the AAAI conference on artificial intelligence , pages 1477–1485, 2023. [17] Yiming Li, Zhiding Yu, Christopher Choy, Chaowei Xiao, Jose M Alvarez, Sanja Fidler, Chen Feng, and Anima Anandkumar. VoxFormer: Sparse Voxel Transformer for Camera-based 3D Semantic Scene Completion. In 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 9087–9098. IEEE, 2023. [18] Zhimin Liao, Ping Wei, Ruijie Zhang, Shuaijia Chen, Haoxuan Wang, and Ziyang Ren. I 2-World: Intra-Inter Tokenization for Efficient Dynamic 4D Scene Forecasting. In 2025 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 25810–25819. IEEE, 2025. [19] Tianran Liu, Shengwen Zhao, Mozhgan Pourkeshavarz, Weican Li, and Nicholas Rhinehart. OccSim: Multi-kilometer Simulation with Long-horizon Occupancy World Models. arXiv preprint arXiv:2603.28887 , 2026. [20] Ilya Loshchilov and Frank Hutter. Decoupled Weight Decay Regularization. arXiv preprint arXiv:1711.05101 ,2017. [21] Jiachen Lu, Ze Huang, Zeyu Yang, Jiahui Zhang, and Li Zhang. Wovogen: World volume-aware diffusion for controllable multi-camera driving scene generation. In 
+
+European conference on computer vision , pages 329–345. Springer, 2024. [22] Chen Min, Dawei Zhao, Liang Xiao, Jian Zhao, Xinli Xu, Zheng Zhu, Lei Jin, Jianshu Li, Yulan Guo, Junliang Xing, et al. Driveworld: 4d pre-trained scene understanding via world models for autonomous driving. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 15522–15533. IEEE, 2024. [23] Robin Rombach. High-resolution image synthesis with latent diffusion models. arXiv preprint arXiv:2112.10752 ,2022. [24] Yining Shi, Kun Jiang, Qiang Meng, Ke Wang, Jiabao Wang, Wenchao Sun, Tuopu Wen, et al. Come: Adding scene-centric forecasting control to occupancy world model. Advances in Neural Information Processing Sys-tems , 38:70–96, 2026. [25] Keyu Tian, Yi Jiang, Zehuan Yuan, Bingyue Peng, and Liwei Wang. Visual Autoregressive Modeling: Scalable Image Generation via Next-Scale Prediction. Advances in Neural Information Processing Systems , 37:84839–84865, 2024. [26] Xiaoyu Tian, Tao Jiang, Longfei Yun, Yucheng Mao, Huitong Yang, Yue Wang, Yilun Wang, and Hang Zhao. Occ3D: A Large-Scale 3D Occupancy Prediction Bench-mark for Autonomous Driving. Advances in Neural Infor-mation Processing Systems , 36:64318–64330, 2023. [27] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention Is All You Need. Advances in Neural Information Processing Systems , 30, 2017. [28] Huiyu Wang, Yukun Zhu, Bradley Green, Hartwig Adam, Alan Yuille, and Liang-Chieh Chen. Axial-DeepLab: Stand-Alone Axial-Attention for Panoptic Segmentation. In European conference on computer vision , pages 108– 126. Springer, 2020. [29] Lening Wang, Wenzhao Zheng, Yilong Ren, Han Jiang, Zhiyong Cui, Haiyang Yu, and Jiwen Lu. Occsora: 4d occupancy generation models as world simulators for au-tonomous driving. IEEE Transactions on Image Process-ing , 2026. [30] Yuqi Wang, Yuntao Chen, Xingyu Liao, Lue Fan, and Zhaoxiang Zhang. Panoocc: Unified occupancy represen-tation for camera-based 3d panoptic segmentation. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 17158–17168. IEEE, 2024. [31] Julong Wei, Shanshuai Yuan, Pengfei Li, Qingda Hu, Zhongxue Gan, and Wenchao Ding. OccLLaMA: An Occupancy-Language-Action Generative World Model for Autonomous Driving. arXiv preprint arXiv:2409.03272 ,2024. [32] Yi Wei, Linqing Zhao, Wenzhao Zheng, Zheng Zhu, Jie Zhou, and Jiwen Lu. SurroundOcc: Multi-Camera 3D Occupancy Prediction for Autonomous Driving. In 2023 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 21672–21683. IEEE, 2023. [33] Jialong Wu, Shaofeng Yin, Ningya Feng, Xu He, Dong Li, Jianye Hao, and Mingsheng Long. iVideoGPT: Interac-tive VideoGPTs are Scalable World Models. Advances in Neural Information Processing Systems , 37:68082–68119, 2024. [34] Jingyi Xu, Xieyuanli Chen, Junyi Ma, Jiawei Huang, Jin-tao Xu, Yue Wang, and Ling Pei. Spatiotemporal Decou-pling for Efficient Vision-Based Occupancy Forecasting. In 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 22338–22347. IEEE, 2025. [35] Tianshuo Xu, Hao Lu, Xu Yan, Yingjie Cai, Bingbing Liu, and Yingcong Chen. Occ-LLM: Enhancing Autonomous Driving with Occupancy-Based Large Language Models. In 2025 IEEE International Conference on Robotics and Automation (ICRA) , pages 8434–8441. IEEE, 2025. 
+
+10 [36] Tianyi Yan, Dongming Wu, Wencheng Han, Junpeng Jiang, Xia Zhou, Kun Zhan, Cheng-zhong Xu, and Jian-bing Shen. DrivingSphere: Building a High-fidelity 4D World for Closed-loop Simulation. In 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 27531–27541. IEEE, 2025. [37] Ziyang Yan, Wenzhen Dong, Yihua Shao, Yuhang Lu, Haiyang Liu, Jingwen Liu, Haozhe Wang, Zhe Wang, Yan Wang, Fabio Remondino, et al. Renderworld: World model with self-supervised 3d label. In 2025 IEEE Inter-national Conference on Robotics and Automation (ICRA) ,pages 6063–6070. IEEE, 2025. [38] Lei Yang, Kaicheng Yu, Tao Tang, Jun Li, Kun Yuan, Li Wang, Xinyu Zhang, and Peng Chen. Bevheight: A robust framework for vision-based roadside 3d object detection. In 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 21611–21620. IEEE, 2023. [39] Yu Yang, Alan Liang, Jianbiao Mei, Yukai Ma, Yong Liu, and Gim Hee Lee. X-Scene: Large-Scale Driving Scene Generation with High Fidelity and Flexible Controllability. In Advances in Neural Information Processing Systems ,pages 104415–104451. Curran Associates, Inc., 2025. [40] Yu Yang, Jianbiao Mei, Yukai Ma, Siliang Du, Wenqing Chen, Yijie Qian, Yuxiang Feng, and Yong Liu. Driving in the occupancy world: Vision-centric 4d occupancy fore-casting and planning via world models for autonomous driving. In Proceedings of the AAAI Conference on Artifi-cial Intelligence , pages 9327–9335, 2025. [41] Zhenya Yang, Zhe Liu, Yuxiang Lu, Liping Hou, Chenx-uan Miao, Siyi Peng, Bailan Feng, Xiang Bai, and Heng-shuang Zhao. GenieDrive: Towards Physics-Aware Driv-ing World Model with 4D Occupancy Guided Video Gen-eration. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 35680– 35690, 2026. [42] Lijun Yu, José Lezama, Nitesh Bharadwaj Gundavarapu, Luca Versari, Kihyuk Sohn, David Minnen, Yong Cheng, Agrim Gupta, Xiuye Gu, Alexander G Hauptmann, et al. Language model beats diffusion-tokenizer is key to vi-sual generation. In International Conference on Learning Representations , pages 765–783, 2024. [43] Qihang Yu, Mark Weber, Xueqing Deng, Xiaohui Shen, Daniel Cremers, and Liang-Chieh Chen. An Image is Worth 32 Tokens for Reconstruction and Generation. Ad-vances in Neural Information Processing Systems , 37: 128940–128966, 2024. [44] Haiming Zhang, Ying Xue, Xu Yan, Jiacheng Zhang, We-ichao Qiu, Dongfeng Bai, Bingbing Liu, Shuguang Cui, and Zhen Li. An Efficient Occupancy World Model via Decoupled Dynamic Flow and Image-assisted Training. 
+
+arXiv preprint arXiv:2412.13772 , 2024. [45] Yunpeng Zhang, Zheng Zhu, and Dalong Du. OccFormer: Dual-path Transformer for Vision-based 3D Semantic Oc-cupancy Prediction. In 2023 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 9399–9409. IEEE, 2023. [46] Wenzhao Zheng, Weiliang Chen, Yuanhui Huang, Borui Zhang, Yueqi Duan, and Jiwen Lu. OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving. In European conference on computer vision , pages 55–72. Springer, 2024. [47] Yang Zhou, Kaijian Chen, Rongjun Xiao, and Hui Huang. Neural Texture Synthesis with Guided Correspondence. In 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 18095–18104. IEEE, 2023. [48] Yang Zhou, Rongjun Xiao, Dani Lischinski, Daniel Cohen-Or, and Hui Huang. Generating Non-Stationary Textures Using Self-Rectification. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) ,pages 7767–7776. IEEE, 2024. [49] Xizhou Zhu, Weijie Su, Lewei Lu, Bin Li, Xiaogang Wang, and Jifeng Dai. Deformable DETR: Deformable Trans-formers for End-to-End Object Detection. arXiv preprint arXiv:2010.04159 , 2020. 
+
+11 Appendix 
+
+## A Architecture and Training Details 
+
+Table A1. Architecture hyperparameters of GeoTex. The default T = 6 corresponds to a 3-second forecasting horizon; 
+
+T = 12 is used only for long-term evaluation.                                                        
+
+> Hyperparameter Value Description
+> H, W, D 200 ,200 ,16 Dimensions of the semantic occupancy grid
+> K18 Semantic labels, including empty
+> L4Number of historical observation frames
+> T6Number of predicted future frames
+> GeoTex Representation
+> Cemb 8Semantic embedding dimension
+> Cstem , C 48 ,96 3D stem and feature channels
+> h, w, d 50 ,50 ,4Volume before column compression
+> Nrep head 4Geometric-texture attention heads
+> h, w, c 50 ,50 ,64 Continuous latent dimensions
+> Cdec 96 ,48 ,24 Decoder channel progression
+> Dlocal {1,2}Local-context dilations
+> GeoTex Prediction
+> |M| 4Fixed observation-memory capacity
+> |H t|4Sliding latent-history capacity
+> Ncell 5Latent transition cells
+> iscene 3Full-scene interaction position
+> Npred head 8Prediction attention heads
+> Nsample 4Samples per historical state –Axial x/y Factorization of full-scene interaction
+> Cego 12 →64 Ego-motion projection
+
+Both representation learning and prediction training use a weight decay of 10 −2.
+
+Representation Learning. GeoTex Representation uses a learning rate of 3×10 −4. After 200 warm-up up-dates, cosine decay reduces the learning rate to 2×10 −6.The KL weight reaches 5×10 −3 over the first 2,000 up-dates. 
+
+Prediction Training. GeoTex Prediction uses a learn-ing rate of 10 −3, gradient clipping at 5, and an exponential moving average (EMA) with decay of 0.999. 
+
+Decoder Adaptation. We freeze the encoder and pre-diction module and adapt only the decoder for 10 epochs at a learning rate of 10 −5, weighting the occupancy losses from encoded and predicted latent states equally. 
+
+## B GeoTex Prediction Architecture 
+
+GeoTex Prediction implements history-grounded forecast-ing through five transition cells. Each cell combines local spatial interaction with target-referenced historical resid-ual updates from recent states. The third cell additionally recalls fixed observation memory and integrates this evi-dence through axially factorized full-scene interaction. Memory recall supplies local evidence for each target position, but elongated structures, road extent, and cross-region dependencies require broader scene context. The third transition cell therefore updates the target state us-ing both current content and recalled evidence through row-wise and column-wise interaction. Here U denotes a generic input to an axial update in the next-frame coor-dinate system, Rrecall the recalled evidence on the target grid, m its validity mask, and at the ego-motion condi-tion from t to t + 1 . Current and memory features use separate key and value projections, while their attention scores share one normalization so the target query can select between predicted content and observed evidence. For axis a ∈ { x, y }, Qa, La, and Aa denote queries, attention scores, and normalized weights: 
+
+Qa = Query a(U, at),
+
+La = QaKcur  
+
+> a
+
+(U)T, QaKmem  
+
+> a
+
+(Rrecall )T ,
+
+Aa = MaskedSoftmax a
+
+ La
+
+√dk
+
++ Bpos  
+
+> a
+
+; m
+
+
+
+,
+
+U ← U + Proj a
+
+
+
+Aa
+
+ V cur  
+
+> a
+
+(U)
+
+V mem  
+
+> a
+
+(Rrecall )
+
+ 
+
+,
+
+(A1) where Query a combines target content, position, and ego-motion. V cur  
+
+> a
+
+and V mem  
+
+> a
+
+are the value projections of current target features and recalled evidence, respectively. The key dimension per attention head is dk, and Bpos  
+
+> a
+
+sup-plies relative position biases to both source blocks. Proj a
+
+concatenates the attention heads and projects the aggre-gated features. The mask m excludes invalid memory positions. Starting from the third cell’s target state after historical updating, Uh = Uloc + ∆ Uhist , the scene update applies the two axes sequentially ( x then y). A feed-forward resid-ual update then produces Ug , completing SceneAttn in the main paper. This factorization propagates recalled evidence over the full scene without constructing dense attention between all pairs of planar positions. The remaining transition cells continue local spatial interaction and historical updates to produce bZt+1 , cor-responding to Refine in the main paper. During autore-gressive inference, the model appends this prediction to the four-frame sliding history Ht and removes the oldest state: 
+
+Ht+1 = {(¯Zt−2, Pt−2), (¯Zt−1, Pt−1),
+
+(¯Zt, Pt), (bZt+1 , Pt+1 )}, (A2) 12 where Ps ∈ R4×4 is frame s’s ego-to-global pose matrix. During inference, ¯Zs is an encoded observation for s ≤ 0
+
+or a previously predicted state for s > 0. Memory M
+
+remains fixed throughout rollout. Training mixes encoded and predicted history states through scheduled sampling. 
+
+## C Category-Wise Reconstruction Analysis 
+
+The main paper analyzes the reconstruction ability of GeoTex Representation over structural interfaces and inte-riors. To further identify which semantic content benefits from GeoTex, we compute reconstruction IoU for each non-empty class on the complete validation set and use the class-wise mean of GenieDrive and I 2-World as the baseline. For each class, the relative gain is defined as 
+
+Gain = 
+
+ IoU GeoTex 
+
+(IoU GenieDrive + IoU I2-World ) /2 − 1
+
+
+
+× 100% .
+
+(A3) As shown in Fig. A1, GeoTex improves every non-empty class, but the gains are not uniformly distributed. The largest improvements occur for manmade and vege-tation , reaching 40.8% and 37.5%, respectively. These classes commonly contain continuous facades, irregular height variations, and structures extending across multi-ple spatial columns, making their reconstruction partic-ularly dependent on within-column height patterns and cross-column relations. Classes with pronounced three-dimensional volume and contour variation also benefit substantially, including construction vehicle at 24.4% and 
+
+trailer at 19.4%. By contrast, the approximately planar driveable surface 
+
+and other flat classes improve by only 8.0% and 4.2%. Gains for small-scale classes, including bicycle , traffic cone , motorcycle , and pedestrian , remain between 3.4% and 5.4%. The gains are mainly concentrated in categories with complex height variations and pronounced spatial extent across columns. 
+
+## D Prediction-Domain Decoder Adaptation 
+
+During representation learning, the decoder receives la-tent representations encoded from observed occupancy, whereas forecasting requires it to decode autoregressively generated states. This distribution gap affects semantic classification and local boundary recovery. To examine its effect, we freeze each method’s encoder and prediction module and adapt only the decoder using both encoded and predicted latent states. For GenieDrive, adaptation starts from our reproduced non-E2E forecasting model. As shown in Tab. A2, all three methods improve in av-erage mIoU. I 2-World increases from 39.73% to 41.65%, a relative gain of 4.83%. Notably, the E2E experiment reported by GenieDrive [41] reduced I 2-World’s average 
+
+Table A2. Effect of prediction-domain decoder adaptation on Occ3D-nuScenes. Avg. is the mean over the 1s, 2s, and 3s endpoints.                       
+
+> Method Decoder mIoU (%) ↑IoU (%) ↑
+> 1s 2s 3s Avg. 1s 2s 3s Avg. I2-World [18] Original 47.62 38.58 32.98 39.73 54.29 49.43 45.69 49.80 Adapted 49.27 40.57 35.11 41.65 54.98 50.32 46.70 50.67 GenieDrive [41] Original 48.29 38.61 32.79 39.90 55.46 49.52 45.18 50.05 Adapted 48.81 39.19 33.34 40.45 55.46 49.57 45.24 50.09 GeoTex(Ours) Original 47.72 38.87 32.85 39.81 60.72 55.89 51.61 56.07 Adapted 54.54 45.99 39.76 46.76 62.59 57.79 53.54 57.97
+
+mIoU to 10.09%. Unlike jointly updating the represen-tation and forecasting model, decoder adaptation keeps the encoded and predicted latent states fixed and focuses optimization on decoding. I 2-World can therefore ben-efit from subsequent adaptation despite the degradation observed under that E2E setting. GenieDrive gains 1.37% in average mIoU while its IoU remains nearly unchanged. The yellow boxes in Fig. A2 illustrate these modest but clear local improve-ments: the green-class confusion along the road edge is reduced, and neighboring semantic regions become better separated. In the left highlighted region of I 2-World, the pedestrian previously merged with the building also be-comes more distinct. These examples show that decoder adaptation reduces local semantic confusion and helps prevent small objects from being absorbed into neigh-boring structures. However, it only adjusts the decoding of fixed predicted states and does not alter the predicted latent-state sequence, so local corrections need not yield a large overall gain. GeoTex shows the most pronounced decoding improve-ment. Its average mIoU increases from 39.81% to 46.76%, a relative gain of 17.46%, while average IoU rises from 56.07% to 57.97%, a relative gain of 3.39%. Before adap-tation, its IoU already exceeds those of the other two methods, indicating that the model preserves scene occu-pancy structure well. The original decoder, however, does not fully translate this structural information into accurate voxel semantics. In the illustrated scene, GeoTex’s original decoder also produces conspicuous grid-like occupancy artifacts. The decoder first unfolds the compact planar state into height features and then progressively upsamples them into 3D occupancy. When applied to predicted states, a mapping learned from encoded observations can amplify incon-sistencies between neighboring latent cells, producing regular voxel fragments and interleaved semantic labels. After adaptation, the grid-like confusion in the right high-lighted region is substantially reduced, boundaries be-come more continuous, and the small object in the left region becomes more clearly separated from surround-13 manmade vegetation construction veh. others trailer terrain car truck sidewalk bus driveable surface barrier pedestrian motorcycle traffic cone other flat bicycle 
+
+> 010 20 30 40
+> Relative IoU improvement (%)  +40.8% +37.5%
+
+Figure A1. Relative reconstruction-IoU gains of GeoTex over the class-wise mean of GenieDrive and I 2-World. 
+
+Figure A2. Predictions before and after decoder adaptation across different methods. The top and bottom rows use the original and adapted decoders, respectively. Yellow boxes highlight reductions in local semantic confusion, merging of neighboring classes, and grid-like occupancy artifacts. 
+
+ing structures. Since the predicted latent states remain identical before and after adaptation, these improvements identify decoder mismatch as an important source of the artifacts and demonstrate that adaptation makes better use of the scene information already present in those states. Overall, all three methods show larger relative gains in mIoU than in IoU, indicating a more pronounced ben-efit in semantic discrimination. The qualitative results also reveal corrections to occupancy boundaries and fine structures. For GeoTex, the high pre-adaptation IoU indi-cates that predicted states retain scene occupancy struc-ture, while the subsequent mIoU gain shows that decoder adaptation improves their semantic readout. 
+
+## E Ego-Motion-Controlled Scene Generation 
+
+We hold the four historical observations and travel speed fixed in an intersection scene and vary only the future turning direction. Straight, left-turn, and right-turn ego-motion sequences each drive a six-frame rollout at 2 Hz, covering the next 3 seconds. The same trained model generates all three sequences without further training. As shown in Fig. A3, the main road extends along its original direction under straight-driving control. Under left- and right-turn controls, the intersection and surround-ing structures change continuously in the ego-centric frame as the vehicle turns, producing distinct future occu-pancy sequences. The main road contours and roadside structures remain coherent while the model responds to the control inputs. GeoTex Prediction uses ego-motion 14 Figure A3. Scene generation under ego-motion control. The left column shows the last historical observation and the prescribed trajectories. The remaining columns show future occupancy sequences for going straight, turning left, and turning right. Below each prediction, (∆ x, ∆y, ∆ψ) denotes forward displacement, lateral displacement, and yaw change relative to the preceding ego frame.   
+
+> Figure A4. Different future evolutions of a surrounding vehicle. The yellow vehicle continues straight in GT, whereas GeoTex predicts a gradual turn toward a side road. This example highlights the distinction between matching the observed trajectory and assessing the plausibility of a future evolution.
+
+to locate historical content relative to future target po-sitions. Observation memory supplies scene context, and recent history provides complementary state updates. Thus, the same historical scene supports different motion-conditioned futures while retaining coherent structure. 
+
+## F Dynamic Future Ambiguity and Evalua-tion Limitations 
+
+Figure A4 shows a divergence between GeoTex and GT in the evolution of a surrounding vehicle. The yellow vehicle continues along the road in GT, whereas GeoTex predicts a gradual turn toward a side road. GeoTex Predic-tion updates scene content using historical evidence after geometric alignment, so object evolution is not restricted to rigid propagation. In this scene, the road branch pro-vides spatial scope for an alternative maneuver. Limited historical observations may not uniquely determine a ve-hicle’s future intent, so predictions that differ from the observed trajectory also need to be assessed against scene and motion constraints. This example illustrates a limitation of evaluation 15 against a single observed future. Both mIoU and IoU mea-sure voxel overlap with GT. For relatively stable structures such as roads and buildings, they directly reflect geomet-ric and semantic agreement. Dynamic objects, however, may admit several plausible future behaviors. Even a tra-jectory that follows the road layout and maintains motion continuity is penalized when its position or orientation dif-fers from GT. These metrics therefore measure fidelity to the observed future, but cannot independently distinguish implausible motion from a plausible alternative. Our future work will explore evaluation protocols that account for both prediction accuracy and generative plau-sibility. Alongside voxel-level geometry and semantics, these protocols should consider motion continuity, road constraints, interaction consistency, and coverage of mul-tiple possible futures, providing a more complete assess-ment of scene evolution in occupancy world models. 16

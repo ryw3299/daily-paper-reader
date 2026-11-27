@@ -1,0 +1,298 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-11-27T02:50:49.045372+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 3,
+    "deep_divecandidates": 0,
+    "deep_cap": 8,
+    "deep_selected": 0,
+    "quick_candidates": 6,
+    "quick_skim_target": 13,
+    "quick_selected": 6
+  },
+  "deep_dive": [],
+  "quick_skim": [
+    {
+      "id": "2611.31952v1",
+      "source": "arxiv",
+      "title": "VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving",
+      "abstract": "A driving planner needs both scene semantics, which vision-language models (VLMs) provide, and spatial structure, which geometric foundation models recover from visual history. We present VLG-Drive, which keeps both models frozen and trains only a fusion interface and a planner from trajectory labels. At each camera-grid cell, the interface fuses the paired VLM and geometry features into one joint token through a geometry-anchored residual, and a command-conditioned planner reads these tokens to predict the ego trajectory. VLG-Drive achieves 31.78 EPDMS on NavHard under perturbed initial states, the highest among the compared methods, and 88.27 PDMS on NavTest from cameras alone. Pointwise fusion outperforms independent VLM and geometry streams on both benchmarks. In closed-loop driving on 420 HUGSIM scenarios, VLG-Drive outperforms all compared planners. These results indicate that a lightweight planner trained on fused features of frozen vision-language and geometric foundation models is an effective alternative to adapting either model for planning.",
+      "authors": [
+        "Junge Zhang",
+        "Jie Zhu",
+        "Yanqi Jia",
+        "Xiangyu Xu",
+        "Zixun Huang",
+        "Wenbin He",
+        "Xin Li",
+        "Jiachen Li",
+        "Liu Ren"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-11-24T04:57:54+00:00",
+      "link": "https://arxiv.org/pdf/2611.31952v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Camera-based end-to-end planner fusing VLM semantics and geometric priors",
+      "llm_evidence_cn": "融合视觉语言语义与几何先验的纯相机端到端规划器",
+      "llm_evidence": "融合视觉语言语义与几何先验的纯相机端到端规划器",
+      "canonical_evidence": "融合视觉语言语义与几何先验的纯相机端到端规划器",
+      "llm_tldr_en": "Driving planners need both scene semantics from vision-language models and spatial structure from geometry models. VLG-Drive keeps both frozen and trains a fusion interface and planner, reaching 31.78 EPDMS on NavHard and 88.27 PDMS on NavTest from cameras alone.",
+      "llm_tldr_cn": "自动驾驶规划既需要视觉语言模型提供的场景语义，也需要几何基础模型从视觉历史中恢复的空间结构。作者提出VLG-Drive，冻结两个基础模型，仅训练融合接口与规划器，在相机栅格单元上以几何锚定残差融合两类特征，再由指令条件规划器预测自车轨迹。方法在NavHard取得31.78 EPDMS，在仅用相机的NavTest上达到88.27 PDMS，表明逐点融合优于独立双流方案。",
+      "llm_tldr": "自动驾驶规划既需要视觉语言模型提供的场景语义，也需要几何基础模型从视觉历史中恢复的空间结构。作者提出VLG-Drive，冻结两个基础模型，仅训练融合接口与规划器，在相机栅格单元上以几何锚定残差融合两类特征，再由指令条件规划器预测自车轨迹。方法在NavHard取得31.78 EPDMS，在仅用相机的NavTest上达到88.27 PDMS，表明逐点融合优于独立双流方案。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.24051v1",
+      "source": "arxiv",
+      "title": "Attention Is Not Relevance: Challenging the Causality of Attention in Autonomous Driving",
+      "abstract": "Attention has become one of the most widely adopted solutions for estimating the relevance of surrounding objects and interpreting an autonomous vehicle's driving decisions. However, its ability to capture the causal impact of individual input elements on an AI model's output has long been discussed in the literature, particularly in the Natural Language Processing (NLP) domain. This work brings this discussion into the autonomous driving domain by analyzing the accuracy of attention in estimating the impact of an input object on an autonomous vehicle's driving, i.e., its relevance. To this end, we compare different attention-based relevance estimation methods against a causal reference of object relevance obtained through counterfactual analysis. We perform our analysis on more than 80,000 synthetic driving scenes using an autonomous vehicle based on PlanT 2.0, a state-of-the-art Transformer-based model for object-level planning. Results show that attention provides a correlational rather than causal indication of object relevance. Attention-based relevance estimation methods do not consistently identify all relevant objects and tend to incorrectly classify as relevant objects with little or no impact on the vehicle's driving. In particular, results show that attention can effectively identify relevant objects in simple single-lane, straight-road scenarios, but its accuracy degrades in more complex settings, such as multi-lane roads and intersections. These findings highlight the limitations of attention as a proxy for object relevance, calling for novel methods able to accurately capture the causal impact of individual objects on the vehicle's driving and distinguish it from correlational associations.",
+      "authors": [
+        "Luca Lusvarghi",
+        "Javier Gozalvez"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-11-18T08:42:22+00:00",
+      "link": "https://arxiv.org/pdf/2611.24051v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Counterfactual analysis of whether attention reflects causal object relevance in driving decisions",
+      "llm_evidence_cn": "用反事实方法检验注意力是否反映驾驶决策中的因果对象相关性",
+      "llm_evidence": "用反事实方法检验注意力是否反映驾驶决策中的因果对象相关性",
+      "canonical_evidence": "用反事实方法检验注意力是否反映驾驶决策中的因果对象相关性",
+      "llm_tldr_en": "Attention is widely used to interpret which objects matter for an autonomous vehicle decision. This work compares attention-based relevance estimates against a counterfactual causal reference, showing attention is not reliable causal relevance in driving.",
+      "llm_tldr_cn": "注意力被广泛用于判断哪些周边对象影响自动驾驶决策，但其是否反映输入的因果影响一直存疑。作者将该争论引入自动驾驶领域，用反事实干预得到的对象因果相关性作为参考，系统比较多种基于注意力的相关性估计方法。分析表明注意力得分与因果相关性存在系统性偏差。该结论对可解释驾驶决策与基于因果的鲁棒性评测具有警示意义。",
+      "llm_tldr": "注意力被广泛用于判断哪些周边对象影响自动驾驶决策，但其是否反映输入的因果影响一直存疑。作者将该争论引入自动驾驶领域，用反事实干预得到的对象因果相关性作为参考，系统比较多种基于注意力的相关性估计方法。分析表明注意力得分与因果相关性存在系统性偏差。该结论对可解释驾驶决策与基于因果的鲁棒性评测具有警示意义。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.34614v1",
+      "source": "arxiv",
+      "title": "Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models",
+      "abstract": "Vision-Language-Action (VLA) models introduce language reasoning into end-to-end autonomous driving. They output a language decision together with a trajectory, which makes the planner more interpretable. However, in existing methods the language decision is either an independent output or an index that selects among similar candidate trajectories, and its annotations are not verified against the trajectory. As a result, the language decision and the trajectory are often inconsistent in closed-loop driving. To address this, we propose Commit2Drive, a framework that imposes the language decision as a consistency constraint on trajectory planning. The decision is a commitment, a maneuver class with a continuous parameter that one deterministic rule reads from any trajectory, and it is grounded in facts reported by the perception of the model itself. A Maneuver Bank maps the commitment to a code with a kinematic meaning, and consistency losses train the planner to execute every admissible decision of a scene, so that the trajectory follows the decision. An automatic data pipeline supplies the supervision. Decisions are labeled from the future motion of the expert, counterfactual executions train the decision and the trajectory together, and rule-based functions with a Vision-Language Model (VLM) generate, review and refine the language annotations. The code is a lookup that involves no hidden state of the language model, so Commit2Drive is extensible to rule-based decisions, which the same planner executes without retraining. Commit2Drive uses a 0.5B language model and runs closed-loop inference online on a single consumer graphics card. On Bench2Drive, Commit2Drive reaches a Driving Score (DS) of 78.50 and a Success Rate (SR) of 55.91% with a lightweight model, which is competitive with the state of the art, and greatly reduces the language-action inconsistency. Code will be released soon.",
+      "authors": [
+        "Zikai Zhang",
+        "Hubert P. Shum",
+        "Toby Breckon"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-25T16:01:47+00:00",
+      "link": "https://arxiv.org/pdf/2611.34614v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "VLA end-to-end driving model constraining language decisions for trajectory planning",
+      "llm_evidence_cn": "视觉-语言-动作端到端驾驶模型，用语言决策约束轨迹规划",
+      "llm_evidence": "视觉-语言-动作端到端驾驶模型，用语言决策约束轨迹规划",
+      "canonical_evidence": "视觉-语言-动作端到端驾驶模型，用语言决策约束轨迹规划",
+      "llm_tldr_en": "Language decisions in vision-language-action driving models are not verified against trajectories, causing closed-loop inconsistency. Commit2Drive treats the decision as a maneuver commitment and enforces it as a consistency constraint on trajectory planning.",
+      "llm_tldr_cn": "现有视觉-语言-动作驾驶模型中，语言决策与轨迹往往相互独立甚至不一致，导致闭环驾驶时出现矛盾行为。作者提出Commit2Drive框架，把语言决策视为机动类别的承诺，并将其作为一致性约束施加到轨迹规划过程中。实验表明该约束提升了语言决策与轨迹在闭环驾驶中的一致性。这一思路增强了端到端驾驶规划的可解释性与自洽性。",
+      "llm_tldr": "现有视觉-语言-动作驾驶模型中，语言决策与轨迹往往相互独立甚至不一致，导致闭环驾驶时出现矛盾行为。作者提出Commit2Drive框架，把语言决策视为机动类别的承诺，并将其作为一致性约束施加到轨迹规划过程中。实验表明该约束提升了语言决策与轨迹在闭环驾驶中的一致性。这一思路增强了端到端驾驶规划的可解释性与自洽性。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.28779v1",
+      "source": "arxiv",
+      "title": "Imagine Smarter, Drive Faster: Efficient World Modeling for Decision-Aware Autonomous Driving",
+      "abstract": "World models hold great promise for autonomous driving planning, yet their ability to imagine the future often comes at a formidable computational cost. Efficiency efforts, such as knowledge distillation and domain-specific pre-training, often shift this burden to costly teachers or training pipelines, leaving lightweight world modeling an open challenge. We introduce FastWorld, a natively lightweight world-model framework for efficient autonomous driving planning. FastWorld reduces computation through compact scene representations, short-horizon action-conditioned prediction, and selective candidate verification and score refinement. These designs support efficient future-informed planning without teacher distillation or additional domain-specific pre-training. On NAVSIMv1, FastWorld achieves 92.2 PDMS at 132 FPS on a single 4090 GPU. It also achieves 89.4 EPDMS on NAVSIMv2 and an average L2 of 0.40 over 3 seconds at 17 FPS on nuScenes. Code and models can be found at https://github.com/MoyangSensei/FastWorld.",
+      "authors": [
+        "Feiyang Jia",
+        "Lin Liu",
+        "Zhicheng Bao",
+        "Caiyan Jia",
+        "Ziying Song",
+        "Shengkai Zhang",
+        "Lina Han",
+        "Yan Zhao",
+        "Xiaoshuai Hao"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-11-21T12:50:58+00:00",
+      "link": "https://arxiv.org/pdf/2611.28779v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Lightweight world model for future-informed autonomous driving planning",
+      "llm_evidence_cn": "面向未来感知自动驾驶规划的轻量世界模型",
+      "llm_evidence": "面向未来感知自动驾驶规划的轻量世界模型",
+      "canonical_evidence": "面向未来感知自动驾驶规划的轻量世界模型",
+      "llm_tldr_en": "World models improve autonomous driving planning but are computationally expensive. FastWorld is a natively lightweight world-model framework using compact scene representations, short-horizon action-conditioned prediction, and selective candidate verification to enable efficient future-informed planning without distillation.",
+      "llm_tldr_cn": "世界模型能提升自动驾驶规划的前瞻性，但想象未来的计算开销巨大，现有蒸馏与领域预训练方案又把负担转移到昂贵教师或训练流程上。作者提出FastWorld，采用紧凑场景表示、短时域动作条件预测以及选择性候选验证与分数精炼，构建原生轻量世界模型框架。该设计无需教师蒸馏即可支撑高效的未来感知规划。",
+      "llm_tldr": "世界模型能提升自动驾驶规划的前瞻性，但想象未来的计算开销巨大，现有蒸馏与领域预训练方案又把负担转移到昂贵教师或训练流程上。作者提出FastWorld，采用紧凑场景表示、短时域动作条件预测以及选择性候选验证与分数精炼，构建原生轻量世界模型框架。该设计无需教师蒸馏即可支撑高效的未来感知规划。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "advanced driver assistance systems and driving functions",
+      "matched_requirement_id": "req-15",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.30511v1",
+      "source": "arxiv",
+      "title": "AXE: AlpaSim E2E Closed Loop Challenge Technical Report",
+      "abstract": "This report presents a comprehensive pipeline for developing an end-to-end (E2E) autonomous driving model for the Physical AI AV Track. The framework consists of data curation, HD map auto-labelling, data-driven imitation learning, and simulator-based reinforcement learning. To ensure safety in the closed-loop setting, we introduce a selection-based E2E planning approach that leverages object detection and BEV segmentation to filter out trajectory candidates likely to cause collisions or off-road driving. Trained on NVIDIA NuRec and the NVIDIA PAI-AV dataset, our method scores a fixed vocabulary of trajectory candidates for collision, drivable-area compliance, and progress learned from simulated rollouts, and selects the best candidate that passes the filter. This design highlights the effectiveness of combining E2E planning with perception-based trajectory filtering for safe and reliable closed-loop autonomous driving.",
+      "authors": [
+        "Joonhee Lim",
+        "Seonmyeong Lee",
+        "Sihwan Hwang",
+        "Hanbin Jang",
+        "Hiwon Shin",
+        "Dogun Kim",
+        "Hyelin Jo",
+        "Hyeonjun Jeong",
+        "Yongjae Lee",
+        "Junseong Kwak",
+        "Junhyeok Park",
+        "Satyam Mishra",
+        "Juyeb Shin",
+        "Uisung Kim",
+        "Hyeonseo Kim",
+        "Saparkhan Kassymbekov",
+        "Hailemichael Molla Gashaw",
+        "Abi Rahman Syamil",
+        "Mingyu Kim",
+        "Hyeongjun Kim",
+        "Yeina Lee",
+        "Moogeun Park",
+        "Dongsuk Kum"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI"
+      ],
+      "published": "2026-11-23T11:30:01+00:00",
+      "link": "https://arxiv.org/pdf/2611.30511v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "end-to-end autonomous driving pipeline from sensors to planning with closed-loop evaluation",
+      "llm_evidence_cn": "从传感器到规划的端到端自动驾驶闭环流程",
+      "llm_evidence": "从传感器到规划的端到端自动驾驶闭环流程",
+      "canonical_evidence": "从传感器到规划的端到端自动驾驶闭环流程",
+      "llm_tldr_en": "This technical report builds an end-to-end driving model with HD map auto-labelling, imitation learning and simulator RL, plus a selection-based planner that filters trajectory candidates by collision, drivable area and progress.",
+      "llm_tldr_cn": "面向物理AI自动驾驶赛道，端到端驾驶模型需要兼顾感知、规划与闭环安全。报告提出完整流水线，包含数据整理、高精地图自动标注、数据驱动模仿学习与仿真强化学习，并引入基于选择的端到端规划方法，利用目标检测与BEV分割过滤易碰撞或越界的轨迹候选。方法在NVIDIA NuRec与PAI-AV数据上训练，按碰撞、可行驶区域合规与进度对候选轨迹打分并择优执行。该工作为端到端驾驶的闭环评测与安全规划提供了可复现的技术基线。",
+      "llm_tldr": "面向物理AI自动驾驶赛道，端到端驾驶模型需要兼顾感知、规划与闭环安全。报告提出完整流水线，包含数据整理、高精地图自动标注、数据驱动模仿学习与仿真强化学习，并引入基于选择的端到端规划方法，利用目标检测与BEV分割过滤易碰撞或越界的轨迹候选。方法在NVIDIA NuRec与PAI-AV数据上训练，按碰撞、可行驶区域合规与进度对候选轨迹打分并择优执行。该工作为端到端驾驶的闭环评测与安全规划提供了可复现的技术基线。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "end-to-end learning from sensor input to driving control",
+      "matched_requirement_id": "req-17",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.33693v1",
+      "source": "arxiv",
+      "title": "GeoTex: Geometry-as-Texture Encoding and History-Grounded 4D Occupancy Forecasting",
+      "abstract": "4D occupancy forecasting models 3D scene evolution to support future prediction and scenario generation in autonomous-driving world models. Semantic occupancy abstracts image color and texture into discrete labels, leaving 3D voxel arrangements as the primary cues for distinguishing local shapes within each class. Existing methods borrow image-encoding frameworks to obtain compact latent representations through height channelization or plane factorization, but do not sufficiently model within-column height patterns and cross-column relations jointly before compression, weakening these geometric cues. Forecasting also underutilizes complementary history and struggles to retain reliable observation evidence. We therefore propose GeoTex, an occupancy world model combining geometry-as-texture encoding with history-grounded forecasting. GeoTex Representation jointly encodes within-column height patterns and cross-column relations into compact continuous latent representations and restores 3D structure through content-dependent height unfolding and geometric interaction. GeoTex Prediction retains initial evidence throughout rollout in fixed cross-observation relational memory and incorporates complementary recent history through target-referenced residual updates. After prediction training, decoder-only adaptation improves semantic decoding of predicted states. GeoTex improves average forecasting mIoU and IoU by 9.79% and 11.91% relative to GenieDrive while reducing parameters from 3.47M to 2.33M, with gains increasing at longer horizons. Code is included in the supplementary material.",
+      "authors": [
+        "Shijun Guo",
+        "Yaming Yang",
+        "Haoran Xu",
+        "Wei Zhao",
+        "Ziyu Guan",
+        "Cai Xu",
+        "Peixi Peng"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-25T02:58:48+00:00",
+      "link": "https://arxiv.org/pdf/2611.33693v1",
+      "tags": [
+        "keyword:self-driving",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Geometry-aware 4D occupancy forecasting for driving world models",
+      "llm_evidence_cn": "面向驾驶世界模型的几何感知4D占据预测",
+      "llm_evidence": "面向驾驶世界模型的几何感知4D占据预测",
+      "canonical_evidence": "面向驾驶世界模型的几何感知4D占据预测",
+      "llm_tldr_en": "Semantic occupancy discards color and texture, and existing encoders do not jointly model within-column height patterns and cross-column relations. GeoTex proposes geometry-as-texture encoding with history-grounded 4D occupancy forecasting for autonomous driving world models.",
+      "llm_tldr_cn": "语义占据把颜色与纹理抽象为离散标签，使三维体素排布成为区分类内局部形状的主要线索，而现有编码方式在压缩前未能联合建模列内高度模式与列间关系。作者提出GeoTex，以几何即纹理的编码方式并结合历史信息接地，改进4D占据预测。该工作为自动驾驶世界模型提供了更可靠的场景演化预测与场景生成能力。",
+      "llm_tldr": "语义占据把颜色与纹理抽象为离散标签，使三维体素排布成为区分类内局部形状的主要线索，而现有编码方式在压缩前未能联合建模列内高度模式与列间关系。作者提出GeoTex，以几何即纹理的编码方式并结合历史信息接地，改进4D占据预测。该工作为自动驾驶世界模型提供了更可靠的场景演化预测与场景生成能力。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "advanced driver assistance systems and driving functions",
+      "matched_requirement_id": "req-15",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}
