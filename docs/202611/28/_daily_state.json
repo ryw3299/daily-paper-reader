@@ -1,0 +1,41 @@
+{
+  "date": "20261128",
+  "date_label": "",
+  "generated_at": "2026-11-28 02:12:09 UTC",
+  "recommend_exists": true,
+  "run_count": 1,
+  "papers": [
+    {
+      "paper_id": "2611.34188v1",
+      "route": "202611/28/2611.34188v1-mine-a-training-free-defense-against-indirect-prompt-injection-via-mutual-information-and-embedding-variance",
+      "title": "MINE: A Training-Free Defense against Indirect Prompt Injection via Mutual Information and Embedding Variance",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "kg-rag-agent"
+        }
+      ],
+      "score": 7.0,
+      "evidence": "针对检索增强生成中间接提示注入的防御",
+      "first_seen_at": "2026-11-28 02:12:09 UTC",
+      "updated_at": "2026-11-28 02:12:09 UTC"
+    },
+    {
+      "paper_id": "2611.32745v1",
+      "route": "202611/28/2611.32745v1-memanchorworld-a-sparse-world-model-with-horizon-conditioned-memory-retrieval-for-autonomous-driving",
+      "title": "MemAnchorWorld: A Sparse World Model with Horizon-Conditioned Memory Retrieval for Autonomous Driving",
+      "section": "quick",
+      "tags": [
+        {
+          "kind": "query",
+          "label": "self-driving"
+        }
+      ],
+      "score": 6.0,
+      "evidence": "面向驾驶占用预测的稀疏世界模型与记忆检索",
+      "first_seen_at": "2026-11-28 02:12:09 UTC",
+      "updated_at": "2026-11-28 02:12:09 UTC"
+    }
+  ]
+}

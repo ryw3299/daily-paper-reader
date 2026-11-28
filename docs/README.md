@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-27</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-28</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-27 02:51:30 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-28 02:12:09 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读 6 篇，全部集中在自动驾驶视觉-语言-动作模型方向，其中 3 篇重点篇目已标注评分。</p>
-<p>最值得看的是两篇 7.0 分工作：VLG-Drive 把视觉-语言与几何先验统一进驾驶框架，Commit2Drive 则把感知落地的语言决策当作“承诺”来约束轨迹规划。</p>
-<p>普通读者可先读这两篇的摘要与方法图建立直觉，再翻《Attention Is Not Relevance》——它提醒注意力权重并不等于因果重要性，正好帮你带着批判眼光看前两篇。</p>
+<p>今日速读两篇：一篇无需训练的间接提示注入防御，一篇自动驾驶稀疏世界模型与记忆检索。最值得看 MINE 用互信息与嵌入方差做推理期防御（7.0/10），以及 MemAnchorWorld 的地平线条件记忆检索思路（6.0/10）。普通读者可先看 MINE 的防御思路，再判断是否深入自动驾驶记忆机制。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving">VLG-Drive: Unifying Vision-Language and Geometric Priors for Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models">Commit2Drive: Perception-Grounded Language Decisions as Commitments for Trajectory Planning in Vision-Language-Action Driving Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Attention Is Not Relevance: Challenging the Causality of Attention in Autonomous Driving">Attention Is Not Relevance: Challenging the Causality of Attention in Autonomous Driving</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MINE: A Training-Free Defense against Indirect Prompt Injection via Mutual Information and Embedding Variance">MINE: A Training-Free Defense against Indirect Prompt Injection via Mutual Information and Embedding Variance</span></li><li><span class="dpr-home-dashboard-paper-title" title="MemAnchorWorld: A Sparse World Model with Horizon-Conditioned Memory Retrieval for Autonomous Driving">MemAnchorWorld: A Sparse World Model with Horizon-Conditioned Memory Retrieval for Autonomous Driving</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">self-driving <strong>5</strong></span><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">kg-rag-agent <strong>1</strong></span><span class="dpr-home-dashboard-tag">self-driving <strong>1</strong></span></div>
 </section>
 </div>
 

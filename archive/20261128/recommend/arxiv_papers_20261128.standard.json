@@ -1,0 +1,100 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-11-28T02:11:41.462222+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 3,
+    "deep_divecandidates": 0,
+    "deep_cap": 8,
+    "deep_selected": 0,
+    "quick_candidates": 2,
+    "quick_skim_target": 13,
+    "quick_selected": 2
+  },
+  "deep_dive": [],
+  "quick_skim": [
+    {
+      "id": "2611.34188v1",
+      "source": "arxiv",
+      "title": "MINE: A Training-Free Defense against Indirect Prompt Injection via Mutual Information and Embedding Variance",
+      "abstract": "Existing defenses against indirect prompt injection in retrieval-augmented generation (RAG) are inherently reactive: prompt-engineering methods are often overridden by the injected instructions, while supervised detectors must be retrained for each new attack style. We propose a different paradigm: defend by maximizing relevance, not by detecting attacks. Our method, MINE, is training-free and attack-agnostic, and it also serves as a query-conditioned reranker. To evaluate defenses under realistic conditions, we introduce LC-Inj-SQuAD, a long-context benchmark with an average of 4,032 words per context. We evaluate on four datasets spanning short-context QA (Inj-SQuAD, Inj-TriviaQA), long-context QA (LC-Inj-SQuAD), and agent tool-call injection (InjecAgent). Across all four, MINE achieves the best accuracy--security trade-off among training-free defenses. It is also the only defense that stays usable against a fully adaptive attacker, generalizes to agent tool-call injection, and achieves the lowest inference latency on long contexts.",
+      "authors": [
+        "Truong Phan",
+        "Ngoc-Quan Pham",
+        "Dat Quoc Nguyen"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI"
+      ],
+      "published": "2026-11-25T11:16:43+00:00",
+      "link": "https://arxiv.org/pdf/2611.34188v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "query:in-car-agent"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "defense against indirect prompt injection in RAG",
+      "llm_evidence_cn": "针对检索增强生成中间接提示注入的防御",
+      "llm_evidence": "针对检索增强生成中间接提示注入的防御",
+      "canonical_evidence": "针对检索增强生成中间接提示注入的防御",
+      "llm_tldr_en": "MINE is a training-free, attack-agnostic defense against indirect prompt injection in RAG that maximizes query relevance instead of detecting attacks, also acting as a reranker, evaluated on a new long-context benchmark.",
+      "llm_tldr_cn": "现有检索增强生成中间接提示注入防御多为被动反应式，提示工程易被覆盖、监督检测器需针对新攻击重训。作者提出MINE，以最大化查询相关性而非检测攻击为核心，训练无关且攻击无关，同时充当查询条件重排序器。为贴近真实条件，构建了平均超四千词的长上下文基准LC-Inj-SQuAD，并在四个短长上下文问答数据集上评测，表明该思路能有效提升抵御注入的鲁棒性。",
+      "llm_tldr": "现有检索增强生成中间接提示注入防御多为被动反应式，提示工程易被覆盖、监督检测器需针对新攻击重训。作者提出MINE，以最大化查询相关性而非检测攻击为核心，训练无关且攻击无关，同时充当查询条件重排序器。为贴近真实条件，构建了平均超四千词的长上下文基准LC-Inj-SQuAD，并在四个短长上下文问答数据集上评测，表明该思路能有效提升抵御注入的鲁棒性。",
+      "llm_tags": [
+        "query:kg-rag-agent:composite"
+      ],
+      "matched_query_tag": "query:kg-rag-agent:composite",
+      "matched_query_text": "Papers central to 面向知识增强车载智能体，重点关注知识图谱、GraphRAG、因果推理等图结构方法在车载智能体领域的应用，以及知识库投毒、检索污染、间接提示注入、错误传播与反事实鲁棒性评测等人工智能安全方向。, especially work that connects or combines: large language model agents for autonomous driving and in-vehicle decision support; knowledge-enhanced in-vehicle conversational agents for driving assistance and reasoning; knowledge graph and graph retrieval augmented generation methods for autonomous driving scene understanding and decision making; How can knowledge graphs and graph retrieval augmented generation improve scene understanding and decision making in in vehicle intelligent agents?.",
+      "matched_requirement_id": "req-composite-kg-rag-agent",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.32745v1",
+      "source": "arxiv",
+      "title": "MemAnchorWorld: A Sparse World Model with Horizon-Conditioned Memory Retrieval for Autonomous Driving",
+      "abstract": "Sparse world models for 4D semantic occupancy forecasting represent scenes with a small set of evolving queries to efficiently predict future geometry and semantics for autonomous driving. However, existing sparse world models face a bottleneck in using historical temporal evidence for long-horizon forecasting. They rely on scene states to carry historical information implicitly, allowing errors to propagate and accumulate across successive forecasting steps and causing geometric and semantic deviations. To address this limitation, we present MemAnchorWorld, a sparse occupancy world model that explicitly retrieves relevant historical geometric and semantic evidence for 4D semantic occupancy forecasting. Inspired by the von Restorff effect, we introduce a forecast-time-conditioned hierarchical dual-path memory-anchor retrieval mechanism. Guided by the effective age and semantic compatibility of historical information, it combines query-level candidate selection with point-level memory-anchor retrieval to provide historical evidence for sparse points at different forecast times. To better use memory anchors and existing features, a point-level residual adapter jointly gated by the task and forecast time separately controls residual corrections to semantics, occupancy confidence, and spatial positions. On Occ3D-nuScenes, MemAnchorWorld achieves an average mIoU of 13.55% and an average IoU of 22.84% across the 1-3 s forecasting horizons, attaining state-of-the-art performance on both metrics.Project page: https://memanchorworld.github.io/",
+      "authors": [
+        "Xinyang Jia",
+        "Yuqi Zhang",
+        "Jiakai Wang",
+        "Yahu Yang",
+        "Guandong Pan",
+        "Chao Tong",
+        "Xianglong Liu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-24T14:56:56+00:00",
+      "link": "https://arxiv.org/pdf/2611.32745v1",
+      "tags": [
+        "keyword:in-car-agent",
+        "keyword:kg-rag-agent",
+        "keyword:self-driving",
+        "query:in-car-agent",
+        "query:kg-rag-agent",
+        "query:self-driving"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "sparse world model with memory retrieval for driving occupancy forecasting",
+      "llm_evidence_cn": "面向驾驶占用预测的稀疏世界模型与记忆检索",
+      "llm_evidence": "面向驾驶占用预测的稀疏世界模型与记忆检索",
+      "canonical_evidence": "面向驾驶占用预测的稀疏世界模型与记忆检索",
+      "llm_tldr_en": "MemAnchorWorld is a sparse occupancy world model that explicitly retrieves horizon-conditioned historical geometric and semantic evidence to reduce error accumulation in long-horizon 4D forecasting for driving.",
+      "llm_tldr_cn": "稀疏世界模型以少量演化查询表示场景，可高效预测自动驾驶所需的未来几何与语义，但长时程预测中历史信息仅隐含在场景状态里，误差会逐步累积。本文提出MemAnchorWorld，显式检索相关的历史几何与语义证据，并以时程条件化的记忆检索机制加以融合。实验表明该方法缓解了长时程4D语义占用预测中的几何与语义漂移。其意义在于为自动驾驶场景预测提供更可靠的记忆利用方式。",
+      "llm_tldr": "稀疏世界模型以少量演化查询表示场景，可高效预测自动驾驶所需的未来几何与语义，但长时程预测中历史信息仅隐含在场景状态里，误差会逐步累积。本文提出MemAnchorWorld，显式检索相关的历史几何与语义证据，并以时程条件化的记忆检索机制加以融合。实验表明该方法缓解了长时程4D语义占用预测中的几何与语义漂移。其意义在于为自动驾驶场景预测提供更可靠的记忆利用方式。",
+      "llm_tags": [
+        "query:self-driving"
+      ],
+      "matched_query_tag": "query:self-driving",
+      "matched_query_text": "advanced driver assistance systems and driving functions",
+      "matched_requirement_id": "req-15",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

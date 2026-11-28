@@ -1,0 +1,1234 @@
+MemAnchorWorld: A Sparse World Model with Horizon-Conditioned Memory
+Retrieval for Autonomous Driving
+Xinyang Jia1
+Yuqi Zhang2*
+Jiakai Wang2*
+Yahu Yang2
+Guandong Pan3
+Chao Tong1
+Xianglong Liu1,2
+1School of Computer Science and Engineering, Beihang University
+2Zhongguancun Laboratory
+3School of Artificial Intelligence, Beihang University
+Abstract
+Sparse world models for 4D semantic occupancy fore-
+casting represent scenes with a small set of evolving queries
+to efficiently predict future geometry and semantics for au-
+tonomous driving. However, existing sparse world mod-
+els face a bottleneck in using historical temporal evidence
+for long-horizon forecasting.
+They rely on scene states
+to carry historical information implicitly, allowing errors
+to propagate and accumulate across successive forecast-
+ing steps and causing geometric and semantic deviations.
+To address this limitation, we present MemAnchorWorld,
+a sparse occupancy world model that explicitly retrieves
+relevant historical geometric and semantic evidence for
+4D semantic occupancy forecasting. Inspired by the von
+Restorff effect, we introduce a forecast-time-conditioned
+hierarchical dual-path memory-anchor retrieval mecha-
+nism. Guided by the effective age and semantic compatibil-
+ity of historical information, it combines query-level can-
+didate selection with point-level memory-anchor retrieval
+to provide historical evidence for sparse points at different
+forecast times. To better use memory anchors and exist-
+ing features, a point-level residual adapter jointly gated
+by the task and forecast time separately controls resid-
+ual corrections to semantics, occupancy confidence, and
+spatial positions. On Occ3D-nuScenes, MemAnchorWorld
+achieves an average mIoU of 13.55% and an average IoU
+of 22.84% across the 1–3 s forecasting horizons, attaining
+state-of-the-art performance on both metrics. Project page:
+https://memanchorworld.github.io/.
+1. Introduction
+Vision-centric autonomous driving has been widely studied,
+with substantial progress in scene perception [3, 13, 19, 34],
+*Corresponding authors.
+Figure 1.
+Comparison of recurrent sparse occupancy forecast-
+ing and MemAnchorWorld. Recurrent forecasting updates scene
+queries through successive steps.
+MemAnchorWorld retrieves
+memory anchors from a separate historical memory and uses task-
+specific gates to refine the outputs at each forecast horizon.
+motion prediction [6, 10, 27, 39], and trajectory plan-
+ning [11, 12, 16, 27]. More recent methods encode scene in-
+formation in learnable sparse queries [22, 23, 27, 31], using
+adaptive position updates and feature interactions to capture
+local geometry and semantics. Related compact representa-
+tions support streaming scene aggregation [1, 22, 26, 42]
+and future occupancy forecasting [4, 7, 35, 41].
+However, existing sparse world models still face a tem-
+poral evidence bottleneck in long-horizon forecasting. As
+shown in Fig. 1(a), occupancy world models that predict fu-
+ture scenes through autoregressive or state-conditioned up-
+dates [4, 18, 37, 40] primarily rely on the recurrent state to
+carry historical information. When local geometric and se-
+mantic details are not sufficiently preserved during encod-
+ing, subsequent predictions struggle to recover them, and
+errors may propagate and accumulate during rollout.
+To address this issue, as shown in Fig. 1(b), we propose
+MemAnchorWorld, a sparse world model for 4D seman-
+tic occupancy forecasting. Inspired by the von Restorff ef-
+fect [30], we introduce a forecast-time-conditioned hierar-
+1
+arXiv:2611.32745v1  [cs.CV]  24 Nov 2026
+
+
+chical dual-path memory-anchor retrieval mechanism. Con-
+sidering the effective age and semantic uncertainty of his-
+torical information, this mechanism first selects candidate
+historical queries through query-level geometric–semantic
+dual-path coarse retrieval. It then performs point-level re-
+trieval among their associated points to select relevant his-
+torical points as memory anchors for each predicted point,
+providing local geometric and semantic evidence for future
+forecasting. To adaptively fuse evidence from memory an-
+chors with the current prediction representation, we intro-
+duce a point-level residual adapter jointly gated by task and
+forecast time, which separately modulates residual correc-
+tions to semantics, occupancy confidence, and spatial posi-
+tions. Furthermore, to improve consistency between point-
+level supervision and voxel-based evaluation, we introduce
+voxel-center-aligned sparse differentiable joint supervision.
+We evaluate MemAnchorWorld on camera-based 4D
+occupancy forecasting and downstream planning using
+Occ3D-nuScenes [2, 28]. In our evaluation, MemAnchor-
+World achieves an average mIoU of 13.55% and an average
+IoU of 22.84% across the 1–3 s forecasting horizons. By
+retrieving memory anchors at each forecast horizon, Me-
+mAnchorWorld mitigates the impact of errors accumulated
+through recurrent state propagation on future occupancy
+predictions. Our contributions are as follows:
+• We propose a forecast-time-conditioned hierarchical
+dual-path memory-anchor retrieval mechanism combin-
+ing age- and semantics-aware query selection with point-
+level memory-anchor retrieval.
+• We develop a point-level residual adapter jointly gated
+by task and forecast time and introduce voxel-center-
+aligned differentiable joint supervision to more closely
+align point-level supervision with voxel-based evaluation.
+• On Occ3D-nuScenes, MemAnchorWorld achieves an av-
+erage mIoU of 13.55% and an average IoU of 22.84%
+in the current evaluation setting, outperforming Sparse-
+World by 0.35 and 0.81 percentage points, respectively.
+2. Related Work
+2.1. Camera-Based Semantic Occupancy
+Camera-based methods infer scene geometry and semantics
+from visual cues, offering lower sensor costs and flexible
+deployment [18, 19, 25, 29, 34]. MonoScene [3] recov-
+ers scene geometry and semantics from a monocular im-
+age through 2D-to-3D feature projection. VoxFormer [19]
+uses depth estimation to construct sparse voxel queries
+for visible occupied regions, followed by feature propaga-
+tion for scene completion. For surround-view scenes, Sur-
+roundOcc [34] aggregates multi-camera features through
+multi-scale 2D–3D attention to construct a 3D volumetric
+representation, whereas TPVFormer [13] encodes 3D space
+using three mutually orthogonal planes to reduce compu-
+tation and storage costs. Other camera-based approaches
+include voxel occupancy in OccNet [29], compact 3D en-
+coding in COTR [25], video-based self-supervision in Self-
+Occ [14], and panoptic occupancy in PanoOcc [32].
+To reduce redundant computation in unoccupied re-
+gions, later studies explore sparse scene representations.
+SparseOcc [23] combines sparse 3D reconstruction with
+mask-guided sampling.
+OPUS [31] directly predicts oc-
+cupied point locations and semantic classes from learnable
+queries. Other methods use parameterized geometric prim-
+itives to describe local space. GaussianFormer-2 [15] com-
+bines probabilistic Gaussian superposition with semantic
+mixture modeling to make scene representations more com-
+pact. For temporal modeling, GaussianWorld [42] decom-
+poses scene evolution into ego-motion alignment, dynamic-
+object motion, and completion of newly observed regions,
+and updates its Gaussian scene state accordingly.
+2.2. 4D Occupancy Forecasting and World Models
+4D occupancy forecasting predicts future scene occupancy
+from historical observations [17]. Cam4DOcc [24] estab-
+lishes a benchmark for camera-based 4D occupancy fore-
+casting, while UniOcc [33] provides a unified benchmark
+for occupancy forecasting and current-frame prediction. Ef-
+ficientOCF [35] decomposes 3D occupancy into bird’s-eye-
+view occupancy and a height representation, and associates
+instances through predicted flow. I2-World [20] uses intra-
+scene and inter-scene tokenization for efficient dynamic 4D
+forecasting. OccWorld [40] jointly forecasts future occu-
+pancy and ego trajectories from discrete scene tokens with
+a spatiotemporal generative Transformer. DOME [8] uses
+trajectory-conditioned spatiotemporal diffusion to generate
+future scenes. PreWorld [18] combines 2D rendering pre-
+training with 3D occupancy supervision to recurrently pre-
+dict future occupancy and ego trajectories.
+Recent studies apply sparse scene representations to fu-
+ture forecasting [4, 5, 7, 41]. SparseWorld [4] represents
+scenes with dynamic sparse queries and predicts future oc-
+cupancy through ego-state-conditioned updates and posi-
+tion regression. DLWM [41] represents scenes with sparse
+3D Gaussians and learns Gaussian-flow-guided latent dy-
+namics for future occupancy forecasting. However, recur-
+rent sparse models may gradually lose local geometric and
+semantic information from earlier observations as scene
+states evolve. MemAnchorWorld addresses this limitation
+by retrieving memory anchors from historical sparse queries
+conditioned on the target forecast time and spatial location,
+then refining future occupancy predictions through residual
+corrections jointly gated by task and forecast time.
+2
+
+
+3. Methodology
+3.1. Preliminaries
+3.1.1. 4D Semantic Occupancy Forecasting
+Let I−L+1:0 = {I(n)
+j
+| −L + 1 ≤j ≤0, 1 ≤n ≤Ncam}
+denote synchronized images from Ncam cameras over L ob-
+served frames, and let E−L+1:0 contain the corresponding
+ego poses and motion states.
+Given these observations, the model predicts semantic
+occupancy grids in the current ego frame at future horizons
+h ∈H:
+bYH = fθ(I−L+1:0, E−L+1:0) ,
+bYH = {bYh}h∈H,
+bYh ∈{1, . . . , C, ∅}Nx×Ny×Nz.
+(1)
+3.1.2. Sparse World Models
+Sparse world models represent a scene using sparse queries,
+each associating a shared feature with a local set of 3D
+points:
+Zk = {(qi,k, Pi,k)}Nk
+i=1,
+Pi,k = {pi,r,k}R
+r=1,
+qi,k ∈RD.
+(2)
+During recurrent forecasting, the model progressively
+updates query features and associated point positions con-
+ditioned on the ego state. The point-level prediction at a
+future horizon of h seconds is denoted by Bh:
+Zk+1 = Fk(Zk),
+Bh = G(Z2h) = {(p0,h
+ir , s0,h
+ir )}i,r,
+(3)
+where Z0 is the current scene state and Fk denotes the ego-
+state-conditioned scene update. The superscript 0 indicates
+the point positions and semantic logits output by the base
+decoder. Below, we describe retrieval and correction at a
+fixed forecast horizon h and abbreviate qi,2h as qi.
+3.1.3. Error Propagation in Recurrent Forecasting
+In recurrent sparse forecasting, historical evidence is car-
+ried by the encoded state and fixed rollout conditions. Un-
+der fixed query correspondences, we vectorize the scene
+state Zk and concatenate it with the ego state xego
+k
+to ob-
+tain the augmented state xk = [vec(Zk), xego
+k ]. Let bxk+1 =
+Fk(bxk), ek = bxk −x⋆
+k, and ϵk = Fk(x⋆
+k) −x⋆
+k+1. For
+continuously differentiable updates and K = 2h, the error
+admits the exact decomposition
+eK = ΦK,0e0 +
+K−1
+X
+j=0
+ΦK,j+1ϵj,
+(4)
+where ΦK,j is the product of integrated Jacobians of the
+augmented transition Fk from step j to K, with ΦK,K = I.
+Thus, initial and intermediate errors contribute to later pre-
+dictions through the subsequent transitions. Detailed for-
+mulas and proofs are provided in Appendix B.1.
+3.2. Framework Overview
+As shown in Fig. 2, MemAnchorWorld retrieves memory
+anchors to refine sparse future predictions and produce 4D
+semantic occupancy. The perception backbone first encodes
+surround-view images into a sparse scene state Z0. Condi-
+tioned on the ego state, the forecasting backbone recurrently
+updates scene queries to generate predictions Bh at each
+forecast horizon. The forecast-time-conditioned hierarchi-
+cal dual-path memory-anchor retrieval module (Sec. 3.3)
+constructs a historical memory bank M from queries in
+earlier frames. Before retrieval at each forecast horizon,
+it uses ego poses to align historical points in a common
+coordinate frame, then applies object motion compensa-
+tion to extrapolate them to the target forecast time. Using
+the corresponding scene queries and predicted points as re-
+trieval cues and conditioned on the forecast-time embed-
+ding, the module considers historical age, semantic reliabil-
+ity, and geometric–semantic relevance. It first selects can-
+didate historical queries through geometric–semantic dual-
+path coarse retrieval, then performs memory-anchor re-
+trieval among their associated points and aggregates the re-
+trieved features and semantics as correction evidence. Fi-
+nally, the point-level residual adapter jointly gated by task
+and forecast time (Sec. 3.4) fuses the retrieved evidence
+with the current prediction representation and forecast-time
+information. It generates separate residual corrections for
+semantics, occupancy confidence, and spatial position, with
+independent gates modulating the strength of each correc-
+tion.
+Sparse occupancy decoding converts the corrected
+point-level outputs into semantic occupancy grids bYh at
+each forecast horizon.
+3.3. Hierarchical Dual-Path Anchor Retrieval
+Memory acquisition. To retain explicit access to older ob-
+servations, we store their queries separately from the evolv-
+ing scene state. At current time t, we select Kmem historical
+observation slots with reference times
+T mem
+t
+= {τj}Kmem
+j=1 ,
+τj < t.
+(5)
+The selected times need not be uniformly spaced. We ex-
+tract observation-state queries from these slots. Each mem-
+ory entry stores a query feature, its associated points, an
+averaged semantic distribution, a semantic reliability score,
+the observation time, and the source ego pose:
+m = (qm, Pm, πm, ρm, τm, Tm),
+(6)
+where the mean semantic distribution πm is obtained by
+averaging the softmax probabilities of the points associated
+3
+
+
+Figure 2. Overview of MemAnchorWorld. First, multi-frame images generate queries and positions. Next, dual-path retrieval selects
+candidate queries; point-level memory-anchor retrieval selects associated points and aggregates evidence. A point-level residual adapter
+corrects semantic logits, occupancy confidence, and positions. Finally, decoding heads generate semantic occupancy and the ego trajectory.
+with each query. Let π(1)
+m
+≥π(2)
+m be its two largest class
+probabilities. We compute semantic reliability ρm as
+ρm = 1
+3
+
+π(1)
+m + (π(1)
+m −π(2)
+m ) + 1 −H(πm)
+log C
+
+.
+(7)
+The score combines peak confidence, separation be-
+tween the leading classes, and low entropy, favoring less
+ambiguous historical predictions.
+Historical memory alignment.
+We map historical
+points from their source ego frame to the current ego frame
+via [ep⊤
+mj, 1]⊤= T−1
+t Tm[p⊤
+mj, 1]⊤. Before candidate se-
+lection, we compensate for object motion by extrapolating
+the aligned points to the target forecast horizon:
+ah
+m = t −τm + h,
+bvh,src
+m
+= fmotion
+ qm, PE(ah
+m)
+
+,
+pM,h
+mj = epmj + ah
+mR⊤
+t Rmbvh,src
+m
+.
+(8)
+Here ah
+m is the effective age, and fmotion predicts transla-
+tion velocity from the historical query feature and effective-
+age encoding. The matrices Rt and Rm are the rotation
+blocks of the corresponding ego poses. Coordinate transfor-
+mation and scaling by the effective age yield the displace-
+ment correction.
+Points associated with the same query
+share this translation to preserve their local configuration.
+Dual-path query selection. Before retrieval, we select
+historical queries by semantic reliability under class and
+spatial diversity constraints.
+The horizon embedding th
+conditions feature matching at both retrieval levels, and the
+sharpened historical semantic distribution is denoted πm.
+For predicted point (i, r), let πir = softmax(s0
+ir). Equa-
+tion (9) reduces reliance on uncertain semantic predictions
+while retaining a minimum semantic contribution:
+wir = max
+(
+1 −H(πir)
+log C
+2
+, wmin
+)
+.
+(9)
+For query-level matching, let πi = R−1 P
+r πir and
+wi = R−1 P
+r wir. We denote the current point centroid
+by µi and the motion-compensated memory centroid by
+µh
+m = R−1 P
+j pM,h
+mj . Both paths restrict candidates to
+∥µi −µh
+m∥≤rq before top-k selection. The coarse ge-
+4
+
+
+ometric and semantic retrieval scores are
+Ag
+im = ϕq(qi, th)⊤ϕk(qm)
+√
+D
+−∥µi −µh
+m∥2
+r2q
+−ah
+m
+amax
++ log(ρm + ε),
+As
+im = Ag
+im + wi log(π⊤
+i πm + ε),
+(10)
+where ϕq and ϕk are query and key projections. Both paths
+combine feature similarity, spatial distance, effective age,
+and semantic reliability; the semantic path additionally con-
+siders semantic agreement. The age penalty favors more
+recent historical observations. The results from both paths
+are merged and deduplicated, yielding candidate historical
+queries and their associated point positions for subsequent
+point-level memory-anchor retrieval.
+Point-level memory-anchor retrieval. We expand can-
+didate queries into their associated 3D points and first com-
+pute softmax-weighted contexts for geometric and addi-
+tional semantic candidates.
+Point-level queries combine
+the current query feature, point position encoding, and
+forecast-time embedding; semantic attention heads also en-
+code the current and historical semantic distributions. Equa-
+tion (11) combines point feature similarity, compensated
+spatial distance, effective age, semantic reliability, and se-
+mantic agreement to compute fine retrieval scores:
+bℓ
+ir,mj = (uℓ
+ir)⊤kℓ
+mj
+√Dℓ
+−
+∥p0
+ir −pM,h
+mj ∥2
+r2p
+−ah
+m
+amax
++ log(ρm + ε)
++ ηℓwir log(π⊤
+irπm + ε),
+(11)
+where uℓ
+ir and kℓ
+mj are the projected point query and mem-
+ory key for head ℓ. The head width is Dℓ, and ηℓweights se-
+mantic agreement. Point-level top-k selection retains only
+point pairs satisfying ∥p0
+ir −pM,h
+mj ∥≤rp. Attention then
+aggregates evidence from the selected memory anchors ac-
+cording to the retrieval scores, yielding a historical fea-
+ture cir, a retrieved semantic distribution πM
+ir , and support
+statistics. Position-conditioned attention lets different pre-
+diction points within the same query retrieve their own local
+historical evidence from memory.
+3.4. Point-Level Residual Adaptation
+The usefulness of historical evidence can differ across tasks
+and forecast times. Equation (12) fuses the current query
+representation, evidence from memory anchors, semantic
+agreement, and forecast-time information to form a point-
+level adaptation feature:
+f h
+ir = MLP
+ [qi, PE(p0
+ir), cir, qi −cir, th,
+πir, πM
+ir , πir −πM
+ir , dir]
+
+.
+(12)
+The statistics dir summarize support counts, reliabil-
+ity, motion-compensated distance, semantic uncertainty and
+agreement, and effective age. For points with valid histori-
+cal support, let αh
+ir,mj denote attention weights normalized
+within each head and averaged over valid heads. We com-
+pute ¯ah
+ir = P
+m,j αh
+ir,mjah
+m and include clip(¯ah
+ir/(amax +
+ε), 0, 1) in dir. This age statistic retains the forecast offset
+h and, together with th, conditions both residuals and gates.
+The adapter predicts separate residuals for semantics, oc-
+cupancy confidence, and spatial position. Equation (13) as-
+signs an independent gate to each task with a learnable 3×3
+forecast-time–task bias:
+gh
+ir,u = vir σ
+ w⊤
+u f h
+ir + bu + βh,u
+
+,
+(13)
+where vir indicates whether valid point-level historical sup-
+port is available. Equation (14) adds the gated residuals
+to the original semantic logits, occupancy confidence, and
+point coordinates, respectively:
+bsir = s0
+ir + gh
+ir,sem∆sir,
+boir = max
+c
+s0
+ir,c + gh
+ir,occ∆oir,
+bpir = p0
+ir + gh
+ir,pos∆pir.
+(14)
+For supervision, we flatten (i, r) into point index i. Cor-
+rected points inside nonempty ground-truth voxels or near
+their centers form positives Ph with semantic labels ci from
+the corresponding ground-truth voxels; other valid points
+form negatives Nh, with Vh = Ph ∪Nh.
+With class weights αc, cross-entropy supervises the se-
+mantic residual and its gate on positive points,
+Lh
+sem =
+P
+i∈Ph αci CE(bsi, ci)
+P
+i∈Ph αci
+.
+(15)
+Balanced binary cross-entropy supervises the occupancy
+residual and its gate,
+ℓocc
+i
+= BCEWithLogits(boi, zi),
+Lh
+occ = 1
+2
+h
+(1 −γh)Avg
+i∈Ph
+ℓocc
+i
++ γhAvg
+c∈C+
+h
+Avg
+i∈Ph,c
+ℓocc
+i
++ Avg
+i∈Nh
+ℓocc
+i
+i
+.
+(16)
+Here zi is 1 for positives and 0 otherwise, Ph,c contains
+positives of class c ∈C+
+h , and γh controls class balancing.
+An anchor regularizer limits occupancy-logit deviations
+from the stop-gradient (sg) backbone confidence proxy,
+Lh
+anc = Avg
+i∈Vh
+SmoothL1
+
+boi, sg
+
+max
+c
+s0
+i,c
+
+.
+(17)
+A threshold-margin loss aligns occupancy correction and
+gating with decoding. Let κc = log(θc/(1 −θc)) for class
+5
+
+
+probability threshold θc. With margin δ,
+ℓthr
+i
+=
+(
+softplus(κci + δ −boi),
+i ∈Ph,
+softplus(boi −κbci + δ),
+i ∈Nh,
+(18)
+where bci
+=
+arg maxc bsi,c.
+The loss Lh
+thr averages
+both group means, pushing positives above their true-class
+thresholds and negatives below their predicted-class thresh-
+olds. The total objective and remaining losses are detailed
+in Appendix B.3.
+4. Experiments
+4.1. Experimental Details
+Dataset.
+We
+conduct
+experiments
+on
+Occ3D-
+nuScenes [28], which provides visibility-aware semantic
+occupancy annotations for nuScenes [2].
+Following the
+forecasting protocol of sparse world models, we use 700
+scenes for training and 150 for validation.
+Each scene
+lasts approximately 20 s, with annotated frames at 0.5 s
+intervals. The evaluation region spans [−40, 40] m along
+both horizontal axes and [−1, 5.4] m vertically.
+It is
+discretized into a 200 × 200 × 16 grid with 0.4 m voxels
+and 17 occupied semantic classes plus free space.
+The
+forecasting backbone observes the current frame and four
+preceding frames over 2 s, then rolls out six future states at
+0.5 s intervals. We evaluate the predictions at 1, 2, and 3 s.
+Implementation
+Details.
+We
+use
+a
+pretrained
+SparseWorld-R50 backbone [4], comprising a ResNet-50
+image encoder [9] and an FPN neck [21] for six surround-
+view images at 256×704 resolution. Its six decoding layers
+expand each query into (1, 4, 16, 24, 32, 48) points, and its
+query schedule assigns 720 queries to the current state and
+(60, 60, 60, 60, 40, 40) to the six future steps. We freeze the
+perception and forecasting backbone while optimizing Me-
+mAnchorWorld’s memory retrieval and residual-adaptation
+modules with the objective in Appendix B.3, Eq. (B.15).
+In this implementation, Kmem = 3 historical slots are
+centered at t−2.5, t−3.5, and t−4.5 s, with a 0.35 s match-
+ing tolerance and a fixed effective-age limit amax = 8 s.
+Each slot contributes at most 256 queries, giving a memory
+of at most 768 entries. Both retrieval levels use a 6 m ra-
+dius and retain up to eight candidates per path or point-level
+head; implementation details are provided in Appendix B.2.
+Evaluation Metrics.
+For occupancy forecasting, we
+report semantic mean intersection-over-union (mIoU) over
+the 17 occupied classes and class-agnostic occupied-space
+IoU at 1, 2, and 3 seconds. For motion planning, we report
+the Euclidean L2 displacement error and the box collision
+rate at the same horizons, together with their averages.
+4.2. Main Results
+4D Occupancy Forecasting.
+Table 1 compares MemAn-
+chorWorld with prior occupancy world models. For tra-
+jectory conditioning, OccWorld, RenderWorld, PreWorld,
+SparseWorld, and MemAnchorWorld use observed ego mo-
+tion [4, 18, 36, 40]; future ground-truth ego trajectories
+serve as training or evaluation targets rather than infer-
+ence inputs. MemAnchorWorld improves both mIoU and
+IoU over SparseWorld at every evaluated horizon. Its av-
+erage mIoU and IoU reach 13.55% and 22.84%, exceeding
+SparseWorld by 0.35 and 0.81 percentage points, respec-
+tively. MemAnchorWorld achieves the highest mIoU and
+IoU at all evaluated horizons and on average among the
+compared methods. These results highlight MemAnchor-
+World’s performance advantages in future occupancy fore-
+casting and its ability to predict future semantic and spatial
+occupancy states more accurately.
+Motion Planning.
+Table 2 compares L2 displacement
+error and box collision rate at 1, 2, and 3 s, together with
+their averages. MemAnchorWorld achieves the lowest aver-
+age L2 error and average box collision rate among the com-
+pared methods. Additionally, Obj Collision, the trajectory-
+reference-point collision rate after GT-collision masking, is
+0% at all three horizons. Metric definitions and the evalua-
+tion are detailed in Appendix B.4. These results suggest that
+MemAnchorWorld effectively captures the end-to-end in-
+teractions among occupancy representation, trajectory pre-
+diction, and planning across all three forecast horizons.
+4.3. Mechanism Diagnosis
+At 1, 2, and 3 s, we evaluate historical complementarity
+(Hist. compl.), correction of wrong base predictions with
+correct history (WC), and retention of correct base predic-
+tions with wrong history (CW). Metric definitions are pro-
+vided in Appendix C.4.
+Complementary Historical Evidence. Table 3 reports
+rates of 25.25%, 24.29%, and 23.19% at the three horizons,
+respectively. Thus, roughly one quarter of points misclas-
+sified by the base prediction can retrieve semantically cor-
+rect memory anchors from history, providing complemen-
+tary semantic evidence for refining the corresponding future
+point-level predictions.
+Use of Complementary History. Among points with an
+incorrect base prediction but a correct historical class, the
+adapter corrects 9.57%, 11.12%, and 12.58% at 1, 2, and
+3 s, respectively. The correction rate increases with the fore-
+cast horizon. These results show that the adapter can use
+correct retrieved historical semantics to guide residual cor-
+rections, recovering the correct class for some initially mis-
+classified points and translating complementary evidence
+into effective prediction refinement.
+Resistance to Conflicting History. When the base pre-
+diction is correct but the historical class is wrong, 97.47%,
+97.19%, and 96.64% of points remain correct after adapta-
+tion at 1, 2, and 3 s, respectively. These results support the
+effectiveness of the gated adapter in selectively fusing his-
+6
+
+
+Table 1. 4D occupancy forecasting on Occ3D-nuScenes. All models use camera input. Baseline values, including averages, are taken from
+the corresponding publications. Metric values are percentages; parentheses indicate gains over SparseWorld in percentage points.
+Method
+Aux. Sup.
+mIoU ↑
+IoU ↑
+1s
+2s
+3s
+Avg.
+1s
+2s
+3s
+Avg.
+OccWorld-S [40]
+None
+0.28
+0.26
+0.24
+0.26
+5.05
+5.01
+4.95
+5.00
+RenderWorld [36]
+None
+2.83
+2.55
+2.37
+2.58
+14.61
+13.61
+12.98
+13.73
+OccWorld-T [40]
+Semantic
+LiDAR
+4.68
+3.36
+2.63
+3.56
+9.32
+8.23
+7.47
+8.34
+OccWorld-D [40]
+3D Occ
+11.55
+8.10
+6.22
+8.62
+18.90
+16.26
+14.43
+16.53
+PreWorld [18]
+3D Occ
+11.69
+8.72
+6.77
+9.06
+23.01
+20.79
+18.84
+20.88
+PreWorld [18]
+2D & 3D Occ
+12.27
+9.24
+7.15
+9.55
+23.62
+21.62
+19.63
+21.62
+DFIT-OccWorld [38]
+3D Occ
+13.38
+10.16
+7.96
+10.50
+19.18
+16.85
+15.02
+17.02
+SparseWorld [4]
+3D Occ
+14.93
+13.15
+11.51
+13.20
+22.96
+22.10
+21.05
+22.03
+MemAnchorWorld
+3D Occ
+15.39 (↑0.46) 13.40 (↑0.25) 11.87 (↑0.36) 13.55 (↑0.35) 23.88 (↑0.92) 22.86 (↑0.76) 21.78 (↑0.73) 22.84 (↑0.81)
+Figure 3. Qualitative 4D semantic occupancy forecasting on Occ3D-nuScenes. Columns show the current frame and forecasts at 1, 2,
+and 3 s. From top to bottom, rows show ground truth, SparseWorld, and MemAnchorWorld. Red boxes highlight local regions where
+MemAnchorWorld better predicts semantic occupancy and its spatial support over time.
+torical evidence, limiting interference from erroneous his-
+tory while preserving initially correct point-level predic-
+tions under semantic conflicts.
+4.4. Ablation Studies
+Table 4 reports ablation results for the core components us-
+ing average mIoU and IoU over the 1–3 s forecasts. Sparse-
+World serves as our baseline, achieving average mIoU and
+IoU scores of 13.20% and 22.03%, respectively. When only
+memory-anchor retrieval is added, ordinary feature fusion
+replaces gated fusion.
+Average mIoU and IoU improve
+over the baseline by 0.04 and 0.22 percentage points, re-
+spectively, indicating that retrieved memory anchors pro-
+vide historical evidence that improves future predictions.
+When only task–horizon gated adaptation is added, an
+MLP encodes queries at the target forecast horizon in place
+of the memory-anchor retrieval branch. Average mIoU and
+IoU improve over the baseline by 0.11 and 0.31 percent-
+age points, respectively.
+These gains indicate that task–
+horizon gated adaptation can use the current prediction rep-
+resentation for adaptive correction, reducing the impact of
+error propagation and accumulation on future predictions.
+7
+
+
+Figure 4. Vehicle-occlusion forecasts at 1 s in two scenes. Columns show the future camera view, ground truth, SparseWorld, and MemAn-
+chorWorld. Green and orange outlines mark the target and foreground vehicles, respectively.
+Table 2. Motion planning on Occ3D-nuScenes. The two metric
+groups report L2 error and box collision rate, respectively. Base-
+line values follow the corresponding publications.
+Method
+Aux. Sup.
+L2 (m) ↓
+Box Collision (%) ↓
+1s
+2s
+3s
+Avg.
+1s
+2s
+3s
+Avg.
+UniAD [12]
+Map, Box,
+Motion, Track,
+3D Occ
+0.48 0.96 1.65 1.03 0.05 0.17 0.71 0.31
+VAD [16]
+Map, Box,
+Motion
+0.54 1.15 1.98 1.22 0.10 0.24 0.96 0.43
+OccNet [29]
+Map, Box,
+3D Occ
+1.29 2.13 2.99 2.14 0.21 0.59 1.37 0.72
+OccWorld-D [40]
+3D Occ
+0.52 1.27 2.41 1.40 0.12 0.40 2.08 0.87
+RenderWorld-V [36]
+3D Occ
+0.48 1.30 2.67 1.48 0.14 0.55 2.23 0.97
+PreWorld [18]
+2D &
+3D Occ
+0.22 0.30 0.40 0.31 0.21 0.66 0.71 0.53
+SparseWorld [4]
+3D Occ
+0.19 0.25 0.36 0.27 0.11 0.29 0.46 0.29
+MemAnchorWorld
+3D Occ
+0.16 0.19 0.24 0.20 0.09 0.10 0.11 0.10
+Table 3.
+Historical-memory diagnosis on points with valid
+retrieved support whose uncorrected positions lie in occupied
+ground-truth voxels.
+Horizon Hist. compl. WC correction CW retention
+1s
+25.25%
+9.57%
+97.47%
+2s
+24.29%
+11.12%
+97.19%
+3s
+23.19%
+12.58%
+96.64%
+With both components fully enabled, average mIoU and
+IoU reach 13.55% and 22.84%, outperforming both single-
+Table 4. Ablation studies of core model components.
+Memory
+retrieval
+Task–horizon
+gating
+Avg. mIoU ↑Avg. IoU ↑
+−
+−
+13.20
+22.03
+−
+✓
+13.31
+22.34
+✓
+−
+13.24
+22.25
+✓
+✓
+13.55
+22.84
+component variants and indicating that memory-anchor re-
+trieval and task–horizon gated adaptation are complemen-
+tary and jointly improve future occupancy forecasting.
+4.5. Visualizations
+4D Semantic Occupancy Forecasting. As shown in Fig. 3,
+MemAnchorWorld and SparseWorld produce similar occu-
+pancy at 0 s because they share the perception backbone. At
+1–3 s, SparseWorld misclassifies some road regions within
+the red boxes as vehicles, producing false vehicle occu-
+pancy, whereas MemAnchorWorld more accurately predicts
+the semantic classes of the regions around vehicles. These
+results suggest that memory anchors retrieved by MemAn-
+chorWorld from historical memory supply class cues for
+misclassified regions, enabling gated corrections to reduce
+semantic errors in future predictions.
+Effectiveness Evaluation. Figure 4 shows predictions
+for two occlusion scenes. The two scenes contain six and
+8
+
+
+seven occluded target voxels, respectively.
+SparseWorld
+correctly predicts none of these target voxels in either scene,
+whereas MemAnchorWorld correctly predicts four target
+voxels in each. Vehicle IoU within the fixed local 3D re-
+gions improves from zero to 19.94% and 11.82%. These ex-
+amples show that MemAnchorWorld can use evidence from
+earlier observations to supplement incomplete scene repre-
+sentations, demonstrating the effectiveness of its memory-
+anchor retrieval and fusion mechanisms.
+5. Conclusion
+In this paper, we presented MemAnchorWorld, a sparse
+occupancy world model addressing the temporal-evidence
+bottleneck in long-horizon forecasting. The model gathers
+historical evidence through hierarchical dual-path memory-
+anchor retrieval and uses a residual adapter jointly gated
+by task and forecast time to correct semantics, occupancy
+confidence, and spatial positions. Experiments on Occ3D-
+nuScenes demonstrate its forecasting and planning perfor-
+mance. Our retrieval does not explicitly establish object-
+level correspondences across time; future work will explore
+stronger motion-aware associations to improve the reliabil-
+ity of memory-anchor retrieval in dynamic scenes.
+LLM Usage Statement
+We used GPT6.1 (OpenAI) to assist with manuscript trans-
+lation, language polishing and grammar checking, litera-
+ture lookup and reference formatting, mathematical expo-
+sition, and the preparation of LaTeX source, tables, and fig-
+ure layouts. All reported experimental measurements were
+obtained through the training and evaluation pipelines de-
+scribed in this work. The authors reviewed and verified all
+AI-assisted content and take full responsibility for the final
+manuscript, conclusions, and experimental results.
+References
+[1] Simon Boeder, Fabian Gigengack, and Benjamin Risse.
+GaussianFlowOcc:
+Sparse and weakly supervised occu-
+pancy estimation using Gaussian splatting and temporal flow.
+In Proceedings of the IEEE/CVF International Conference
+on Computer Vision (ICCV), pages 24943–24954, 2025. 1
+[2] Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh Vora,
+Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-
+ancarlo Baldan, and Oscar Beijbom.
+nuScenes: A multi-
+modal dataset for autonomous driving. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 11621–11631, 2020. 2, 6
+[3] Anh-Quan Cao and Raoul de Charette. MonoScene: Monoc-
+ular 3D semantic scene completion.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 3991–4001, 2022. 1, 2
+[4] Chenxu Dang, Haiyan Liu, Jason Bao, Pei An, Xinyue Tang,
+An Pan, Jie Ma, Bingchuan Sun, and Yan Wang. Sparse-
+World: A flexible, adaptive, and efficient 4D occupancy
+world model powered by sparse and dynamic queries. Pro-
+ceedings of the AAAI Conference on Artificial Intelligence,
+40(5):3497–3505, 2026. 1, 2, 6, 7, 8
+[5] Christopher Diehl, Quinlan Sykora, Ben Agro, Thomas
+Gilles, Sergio Casas, and Raquel Urtasun. DIO: Decompos-
+able implicit 4D occupancy-flow world model. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), pages 27456–27466, 2025. 2
+[6] Shaoheng Fang, Zi Wang, Yiqi Zhong, Junhao Ge, and
+Siheng Chen.
+TBP-Former:
+Learning temporal bird’s-
+eye-view pyramid for joint perception and prediction in
+vision-centric autonomous driving.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 1368–1378, 2023. 1
+[7] Tuo Feng, Wenguan Wang, and Yi Yang. Gaussian-based
+world model: Gaussian priors for voxel-based occupancy
+prediction and future motion prediction. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision
+(ICCV), pages 25239–25249, 2025. 1, 2
+[8] Songen Gu, Wei Yin, Bu Jin, Xiaoyang Guo, Junming Wang,
+Haodong Li, Qian Zhang, and Xiaoxiao Long. DOME: Tam-
+ing diffusion model into high-fidelity controllable occupancy
+world model, 2024. arXiv:2410.10429. 2
+[9] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning for image recognition. In Proceed-
+ings of the IEEE Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 770–778, 2016. 6
+[10] Anthony Hu, Zak Murez, Nikhil Mohan, Sof´ıa Dudas, Jef-
+frey Hawke, Vijay Badrinarayanan, Roberto Cipolla, and
+Alex Kendall. FIERY: Future instance prediction in bird’s-
+eye view from surround monocular cameras. In Proceedings
+of the IEEE/CVF International Conference on Computer Vi-
+sion (ICCV), pages 15273–15282, 2021. 1
+[11] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi
+Yan, and Dacheng Tao. ST-P3: End-to-end vision-based au-
+tonomous driving via spatial-temporal feature learning. In
+Computer Vision – ECCV 2022, pages 533–549, 2022. 1
+[12] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima,
+Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai
+Wang, Lewei Lu, Xiaosong Jia, Qiang Liu, Jifeng Dai, Yu
+Qiao, and Hongyang Li. Planning-oriented autonomous driv-
+ing. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 17853–
+17862, 2023. 1, 8
+[13] Yuanhui Huang, Wenzhao Zheng, Yunpeng Zhang, Jie Zhou,
+and Jiwen Lu.
+Tri-perspective view for vision-based 3D
+semantic occupancy prediction.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 9223–9232, 2023. 1, 2
+[14] Yuanhui Huang, Wenzhao Zheng, Borui Zhang, Jie Zhou,
+and Jiwen Lu.
+SelfOcc: Self-supervised vision-based 3D
+occupancy prediction.
+In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 19946–19956, 2024. 2
+[15] Yuanhui Huang, Amonnut Thammatadatrakoon, Wenzhao
+Zheng,
+Yunpeng Zhang,
+Dalong Du,
+and Jiwen Lu.
+9
+
+
+GaussianFormer-2: Probabilistic Gaussian superposition for
+efficient 3D occupancy prediction.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 27477–27486, 2025. 2
+[16] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie
+Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang,
+and Xinggang Wang.
+VAD: Vectorized scene representa-
+tion for efficient autonomous driving.
+In Proceedings of
+the IEEE/CVF International Conference on Computer Vision
+(ICCV), pages 8340–8350, 2023. 1, 8
+[17] Tarasha Khurana, Peiyun Hu, David Held, and Deva Ra-
+manan. Point cloud forecasting as a proxy for 4D occupancy
+forecasting.
+In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), pages
+1116–1124, 2023. 2
+[18] Xiang Li, Pengfei Li, Yupeng Zheng, Wei Sun, Yan Wang,
+and Yilun Chen. Semi-supervised vision-centric 3D occu-
+pancy world model for autonomous driving. In International
+Conference on Learning Representations (ICLR), 2025. 1, 2,
+6, 7, 8
+[19] Yiming Li, Zhiding Yu, Christopher Choy, Chaowei Xiao,
+Jose M. Alvarez, Sanja Fidler, Chen Feng, and Anima
+Anandkumar.
+VoxFormer: Sparse voxel transformer for
+camera-based 3D semantic scene completion. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), pages 9087–9098, 2023. 1, 2
+[20] Zhimin Liao, Ping Wei, Ruijie Zhang, Shuaijia Chen, Haox-
+uan Wang, and Ziyang Ren. I2-World: Intra-inter tokeniza-
+tion for efficient dynamic 4D scene forecasting. In Proceed-
+ings of the IEEE/CVF International Conference on Com-
+puter Vision (ICCV), pages 25810–25819, 2025. 2
+[21] Tsung-Yi Lin, Piotr Doll´ar, Ross Girshick, Kaiming He,
+Bharath Hariharan, and Serge Belongie.
+Feature pyramid
+networks for object detection. In Proceedings of the IEEE
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 2117–2125, 2017. 6
+[22] Xuewu Lin, Tianwei Lin, Zixiang Pei, Lichao Huang, and
+Zhizhong Su. Sparse4D v2: Recurrent temporal fusion with
+sparse model, 2023. arXiv:2305.14018. 1
+[23] Haisong Liu, Yang Chen, Haiguang Wang, Zetong Yang,
+Tianyu Li, Jia Zeng, Li Chen, Hongyang Li, and Limin
+Wang. Fully sparse 3D occupancy prediction. In Computer
+Vision – ECCV 2024, 2024. 1, 2
+[24] Junyi Ma, Xieyuanli Chen, Jiawei Huang, Jingyi Xu, Zhen
+Luo, Jintao Xu, Weihao Gu, Rui Ai, and Hesheng Wang.
+Cam4DOcc:
+Benchmark for camera-only 4D occupancy
+forecasting in autonomous driving applications. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), pages 21486–21495, 2024. 2
+[25] Qihang Ma, Xin Tan, Yanyun Qu, Lizhuang Ma, Zhizhong
+Zhang, and Yuan Xie. COTR: Compact occupancy TRans-
+former for vision-based 3D occupancy prediction. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition (CVPR), pages 19936–19945, 2024.
+2
+[26] Jinhyung Park, Chensheng Peng, Yihan Hu, Wenzhao
+Zheng, Kris Kitani, and Wei Zhan. S2GO: Streaming sparse
+Gaussian occupancy. In International Conference on Learn-
+ing Representations (ICLR), 2026. 1
+[27] Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang,
+Haoran Wu, and Sifa Zheng.
+SparseDrive:
+End-to-end
+autonomous driving via sparse scene representation.
+In
+IEEE International Conference on Robotics and Automation
+(ICRA), pages 8795–8801, 2025. 1
+[28] Xiaoyu Tian, Tao Jiang, Longfei Yun, Yucheng Mao,
+Huitong Yang, Yue Wang, Yilun Wang, and Hang Zhao.
+Occ3D: A large-scale 3D occupancy prediction benchmark
+for autonomous driving. In Advances in Neural Information
+Processing Systems, 2023. 2, 6
+[29] Wenwen Tong, Chonghao Sima, Tai Wang, Li Chen, Silei
+Wu, Hanming Deng, Yi Gu, Lewei Lu, Ping Luo, Dahua Lin,
+and Hongyang Li. Scene as occupancy. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision
+(ICCV), pages 8406–8415, 2023. 2, 8
+[30] Hedwig von Restorff. ¨Uber die Wirkung von Bereichsbildun-
+gen im Spurenfeld. Psychologische Forschung, 18:299–342,
+1933. 1
+[31] Jiabao Wang, Zhaojiang Liu, Qiang Meng, Liujiang Yan,
+Ke Wang, Jie Yang, Wei Liu, Qibin Hou, and Ming-Ming
+Cheng. OPUS: Occupancy prediction using a sparse set. In
+Advances in Neural Information Processing Systems, 2024.
+1, 2
+[32] Yuqi Wang, Yuntao Chen, Xingyu Liao, Lue Fan, and Zhaox-
+iang Zhang. PanoOcc: Unified occupancy representation for
+camera-based 3D panoptic segmentation. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 17158–17168, 2024. 2
+[33] Yuping Wang, Xiangyu Huang, Xiaokang Sun, Mingxuan
+Yan, Shuo Xing, Zhengzhong Tu, and Jiachen Li. UniOcc: A
+unified benchmark for occupancy forecasting and prediction
+in autonomous driving.
+In Proceedings of the IEEE/CVF
+International Conference on Computer Vision (ICCV), pages
+25560–25570, 2025. 2
+[34] Yi Wei, Linqing Zhao, Wenzhao Zheng, Zheng Zhu, Jie
+Zhou, and Jiwen Lu. SurroundOcc: Multi-camera 3D oc-
+cupancy prediction for autonomous driving. In Proceedings
+of the IEEE/CVF International Conference on Computer Vi-
+sion (ICCV), pages 21729–21740, 2023. 1, 2
+[35] Jingyi Xu, Xieyuanli Chen, Junyi Ma, Jiawei Huang, Jintao
+Xu, Yue Wang, and Ling Pei. Spatiotemporal decoupling for
+efficient vision-based occupancy forecasting. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 22338–22347, 2025. 1, 2
+[36] Ziyang Yan, Wenzhen Dong, Yihua Shao, Yuhang Lu,
+Haiyang Liu, Jingwen Liu, Haozhe Wang, Zhe Wang,
+Yan Wang, Fabio Remondino, and Yuexin Ma.
+Render-
+World: World model with self-supervised 3D label. In 2025
+IEEE International Conference on Robotics and Automation
+(ICRA), pages 6063–6070, 2025. 6, 7, 8
+[37] Zhenya Yang, Zhe Liu, Yuxiang Lu, Liping Hou, Chenxuan
+Miao, Siyi Peng, Bailan Feng, Xiang Bai, and Hengshuang
+Zhao.
+GenieDrive: Towards physics-aware driving world
+model with 4D occupancy guided video generation. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+10
+
+
+and Pattern Recognition (CVPR), pages 35680–35690, 2026.
+1
+[38] Haiming Zhang, Ying Xue, Xu Yan, Jiacheng Zhang, We-
+ichao Qiu, Dongfeng Bai, Bingbing Liu, Shuguang Cui,
+and Zhen Li. An efficient occupancy world model via de-
+coupled dynamic flow and image-assisted training, 2024.
+arXiv:2412.13772. 7
+[39] Yunpeng Zhang, Zheng Zhu, Wenzhao Zheng, Junjie Huang,
+Guan Huang, Jie Zhou, and Jiwen Lu. BEVerse: Unified per-
+ception and prediction in birds-eye-view for vision-centric
+autonomous driving, 2022. arXiv:2205.09743. 1
+[40] Wenzhao Zheng, Weiliang Chen, Yuanhui Huang, Borui
+Zhang, Yueqi Duan, and Jiwen Lu.
+OccWorld: Learning
+a 3D occupancy world model for autonomous driving. In
+Computer Vision – ECCV 2024, pages 55–72, 2024. 1, 2, 6,
+7, 8
+[41] Yiyao Zhu, Ying Xue, Haiming Zhang, Guangfeng Jiang,
+Wending Zhou, Xu Yan, Jiantao Gao, Yingjie Cai, Bingbing
+Liu, Zhen Li, and Shaojie Shen. DLWM: Dual latent world
+models enable holistic Gaussian-centric pre-training in au-
+tonomous driving. In Proceedings of the IEEE/CVF Confer-
+ence on Computer Vision and Pattern Recognition (CVPR),
+pages 39713–39723, 2026. 1, 2
+[42] Sicheng Zuo, Wenzhao Zheng, Yuanhui Huang, Jie Zhou,
+and Jiwen Lu.
+GaussianWorld:
+Gaussian world model
+for streaming 3D occupancy prediction. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 6772–6781, 2025. 1, 2
+11

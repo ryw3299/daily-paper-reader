@@ -1,0 +1,39 @@
+{
+  "label": "2026-11-28",
+  "date": "2026-11-28",
+  "generated_at": "2026-11-28T02:12:10",
+  "count": 2,
+  "papers": [
+    {
+      "paper_id": "202611/28/2611.34188v1-mine-a-training-free-defense-against-indirect-prompt-injection-via-mutual-information-and-embedding-variance",
+      "section": "quick",
+      "title_en": "MINE: A Training-Free Defense against Indirect Prompt Injection via Mutual Information and Embedding Variance",
+      "authors": "Truong Phan, Ngoc-Quan Pham, Dat Quoc Nguyen",
+      "date": "2026-11-25",
+      "pdf": "https://arxiv.org/pdf/2611.34188v1",
+      "score": "7.0",
+      "evidence": "针对检索增强生成中间接提示注入的防御",
+      "tldr": "RAG中间接提示注入防御多为被动式：提示工程易被覆盖，监督检测器需随攻击重训。MINE提出免训练、攻击无关的新范式：不检测攻击，而通过互信息与嵌入方差最大化相关性，并兼作查询条件重排器。作者构建长上下文基准LC-Inj-SQuAD，在四个数据集上取得免训练防御最佳准确率-安全权衡。它还能抵御完全自适应攻击、泛化到工具调用注入，并降低长上下文推理延迟。",
+      "tags": "query:kg-rag-agent",
+      "abstract_en": "Existing defenses against indirect prompt injection in retrieval-augmented generation (RAG) are inherently reactive: prompt-engineering methods are often overridden by the injected instructions, while supervised detectors must be retrained for each new attack style. We propose a different paradigm: defend by maximizing relevance, not by detecting attacks. Our method, MINE, is training-free and attack-agnostic, and it also serves as a query-conditioned reranker. To evaluate defenses under realistic conditions, we introduce LC-Inj-SQuAD, a long-context benchmark with an average of 4,032 words per context. We evaluate on four datasets spanning short-context QA (Inj-SQuAD, Inj-TriviaQA), long-context QA (LC-Inj-SQuAD), and agent tool-call injection (InjecAgent). Across all four, MINE achieves the best accuracy--security trade-off among training-free defenses. It is also the only defense that stays usable against a fully adaptive attacker, generalizes to agent tool-call injection, and achieves the lowest inference latency on long contexts.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/28/2611.32745v1-memanchorworld-a-sparse-world-model-with-horizon-conditioned-memory-retrieval-for-autonomous-driving",
+      "section": "quick",
+      "title_en": "MemAnchorWorld: A Sparse World Model with Horizon-Conditioned Memory Retrieval for Autonomous Driving",
+      "authors": "Xinyang Jia, Yuqi Zhang, Jiakai Wang, Yahu Yang, Guandong Pan, Chao Tong, Xianglong Liu",
+      "date": "2026-11-24",
+      "pdf": "https://arxiv.org/pdf/2611.32745v1",
+      "score": "6.0",
+      "evidence": "面向驾驶占用预测的稀疏世界模型与记忆检索",
+      "tldr": "稀疏世界模型用少量演化查询预测4D语义占据，但历史信息只能隐式承载于场景状态，误差会逐步累积。MemAnchorWorld受von Restorff效应启发，引入按预测时刻条件化的层次化双路径记忆锚检索，结合查询级候选选择与点级记忆锚检索显式调取历史几何与语义证据。在Occ3D-nuScenes上1-3秒预测horizon平均mIoU达13.55%、平均IoU达22.84%，两项指标均取得最优。该工作为长时程稀疏占据预测提供了显式历史检索的新思路。",
+      "tags": "query:self-driving",
+      "abstract_en": "Sparse world models for 4D semantic occupancy forecasting represent scenes with a small set of evolving queries to efficiently predict future geometry and semantics for autonomous driving. However, existing sparse world models face a bottleneck in using historical temporal evidence for long-horizon forecasting. They rely on scene states to carry historical information implicitly, allowing errors to propagate and accumulate across successive forecasting steps and causing geometric and semantic deviations. To address this limitation, we present MemAnchorWorld, a sparse occupancy world model that explicitly retrieves relevant historical geometric and semantic evidence for 4D semantic occupancy forecasting. Inspired by the von Restorff effect, we introduce a forecast-time-conditioned hierarchical dual-path memory-anchor retrieval mechanism. Guided by the effective age and semantic compatibility of historical information, it combines query-level candidate selection with point-level memory-anchor retrieval to provide historical evidence for sparse points at different forecast times. To better use memory anchors and existing features, a point-level residual adapter jointly gated by the task and forecast time separately controls residual corrections to semantics, occupancy confidence, and spatial positions. On Occ3D-nuScenes, MemAnchorWorld achieves an average mIoU of 13.55% and an average IoU of 22.84% across the 1-3 s forecasting horizons, attaining state-of-the-art performance on both metrics.Project page: https://memanchorworld.github.io/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
